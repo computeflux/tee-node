@@ -1,0 +1,41 @@
+{
+    "exe": "dsecret",
+    "key": "./keys/private.pem",
+    "debug": true,
+    "heapSize": 512,
+    "executableHeap": false,
+    "productID": 1,
+    "securityVersion": 1,
+    "mounts": [
+        {
+            "source": "/chain_data",
+            "target": "/chain_data",
+            "type": "hostfs",
+            "readOnly": false
+        }
+    ],
+    "env": [
+        {
+            "name": "SIDE_CHAIN_PORT",
+            "fromHost": true
+        },
+        {
+            "name": "SIDE_CHAIN_ADDR",
+            "fromHost": true
+        },
+        {
+            "name": "GQL_PORT",
+            "fromHost": true
+        },
+        {
+            "name": "CHAIN_ENV",
+            "fromHost": true
+        }
+    ],
+    "files": [
+        {
+            "source": "/etc/ssl/certs/ca-certificates.crt",
+            "target": "/etc/ssl/certs/ca-certificates.crt"
+        }
+    ]
+}

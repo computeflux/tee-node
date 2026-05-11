@@ -1,0 +1,4078 @@
+{
+  "contract": {
+    "name": "subnet",
+    "version": "0.1.0"
+  },
+  "image": null,
+  "source": {
+    "compiler": "rustc",
+    "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "language": "wrevive"
+  },
+  "spec": {
+    "constructors": [
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "Subnet 合约构造函数。",
+          "",
+          "该函数在合约部署时自动调用，创建一个新的 Subnet 合约实例。",
+          "当前实现为空操作，合约的初始化逻辑由 `init` 函数完成。",
+          "",
+          "# 调用权限",
+          "任何人（由部署器在合约部署时自动调用）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：构造成功。"
+        ],
+        "label": "new",
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 2
+        },
+        "selector": "0x00000000"
+      }
+    ],
+    "docs": [],
+    "environment": {
+      "accountId": {
+        "displayName": [
+          "[u8; 32]"
+        ],
+        "type": 23
+      },
+      "balance": {
+        "displayName": [
+          "Balance"
+        ],
+        "type": 37
+      },
+      "blockNumber": {
+        "displayName": [
+          "BlockNumber"
+        ],
+        "type": 5
+      },
+      "hash": {
+        "displayName": [
+          "Hash"
+        ],
+        "type": 69
+      },
+      "nativeToEthRatio": 100000000,
+      "staticBufferSize": 16384,
+      "timestamp": {
+        "displayName": [
+          "Timestamp"
+        ],
+        "type": 19
+      }
+    },
+    "events": [],
+    "lang_error": {
+      "displayName": [
+        "ink",
+        "LangError"
+      ],
+      "type": 3
+    },
+    "messages": [
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "初始化 Subnet 合约。",
+          "",
+          "设置治理合约地址（调用者自身）、epoch 相关参数、各类 ID 计数器的初始值等。",
+          "该函数只能执行一次，若已初始化则直接返回成功而不做任何修改。",
+          "",
+          "# 调用权限",
+          "任何人（仅在首次调用时有效，调用者将被记录为治理合约地址）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：初始化成功或已经初始化过。"
+        ],
+        "label": "init",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x25b9ac95"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询当前的 epoch 信息。",
+          "",
+          "返回当前 epoch 编号、epoch 间隔（区块数）、上一个 epoch 的区块高度、",
+          "当前区块时间戳以及侧链多签地址等关键信息。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `EpochInfo`：包含 epoch 编号、epoch_slot、last_epoch_block、now、side_chain_pub 的结构体。"
+        ],
+        "label": "epoch_info",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 11
+        },
+        "selector": "0xdd2be194"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "epoch_slot",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置 epoch 的区块间隔（slot）。",
+          "",
+          "修改两次 epoch 切换之间所需经过的区块数量。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `epoch_slot`：新的 epoch 间隔区块数。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_epoch_slot",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x6c9fe8a0"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询侧链多签地址。",
+          "",
+          "返回当前设置的侧链多签公钥地址，用于验证侧链发起的调用。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Address`：侧链多签地址，若未设置则返回零地址。"
+        ],
+        "label": "side_chain_key",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 12
+        },
+        "selector": "0x334cf907"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "注册一个新的区域（Region）。",
+          "",
+          "为 Subnet 网络新增一个地理或逻辑区域，区域 ID 自增分配，",
+          "可用于后续 Worker 注册时选择所属区域。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `name`：区域名称（字节数组）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：区域设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_region",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x2c69fd19"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "根据区域 ID 查询区域名称。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `id`：区域 ID。",
+          "",
+          "# 返回值",
+          "- `Some(Bytes)`：该区域对应的名称。",
+          "- `None`：区域不存在。"
+        ],
+        "label": "region",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 15
+        },
+        "selector": "0x90524f41"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "列出所有已注册的区域。",
+          "",
+          "返回所有区域的 ID 和名称列表，按 ID 降序排列，最多返回 1000 条记录。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Vec<(u32, Bytes)>`：区域 ID 与名称的列表，降序排列，最多 1000 条。"
+        ],
+        "label": "regions",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 18
+        },
+        "selector": "0xb11965c1"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "level",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 7
+            }
+          },
+          {
+            "docs": [],
+            "label": "price",
+            "type": {
+              "displayName": [
+                "RunPrice"
+              ],
+              "type": 20
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置指定等级的运行价格。",
+          "",
+          "为 Worker 的不同等级配置对应的运行定价信息。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `level`：Worker 等级（如 0, 1, 2 ...）。",
+          "- `price`：该等级对应的运行价格结构体。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_level_price",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x7159e191"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "level",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 7
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "查询指定等级的运行价格。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `level`：Worker 等级。",
+          "",
+          "# 返回值",
+          "- `Some(RunPrice)`：该等级对应的价格信息。",
+          "- `None`：该等级价格未设置。"
+        ],
+        "label": "level_price",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 22
+        },
+        "selector": "0x99df4df3"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "info",
+            "type": {
+              "displayName": [
+                "AssetInfo"
+              ],
+              "type": 25
+            }
+          },
+          {
+            "docs": [],
+            "label": "price",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "注册一种新的资产。",
+          "",
+          "新增一种可用于 Worker 抵押的资产类型，并为其设置单价。",
+          "资产 ID 自增分配。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `info`：资产信息结构体（如资产名称、精度等）。",
+          "- `price`：资产单价（U256）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：资产注册成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_asset",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x4fbded83"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "根据资产 ID 查询资产信息及价格。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `id`：资产 ID。",
+          "",
+          "# 返回值",
+          "- `Some((AssetInfo, U256))`：资产信息和单价。",
+          "- `None`：资产不存在。"
+        ],
+        "label": "asset",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 29
+        },
+        "selector": "0x48139d63"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "addr",
+            "type": {
+              "displayName": [
+                "Address"
+              ],
+              "type": 9
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置 Cloud 合约地址。",
+          "",
+          "Cloud 合约用于发起对 Worker 抵押的罚没（slash）操作。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `addr`：Cloud 合约的地址。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_cloud_contract",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x2316651f"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询当前设置的 Cloud 合约地址。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Address`：Cloud 合约地址，若未设置则返回零地址。"
+        ],
+        "label": "cloud_contract",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 12
+        },
+        "selector": "0x8b70fb23"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置全局最小抵押金额。",
+          "",
+          "Worker 启动时必须满足总抵押金额不低于该值。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `amount`：最小抵押金额（U256）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_min_mortgage",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x0d1e75a9"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询全局最小抵押金额。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `U256`：当前全局最小抵押金额，若未设置则返回 0。"
+        ],
+        "label": "min_mortgage",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 30
+        },
+        "selector": "0xd4a4e1ac"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "level",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 7
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置指定等级的最小抵押金额。",
+          "",
+          "可为不同等级的 Worker 设置不同的最低抵押要求，",
+          "若某等级未单独设置，则回退到全局最小抵押金额。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `level`：Worker 等级。",
+          "- `amount`：该等级对应的最小抵押金额。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_level_min_mortgage",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0xb752c615"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "level",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 7
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "查询指定等级的最小抵押金额。",
+          "",
+          "优先返回该等级单独设置的值；若未设置，则返回全局最小抵押金额；",
+          "若全局也未设置，则返回 0。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `level`：Worker 等级。",
+          "",
+          "# 返回值",
+          "- `U256`：该等级的最小抵押金额。"
+        ],
+        "label": "level_min_mortgage",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 30
+        },
+        "selector": "0xe11eb329"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "worker_id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "计算指定 Worker 已抵押的总资源量。",
+          "",
+          "遍历该 Worker 的所有有效抵押记录，累加 CPU、内存、CVM CPU、CVM 内存、磁盘和 GPU 资源。",
+          "已标记为删除（deleted）的抵押记录不参与计算。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `worker_id`：Worker 的唯一 ID。",
+          "",
+          "# 返回值",
+          "- `(cpu, mem, cvm_cpu, cvm_mem, disk, gpu)`：六种资源的总量元组。"
+        ],
+        "label": "worker_total_resources",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 32
+        },
+        "selector": "0x1be9202d"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "worker_id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "计算指定 Worker 已抵押的总资产金额。",
+          "",
+          "遍历该 Worker 的所有有效抵押记录，累加抵押金额。",
+          "已标记为删除（deleted）的抵押记录不参与计算。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `worker_id`：Worker 的唯一 ID。",
+          "",
+          "# 返回值",
+          "- `U256`：该 Worker 当前有效的总抵押金额。"
+        ],
+        "label": "worker_total_mortgage",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 30
+        },
+        "selector": "0x340487c0"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "worker_id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          },
+          {
+            "docs": [],
+            "label": "to",
+            "type": {
+              "displayName": [
+                "Address"
+              ],
+              "type": 9
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "罚没（slash）指定 Worker 的抵押资产。",
+          "",
+          "从该 Worker 的抵押记录中按顺序扣除指定金额，将被扣除的代币转账到指定地址。",
+          "若某条抵押记录金额不足，则继续扣除下一条，直到满足罚没金额为止。",
+          "被完全扣除的记录会被标记为删除。",
+          "",
+          "# 调用权限",
+          "仅 Cloud 合约可调用。",
+          "",
+          "# 参数",
+          "- `worker_id`：目标 Worker 的 ID。",
+          "- `amount`：需要罚没的总金额。",
+          "- `to`：罚没资金接收地址。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：罚没成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是 Cloud 合约。",
+          "- `Err(Error::SlashAmountTooLarge)`：罚没金额超过实际抵押总额。",
+          "- `Err(Error::WorkerMortgageNotExist)`：抵押记录不存在。",
+          "- `Err(Error::TransferFailed)`：转账失败。"
+        ],
+        "label": "slash_worker_mortgage",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x174e58ad"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "根据 Worker ID 查询 Worker 详情。",
+          "",
+          "返回的 Worker 信息中包含从 `WORKER_STATUS` 映射中实时读取的状态字段。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `id`：Worker 的唯一 ID。",
+          "",
+          "# 返回值",
+          "- `Some(K8sCluster)`：Worker 详细信息（含实时状态）。",
+          "- `None`：Worker 不存在。"
+        ],
+        "label": "worker",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 42
+        },
+        "selector": "0xb5af8668"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "start",
+            "type": {
+              "displayName": [
+                "Option"
+              ],
+              "type": 43
+            }
+          },
+          {
+            "docs": [],
+            "label": "size",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "分页列出 Worker 列表。",
+          "",
+          "按 Worker ID 降序排列返回 Worker 信息，支持分页查询。",
+          "`start=None` 表示从最新的 Worker 开始查询。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `start`：起始 Worker ID（可选），`None` 表示从最新开始。",
+          "- `size`：本次查询返回的最大数量。",
+          "",
+          "# 返回值",
+          "- `Vec<(u64, K8sCluster)>`：Worker ID 与详细信息的列表。"
+        ],
+        "label": "workers",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 46
+        },
+        "selector": "0x38269b2d"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "user",
+            "type": {
+              "displayName": [
+                "Address"
+              ],
+              "type": 9
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "根据用户地址查询其拥有的 Worker。",
+          "",
+          "通过 `OWNER_OF_WORKER` 映射查找用户对应的 Worker ID，再返回 Worker 详情。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `user`：用户地址。",
+          "",
+          "# 返回值",
+          "- `Some((u64, K8sCluster))`：用户拥有的 Worker ID 及详细信息。",
+          "- `None`：该用户未拥有 Worker。"
+        ],
+        "label": "user_worker",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 48
+        },
+        "selector": "0xf540bb72"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 35
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "根据 P2P/Mint ID 查询对应的 Worker。",
+          "",
+          "通过 `MINT_OF_WORKER` 映射查找 P2P ID 对应的 Worker ID，再返回 Worker 详情。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 参数",
+          "- `id`：Worker 的 P2P ID（AccountId 类型）。",
+          "",
+          "# 返回值",
+          "- `Some((u64, K8sCluster))`：Worker ID 及详细信息。",
+          "- `None`：不存在对应 Worker。"
+        ],
+        "label": "mint_worker",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 48
+        },
+        "selector": "0x25433b3a"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "p2p_id",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 35
+            }
+          },
+          {
+            "docs": [],
+            "label": "ip",
+            "type": {
+              "displayName": [
+                "Ip"
+              ],
+              "type": 39
+            }
+          },
+          {
+            "docs": [],
+            "label": "port",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "level",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 7
+            }
+          },
+          {
+            "docs": [],
+            "label": "region_id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "注册一个新的 Worker 节点。",
+          "",
+          "调用者成为该 Worker 的拥有者，P2P ID 与 Worker ID 绑定。",
+          "每个地址只能注册一个 Worker。Worker 初始状态为 0（未启动）。",
+          "",
+          "# 调用权限",
+          "任何人（每个地址限注册一个 Worker）。",
+          "",
+          "# 参数",
+          "- `name`：Worker 名称。",
+          "- `p2p_id`：Worker 的 P2P 身份 ID。",
+          "- `ip`：Worker 的网络 IP 地址。",
+          "- `port`：Worker 的服务端口。",
+          "- `level`：Worker 等级。",
+          "- `region_id`：所属区域 ID（必须已存在）。",
+          "",
+          "# 返回值",
+          "- `Ok(NodeID)`：新注册的 Worker ID。",
+          "- `Err(Error::RegionNotExist)`：指定的区域不存在。"
+        ],
+        "label": "worker_register",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 50
+        },
+        "selector": "0x67b84412"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "ip",
+            "type": {
+              "displayName": [
+                "Ip"
+              ],
+              "type": 39
+            }
+          },
+          {
+            "docs": [],
+            "label": "port",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "更新 Worker 的基本信息。",
+          "",
+          "允许 Worker 拥有者修改 Worker 的名称、IP 地址和端口。",
+          "",
+          "# 调用权限",
+          "仅 Worker 拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：目标 Worker 的 ID。",
+          "- `name`：新的 Worker 名称。",
+          "- `ip`：新的 IP 地址。",
+          "- `port`：新的服务端口。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：更新成功。",
+          "- `Err(Error::WorkerNotExist)`：Worker 不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是该 Worker 的拥有者。"
+        ],
+        "label": "worker_update",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x76cb4d39"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "cpu",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "mem",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "cvm_cpu",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "cvm_mem",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "disk",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "gpu",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          },
+          {
+            "docs": [],
+            "label": "deposit",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "为 Worker 添加资源抵押。",
+          "",
+          "Worker 拥有者通过向合约转入代币来抵押资源。抵押时需声明 CPU、内存、CVM CPU、CVM 内存、",
+          "磁盘和 GPU 数量。实际转账金额必须大于等于声明的 `deposit` 金额。",
+          "Worker 必须处于未启动状态（status == 0）才能抵押。",
+          "",
+          "# 调用权限",
+          "仅 Worker 拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：Worker ID。",
+          "- `cpu`：抵押的 CPU 资源量。",
+          "- `mem`：抵押的内存资源量。",
+          "- `cvm_cpu`：抵押的 CVM CPU 资源量。",
+          "- `cvm_mem`：抵押的 CVM 内存资源量。",
+          "- `disk`：抵押的磁盘资源量。",
+          "- `gpu`：抵押的 GPU 资源量。",
+          "- `deposit`：声明的抵押金额（实际转账金额必须 ≥ 此值）。",
+          "",
+          "# 返回值",
+          "- `Ok(u32)`：新创建的抵押记录 ID。",
+          "- `Err(Error::WorkerNotExist)`：Worker 不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是拥有者。",
+          "- `Err(Error::WorkerStatusNotReady)`：Worker 已启动，不可抵押。",
+          "- `Err(Error::DepositNotEnough)`：实际转账金额不足。"
+        ],
+        "label": "worker_mortgage",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 52
+        },
+        "selector": "0x7d55701a"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "worker_id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "mortgage_id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "解除 Worker 的指定抵押记录并退还资金。",
+          "",
+          "将指定的抵押记录标记为删除，并将该记录对应的抵押金额全额退还给 Worker 拥有者。",
+          "Worker 必须处于未启动状态（status == 0）才能解抵押。",
+          "",
+          "# 调用权限",
+          "仅 Worker 拥有者可调用。",
+          "",
+          "# 参数",
+          "- `worker_id`：Worker ID。",
+          "- `mortgage_id`：要解除的抵押记录 ID。",
+          "",
+          "# 返回值",
+          "- `Ok(u32)`：已解除的抵押记录 ID。",
+          "- `Err(Error::WorkerNotExist)`：Worker 不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是拥有者。",
+          "- `Err(Error::WorkerStatusNotReady)`：Worker 已启动，不可解抵押。",
+          "- `Err(Error::WorkerMortgageNotExist)`：抵押记录不存在。",
+          "- `Err(Error::TransferFailed)`：退款转账失败。"
+        ],
+        "label": "worker_unmortgage",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 52
+        },
+        "selector": "0xa82a4c16"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "启动 Worker。",
+          "",
+          "侧链调用此函数将 Worker 状态置为 1（运行中）。",
+          "启动前会校验 Worker 的总抵押金额是否达到对应等级的最低要求，",
+          "并校验 Worker 是否至少抵押了一种资源（CPU、内存、磁盘、GPU 等）。",
+          "",
+          "# 调用权限",
+          "仅侧链多签地址（side_chain）可调用。",
+          "",
+          "# 参数",
+          "- `id`：要启动的 Worker ID。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：启动成功。",
+          "- `Err(Error::WorkerNotExist)`：Worker 不存在。",
+          "- `Err(Error::InvalidSideChainCaller)`：调用者不是侧链多签地址。",
+          "- `Err(Error::MortgageNotEnough)`：抵押金额不足。",
+          "- `Err(Error::ResourceNotEnough)`：未抵押任何资源。"
+        ],
+        "label": "worker_start",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x809a9d5f"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "申请停止 Worker。",
+          "",
+          "Worker 拥有者可以停止运行中的 Worker（status == 1），将状态置为已停止（status == 2）。",
+          "停止后抵押金可通过 `worker_unmortgage` 逐笔解除并退还。",
+          "注意：停止并不自动退还抵押金，需调用方后续手动解除；",
+          "Slash 机制在 Worker 停止后仍可对剩余抵押金执行罚没。",
+          "",
+          "# 调用权限",
+          "仅 Worker 拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：要停止的 Worker ID。",
+          "",
+          "# 返回值",
+          "- `Ok(NodeID)`：停止成功，返回 Worker ID。",
+          "- `Err(Error::WorkerNotExist)`：Worker 不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是拥有者。",
+          "- `Err(Error::WorkerStatusNotReady)`：Worker 未处于运行状态（status != 1），无法停止。"
+        ],
+        "label": "worker_stop",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 50
+        },
+        "selector": "0xc2391e1b"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "nodes",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 53
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "设置引导节点（Boot Nodes）列表。",
+          "",
+          "引导节点用于网络发现和初始化连接。传入的节点 ID 列表会自动去重并排序。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `nodes`：引导节点 ID 列表（Secret Node ID 数组）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：设置成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "set_boot_nodes",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0xd26c4384"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询当前的引导节点列表。",
+          "",
+          "根据 `BOOT_NODES` 中存储的 ID 列表，从 `SECRETS` 映射中查询对应的 SecretNode 详情并返回。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Ok(Vec<SecretNode>)`：引导节点的详细信息列表。"
+        ],
+        "label": "boot_nodes",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 57
+        },
+        "selector": "0xa60cc5c0"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "获取当前待处理的 Secret 节点变更列表。",
+          "",
+          "返回 pending_secrets 中所有记录，包含 Secret Node ID 和对应的权重（power）。",
+          "这些记录将在下一个 epoch 被合并到运行中的验证者集合。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Vec<(u64, u32)>`：待处理 Secret 节点 ID 与权重的列表。"
+        ],
+        "label": "get_pending_secrets",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 60
+        },
+        "selector": "0xbc8e5d44"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "列出所有已注册的 Secret 节点。",
+          "",
+          "返回所有 Secret Node 的 ID 和详细信息，按 ID 降序排列，最多返回 10000 条记录。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Vec<(u64, SecretNode)>`：Secret Node ID 与详细信息的列表。"
+        ],
+        "label": "secrets",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 63
+        },
+        "selector": "0xf3e23961"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "validator_id",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 35
+            }
+          },
+          {
+            "docs": [],
+            "label": "p2p_id",
+            "type": {
+              "displayName": [
+                "AccountId"
+              ],
+              "type": 35
+            }
+          },
+          {
+            "docs": [],
+            "label": "ip",
+            "type": {
+              "displayName": [
+                "Ip"
+              ],
+              "type": 39
+            }
+          },
+          {
+            "docs": [],
+            "label": "port",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "注册一个新的 Secret 节点。",
+          "",
+          "调用者成为该 Secret 节点的拥有者。节点初始状态为 0。",
+          "第一个注册的 Secret 节点（id == 0）会自动被加入运行中的验证者集合。",
+          "",
+          "# 调用权限",
+          "任何人（每个地址限注册一个 Secret 节点）。",
+          "",
+          "# 参数",
+          "- `name`：Secret 节点名称。",
+          "- `validator_id`：验证者身份 ID。",
+          "- `p2p_id`：P2P 网络身份 ID。",
+          "- `ip`：节点 IP 地址。",
+          "- `port`：节点服务端口号。",
+          "",
+          "# 返回值",
+          "- `Ok(NodeID)`：新注册的 Secret 节点 ID。"
+        ],
+        "label": "secret_register",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 50
+        },
+        "selector": "0xbd9b2eb3"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "ip",
+            "type": {
+              "displayName": [
+                "Ip"
+              ],
+              "type": 39
+            }
+          },
+          {
+            "docs": [],
+            "label": "port",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 5
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "更新 Secret 节点的基本信息。",
+          "",
+          "允许 Secret 节点拥有者修改节点名称、IP 地址和端口。",
+          "",
+          "# 调用权限",
+          "仅 Secret 节点拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：Secret 节点 ID。",
+          "- `name`：新的节点名称。",
+          "- `ip`：新的 IP 地址。",
+          "- `port`：新的服务端口号。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：更新成功。",
+          "- `Err(Error::NodeNotExist)`：节点不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是节点拥有者。"
+        ],
+        "label": "secret_update",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x3f9286d7"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          },
+          {
+            "docs": [],
+            "label": "deposit",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 26
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "向 Secret 节点追加抵押（存款）。",
+          "",
+          "Secret 节点拥有者可以增加该节点的抵押金额。注意：此函数目前仅从调用参数中读取金额，",
+          "并未检查实际转账金额，具体存款逻辑可能需要配合前端或其他合约调用。",
+          "",
+          "# 调用权限",
+          "仅 Secret 节点拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：Secret 节点 ID。",
+          "- `deposit`：要追加的抵押金额。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：存款成功。",
+          "- `Err(Error::NodeNotExist)`：节点不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是节点拥有者。"
+        ],
+        "label": "secret_deposit",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x51685fb5"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "删除（注销）Secret 节点。",
+          "",
+          "将 Secret 节点标记为终止状态（设置 terminal_block）。",
+          "删除前会检查该节点是否处于运行中或待处理列表，且抵押金额必须为 0。",
+          "",
+          "# 调用权限",
+          "仅 Secret 节点拥有者可调用。",
+          "",
+          "# 参数",
+          "- `id`：要删除的 Secret 节点 ID。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：删除成功。",
+          "- `Err(Error::NodeNotExist)`：节点不存在。",
+          "- `Err(Error::WorkerNotOwnedByCaller)`：调用者不是节点拥有者。",
+          "- `Err(Error::NodeIsRunning)`：节点仍在运行中或有抵押未清。"
+        ],
+        "label": "secret_delete",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0xc3c405f0"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询当前运行中的验证者列表。",
+          "",
+          "返回当前 epoch 中正在运行的所有 Secret 验证者节点，包含节点 ID、节点详情和权重（power）。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Vec<(u64, SecretNode, u32)>`：验证者 ID、节点详情和权重的列表。"
+        ],
+        "label": "validators",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 66
+        },
+        "selector": "0x9e0b225c"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "将指定 Secret 节点加入验证者集合（待处理）。",
+          "",
+          "将目标节点以权重 1 加入 `PENDING_VALIDATORS`。若该节点已在待处理列表中，",
+          "则将其权重设为 1。该变更将在下一个 epoch 生效。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `id`：要加入验证者集合的 Secret 节点 ID。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：操作成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。",
+          "- `Err(Error::NodeNotExist)`：节点不存在。"
+        ],
+        "label": "validator_join",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x3fd6f795"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "NodeID"
+              ],
+              "type": 33
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "将指定 Secret 节点从验证者集合中移除（待处理）。",
+          "",
+          "将目标节点以权重 0 加入 `PENDING_VALIDATORS`。若该节点已在待处理列表中，",
+          "则将其权重设为 0（表示移除）。该变更将在下一个 epoch 生效。",
+          "",
+          "# 调用权限",
+          "仅治理合约（gov）可调用。",
+          "",
+          "# 参数",
+          "- `id`：要从验证者集合中移除的 Secret 节点 ID。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：操作成功。",
+          "- `Err(Error::MustCallByMainContract)`：调用者不是治理合约。"
+        ],
+        "label": "validator_delete",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x6cb75fa6"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "_node_id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "推进到下一个 epoch 并更新验证者集合。",
+          "",
+          "侧链调用此函数来触发 epoch 切换。首次调用时会将调用者地址记录为侧链多签地址；",
+          "后续调用必须由该多签地址发起。调用时需满足距离上一个 epoch 已超过 `epoch_slot` 区块数。",
+          "epoch 切换后会调用 `calc_new_validators` 合并 pending 列表，更新运行中的验证者集合。",
+          "",
+          "# 调用权限",
+          "首次调用可为任何人（将调用者设为侧链多签地址）；后续仅侧链多签地址可调用。",
+          "",
+          "# 参数",
+          "- `_node_id`：节点 ID（当前未使用，保留用于未来扩展）。",
+          "",
+          "# 返回值",
+          "- `Ok(())`：epoch 切换成功。",
+          "- `Err(Error::InvalidSideChainCaller)`：调用者不是已记录的侧链多签地址。",
+          "- `Err(Error::EpochNotExpired)`：当前 epoch 尚未到期。"
+        ],
+        "label": "set_next_epoch",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x57c9fedf"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询下一个 epoch 的预期验证者集合。",
+          "",
+          "模拟 epoch 切换后的验证者集合：将运行中的验证者与待处理列表合并，",
+          "过滤掉权重为 0 的节点，返回最终的验证者列表。",
+          "此函数仅做模拟计算，不会修改任何状态。",
+          "",
+          "# 调用权限",
+          "任何人（只读查询）。",
+          "",
+          "# 返回值",
+          "- `Ok(Vec<(u64, SecretNode, u32)>)`：下一个 epoch 的验证者 ID、详情和权重列表。",
+          "- `Err(Error::EpochNotExpired)`：当前 epoch 尚未接近到期（距离上次 epoch 不足 `epoch_slot - 5` 个区块）。"
+        ],
+        "label": "next_epoch_validators",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 68
+        },
+        "selector": "0xf05b9327"
+      }
+    ]
+  },
+  "storage": null,
+  "types": [
+    {
+      "id": 0,
+      "type": {
+        "def": {
+          "tuple": []
+        }
+      }
+    },
+    {
+      "id": 1,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [],
+                "index": 0,
+                "name": "NotEnoughBalance"
+              },
+              {
+                "fields": [],
+                "index": 1,
+                "name": "MustCallByMainContract"
+              },
+              {
+                "fields": [],
+                "index": 2,
+                "name": "WorkerNotExist"
+              },
+              {
+                "fields": [],
+                "index": 3,
+                "name": "WorkerNotOwnedByCaller"
+              },
+              {
+                "fields": [],
+                "index": 4,
+                "name": "WorkerStatusNotReady"
+              },
+              {
+                "fields": [],
+                "index": 5,
+                "name": "WorkerMortgageNotExist"
+              },
+              {
+                "fields": [],
+                "index": 6,
+                "name": "TransferFailed"
+              },
+              {
+                "fields": [],
+                "index": 7,
+                "name": "WorkerIsUseByUser"
+              },
+              {
+                "fields": [],
+                "index": 8,
+                "name": "NodeNotExist"
+              },
+              {
+                "fields": [],
+                "index": 9,
+                "name": "SecretNodeAlreadyExists"
+              },
+              {
+                "fields": [],
+                "index": 10,
+                "name": "SetCodeFailed"
+              },
+              {
+                "fields": [],
+                "index": 11,
+                "name": "EpochNotExpired"
+              },
+              {
+                "fields": [],
+                "index": 12,
+                "name": "InvalidSideChainSignature"
+              },
+              {
+                "fields": [],
+                "index": 13,
+                "name": "NodeIsRunning"
+              },
+              {
+                "fields": [],
+                "index": 14,
+                "name": "InvalidSideChainCaller"
+              },
+              {
+                "fields": [],
+                "index": 15,
+                "name": "RegionNotExist"
+              },
+              {
+                "fields": [],
+                "index": 16,
+                "name": "AssetNotExist"
+              },
+              {
+                "fields": [],
+                "index": 17,
+                "name": "DepositNotEnough"
+              },
+              {
+                "fields": [],
+                "index": 18,
+                "name": "MortgageNotEnough"
+              },
+              {
+                "fields": [],
+                "index": 19,
+                "name": "SlashAmountTooLarge"
+              },
+              {
+                "fields": [],
+                "index": 20,
+                "name": "CloudContractNotSet"
+              },
+              {
+                "fields": [],
+                "index": 21,
+                "name": "ResourceNotEnough"
+              }
+            ]
+          }
+        },
+        "path": [
+          "Error"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 0
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 0
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 1,
+                "name": "CouldNotReadInput"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "LangError"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 2
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 2
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "type": {
+        "def": {
+          "primitive": "u32"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": {
+        "def": {
+          "primitive": "u32"
+        },
+        "path": [
+          "BlockNumber"
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "type": {
+        "def": {
+          "primitive": "u8"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": {
+        "def": {
+          "array": {
+            "len": 20,
+            "type": 7
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 8,
+                "typeName": "[u8; 20]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "primitive_types",
+          "H160"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "epoch",
+                "type": 5,
+                "typeName": "u32"
+              },
+              {
+                "name": "epoch_slot",
+                "type": 5,
+                "typeName": "u32"
+              },
+              {
+                "name": "last_epoch_block",
+                "type": 6,
+                "typeName": "BlockNumber"
+              },
+              {
+                "name": "now",
+                "type": 6,
+                "typeName": "BlockNumber"
+              },
+              {
+                "name": "side_chain_pub",
+                "type": 9,
+                "typeName": "Address"
+              }
+            ]
+          }
+        },
+        "path": [
+          "EpochInfo"
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 10
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 10
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 9
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 7
+          }
+        },
+        "path": [
+          "Bytes"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 13
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 13
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 14
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 14
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": {
+        "def": {
+          "tuple": [
+            5,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 16
+          }
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 17
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 17
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": {
+        "def": {
+          "primitive": "u64"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "cpu_per",
+                "type": 19,
+                "typeName": "u64"
+              },
+              {
+                "name": "cvm_cpu_per",
+                "type": 19,
+                "typeName": "u64"
+              },
+              {
+                "name": "memory_per",
+                "type": 19,
+                "typeName": "u64"
+              },
+              {
+                "name": "cvm_memory_per",
+                "type": 19,
+                "typeName": "u64"
+              },
+              {
+                "name": "disk_per",
+                "type": 19,
+                "typeName": "u64"
+              },
+              {
+                "name": "gpu_per",
+                "type": 19,
+                "typeName": "u64"
+              }
+            ]
+          }
+        },
+        "path": [
+          "RunPrice"
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 20
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 20
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 21
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 21
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": {
+        "def": {
+          "array": {
+            "len": 32,
+            "type": 7
+          }
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 23,
+                "typeName": "[u8; 32]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "primitive_types",
+          "H256"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 13,
+                    "typeName": "Bytes"
+                  }
+                ],
+                "index": 0,
+                "name": "Native"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 13,
+                    "typeName": "Bytes"
+                  },
+                  {
+                    "type": 24,
+                    "typeName": "H256"
+                  }
+                ],
+                "index": 1,
+                "name": "ERC20"
+              }
+            ]
+          }
+        },
+        "path": [
+          "AssetInfo"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "type": {
+        "def": {
+          "composite": {}
+        },
+        "path": [
+          "U256"
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "type": {
+        "def": {
+          "tuple": [
+            25,
+            26
+          ]
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 27
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 27
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 28
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 28
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 30,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 26
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 26
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "type": {
+        "def": {
+          "tuple": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 31
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 31
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "type": {
+        "def": {
+          "primitive": "u64"
+        },
+        "path": [
+          "NodeID"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 6
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 6
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 23,
+                "typeName": "[u8; 32]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "types",
+          "AccountId"
+        ]
+      }
+    },
+    {
+      "id": 36,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 5
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 37,
+      "type": {
+        "def": {
+          "primitive": "u128"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 37
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 37
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ipv4",
+                "type": 36,
+                "typeName": "Option<u32>"
+              },
+              {
+                "name": "ipv6",
+                "type": 38,
+                "typeName": "Option<u128>"
+              },
+              {
+                "name": "domain",
+                "type": 14,
+                "typeName": "Option<Bytes>"
+              }
+            ]
+          }
+        },
+        "path": [
+          "Ip"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "name",
+                "type": 13,
+                "typeName": "Bytes"
+              },
+              {
+                "name": "owner",
+                "type": 9,
+                "typeName": "Address"
+              },
+              {
+                "name": "level",
+                "type": 7,
+                "typeName": "u8"
+              },
+              {
+                "name": "region_id",
+                "type": 5,
+                "typeName": "u32"
+              },
+              {
+                "name": "start_block",
+                "type": 6,
+                "typeName": "BlockNumber"
+              },
+              {
+                "name": "stop_block",
+                "type": 34,
+                "typeName": "Option<BlockNumber>"
+              },
+              {
+                "name": "terminal_block",
+                "type": 34,
+                "typeName": "Option<BlockNumber>"
+              },
+              {
+                "name": "p2p_id",
+                "type": 35,
+                "typeName": "AccountId"
+              },
+              {
+                "name": "ip",
+                "type": 39,
+                "typeName": "Ip"
+              },
+              {
+                "name": "port",
+                "type": 5,
+                "typeName": "u32"
+              },
+              {
+                "name": "status",
+                "type": 7,
+                "typeName": "u8"
+              }
+            ]
+          }
+        },
+        "path": [
+          "K8sCluster"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 40
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 40
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 42,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 41
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 41
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 19
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 19
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 44,
+      "type": {
+        "def": {
+          "tuple": [
+            19,
+            40
+          ]
+        }
+      }
+    },
+    {
+      "id": 45,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 44
+          }
+        }
+      }
+    },
+    {
+      "id": 46,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 45
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 45
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 47,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 44
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 44
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 47
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 47
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 33
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 33
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 49
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 49
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 5
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 5
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 51
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 51
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 53,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 19
+          }
+        }
+      }
+    },
+    {
+      "id": 54,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "name",
+                "type": 13,
+                "typeName": "Bytes"
+              },
+              {
+                "name": "owner",
+                "type": 9,
+                "typeName": "Address"
+              },
+              {
+                "name": "validator_id",
+                "type": 35,
+                "typeName": "AccountId"
+              },
+              {
+                "name": "p2p_id",
+                "type": 35,
+                "typeName": "AccountId"
+              },
+              {
+                "name": "start_block",
+                "type": 6,
+                "typeName": "BlockNumber"
+              },
+              {
+                "name": "terminal_block",
+                "type": 34,
+                "typeName": "Option<BlockNumber>"
+              },
+              {
+                "name": "ip",
+                "type": 39,
+                "typeName": "Ip"
+              },
+              {
+                "name": "port",
+                "type": 5,
+                "typeName": "u32"
+              },
+              {
+                "name": "status",
+                "type": 7,
+                "typeName": "u8"
+              }
+            ]
+          }
+        },
+        "path": [
+          "SecretNode"
+        ]
+      }
+    },
+    {
+      "id": 55,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 54
+          }
+        }
+      }
+    },
+    {
+      "id": 56,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 55
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 55
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 57,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 56
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 56
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 58,
+      "type": {
+        "def": {
+          "tuple": [
+            19,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": 59,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 58
+          }
+        }
+      }
+    },
+    {
+      "id": 60,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 59
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 59
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 61,
+      "type": {
+        "def": {
+          "tuple": [
+            19,
+            54
+          ]
+        }
+      }
+    },
+    {
+      "id": 62,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 61
+          }
+        }
+      }
+    },
+    {
+      "id": 63,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 62
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 62
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 64,
+      "type": {
+        "def": {
+          "tuple": [
+            19,
+            54,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "id": 65,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 64
+          }
+        }
+      }
+    },
+    {
+      "id": 66,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 65
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 65
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 67,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 65
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 65
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 68,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 67
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 67
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 69,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 23,
+                "typeName": "[u8; 32]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "types",
+          "Hash"
+        ]
+      }
+    }
+  ],
+  "version": 6
+}

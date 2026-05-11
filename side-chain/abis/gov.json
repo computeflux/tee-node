@@ -1,0 +1,2502 @@
+{
+  "contract": {
+    "name": "gov",
+    "version": "0.1.0"
+  },
+  "image": null,
+  "source": {
+    "compiler": "contractgen",
+    "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "language": "go"
+  },
+  "spec": {
+    "constructors": [],
+    "docs": [],
+    "environment": {
+      "accountId": {
+        "displayName": [
+          "AccountId"
+        ],
+        "type": 13
+      },
+      "balance": {
+        "displayName": [
+          "Balance"
+        ],
+        "type": 50
+      },
+      "blockNumber": {
+        "displayName": [
+          "BlockNumber"
+        ],
+        "type": 2
+      },
+      "hash": {
+        "displayName": [
+          "Hash"
+        ],
+        "type": 51
+      },
+      "nativeToEthRatio": 100000000,
+      "staticBufferSize": 16384,
+      "timestamp": {
+        "displayName": [
+          "Timestamp"
+        ],
+        "type": 3
+      }
+    },
+    "events": [],
+    "lang_error": {
+      "displayName": [
+        "ink",
+        "LangError"
+      ],
+      "type": 9
+    },
+    "messages": [
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "index",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "cancel_vote",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x06991e89"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "public_join",
+            "type": {
+              "displayName": [
+                "bool"
+              ],
+              "type": 6
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "set_public_join",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x13647515"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "call",
+            "type": {
+              "displayName": [
+                "CallContent"
+              ],
+              "type": 17
+            }
+          },
+          {
+            "docs": [],
+            "label": "track_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "submit_proposal",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x1c0471c4"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "leave",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x1fac3dd3"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "track_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "set_default_track",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x2987d4ba"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "start_key",
+            "type": {
+              "displayName": [
+                "Option"
+              ],
+              "type": 37
+            }
+          },
+          {
+            "docs": [],
+            "label": "size",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "votes",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 49
+        },
+        "selector": "0x340f2cf4"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "default_track",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 22
+        },
+        "selector": "0x3626e9bf"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "tracks",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 44
+        },
+        "selector": "0x3c05be89"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "exec_proposal",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x3e44340e"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "cancel_proposal",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x46c421db"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "index",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "vote",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 47
+        },
+        "selector": "0x4d151cf1"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "members",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 26
+        },
+        "selector": "0x53550f05"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "init",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x53e39003"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "public_join",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x6d6f0772"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "get_public_join",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 23
+        },
+        "selector": "0x76f20724"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "total_supply",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 21
+        },
+        "selector": "0x771771f7"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "proposal",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 33
+        },
+        "selector": "0x799fe2dd"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "to",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          },
+          {
+            "docs": [],
+            "label": "track_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "spend",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x872c40e9"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "owner",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "balance_of",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 21
+        },
+        "selector": "0x87e0ff32"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "leave_with_burn",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x8d6e0f8c"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "to",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "value",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "mint",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x9b7bfa69"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "spend_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "payout",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xa4f0196c"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "to",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "value",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "transfer",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xada06462"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "track",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 41
+        },
+        "selector": "0xb9fd54c4"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "opinion_yes",
+            "type": {
+              "displayName": [
+                "bool"
+              ],
+              "type": 6
+            }
+          },
+          {
+            "docs": [],
+            "label": "lock_amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "submit_vote",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xbb5ca128"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "new_user",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "balance",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "join",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xc6c83af9"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "track",
+            "type": {
+              "displayName": [
+                "TrackData"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "add_track",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xdf60a515"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "proposal_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "deposit_proposal",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xea58b31d"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "from",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "to",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "transfer_from",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xee3bc685"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "proposal_status",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 36
+        },
+        "selector": "0xfd88907b"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "start_key",
+            "type": {
+              "displayName": [
+                "Option"
+              ],
+              "type": 37
+            }
+          },
+          {
+            "docs": [],
+            "label": "size",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "proposals",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 39
+        },
+        "selector": "0xfe26fd17"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "user",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "start_key",
+            "type": {
+              "displayName": [
+                "Option"
+              ],
+              "type": 37
+            }
+          },
+          {
+            "docs": [],
+            "label": "size",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "votes_of_user",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 49
+        },
+        "selector": "0xfeadee12"
+      }
+    ]
+  },
+  "storage": null,
+  "types": [
+    {
+      "id": 0,
+      "type": {
+        "def": {
+          "primitive": "u8"
+        }
+      }
+    },
+    {
+      "id": 1,
+      "type": {
+        "def": {
+          "primitive": "u16"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": {
+        "def": {
+          "primitive": "u32"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": {
+        "def": {
+          "primitive": "u64"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": {
+        "def": {
+          "primitive": "i64"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": {
+        "def": {
+          "primitive": "u128"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": {
+        "def": {
+          "primitive": "bool"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": {
+        "def": {
+          "array": {
+            "len": 4,
+            "type": 3
+          }
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "type": 7,
+                "typeName": "[u64; 4]"
+              }
+            ]
+          }
+        },
+        "path": [
+          "U256"
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 1,
+                "name": "CouldNotReadInput"
+              }
+            ]
+          }
+        },
+        "path": [
+          "ink_primitives",
+          "LangError"
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [],
+                "index": 0,
+                "name": "InsufficientAllowance"
+              },
+              {
+                "fields": [],
+                "index": 1,
+                "name": "InvalidDeposit"
+              },
+              {
+                "fields": [],
+                "index": 2,
+                "name": "InvalidDepositTime"
+              },
+              {
+                "fields": [],
+                "index": 3,
+                "name": "InvalidProposal"
+              },
+              {
+                "fields": [],
+                "index": 4,
+                "name": "InvalidProposalCaller"
+              },
+              {
+                "fields": [],
+                "index": 5,
+                "name": "InvalidProposalStatus"
+              },
+              {
+                "fields": [],
+                "index": 6,
+                "name": "InvalidVote"
+              },
+              {
+                "fields": [],
+                "index": 7,
+                "name": "InvalidVoteStatus"
+              },
+              {
+                "fields": [],
+                "index": 8,
+                "name": "InvalidVoteTime"
+              },
+              {
+                "fields": [],
+                "index": 9,
+                "name": "InvalidVoteUser"
+              },
+              {
+                "fields": [],
+                "index": 10,
+                "name": "LowBalance"
+              },
+              {
+                "fields": [],
+                "index": 11,
+                "name": "MemberBalanceNotZero"
+              },
+              {
+                "fields": [],
+                "index": 12,
+                "name": "MemberExisted"
+              },
+              {
+                "fields": [],
+                "index": 13,
+                "name": "MemberNotExisted"
+              },
+              {
+                "fields": [],
+                "index": 14,
+                "name": "MustCallByGov"
+              },
+              {
+                "fields": [],
+                "index": 15,
+                "name": "NoTrack"
+              },
+              {
+                "fields": [],
+                "index": 16,
+                "name": "PropNotOngoing"
+              },
+              {
+                "fields": [],
+                "index": 17,
+                "name": "ProposalInDecision"
+              },
+              {
+                "fields": [],
+                "index": 18,
+                "name": "ProposalNotConfirmed"
+              },
+              {
+                "fields": [],
+                "index": 19,
+                "name": "PublicJoinNotAllowed"
+              },
+              {
+                "fields": [],
+                "index": 20,
+                "name": "SpendAlreadyExecuted"
+              },
+              {
+                "fields": [],
+                "index": 21,
+                "name": "SpendNotFound"
+              },
+              {
+                "fields": [],
+                "index": 22,
+                "name": "TransferDisabled"
+              }
+            ]
+          }
+        },
+        "path": [
+          "Error"
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 10
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T"
+          },
+          {
+            "name": "E",
+            "type": 10
+          }
+        ],
+        "path": [
+          "ink",
+          "MessageResult"
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 0
+          }
+        },
+        "path": [
+          "Bytes"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "T",
+                "type": 2
+              },
+              {
+                "name": "V",
+                "type": 12
+              }
+            ]
+          }
+        },
+        "path": [
+          "UniAddr"
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Name",
+                "type": 15
+              },
+              {
+                "name": "PreparePeriod",
+                "type": 2
+              },
+              {
+                "name": "MaxDeciding",
+                "type": 2
+              },
+              {
+                "name": "ConfirmPeriod",
+                "type": 2
+              },
+              {
+                "name": "DecisionPeriod",
+                "type": 2
+              },
+              {
+                "name": "MinEnactmentPeriod",
+                "type": 2
+              },
+              {
+                "name": "DecisionDeposit",
+                "type": 8
+              },
+              {
+                "name": "MaxBalance",
+                "type": 8
+              },
+              {
+                "name": "MinApproval",
+                "type": 16
+              },
+              {
+                "name": "MinSupport",
+                "type": 16
+              }
+            ]
+          }
+        },
+        "path": [
+          "TrackData"
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 0
+          }
+        },
+        "path": [
+          "string"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Type",
+                "type": 15
+              },
+              {
+                "name": "LinearBegin",
+                "type": 2
+              },
+              {
+                "name": "LinearEnd",
+                "type": 2
+              },
+              {
+                "name": "LinearLength",
+                "type": 4
+              },
+              {
+                "name": "StepBegin",
+                "type": 2
+              },
+              {
+                "name": "StepEnd",
+                "type": 2
+              },
+              {
+                "name": "StepSize",
+                "type": 2
+              },
+              {
+                "name": "StepPeriod",
+                "type": 4
+              },
+              {
+                "name": "ReciprocalFactor",
+                "type": 2
+              },
+              {
+                "name": "ReciprocalXScale",
+                "type": 2
+              },
+              {
+                "name": "ReciprocalXOffset",
+                "type": 4
+              },
+              {
+                "name": "ReciprocalYOffset",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "Curve"
+        ]
+      }
+    },
+    {
+      "id": 17,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Contract",
+                "type": 18
+              },
+              {
+                "name": "Selector",
+                "type": 19
+              },
+              {
+                "name": "Args",
+                "type": 20
+              },
+              {
+                "name": "Amount",
+                "type": 8
+              }
+            ]
+          }
+        },
+        "path": [
+          "CallContent"
+        ]
+      }
+    },
+    {
+      "id": 18,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 0
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 0
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": {
+        "def": {
+          "array": {
+            "len": 4,
+            "type": 0
+          }
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 18
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 18
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 8
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 8
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 2
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 2
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 6
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 6
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Account",
+                "type": 13
+              },
+              {
+                "name": "Balance",
+                "type": 8
+              }
+            ]
+          }
+        },
+        "path": [
+          "Member"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 24
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 24
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 25
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 25
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ID",
+                "type": 2
+              },
+              {
+                "name": "Proposal",
+                "type": 28
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProposalWithID"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Call",
+                "type": 29
+              },
+              {
+                "name": "TrackID",
+                "type": 2
+              },
+              {
+                "name": "Caller",
+                "type": 13
+              },
+              {
+                "name": "Status",
+                "type": 30
+              },
+              {
+                "name": "SubmitBlock",
+                "type": 4
+              },
+              {
+                "name": "Deposit",
+                "type": 31
+              }
+            ]
+          }
+        },
+        "path": [
+          "Proposal"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 17
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 17
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 30,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "State",
+                "type": 0
+              },
+              {
+                "name": "Block",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProposalStatus"
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Depositor",
+                "type": 13
+              },
+              {
+                "name": "Amount",
+                "type": 8
+              },
+              {
+                "name": "Block",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProposalDeposit"
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 27
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 27
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 32
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 32
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "State",
+                "type": 0
+              },
+              {
+                "name": "BlockHeight",
+                "type": 4
+              },
+              {
+                "name": "ConfirmedNumber",
+                "type": 2
+              },
+              {
+                "name": "LastConfirmedBlock",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProposalStatusQuery"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 34
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 34
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 36,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 35
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 35
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 37,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 2
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 2
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 27
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 27
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 38
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 38
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 14
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 14
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 40
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 40
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 42,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ID",
+                "type": 2
+              },
+              {
+                "name": "Track",
+                "type": 14
+              }
+            ]
+          }
+        },
+        "path": [
+          "TrackWithID"
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 42
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 42
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 44,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 43
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 43
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 45,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Index",
+                "type": 2
+              },
+              {
+                "name": "ProposalID",
+                "type": 2
+              },
+              {
+                "name": "Caller",
+                "type": 13
+              },
+              {
+                "name": "Pledge",
+                "type": 8
+              },
+              {
+                "name": "OpinionYes",
+                "type": 6
+              },
+              {
+                "name": "VoteWeight",
+                "type": 8
+              },
+              {
+                "name": "VoteBlock",
+                "type": 4
+              },
+              {
+                "name": "Deleted",
+                "type": 6
+              }
+            ]
+          }
+        },
+        "path": [
+          "Vote"
+        ]
+      }
+    },
+    {
+      "id": 46,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 45
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 45
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 47,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 46
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 46
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 45
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 45
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 48
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 48
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "type": {
+        "def": {
+          "primitive": "u128"
+        },
+        "path": [
+          "Balance"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "0",
+                "type": 12
+              }
+            ]
+          }
+        },
+        "path": [
+          "Hash"
+        ]
+      }
+    }
+  ],
+  "version": 6
+}

@@ -1,0 +1,29 @@
+# get shell path
+SOURCE="$0"
+while [ -h "$SOURCE"  ]; do
+    DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /*  ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
+cd $DIR/../
+
+img=$(cat ./hack/.version)
+
+export DSECRET_IMAGE=$img
+export DSECRET_DIR=/srv/node0/chain_data
+export NAME=dsecret-0
+
+export SIDE_CHAIN_PORT=30110
+export SIDE_CHAIN_RPC_PORT=30111
+export GQL_PORT=30115
+export CHAIN_ENV=test
+
+
+echo '' > ./hack/k8s.yaml
+envsubst < ./hack/k8s-temp.yaml > ./hack/k8s.yaml
+
+# 部署镜像
+kubectl delete deployment dsecret-0 -n worker-addon
+kubectl delete service dsecret-0-service -n worker-addon
+kubectl create -f ./hack/k8s.yaml

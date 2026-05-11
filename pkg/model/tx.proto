@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+package model;
+
+option go_package = "";
+
+
+// side chain transaction
+message Tx{
+  bytes caller = 10;   // 交易发起方（公钥，用于验证签名）
+  uint32 caller_type = 12; // 0 => TEE, 10000 => ed25519, 1 => polkadot_sign(contract)
+  bytes call = 13; // call bytes
+  bytes signature = 11; // 对 Tx 的签名（签名为空时签名字段不参与序列化，即对 payload+caller 的序列化结果签名）
+}
+
+message SysCall{
+  oneof payload {
+    int64 empty = 99;
+    EpochEnd epoch_end = 1;
+    int64 epoch_start = 2;
+    HubCall hub_call = 3;
+    int64 sync_tx_start  = 4;
+    int64 sync_tx_end = 5;
+    int64 sync_tx_retry = 6;
+    ContractCall contract = 7;
+  }
+}
+
+message ContractCall{
+  bytes name = 1;
+  bytes method = 2;
+  repeated bytes args = 3;
+}
+
+// side validator
+message SideValidator {
+  bytes pubkey = 1;
+  int64 power = 2;
+}
+
+// Call from TEE to mainchain
+message EpochEnd {
+  uint32 epoch = 1;
+  repeated SideValidator validators = 2;
+  bytes dkg_pub = 3;
+  bytes dkg_commits = 4;
+}
+
+// Call from TEE to mainchain
+message Bridge {
+  string msg_id = 1;
+  bytes payload = 2;
+}
+
+// Polkadot Hub Call
+message HubCall {
+  uint32 chain_id = 1;
+  repeated TeeCall call = 2;
+}
+
+// DKG message
+message DkgMessage {
+  string from = 1;
+  To to = 2;
+  string msg_id = 3;
+  bytes payload = 4;
+  string error = 5;
+  string type = 6;
+}
+
+// block partial sign
+message BlockPartialSign {
+  string from = 1;
+  To to = 2;
+  int64 tx_index = 3;
+  bytes hub_sig = 4;
+}
+
+// p2p msg send to
+message To {
+  oneof payload {
+    bool broadcast  = 1;
+    Nodes nodes = 2;
+    bytes node = 3;
+  }
+}
+
+// multi node
+message Nodes {
+  repeated bytes l = 2;
+}
+
+// TEE call
+message TeeCall{
+  bytes caller = 1;
+  int64 time = 2;
+  uint32 tee_type = 3;
+  bytes report = 4;
+  oneof tx {
+    PodStart pod_start = 5;
+    PodMint pod_mint = 6;
+    BridgeCall bridge_call = 7;
+    bytes text = 8;
+    UploadSecret upload_secret = 9;
+    InitDisk init_disk = 10;
+  }
+}
+
+// polkadot hub pod mint call
+message PodStart {
+  uint64 id = 1;
+  bytes app_id = 2;
+  bytes name_space = 3;
+  bytes pub_key = 4;
+  repeated uint64 secrets = 5;
+  repeated uint64 disks = 6;
+}
+
+// polkadot hub pod mint call
+message PodMint {
+  uint64 Id = 1;
+  bytes reportHash = 3;
+}
+
+// polkadot hub pod mint call
+message BridgeCall {
+  int64 time = 1;
+}
+
+// TEE report verify result
+message TeeVerifyResult {
+  uint32 tee_type = 1;
+  bytes code_signer = 2;
+  bytes code_signature = 3;
+  bytes code_product_id = 4;
+}
+
+// Upload secret hash
+message UploadSecret {
+  bytes user = 1;
+  uint64 index = 2;
+  bytes data = 3;
+  uint64 time = 4;
+  bytes hash = 5;
+}
+
+// Init disk
+message InitDisk {
+  bytes user = 1;
+  uint64 index = 2;
+  bytes data = 3;
+  uint64 time = 4;
+  bytes hash = 5;
+}
+
+message SecretBox{
+  string from = 1;
+  To to = 2;
+  oneof payload {
+    PodStart req = 4;
+    DecryptSharesResp shares_resp = 5;
+    DecryptResp resp = 6;
+  }
+}
+
+// secret data
+message SecretStore {
+  bytes raw_enc_cmt = 1;
+  repeated bytes raw_enc_scrt = 2;
+}
+
+// DecryptShare
+message DecryptShare {
+  int32 share_index = 2;
+  bytes xnc_ski = 3;
+  bytes chlgi = 4;
+  bytes proofi = 5;
+}
+
+// DecryptShares
+message DecryptSharesResp {
+  PodStart req = 2;
+  map<uint64, DecryptShare> secret_shares = 3;
+  map<uint64, DecryptShare> disk_shares = 4;
+  bytes error = 5;
+}
+
+// Decrypt resp
+message DecryptResp {
+  bytes dkg_key = 1;
+  map<uint64, Secret> secrets = 3;
+  map<uint64, Secret> disk_keys = 4;
+}
+
+// Decrypted secret
+message Secret {
+	bytes xnc_cmt = 1;
+	repeated bytes enc_scrt = 2;
+}
+
+message TeeTrigger {
+  TeeCall tee = 1;
+  uint64 cluster_id = 2;
+  repeated uint64 callids = 3;
+}
+
+// api req 
+message ApiReq {
+  bytes url = 2;
+  bytes from = 3;
+  bytes data = 4;
+}
+
+// api resp 
+message ApiResp {
+  int32 code = 2;
+  bytes data = 3;
+}
+
+// P2P 消息包装器，用于持久化存储待发送的消息
+message PeerMsg {
+  // 目标节点
+  To to = 1;
+  
+  // 消息内容（oneof 确保只能有一种类型）
+  oneof payload {
+    DkgMessage dkg_message = 2;
+    BlockPartialSign block_partial_sign = 3;
+    SecretBox secret_box = 4;
+  }
+}

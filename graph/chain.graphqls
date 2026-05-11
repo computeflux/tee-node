@@ -1,0 +1,20 @@
+type ChainInfo {
+  is_main: Boolean!
+  cloud_contract: String!
+  subnet_contract: String!
+  """链类型（如 local / test / main）"""
+  chain_type: String!
+  """展示用网络名称（如 Paseo / Polkadot）"""
+  network_label: String!
+  """链节点 URL 列表"""
+  urls: [String!]!
+}
+
+extend type Query {
+  chain_info: [ChainInfo!]!
+  validators: [String!]!
+}
+
+extend type Mutation {
+  start_epoch: Boolean!
+}

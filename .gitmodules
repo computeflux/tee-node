@@ -1,0 +1,4 @@
+[submodule "ext/cometbft"]
+	path = ext/cometbft
+	url = https://github.com/cometbft/cometbft
+	tag = v1.0.1
