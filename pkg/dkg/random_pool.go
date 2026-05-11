@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 const (

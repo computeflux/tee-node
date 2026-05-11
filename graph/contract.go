@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
-	sidechain "github.com/wetee-dao/tee-dsecret/side-chain"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
 
 // DecodeCaller 支持 32 字节 hex（可带 0x 前缀）或 SS58，返回公钥字节。

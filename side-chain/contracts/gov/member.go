@@ -3,7 +3,7 @@ package gov
 import (
 	"math/big"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 func (d GovQuery) Members() ([]Member, error) {

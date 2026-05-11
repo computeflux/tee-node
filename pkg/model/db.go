@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/cockroachdb/pebble"
-	"github.com/cosmos/gogoproto/proto"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/cockroachdb/pebbleer/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/cosmos/gogoproto/proto""
+	"github.com/cosmos/gogoproto/proto
 )
 
 var DBINS *DB

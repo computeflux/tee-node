@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/network/local"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/stretchr/testify/require"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/network/local"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
 )
 
 func TestRandomShareGeneration(t *testing.T) {

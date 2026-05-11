@@ -1,13 +1,13 @@
 package chains
 
 import (
-	// pallets "github.com/wetee-dao/tee-dsecret/pkg/chains/pallets"
+	// pallets "github.com/computeflux/tee-provider/pkg/chains/pallets"
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	revive "github.com/computeflux/tee-provider/pkg/chains/revive"
+	"github.com/computeflux/tee-provider/pkg/model"
 	chain "github.com/wetee-dao/ink.go"
-	revive "github.com/wetee-dao/tee-dsecret/pkg/chains/revive"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 var MainChain MainChainApi

@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 var (

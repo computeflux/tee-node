@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 )
 
 func (app *SideChain) checkTx(txbt []byte) uint32 {

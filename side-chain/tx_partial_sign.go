@@ -5,11 +5,11 @@ import (
 	"sort"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/pkg/errors"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/dkg"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
 )
 
 const TxIndexPrefix = "tx_index_"

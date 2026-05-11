@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/pkg/errors"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
+	abci "github.com/cometbft/cometbft/abci/typeux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/pkg/errors"oi"
+	"gthub.com/pkg/errrs
 )
 
 func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, proposer []byte) ([]*abci.ExecTxResult, error) {

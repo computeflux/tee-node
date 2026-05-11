@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 // type ChainState struct {

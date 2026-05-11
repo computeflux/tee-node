@@ -9,9 +9,9 @@ import (
 	"github.com/cometbft/cometbft/p2p/conn"
 	"github.com/cometbft/cometbft/types"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 var MaxMsgSize = types.MaxBlockSizeBytes

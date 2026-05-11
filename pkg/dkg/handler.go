@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // HandleDkg 处理不同的DKG消息类型

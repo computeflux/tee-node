@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
-	sidechain "github.com/wetee-dao/tee-dsecret/side-chain"
+	"github.com/computeflux/tee-provider/pkg/util"
+	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
 
 var sideChain *sidechain.SideChain

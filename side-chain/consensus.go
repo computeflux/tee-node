@@ -8,14 +8,14 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/version"
-	"github.com/cosmos/gogoproto/proto"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
+	"github.com/copputefluxetee-/tevider/pkg/m-delprovidioer/pkg/model/protoio"
+	"github.com/cossospgogo/prt
 
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/dkg"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	bftbrigde "github.com/wetee-dao/tee-dsecret/pkg/network/bft-brigde"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/model"
+	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 const ApplicationVersion = 1

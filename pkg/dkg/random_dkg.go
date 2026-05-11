@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
 	"go.dedis.ch/kyber/v4/sign/schnorr"
 )
@@ -474,5 +474,3 @@ func (dkg *DKG) handleRandomDealRespBatch(from string, payload []byte) error {
 
 	return nil
 }
-
-

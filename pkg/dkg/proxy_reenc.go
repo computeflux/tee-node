@@ -10,8 +10,8 @@ package dkg
 
 // 	"go.dedis.ch/kyber/v4/share"
 
-// 	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/dkg/proxy-reenc"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/model"
+// 	proxy_reenc "github.com/computeflux/tee-provider/pkg/dkg/proxy-reenc"
+// 	"github.com/computeflux/tee-provider/pkg/model"
 // )
 
 // // SendEncryptedSecretRequest 发送加密的秘密请求，并等待指定数量的节点响应

@@ -4,9 +4,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/stretchr/testify/require"
 	"github.com/wetee-dao/ink.go/util"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 func addr(b []byte) model.UniAddr {

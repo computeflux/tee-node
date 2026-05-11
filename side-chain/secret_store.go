@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
-	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/proxy-reenc"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
 	"go.dedis.ch/kyber/v4/suites"
 )
 

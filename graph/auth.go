@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/vedhavyas/go-subkey/v2"
 	"github.com/vedhavyas/go-subkey/v2/sr25519"
 	"github.com/vektah/gqlparser/v2/gqlerror"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 var (

@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/stretchr/testify/require"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 // testDBSubdir is the subdirectory where the test database is stored.

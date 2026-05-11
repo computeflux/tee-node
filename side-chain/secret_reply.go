@@ -3,8 +3,8 @@ package sidechain
 import (
 	"fmt"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/proxy-reenc"
+	"github.com/computeflux/tee-provider/pkg/model"
+	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
 	"go.dedis.ch/kyber/v4/share"
 	"go.dedis.ch/kyber/v4/suites"
 )

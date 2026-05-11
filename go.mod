@@ -1,4 +1,4 @@
-module github.com/wetee-dao/tee-dsecret
+module github.com/computeflux/tee-provider
 
 go 1.25.6
 

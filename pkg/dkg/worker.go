@@ -8,8 +8,8 @@ package dkg
 
 // 	stypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 // 	uuid "github.com/satori/go.uuid"
-// 	gtypes "github.com/wetee-dao/tee-dsecret/pkg/chains/revive/generated/types"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/model"
+// 	gtypes "github.com/computeflux/tee-provider/pkg/chains/revive/generated/types"
+// 	"github.com/computeflux/tee-provider/pkg/model"
 // )
 
 // // HandleUploadClusterProof 函数处理上传集群证明的逻辑

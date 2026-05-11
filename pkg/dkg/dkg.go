@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	p2peer "github.com/wetee-dao/tee-dsecret/pkg/network"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/model"
+	p2peer "github.com/computeflux/tee-provider/pkg/network"
+	"github.com/computeflux/tee-provider/pkg/util"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
 	"go.dedis.ch/kyber/v4/suites"
 )

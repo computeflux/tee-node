@@ -14,11 +14,11 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/version"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/dkg"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	bftbrigde "github.com/wetee-dao/tee-dsecret/pkg/network/bft-brigde"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/model"
+	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 var SideChainNode *nm.Node

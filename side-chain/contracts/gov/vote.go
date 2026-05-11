@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/wetee-dao/ink.go/util"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 // Vote 获取单个投票

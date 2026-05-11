@@ -10,10 +10,10 @@ import (
 	"go.dedis.ch/kyber/v4/share"
 	"go.dedis.ch/kyber/v4/suites"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/proxy-reenc"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/model"
+	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // PreRecerve is the channel to receive DecryptShares

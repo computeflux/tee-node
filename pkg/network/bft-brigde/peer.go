@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/cometbft/cometbft/p2p"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 const pendingMsgKey = "bft_reactor_pending_msgs"

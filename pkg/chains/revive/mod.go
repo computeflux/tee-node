@@ -9,13 +9,13 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/computeflux/tee-provider/pkg/chains/revive/cloud"
+	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
 	"github.com/wetee-dao/ink.go/util"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains/revive/cloud"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains/revive/subnet"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 var MainChainConfig *model.ChainConfigType

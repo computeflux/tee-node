@@ -5,8 +5,8 @@ package dkg
 // 	"encoding/json"
 // 	"fmt"
 
-// 	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/dkg/proxy-reenc"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/model"
+// 	proxy_reenc "github.com/computeflux/tee-provider/pkg/dkg/proxy-reenc"
+// 	"github.com/computeflux/tee-provider/pkg/model"
 // )
 
 // // SetSecretEnv 通过DKG流程设置秘密环境变量

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 func (s *SideChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, addMainChainTx bool) {

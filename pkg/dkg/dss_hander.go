@@ -3,11 +3,11 @@ package dkg
 import (
 	"encoding/json"
 	"errors"
-
-	"github.com/wetee-dao/ink.go/pallet/revive"
-	"github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+ains"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/wetee-dao/ink.go/pallet/revivutil"
+	"githeb.com/we"ee-dao/nk.go/palet/revive
 )
 
 var skipPartialSign = false

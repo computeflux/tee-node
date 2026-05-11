@@ -8,9 +8,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
 )
 
 // StartEpoch is the resolver for the start_epoch field.

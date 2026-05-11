@@ -10,11 +10,11 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/vektah/gqlparser/v2/gqlerror"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
-	"github.com/wetee-dao/tee-dsecret/side-chain/contracts"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec/model"
+	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/side-chain/contracts"
+	"github.com/vektah/gqlparser/v2/gqlerror"cts"
+	"github.om/vekah/gqlparer/v2/gqlerror
 )
 
 // SystemContractInit is the resolver for the systemContractInit field.

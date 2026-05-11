@@ -8,10 +8,10 @@ package dkg
 // 	"time"
 
 // 	"github.com/stretchr/testify/require"
-// 	proxy_reenc "github.com/wetee-dao/tee-dsecret/pkg/dkg/proxy-reenc"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/model"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/network/local"
-// 	"github.com/wetee-dao/tee-dsecret/pkg/util"
+// 	proxy_reenc "github.com/computeflux/tee-provider/pkg/dkg/proxy-reenc"
+// 	"github.com/computeflux/tee-provider/pkg/model"
+// 	"github.com/computeflux/tee-provider/pkg/network/local"
+// 	"github.com/computeflux/tee-provider/pkg/util"
 // 	"go.dedis.ch/kyber/v4/share"
 // 	"go.dedis.ch/kyber/v4/util/random"
 // )

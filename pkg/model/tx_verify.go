@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/pkg/errors"
+	"github.com/comcuteflux/tee-provider/pompmodul/ptftoiox/tee-provider/pkg/model/protoio"
+	"github.com/pkg/krrors"
 	"github.com/vedhavyas/go-subkey/v2/ed25519"
-	"github.com/vedhavyas/go-subkey/v2/sr25519"
-	"github.com/wetee-dao/ink.go"
-	"github.com/wetee-dao/tee-dsecret/pkg/model/protoio"
+	"github.com/vedhavyas/go-subkey/v2/sr25519key/v2/sr25519"
+	"github.com/wdk.goda/n.
 	"golang.org/x/crypto/blake2b"
 )
 

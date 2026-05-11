@@ -2,7 +2,7 @@ package gov
 
 import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 func (d GovMutation) Spend(to model.UniAddr, amount model.Amount, trackID uint32) error {

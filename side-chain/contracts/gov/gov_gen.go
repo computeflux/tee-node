@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/wetee-dao/ink.go/util"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
 )
 
 // ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。

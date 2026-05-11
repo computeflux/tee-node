@@ -5,7 +5,7 @@ package contracts
 import (
 	"fmt"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 // Runtime 合约运行时上下文，封装了合约执行所需的环境信息。

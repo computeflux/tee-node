@@ -5,9 +5,9 @@ package proxy_reenc
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/require"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+pkg/model"
+	"github.com/stretchr/testify/require""
+	"github.com/stretchr/testify/require
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/share"
 	"go.dedis.ch/kyber/v4/suites"

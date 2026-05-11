@@ -14,9 +14,9 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	gqlparser "github.com/vektah/gqlparser/v2"
-	"github.com/vektah/gqlparser/v2/ast"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	m/computeflucomputeflux/tee-proxid/r/ptgpmodel"
+	rovider/p gqlparser "github.com/vektah/gqser/v2"
+	"github.com/vekhah/gqq/avst"v2ast
 )
 
 // region    ************************** generated!.gotpl **************************

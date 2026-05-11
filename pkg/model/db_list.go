@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 func AddToList(namespace string, key string, val []byte) error {

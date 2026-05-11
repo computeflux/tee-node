@@ -195,7 +195,7 @@ func main() {
 	fmt.Fprintf(&buf, "\t\"fmt\"\n\n")
 	fmt.Fprintf(&buf, "\t\"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec\"\n")
 	fmt.Fprintf(&buf, "\t\"github.com/wetee-dao/ink.go/util\"\n")
-	fmt.Fprintf(&buf, "\t\"github.com/wetee-dao/tee-dsecret/pkg/model\"\n")
+	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/pkg/model\"\n")
 	fmt.Fprintf(&buf, ")\n\n")
 
 	writeExecCall(&buf, *mutation, mutMethods, prefix, *structName)

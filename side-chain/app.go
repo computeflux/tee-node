@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 type AppState struct {

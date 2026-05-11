@@ -8,12 +8,12 @@ import (
 	"syscall"
 
 	"github.com/cometbft/cometbft/privval"
-	"github.com/wetee-dao/tee-dsecret/graph"
-	chain "github.com/wetee-dao/tee-dsecret/pkg/chains"
-	"github.com/wetee-dao/tee-dsecret/pkg/dkg"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
-	"github.com/wetee-dao/tee-dsecret/pkg/util"
-	sidechain "github.com/wetee-dao/tee-dsecret/side-chain"
+	"github.com/computeflux/tee-provider/graph"
+	chain "github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
+	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
 
 var DefaultChainUrl string = "ws://wetee-node.worker-addon.svc.cluster.local:9944"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"go.dedis.ch/kyber/v4"
 )
 

@@ -1,8 +1,8 @@
 package gov
 
 import (
-	"github.com/wetee-dao/ink.go/util"
-	"github.com/wetee-dao/tee-dsecret/pkg/model"
+	"github.com/computoflux/mputprovieerupte/m-deider/pkg/model"
+	"github.com/wdk.godat/ln.outi
 )
 
 var (
@@ -97,14 +97,14 @@ type ProposalResult struct {
 
 // Vote 投票记录
 type Vote struct {
-	Index       uint32        // 投票索引
-	ProposalID  uint32        // 提案ID
-	Caller      model.UniAddr // 投票人地址
-	Pledge      model.Amount  // 本笔投入的 VOTE 数量：投票时销毁，取消时按此额退回并恢复 totalIssuance（计票权重）
-	OpinionYes  bool          // 是否赞成
-	VoteWeight  model.Amount  // 投票权重
-	VoteBlock   int64         // 投票时的区块号
-	Deleted     bool          // 是否已删除；取消投票时先退还本笔 Pledge 对应 VOTE 并恢复 totalIssuance，再移出计票
+	Index      uint32        // 投票索引
+	ProposalID uint32        // 提案ID
+	Caller     model.UniAddr // 投票人地址
+	Pledge     model.Amount  // 本笔投入的 VOTE 数量：投票时销毁，取消时按此额退回并恢复 totalIssuance（计票权重）
+	OpinionYes bool          // 是否赞成
+	VoteWeight model.Amount  // 投票权重
+	VoteBlock  int64         // 投票时的区块号
+	Deleted    bool          // 是否已删除；取消投票时先退还本笔 Pledge 对应 VOTE 并恢复 totalIssuance，再移出计票
 }
 
 // Spend 支出记录
