@@ -1,0 +1,228 @@
+package gateway
+
+import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"runtime/debug"
+	"sync"
+	"strings"
+	"time"
+
+	"github.com/computeflux/tee-provider/pkg/model"
+)
+
+// ── Panic Recovery ───────────────────────────────────────
+
+func RecoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("[PANIC] %v\n%s", err, debug.Stack())
+				writeError(w, http.StatusInternalServerError,
+					fmt.Sprintf("panic: %v", err), "server_error")
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ── Request ID ───────────────────────────────────────────
+
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("X-Request-Id")
+		if id == "" {
+			id = fmt.Sprintf("%d-%x", time.Now().UnixNano(), make([]byte, 4))
+		}
+		w.Header().Set("X-Request-Id", id)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ── Logger ────────────────────────────────────────────────
+
+func LoggerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ww := &responseWriter{ResponseWriter: w, statusCode: 200}
+		next.ServeHTTP(ww, r)
+		elapsed := time.Since(start)
+		log.Printf("[HTTP] %s %s | %d | %v | %s",
+			r.Method, r.URL.Path, ww.statusCode, elapsed, r.RemoteAddr)
+	})
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// ── GZip Decode ──────────────────────────────────────────
+
+func GzipDecodeMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Encoding") == "gzip" {
+			gr, err := gzip.NewReader(r.Body)
+			if err != nil {
+				http.Error(w, "invalid gzip body", http.StatusBadRequest)
+				return
+			}
+			defer gr.Close()
+			r.Body = io.NopCloser(gr)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ── In-Memory Rate Limiter ───────────────────────────────
+
+type rateLimiter struct {
+	mu      sync.Mutex
+	buckets map[string][]time.Time
+}
+
+var limiter = &rateLimiter{buckets: make(map[string][]time.Time)}
+
+func (rl *rateLimiter) allow(key string, maxReq int, duration time.Duration) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	window := now.Add(-duration)
+	bucket := rl.buckets[key]
+
+	// 清理过期
+	filtered := make([]time.Time, 0, len(bucket))
+	for _, t := range bucket {
+		if t.After(window) {
+			filtered = append(filtered, t)
+		}
+	}
+
+	if len(filtered) >= maxReq {
+		rl.buckets[key] = filtered
+		return false
+	}
+
+	filtered = append(filtered, now)
+	rl.buckets[key] = filtered
+	return true
+}
+
+func RateLimitMiddleware(maxReq int, duration time.Duration) func(http.Handler) http.Handler {
+	if maxReq <= 0 {
+		return func(next http.Handler) http.Handler { return next }
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := r.RemoteAddr
+			if !limiter.allow(key, maxReq, duration) {
+				writeError(w, http.StatusTooManyRequests, "rate limit exceeded", "rate_limit")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ── Cache Control ────────────────────────────────────────
+
+func CacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			w.Header().Set("Cache-Control", "no-cache")
+		} else {
+			w.Header().Set("Cache-Control", "max-age=604800")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ── Provider Monitor ──────────────────────────────────────
+
+type channelMetric struct {
+	recent []bool // true=success, false=fail
+}
+
+var channelMetrics = make(map[uint64]*channelMetric)
+
+func EmitChannelMetric(providerID uint64, success bool) {
+	m, ok := channelMetrics[providerID]
+	if !ok {
+		m = &channelMetric{}
+		channelMetrics[providerID] = m
+	}
+
+	queueSize := 100
+	if len(m.recent) >= queueSize {
+		m.recent = m.recent[1:]
+	}
+	m.recent = append(m.recent, success)
+
+	// 自动禁用低成功率 channel
+	threshold := 0.3
+	if len(m.recent) >= queueSize {
+		successCount := 0
+		for _, s := range m.recent {
+			if s {
+				successCount++
+			}
+		}
+		rate := float64(successCount) / float64(len(m.recent))
+		if rate < threshold {
+			log.Printf("[MONITOR] channel %d success rate %.2f < %.2f, disabling",
+				providerID, rate, threshold)
+			ch, _ := model.GetGatewayProvider(providerID)
+			if ch != nil && ch.IsActive {
+				ch.IsActive = false
+				model.SetGatewayProvider(providerID, ch)
+			}
+			m.recent = nil
+		}
+	}
+}
+
+func ShouldDisableChannel(errMsg string, statusCode int) bool {
+	if statusCode == http.StatusUnauthorized {
+		return true
+	}
+	lower := strings.ToLower(errMsg)
+	triggers := []string{
+		"insufficient_quota", "invalid_api_key", "account_deactivated",
+		"credit", "balance", "已欠费", "permission denied",
+	}
+	for _, t := range triggers {
+		if strings.Contains(lower, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// ── JSON helpers ─────────────────────────────────────────
+
+func writeError(w http.ResponseWriter, code int, msg, typ string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": map[string]string{"message": msg, "type": typ},
+	})
+}
+
+func readRequestBody(r *http.Request) ([]byte, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	r.Body = io.NopCloser(bytes.NewBuffer(body))
+	return body, nil
+}

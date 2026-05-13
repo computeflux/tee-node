@@ -1,0 +1,154 @@
+package gateway
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/services/gateway/relay"
+)
+
+func RegisterGatewayRoutes(r chi.Router) {
+	r.Route("/v1", func(r chi.Router) {
+		r.Use(RecoveryMiddleware)
+		r.Use(RequestIDMiddleware)
+		r.Use(LoggerMiddleware)
+		r.Use(GzipDecodeMiddleware)
+		r.Use(RateLimitMiddleware(60, time.Minute))
+		r.Use(CacheMiddleware)
+		r.Use(TokenAuthMiddleware)
+		r.Use(DistributeMiddleware)
+
+		r.Post("/chat/completions", HandleRelay)
+		r.Post("/completions", HandleRelay)
+		r.Post("/embeddings", HandleRelay)
+		r.Post("/images/generations", HandleRelay)
+		r.Post("/audio/speech", HandleRelay)
+		r.Post("/audio/transcriptions", HandleRelay)
+		r.Get("/models", HandleListModels)
+	})
+}
+
+func HandleRelay(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	channel := GetChannelFromContext(r)
+	endpoint := GetEndpointFromContext(r)
+	modelName := GetModelFromContext(r)
+	if channel == nil || endpoint == nil {
+		writeError(w, http.StatusServiceUnavailable, "no route", "server_error")
+		return
+	}
+
+	// Endpoint 级别限流 — 这才是真正的瓶颈
+	provider := relay.DetectProvider(endpoint.URL)
+	rpmLimit, maxConc := GetProviderLimits(provider)
+	lim := getEndpointLimiter(endpoint.ID, rpmLimit)
+	lim.SetLimits(rpmLimit, maxConc)
+	if !lim.Allow() {
+		releaseEndpoint(channel.ID, endpoint.ID)
+		rpm, inf := lim.Stats()
+		writeError(w, http.StatusTooManyRequests,
+			fmt.Sprintf("rate limited: %d/%d RPM, %d/%d inflight", rpm, rpmLimit, inf, maxConc),
+			"rate_limit")
+		return
+	}
+	defer lim.Done()
+
+	bodyBytes, _ := readRequestBody(r)
+	var reqBody struct {
+		Model  string `json:"model"`
+		Stream bool   `json:"stream"`
+	}
+	json.Unmarshal(bodyBytes, &reqBody)
+	if reqBody.Model != "" {
+		modelName = reqBody.Model
+	}
+
+	usage, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
+	releaseEndpoint(channel.ID, endpoint.ID)
+	if err != nil {
+		EmitChannelMetric(channel.ID, false)
+		writeError(w, http.StatusBadGateway, err.Error(), "server_error")
+		return
+	}
+
+	EmitChannelMetric(channel.ID, true)
+	recordUsageAsync(0, time.Now().Format("2006-01-02"), channel.ID, uint64(func() int {
+		if usage != nil {
+			return usage.TotalTokens
+		}
+		return 0
+	}()))
+
+	elapsed := time.Since(start)
+	tkns := 0
+	if usage != nil {
+		tkns = usage.TotalTokens
+	}
+	log.Printf("[GATEWAY] %s %s -> %s (%d tokens, %v)", r.Method, modelName, endpoint.URL, tkns, elapsed)
+}
+
+func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, error) {
+	ctx := relay.NewRelayContext(w, r)
+	ctx.Set("request_model", modelName)
+
+	meta := relay.GetByContext(ctx)
+	meta.BaseURL = endpoint.URL
+	meta.APIKey = endpoint.APIKey
+	meta.IsStream = isStream
+
+	adaptor := relay.GetAdaptorForProvider(relay.DetectProvider(endpoint.URL))
+	adaptor.Init(meta)
+
+	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("upstream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
+	if bizErr != nil {
+		if ShouldDisableChannel(bizErr.Error.Message, bizErr.StatusCode) {
+			endpoint.IsActive = false
+			model.SetGatewayEndpoint(endpoint.ID, endpoint)
+			disableEndpoint(endpoint.ProviderID, endpoint.ID)
+			log.Printf("[MONITOR] disabled endpoint %d: %s", endpoint.ID, bizErr.Error.Message)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(bizErr.StatusCode)
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": bizErr.Error})
+		return nil, fmt.Errorf("%d: %s", bizErr.StatusCode, bizErr.Error.Message)
+	}
+	return usage, nil
+}
+
+func HandleListModels(w http.ResponseWriter, r *http.Request) {
+	models := []map[string]interface{}{}
+	var id uint64
+	for {
+		m, err := model.GetGatewayModel(id)
+		if err != nil || m == nil {
+			break
+		}
+		if m.IsActive {
+			models = append(models, map[string]interface{}{
+				"id": m.Name, "object": "model", "owned_by": m.Owner,
+			})
+		}
+		id++
+		if id > 1000 {
+			break
+		}
+	}
+	if models == nil {
+		models = []map[string]interface{}{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"object": "list", "data": models})
+}

@@ -1,0 +1,100 @@
+# ── 类型定义 ────────────────────────────────────────────
+
+type AuthResponse {
+  success: Boolean!
+  userInfo: UserInfo
+  token: String
+  address: String
+  error: String
+}
+
+type UserInfo {
+  email: String!
+  name: String
+  profileImage: String
+  verifier: String
+  verifierId: String
+  typeOfLogin: String
+  aggregateVerifier: String
+  authConnection: String
+  authConnectionId: String
+}
+
+type OAuthURL {
+  authUrl: String!
+}
+
+type WalletResult {
+  status: String!
+  result: String
+  error: String
+}
+
+type RecoveryResult {
+  status: String!
+  recoveryToken: String
+  token: String
+  address: String
+  email: String
+  error: String
+}
+
+# ── 输入类型 ────────────────────────────────────────────
+
+input TxInput {
+  from: String!
+  to: String!
+  value: String
+  data: String
+  gas: String
+  gasPrice: String
+  nonce: String
+  chainId: String
+  passwordHash: String
+}
+
+# ── Mutation ────────────────────────────────────────────
+
+extend type Mutation {
+  """请求 OTP 验证码"""
+  requestOTP(email: String!, clientId: String!): AuthResponse!
+
+  """验证 OTP 并完成登录"""
+  verifyOTP(email: String!, otp: String!, clientId: String!): AuthResponse!
+
+  """社交登录"""
+  socialLogin(
+    provider: String!
+    idToken: String
+    code: String
+    codeVerifier: String
+  ): AuthResponse!
+
+  """设置交易密码"""
+  setPassword(token: String!, passwordHash: String!): WalletResult!
+
+  """签名交易"""
+  signTransaction(token: String!, tx: TxInput!): WalletResult!
+
+  """签名消息"""
+  signMessage(token: String!, message: String!, from: String!): WalletResult!
+
+  """发起社交恢复"""
+  requestRecovery(recoveryEmail: String!): RecoveryResult!
+
+  """验证恢复 OTP"""
+  verifyRecovery(recoveryEmail: String!, otp: String!): RecoveryResult!
+
+  """完成恢复"""
+  completeRecovery(recoveryToken: String!, passwordHash: String!): RecoveryResult!
+}
+
+# ── Query ───────────────────────────────────────────────
+
+extend type Query {
+  """获取 OAuth 授权 URL"""
+  oauthURL(provider: String!): OAuthURL!
+
+  """认证服务健康检查"""
+  authHealth: String!
+}
