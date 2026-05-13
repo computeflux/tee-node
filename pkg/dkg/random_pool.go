@@ -51,7 +51,7 @@ func NewRandomSharePool(signer *model.PrivKey, capacity int) *RandomSharePool {
 		capacity:   capacity,
 		shares:     make(map[uint32]*model.DistKeyShare),
 		txMappings: make(map[int64]uint32),
-		persistKey: signer.GetPublic().SS58(),
+		persistKey: signer.GetPublicForSuite(model.SuiteEd25519).SS58(),
 	}
 	_ = pool.load()
 	return pool

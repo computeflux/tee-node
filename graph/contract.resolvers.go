@@ -10,11 +10,11 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec/model"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/side-chain/contracts"
-	"github.com/vektah/gqlparser/v2/gqlerror"cts"
-	"github.om/vekah/gqlparer/v2/gqlerror
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // SystemContractInit is the resolver for the systemContractInit field.
@@ -26,7 +26,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("contract is inited")
 	}
 
-	if sideChain.GetDKG().DkgPubKey == nil {
+	if sideChain.GetDKG().SystemPubKey() == nil {
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
 
@@ -45,12 +45,13 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
 
-	signer := dkg.Signer.ToSigner()
+	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
 	sysCall := &model.SysCall{
 		Payload: &model.SysCall_Contract{
 			Contract: call,
 		},
 	}
+	// First occurrence: SystemContractInit
 
 	sigBytes, err := sysCall.BytesForSig()
 	if err != nil {
@@ -61,7 +62,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("Sign: %v", err)
 	}
 
-	err = SubmitContractCall(signer.PublicKey, 0, contract, method, argBytes, signature)
+	err = SubmitContractCall(signer.Public(), 0, contract, method, argBytes, signature)
 	if err != nil {
 		return false, gqlerror.Errorf("SystemContractInit DecodeCaller: %v", err)
 	}
@@ -100,11 +101,11 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 
 	// 获取 DKG Signer
 	dkg := sideChain.GetDKG()
-	if dkg == nil || dkg.DkgPubKey == nil {
+	if dkg == nil || dkg.SystemPubKey() == nil {
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
 
-	signer := dkg.Signer.ToSigner()
+	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
 	sysCall := &model.SysCall{
 		Payload: &model.SysCall_Contract{
 			Contract: call,
@@ -120,7 +121,7 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 		return false, gqlerror.Errorf("Sign: %v", err)
 	}
 
-	if err := SubmitContractCall(signer.PublicKey, 0, contract, model.MethodToSelector("Mint"), argBytes, signature); err != nil {
+	if err := SubmitContractCall(signer.Public(), 0, contract, model.MethodToSelector("Mint"), argBytes, signature); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)
 	}
 

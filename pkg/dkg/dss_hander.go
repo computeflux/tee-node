@@ -3,11 +3,11 @@ package dkg
 import (
 	"encoding/json"
 	"errors"
-ains"
+
+	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/wetee-dao/ink.go/pallet/revivutil"
-	"githeb.com/we"ee-dao/nk.go/palet/revive
+	"github.com/wetee-dao/ink.go/pallet/revive"
 )
 
 var skipPartialSign = false
@@ -20,7 +20,11 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	// skip partial sign return []byte for util test
 	if skipPartialSign {
 		msg := model.NewEpochMsg{}
-		bt, _ := json.Marshal(msg)
+		bt, err := json.Marshal(msg)
+		if err != nil {
+			util.LogError("DKG", "marshal NewEpochMsg error:", err)
+			return
+		}
 		dkg.sendToNode(model.SendToNode(&dkg.NewEpochSponsor.P2pId), &model.DkgMessage{
 			Type:    "consensus_to_newpoch",
 			Payload: bt,
@@ -33,14 +37,13 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		return
 	}
 
-	client := chains.MainChain.GetClient()
-
-	if dkg.NewDkgPubKey == nil {
+	if dkg.NewDkgPubKeys[model.SuiteEd25519] == nil {
 		util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "NewDkgPubKey is nil")
 		return
 	}
-	h160 := dkg.NewDkgPubKey.H160()
-	_, isSome, err := revive.GetOriginalAccountLatest(client.Api().RPC.State, h160)
+
+	h160 := dkg.NewDkgPubKeys[model.SuiteEd25519].ChainH160()
+	isSome, err := chains.MainChain.CheckMapAccount(h160)
 	if err != nil {
 		util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "GetOriginalAccountLatest error:"+err.Error())
 		return
@@ -55,27 +58,23 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "AsCall error:"+err.Error())
 			return
 		}
-		signer := NewDssSigner(dkg, 0)
+		signer := NewDssSigner(dkg, 0, model.SuiteEd25519)
 
-		sig, err = client.PartialSign(signer, call)
+		sig, err = chains.MainChain.PartialSign(signer, model.ChainCall{Data: call.Args})
 		if err != nil {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "MapAccount PartialSign error:"+err.Error())
 			return
 		}
 	} else {
-		signer := NewDssSigner(dkg, 0)
-		call, err := chains.MainChain.TxCallOfSetNextEpoch(dkg.NewEpochSponsor.NodeID, signer.AccountID())
-		util.LogWithPurple("DKG SendNewEpochPartialSigToSponsor", "side chain key", dkg.NewDkgPubKey.SS58(), dkg.NewDkgPubKey.H160().Hex())
+		signer := NewDssSigner(dkg, 0, model.SuiteEd25519)
+		call, err := chains.MainChain.TxCallOfSetNextEpoch(dkg.NewEpochSponsor.NodeID, signer.ChainAccountID())
+		util.LogWithPurple("DKG SendNewEpochPartialSigToSponsor", "side chain key", dkg.NewDkgPubKeys[model.SuiteEd25519].SS58(), dkg.NewDkgPubKeys[model.SuiteEd25519].ChainH160().Hex())
 		if err != nil {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "TxCallOfSetNextEpoch error:"+err.Error())
 			return
 		}
-		if err != nil {
-			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "MainChain.TxCallOfSetNextEpoch error:"+err.Error())
-			return
-		}
 
-		sig, err = client.PartialSign(signer, *call)
+		sig, err = chains.MainChain.PartialSign(signer, *call)
 		if err != nil && isSome {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "PartialSign error:"+err.Error())
 			return
@@ -86,7 +85,11 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		Time:       dkg.NewEpochTime,
 		PartialSig: sig,
 	}
-	bt, _ := json.Marshal(msg)
+	bt, err := json.Marshal(msg)
+	if err != nil {
+		util.LogError("DKG", "marshal NewEpochMsg error:", err)
+		return
+	}
 	dkg.sendToNode(model.SendToNode(&dkg.NewEpochSponsor.P2pId), &model.DkgMessage{
 		Type:    "consensus_to_newpoch",
 		Payload: bt,
@@ -94,13 +97,17 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 }
 
 func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
+	dkg.mu.Lock()
+
 	if !dkg.ConsensusIsbusy() {
+		dkg.mu.Unlock()
 		return nil
 	}
 
 	msg := new(model.NewEpochMsg)
 	err := json.Unmarshal(data, msg)
 	if err != nil {
+		dkg.mu.Unlock()
 		dkg.consensusFailBack(errors.New("SendNewEpochPartialSigToSponsor client.PartialSign error:" + err.Error()))
 		return err
 	}
@@ -111,13 +118,16 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	}
 
 	dkg.NewEpochPartialSigs[OrgId] = msg
-	if len(dkg.NewEpochPartialSigs) <= dkg.Threshold {
+	enough := len(dkg.NewEpochPartialSigs) > dkg.Threshold
+	dkg.mu.Unlock()
+
+	if !enough {
 		return nil
 	}
 
 	// add for test
 	if skipPartialSign {
-		dkg.consensusSuccessBack(&DssSigner{}, dkg.NewEpochSponsor.NodeID)
+		dkg.consensusSuccessBack(&DssSigner{suite: model.SuiteEd25519}, dkg.NewEpochSponsor.NodeID)
 		return nil
 	}
 
@@ -129,9 +139,8 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	}
 
 	// check key is has been mapped
-	client := chains.MainChain.GetClient()
-	h160 := dkg.NewDkgPubKey.H160()
-	_, isSome, err := revive.GetOriginalAccountLatest(client.Api().RPC.State, h160)
+	h160 := dkg.NewDkgPubKeys[model.SuiteEd25519].ChainH160()
+	isSome, err := chains.MainChain.CheckMapAccount(h160)
 	if err != nil {
 		dkg.consensusFailBack(errors.New("SendNewEpochPartialSigToSponsor GetOriginalAccountLatest error:" + err.Error()))
 		return errors.New("SendNewEpochPartialSigToSponsor error:" + err.Error())
@@ -139,10 +148,10 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	// mapAccount
 	if !isSome {
-		signer := DssSigner{dkg: dkg}
+		signer := DssSigner{dkg: dkg, suite: model.SuiteEd25519}
 		signer.SetSigs(shares)
 
-		util.LogWithGreen("SendNewEpochPartialSigToSponsor mapAccount", dkg.DkgPubKey.SS58())
+		util.LogWithGreen("SendNewEpochPartialSigToSponsor mapAccount", dkg.DkgPubKeys[model.SuiteEd25519].SS58())
 
 		runtimeCall := revive.MakeMapAccountCall()
 		call, err := (runtimeCall).AsCall()
@@ -150,19 +159,22 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 			dkg.consensusFailBack(errors.New("SendNewEpochPartialSigToSponsor AsCall error:" + err.Error()))
 			return errors.New("AsCall error:" + err.Error())
 		}
-		err = client.SignAndSubmit(&signer, call, false, 0)
+		err = chains.MainChain.SignAndSubmit(&signer, model.ChainCall{Data: call.Args}, false, 0)
 		if err != nil {
 			dkg.consensusFailBack(errors.New("SendNewEpochPartialSigToSponsor side chain key MapAccount error:" + err.Error()))
 			return errors.New("side chain key MapAccount error:" + err.Error())
 		}
 
+		// MapAccount tx submitted but needs on-chain confirmation.
+		// Signal "failure" to trigger retry on next block epoch.
 		dkg.consensusFailBack(errors.New("SendNewEpochPartialSigToSponsor run makeaccount, next time submit tx"))
 		return nil
 	}
 
-	// util.LogWithPurple("DKG", "SubmitToNepoch side chain key", dkg.NewDkgPubKey.SS58(), dkg.NewDkgPubKey.H160().Hex())
+	// util.LogWithPurple("DKG", "SubmitToNepoch side chain key", dkg.NewDkgPubKeys[model.SuiteEd25519].SS58(), dkg.NewDkgPubKeys[model.SuiteEd25519].ChainH160().Hex())
 	signer := DssSigner{
-		dkg: dkg,
+		dkg:   dkg,
+		suite: model.SuiteEd25519,
 	}
 	signer.SetSigs(shares)
 
@@ -172,7 +184,9 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 func (dkg *DKG) SaveSponsor(newMsg *model.ConsensusMsg) {
 	if newMsg.Sponsor != nil {
+		dkg.mu.Lock()
 		dkg.NewEpochSponsor = newMsg.Sponsor
 		dkg.NewEpochTime = newMsg.EpochTime
+		dkg.mu.Unlock()
 	}
 }

@@ -35,13 +35,16 @@ func LogWithTime(a ...any) {
 	fmt.Println(a...)
 }
 
-func (s *SideChain) ProposerAddressToNodeKey(proposer []byte) *model.PubKey {
+func (s *SideChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, error) {
+	if s.dkg == nil {
+		return nil, errors.New("dkg is nil")
+	}
 	for _, node := range s.dkg.Nodes {
 		if bytes.Equal(proposer, crypto.AddressHash(node.ValidatorId.PublicKey)) {
-			return &node.P2pId
+			return &node.P2pId, nil
 		}
 	}
-	panic("ProposerAddress not in DKG")
+	return nil, errors.New("ProposerAddress not in DKG")
 }
 
 func GetDkgPubkey() (*types.AccountID, error) {

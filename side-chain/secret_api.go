@@ -87,7 +87,6 @@ func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRe
 		case <-time.After(30 * time.Second):
 			util.LogError("BroadcastDecryptSecret", "Timeout receiving from channel")
 			timeoutErr = fmt.Errorf("timeout receiving from channel")
-			break
 		}
 	}
 	// drain remaining messages and clean up channel to avoid goroutine leaks
@@ -152,7 +151,7 @@ func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRe
 	encodeSecret := make(map[uint64]*model.Secret)
 	for index, shares := range secretShares {
 		// 从收集的响应中恢复重加密承诺
-		xncCmt, err := proxy_reenc.Recover(suite, shares, threshold, len(validators))
+		xncCmt, err := proxy_reenc.Recover(suite, shares, uint32(threshold), uint32(len(validators)))
 		if err != nil {
 			return nil, fmt.Errorf("recover reencrypt reply: %s", err)
 		}
@@ -175,7 +174,7 @@ func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRe
 	encodeDiskKey := make(map[uint64]*model.Secret)
 	for index, shares := range diskShares {
 		// 从收集的响应中恢复重加密承诺
-		xncCmt, err := proxy_reenc.Recover(suite, shares, threshold, len(validators))
+		xncCmt, err := proxy_reenc.Recover(suite, shares, uint32(threshold), uint32(len(validators)))
 		if err != nil {
 			return nil, fmt.Errorf("recover reencrypt reply: %s", err)
 		}

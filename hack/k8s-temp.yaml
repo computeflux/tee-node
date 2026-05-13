@@ -1,76 +1,76 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: $NAME
-  namespace: worker-addon
+    name: $NAME
+    namespace: worker-addon
 spec:
-  # 先停旧 Pod，再起新镜像（避免与旧容器并行占 SGX/端口）；升级会有短暂中断
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: $NAME
-  template:
-    metadata:
-      labels:
-        app: $NAME
-    spec:
-      containers:
-        - name: c0
-          image: $DSECRET_IMAGE
-          ports:
-            - containerPort: $SIDE_CHAIN_PORT
-              name: side
-              protocol: TCP
-            - containerPort: $GQL_PORT
-              name: qgl
-              protocol: TCP
-          env:
-            - name: SIDE_CHAIN_PORT
-              value: '$SIDE_CHAIN_PORT'
-            - name: GQL_PORT
-              value: '$GQL_PORT'
-            - name: CHAIN_ENV
-              value: $CHAIN_ENV
-          volumeMounts:
-            - name: $NAME
-              mountPath: /chain_data
-          resources:
-            limits:
-              alibabacloud.com/sgx_epc_MiB: 10
-            requests:
-              alibabacloud.com/sgx_epc_MiB: 10
-      volumes:
-        - name: $NAME
-          hostPath:
-            type: DirectoryOrCreate
-            path: $DSECRET_DIR
-      nodeSelector:
-        TEE: "SGX"
+    # 先停旧 Pod，再起新镜像（避免与旧容器并行占 SGX/端口）；升级会有短暂中断
+    strategy:
+        type: Recreate
+    selector:
+        matchLabels:
+            app: $NAME
+    template:
+        metadata:
+            labels:
+                app: $NAME
+        spec:
+            containers:
+                - name: c0
+                  image: $DSECRET_IMAGE
+                  ports:
+                      - containerPort: $SIDE_CHAIN_PORT
+                        name: side
+                        protocol: TCP
+                      - containerPort: $GQL_PORT
+                        name: qgl
+                        protocol: TCP
+                  env:
+                      - name: SIDE_CHAIN_PORT
+                        value: "$SIDE_CHAIN_PORT"
+                      - name: GQL_PORT
+                        value: "$GQL_PORT"
+                      - name: CHAIN_ENV
+                        value: $CHAIN_ENV
+                  volumeMounts:
+                      - name: $NAME
+                        mountPath: /token_chain_data
+                  resources:
+                      limits:
+                          alibabacloud.com/sgx_epc_MiB: 10
+                      requests:
+                          alibabacloud.com/sgx_epc_MiB: 10
+            volumes:
+                - name: $NAME
+                  hostPath:
+                      type: DirectoryOrCreate
+                      path: $DSECRET_DIR
+            nodeSelector:
+                TEE: "SGX"
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: $NAME-service
-  namespace: worker-addon
+    name: $NAME-service
+    namespace: worker-addon
 spec:
-  type: NodePort
-  selector:
-    app: $NAME
-  ports:
-    - name: side
-      protocol: TCP
-      nodePort: $SIDE_CHAIN_PORT
-      port: $SIDE_CHAIN_PORT
-      targetPort: $SIDE_CHAIN_PORT
-    - name: side-rpc
-      protocol: TCP
-      nodePort: $SIDE_CHAIN_RPC_PORT
-      port: $SIDE_CHAIN_RPC_PORT
-      targetPort: $SIDE_CHAIN_RPC_PORT
-    - name: qgl
-      protocol: TCP
-      nodePort: $GQL_PORT
-      port: $GQL_PORT
-      targetPort: $GQL_PORT
+    type: NodePort
+    selector:
+        app: $NAME
+    ports:
+        - name: side
+          protocol: TCP
+          nodePort: $SIDE_CHAIN_PORT
+          port: $SIDE_CHAIN_PORT
+          targetPort: $SIDE_CHAIN_PORT
+        - name: side-rpc
+          protocol: TCP
+          nodePort: $SIDE_CHAIN_RPC_PORT
+          port: $SIDE_CHAIN_RPC_PORT
+          targetPort: $SIDE_CHAIN_RPC_PORT
+        - name: qgl
+          protocol: TCP
+          nodePort: $GQL_PORT
+          port: $GQL_PORT
+          targetPort: $GQL_PORT

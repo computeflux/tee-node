@@ -8,10 +8,10 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
-# ensure host /chain_data points to hack/node0/chain_data (cannot change enclave.json)
+# ensure host /token_chain_data points to hack/node0/token_chain_data (cannot change enclave.json)
 ROOT_DIR="$(pwd)"
-NODE_DIR="/srv/node0"
-NODE_CHAIN_DIR="$NODE_DIR/chain_data"
+NODE_DIR="/srv/token_node0"
+NODE_CHAIN_DIR="$NODE_DIR/token_chain_data"
 
 ensure_dir() {
     local dir="$1"
@@ -59,7 +59,7 @@ ensure_dir "$NODE_CHAIN_DIR" || exit 1
 
 ensure_chain_data_link() {
     local desired="$1"
-    local target="/chain_data"
+    local target="/token_chain_data"
 
     if [ -L "$target" ]; then
         local cur
@@ -143,6 +143,6 @@ export SIDE_CHAIN_RPC_PORT=30111
 export GQL_PORT=30115
 export CHAIN_ENV=test
 
-# run from / so relative ./chain_data resolves to /chain_data
+# run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
 ego run "$ROOT_DIR/hack/build/dsecret"

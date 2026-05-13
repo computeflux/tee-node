@@ -9,10 +9,13 @@ import (
 
 	"github.com/cometbft/cometbft/privval"
 	"github.com/computeflux/tee-provider/graph"
+	"github.com/computeflux/tee-provider/pkg/api/auth"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	authsvc "github.com/computeflux/tee-provider/services/auth"
+	"github.com/computeflux/tee-provider/services/wallet"
 	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
 
@@ -41,8 +44,8 @@ func main() {
 
 	// Init key for DKG
 	validatorKey := privval.LoadFilePV(
-		"./chain_data/config/priv_validator_key.json",
-		"./chain_data/data/priv_validator_state.json",
+		"./token_chain_data/config/priv_validator_key.json",
+		"./token_chain_data/data/priv_validator_state.json",
 	)
 	dkgKey := validatorKey.Key.PrivKey
 
@@ -53,8 +56,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	util.LogWithYellow("Mainchain Key", nodePriv.GetPublic().SS58())
-	util.LogWithYellow("P2P Key", p2pKey.GetPublic().SS58())
+	util.LogWithYellow("Mainchain Key", nodePriv.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(model.SuiteEd25519).SS58())
 
 	chainConfig := model.GetChainConfig(chainEnv)
 	if chainConfig == nil {
@@ -88,8 +91,8 @@ func main() {
 	go dkgIns.Start()
 	defer dkgIns.Stop()
 
-	if dkgIns.DkgPubKey != nil {
-		util.LogWithYellow("DKG PubKey", dkgIns.DkgPubKey.SS58())
+	if dkgIns.SystemPubKey() != nil {
+		util.LogWithYellow("DKG PubKey", dkgIns.SystemPubKey().SS58())
 	}
 
 	// Set DKG to sideChain
@@ -118,8 +121,27 @@ func main() {
 		node.Wait()
 	}()
 
-	// 启动 graphql 服务器
-	go graph.StartServer(sideChain, gqlPort)
+	// ── 初始化 Web3Auth 服务 ──────────────────────────────
+	authCfg := auth.LoadConfig()
+	walletSvc := wallet.NewWalletService(authCfg)
+	jwtSvc := authsvc.NewJWTService(authCfg)
+	emailSvc := authsvc.NewEmailService(authCfg)
+	oauthSvc := authsvc.NewOAuthService(authCfg)
+	otpSvc := authsvc.NewOTPService(authCfg.OTPTTLMins)
+
+	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
+	resolver := &graph.Resolver{
+		SideChain: sideChain,
+		AuthCfg:   authCfg,
+		WalletSvc: walletSvc,
+		JWTSvc:    jwtSvc,
+		EmailSvc:  emailSvc,
+		OAuthSvc:  oauthSvc,
+		OTPSvc:    otpSvc,
+	}
+
+	// Start GraphQL server
+	go graph.StartServerWithResolver(sideChain, gqlPort, resolver)
 
 	// wait for stop signal
 	sigCh := make(chan os.Signal, 1)

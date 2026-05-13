@@ -1,17 +1,18 @@
-// / Copyright (c) 2022 Sourcenetwork Developers. All rights reserved.
-// / copy from https://github.com/sourcenetwork/orbis-go
+// Copyright (c) 2022 Sourcenetwork Developers. All rights reserved.
+// copy from https://github.com/sourcenetwork/orbis-go
 
 package proxy_reenc
 
 import (
 	"testing"
-pkg/model"
-	"github.com/stretchr/testify/require""
-	"github.com/stretchr/testify/require
+
+	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/share"
 	"go.dedis.ch/kyber/v4/suites"
 	"go.dedis.ch/kyber/v4/util/random"
+
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 func TestInlineReencryptAndVerify(t *testing.T) {
@@ -21,7 +22,7 @@ func TestInlineReencryptAndVerify(t *testing.T) {
 		suite = suites.MustFind("Ed25519")
 
 		s       = suite.Scalar().Pick(suite.RandomStream())
-		priPoly = share.NewPriPoly(suite, th, s, suite.RandomStream())
+		priPoly = share.NewPriPoly(suite, uint32(th), s, suite.RandomStream())
 		pubPoly = priPoly.Commit(nil)
 
 		dkgCommit = pubPoly.Commit() // DKG 公钥
@@ -57,7 +58,7 @@ func TestInlineReencryptAndVerify(t *testing.T) {
 
 	// 4 - Recover re-encrypted commmitment using Lagrange interpolation.
 	// ski * (xG + rG) => rsG + xsG
-	xncCmt, err := share.RecoverCommit(suite, pubShares, th, n)
+	xncCmt, err := share.RecoverCommit(suite, pubShares, uint32(th), uint32(n))
 	require.NoErrorf(t, err, "failed to recover commit")
 
 	// 5 - Decode encrypted key with re-encrypted commitment and reader's privatekey.
@@ -73,7 +74,7 @@ func TestReencryptAndVerify(t *testing.T) {
 		suite = suites.MustFind("Ed25519")
 
 		s       = suite.Scalar().Pick(suite.RandomStream())
-		priPoly = share.NewPriPoly(suite, th, s, suite.RandomStream())
+		priPoly = share.NewPriPoly(suite, uint32(th), s, suite.RandomStream())
 		pubPoly = priPoly.Commit(nil)
 
 		dkgCommit = pubPoly.Commit() // DKG 公钥
@@ -145,7 +146,7 @@ func TestReencryptAndVerify(t *testing.T) {
 
 	// 4 - Recover re-encrypted commmitment using Lagrange interpolation.
 	// ski * (xG + rG) => rsG + xsG
-	xncCmt, err := share.RecoverCommit(suite, pubShares, th, n)
+	xncCmt, err := share.RecoverCommit(suite, pubShares, uint32(th), uint32(n))
 	require.NoErrorf(t, err, "failed to recover commit")
 
 	// 5 - Decode encrypted key with re-encrypted commitment and reader's privatekey.

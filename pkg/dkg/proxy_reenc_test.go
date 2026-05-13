@@ -17,7 +17,7 @@ package dkg
 // )
 
 // func TestReencrypt(t *testing.T) {
-// 	os.RemoveAll("./chain_data")
+// 	os.RemoveAll("./token_chain_data")
 
 // 	db, err := model.NewDB()
 // 	if err != nil {

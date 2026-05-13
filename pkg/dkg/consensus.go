@@ -42,24 +42,27 @@ func (dkg *DKG) TryEpochConsensus(
 		return fmt.Errorf("new validators count < len(Validators)*3/4")
 	}
 
-	// check local node is in validators, only validator node can start consensus
-	dkg.mu.RLock()
-	dkgKeyShare := dkg.DkgKeyShare
+	// get ed25519 share for backward compat check
+	edShare := dkg.GetDkgKeyShare(model.SuiteEd25519)
 	nodeCount := len(dkg.Nodes)
 	nodesCopy := make([]*model.Validator, 0, nodeCount)
 	for _, n := range dkg.Nodes {
 		nodesCopy = append(nodesCopy, n)
 	}
-	dkg.mu.RUnlock()
 
-	if dkgKeyShare == nil && msg.Epoch > StartEpoch {
+	if edShare == nil && msg.Epoch > StartEpoch {
 		util.LogError("DKG Consensus", "msg.Epoch", msg.Epoch, "| Node is not old validator, cannot start consensus")
 		return errors.New("node is not old validator, cannot start consensus")
 	}
 
 	// init consensus msg
-	if dkgKeyShare != nil {
-		msg.ShareCommits = *util.DeepCopy(dkgKeyShare.CommitsWrap)
+	if edShare != nil {
+		// Use ed25519 commits as representative
+		commitsCopy, err := model.DeepCopyIf(edShare.CommitsWrap)
+		if err != nil {
+			return err
+		}
+		msg.ShareCommits = *commitsCopy
 		msg.ConsensusNodeNum = nodeCount
 		msg.OldValidators = nodesCopy
 	} else {
@@ -68,7 +71,7 @@ func (dkg *DKG) TryEpochConsensus(
 	}
 
 	// generate new validators sidekey
-	dkgSigner := dkg.Signer.GetPublic().SS58()
+	dkgSigner := dkg.Signer.GetPublicForSuite(model.SuiteEd25519).SS58()
 	validator := new(model.Validator)
 	for _, v := range msg.Validators {
 		if v.ValidatorId.SS58() == dkgSigner {
@@ -124,15 +127,12 @@ func (dkg *DKG) startConsensus(msg model.ConsensusMsg) error {
 	return dkg.reConsensus(msg)
 }
 
-// Init Consensus
+// Init Consensus — runs DKG for ALL suites in parallel
 func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
-	// if flag.Lookup("test.v") == nil {
-	// 	go dkg.HandleSecretSave()
-	// }
 	dkg.mu.Lock()
 	dkg.Nodes = msg.Validators
 	dkg.NewNodes = msg.Validators
-	dkg.Threshold = len(msg.Validators) * 2 / 3
+	dkg.Threshold = len(msg.Validators) - (len(msg.Validators)-1)/3
 	dkg.mu.Unlock()
 
 	// 如果已经初始化，则直接返回
@@ -140,52 +140,58 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 		return nil
 	}
 
-	// dkg 节点列表
-	nodes := make([]pedersen.Node, 0, len(dkg.Nodes))
-	for i, p := range dkg.Nodes {
-		nodes = append(nodes, pedersen.Node{
-			Index:  uint32(i),
-			Public: p.ValidatorId.Point(),
-		})
-	}
-	signer := schnorr.NewScheme(dkg.Suite)
-
-	// 初始化协议配置
-	dkg.mu.RLock()
-	threshold := dkg.Threshold
-	dkg.mu.RUnlock()
-	conf := pedersen.Config{
-		Suite:     dkg.Suite,
-		NewNodes:  nodes,
-		Threshold: threshold,
-		Auth:      signer,
-		FastSync:  true,
-		Longterm:  dkg.Signer.Scalar(),
-		Nonce:     epochToNonce(0),
-		Log:       dkg.log,
-	}
-
-	// initialize dealer
-	var err error
-	dkg.DistKeyGenerator, err = pedersen.NewDistKeyHandler(&conf)
+	// 为所有 suite 并行生成 deal
+	newMsg, err := model.DeepCopyIf(msg)
 	if err != nil {
-		dkg.finishDkgConsensusStep(false, "pedersen.NewDistKeyHandler")
-		return fmt.Errorf("failed to initialize DKG protocol: %w", err)
+		return err
 	}
-
-	// 获取当前节点的协议
-	// get deal of current node
-	deal, err := dkg.DistKeyGenerator.Deals()
-	if err != nil {
-		dkg.finishDkgConsensusStep(false, "dkg.DistKeyGenerator.Deals")
-		return fmt.Errorf("failed to generate key shares: %w", err)
-	}
-
-	// 开启节点共识
-	// send deal to all nodes
-	newMsg := util.DeepCopy(msg)
-	newMsg.DealBundle = &model.DealBundle{DealBundle: deal}
+	newMsg.DealBundles = make(map[model.SuiteType]*model.DealBundle)
 	newMsg.ShareCommits = model.KyberPoints{}
+
+	for _, st := range model.AllSuites() {
+		suite := dkg.Suites[st]
+
+		// Build node list.
+		nodes := make([]pedersen.Node, 0, len(dkg.Nodes))
+		for i, p := range dkg.Nodes {
+			nodes = append(nodes, pedersen.Node{
+				Index:  uint32(i),
+				Public: p.ValidatorId.Point(),
+			})
+		}
+		signer := schnorr.NewScheme(suite)
+
+		// 初始化协议配置
+		conf := pedersen.Config{
+			Suite:     suite,
+			NewNodes:  nodes,
+			Threshold: uint32(dkg.Threshold),
+			Auth:      signer,
+			FastSync:  true,
+			Longterm:  dkg.longtermForSuite(st),
+			Nonce:     epochToNonce(0),
+			Log:       dkg.log,
+		}
+
+		// initialize dealer
+		gen, err := pedersen.NewDistKeyHandler(&conf)
+		if err != nil {
+			dkg.finishDkgConsensusStep(false, "pedersen.NewDistKeyHandler:"+st.String())
+			return fmt.Errorf("failed to initialize DKG protocol for %s: %w", st, err)
+		}
+		dkg.DistKeyGens[st] = gen
+
+		// 获取当前节点的 deal
+		deal, err := gen.Deals()
+		if err != nil {
+			dkg.finishDkgConsensusStep(false, "Deals:"+st.String())
+			return fmt.Errorf("failed to generate key shares for %s: %w", st, err)
+		}
+
+		newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal}
+	}
+
+	// 发送包含所有 suite deal 的消息
 	err = dkg.sendDealMessage(model.SendToNodes(dkg.OldAndNetIds()), newMsg)
 	if err != nil {
 		fmt.Println("Send error:", err)
@@ -194,97 +200,107 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 	return nil
 }
 
-// Re-consensus DKG
+// Re-consensus DKG — runs DKG for ALL suites
 func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 	// old
 	dkg.mu.Lock()
-	dkg.Threshold = len(msg.OldValidators) * 2 / 3
+	dkg.Threshold = len(msg.OldValidators) - (len(msg.OldValidators)-1)/3
 	dkg.Nodes = msg.OldValidators
 	// new
 	dkg.NewNodes = msg.Validators
 	dkg.NewEpoch = msg.Epoch
 	dkg.mu.Unlock()
 
-	// new DKG 节点列表
-	newNodes := make([]pedersen.Node, 0, len(msg.Validators))
-	for i, p := range msg.Validators {
-		newNodes = append(newNodes, pedersen.Node{
-			Index:  uint32(i),
-			Public: p.ValidatorId.Point(),
-		})
-	}
+	newThreshold := len(msg.Validators) - (len(msg.Validators)-1)/3
 
-	// 获取旧节点列表
-	oldNodes := make([]pedersen.Node, 0, len(dkg.Nodes))
-	for i, p := range dkg.Nodes {
-		oldNodes = append(oldNodes, pedersen.Node{
-			Index:  uint32(i),
-			Public: p.ValidatorId.Point(),
-		})
-	}
-
-	newThreshold := len(msg.Validators) * 2 / 3
-
-	// 初始化协议配置
-	conf := pedersen.Config{
-		OldNodes:     oldNodes,
-		OldThreshold: dkg.Threshold,
-		Threshold:    newThreshold,
-		NewNodes:     newNodes,
-		Nonce:        epochToNonce(msg.Epoch),
-		Suite:        dkg.Suite,
-		Auth:         schnorr.NewScheme(dkg.Suite),
-		FastSync:     true,
-		Longterm:     dkg.Signer.Scalar(),
-		Log:          dkg.log,
-	}
-
-	if dkg.DkgKeyShare != nil {
-		priv := dkg.DkgKeyShare
-		conf.Share = &pedersen.DistKeyShare{
-			Commits: priv.Commitments(),
-			Share:   priv.PriShare(),
-		}
-	} else {
-		conf.PublicCoeffs = msg.ShareCommits.Public
-	}
-
-	var err error
-	dkg.DistKeyGenerator, err = pedersen.NewDistKeyHandler(&conf)
+	// 为所有 suite 并行生成 deal
+	newMsg, err := model.DeepCopyIf(msg)
 	if err != nil {
-		dkg.finishDkgConsensusStep(false, "pedersen.NewDistKeyHandler(&conf)")
-		fmt.Println("unable to create DistKeyGenerator", err.Error())
 		return err
 	}
+	newMsg.DealBundles = make(map[model.SuiteType]*model.DealBundle)
 
-	priShare := dkg.DkgKeyShare
+	for _, st := range model.AllSuites() {
+		suite := dkg.Suites[st]
 
-	// 重置 DKG Key
+		// new DKG 节点列表
+		newNodes := make([]pedersen.Node, 0, len(msg.Validators))
+		for i, p := range msg.Validators {
+			newNodes = append(newNodes, pedersen.Node{
+				Index:  uint32(i),
+				Public: p.ValidatorId.Point(),
+			})
+		}
+
+		// 获取旧节点列表
+		oldNodes := make([]pedersen.Node, 0, len(dkg.Nodes))
+		for i, p := range dkg.Nodes {
+			oldNodes = append(oldNodes, pedersen.Node{
+				Index:  uint32(i),
+				Public: p.ValidatorId.Point(),
+			})
+		}
+
+		// 初始化协议配置
+		conf := pedersen.Config{
+			OldNodes:     oldNodes,
+			OldThreshold: uint32(dkg.Threshold),
+			Threshold:    uint32(newThreshold),
+			NewNodes:     newNodes,
+			Nonce:        epochToNonce(msg.Epoch),
+			Suite:        suite,
+			Auth:         schnorr.NewScheme(suite),
+			FastSync:     true,
+			Longterm:     dkg.longtermForSuite(st),
+			Log:          dkg.log,
+		}
+
+		oldShare := dkg.GetDkgKeyShare(st)
+		if oldShare != nil {
+			conf.Share = &pedersen.DistKeyShare{
+				Commits: oldShare.Commitments(),
+				Share:   oldShare.PriShare(),
+			}
+		} else {
+			conf.PublicCoeffs = msg.ShareCommits.Public
+		}
+
+		gen, err := pedersen.NewDistKeyHandler(&conf)
+		if err != nil {
+			dkg.finishDkgConsensusStep(false, "re-NewDistKeyHandler:"+st.String())
+			fmt.Println("unable to create DistKeyGenerator for", st, err.Error())
+			return err
+		}
+		dkg.DistKeyGens[st] = gen
+
+		// old node with share issues deals
+		if oldShare != nil {
+			deal, err := gen.Deals()
+			if err != nil {
+				dkg.finishDkgConsensusStep(false, "re-Deals:"+st.String())
+				return fmt.Errorf("failed to generate key shares for %s: %w", st, err)
+			}
+			newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal}
+		}
+	}
+
+	// 重置缓存
 	dkg.mu.Lock()
-	dkg.deals = map[string]*model.DealBundle{}
-	dkg.responses = map[string]*pedersen.ResponseBundle{}
+	for _, st := range model.AllSuites() {
+		dkg.deals[st] = make(map[string]*model.DealBundle)
+		dkg.responses[st] = make(map[string]*pedersen.ResponseBundle)
+	}
 	dkg.justifs = []*pedersen.JustificationBundle{}
 	dkg.mu.Unlock()
 
-	// old node not issue deals
-	if priShare == nil {
+	// 发送包含所有 suite deal 的消息
+	if len(newMsg.DealBundles) > 0 {
+		err := dkg.sendDealMessage(model.SendToNodes(dkg.NewNetIds()), newMsg)
+		if err != nil {
+			fmt.Println("Send error:", err)
+		}
+	} else {
 		dkg.log.Info("node is not old validator, not send deal")
-		return nil
-	}
-
-	// 获取当前节点的协议
-	deal, err := dkg.DistKeyGenerator.Deals()
-	if err != nil {
-		dkg.finishDkgConsensusStep(false, "dkg.DistKeyGenerator.Deals()")
-		return fmt.Errorf("failed to generate key shares: %w", err)
-	}
-
-	// 开启节点共识
-	newMsg := util.DeepCopy(msg)
-	newMsg.DealBundle = &model.DealBundle{DealBundle: deal}
-	err = dkg.sendDealMessage(model.SendToNodes(dkg.NewNetIds()), newMsg)
-	if err != nil {
-		fmt.Println("Send error:", err)
 	}
 
 	return nil
@@ -307,8 +323,10 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	}
 
 	dkg.mu.Lock()
-	dkg.deals = map[string]*model.DealBundle{}
-	dkg.responses = map[string]*pedersen.ResponseBundle{}
+	for _, st := range model.AllSuites() {
+		dkg.deals[st] = make(map[string]*model.DealBundle)
+		dkg.responses[st] = make(map[string]*pedersen.ResponseBundle)
+	}
 	dkg.justifs = []*pedersen.JustificationBundle{}
 	dkg.mu.Unlock()
 	if !isok {
@@ -321,14 +339,17 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	}
 
 	dkg.saveState()
-	// if dkg.DkgPubKey == nil, set new data to init
+	// 首次完成：迁移 new → current
 	dkg.mu.Lock()
-	if dkg.DkgPubKey == nil {
+	edPub := dkg.SystemPubKey()
+	if edPub == nil {
 		dkg.Nodes = dkg.NewNodes
 		dkg.Epoch = dkg.NewEpoch
-		dkg.Threshold = len(dkg.NewNodes) * 2 / 3
-		dkg.DkgPubKey = dkg.NewDkgPubKey
-		dkg.DkgKeyShare = dkg.NewDkgKeyShare
+		dkg.Threshold = len(dkg.NewNodes) - (len(dkg.NewNodes)-1)/3
+		for _, st := range model.AllSuites() {
+			dkg.DkgPubKeys[st] = dkg.NewDkgPubKeys[st]
+			dkg.DkgKeyShares[st] = dkg.NewDkgKeyShares[st]
+		}
 	}
 	dkg.mu.Unlock()
 	dkg.SendNewEpochPartialSigToSponsor()
@@ -343,7 +364,8 @@ func (dkg *DKG) ToNewEpoch() {
 	defer dkg.setConsensusFree()
 
 	dkg.mu.Lock()
-	if dkg.NewDkgKeyShare == nil {
+	edShare := dkg.NewDkgKeyShares[model.SuiteEd25519]
+	if edShare == nil {
 		dkg.mu.Unlock()
 		util.LogWithRed("DKG consensus ToNewEpoch", "failed <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< New Epoch", dkg.NewEpoch)
 		if dkg.consensusFailBack != nil {
@@ -354,14 +376,16 @@ func (dkg *DKG) ToNewEpoch() {
 
 	dkg.Nodes = dkg.NewNodes
 	dkg.Epoch = dkg.NewEpoch
-	dkg.Threshold = len(dkg.NewNodes) * 2 / 3
-	dkg.DkgPubKey = dkg.NewDkgPubKey
-	dkg.DkgKeyShare = dkg.NewDkgKeyShare
+	dkg.Threshold = len(dkg.NewNodes) - (len(dkg.NewNodes)-1)/3
+	for _, st := range model.AllSuites() {
+		dkg.DkgPubKeys[st] = dkg.NewDkgPubKeys[st]
+		dkg.DkgKeyShares[st] = dkg.NewDkgKeyShares[st]
+		dkg.NewDkgPubKeys[st] = nil
+		dkg.NewDkgKeyShares[st] = nil
+	}
 
 	dkg.NewNodes = nil
 	dkg.NewEpoch = 0
-	dkg.NewDkgPubKey = nil
-	dkg.NewDkgKeyShare = nil
 
 	// reset cache
 	dkg.NewEpochSponsor = nil
@@ -369,7 +393,6 @@ func (dkg *DKG) ToNewEpoch() {
 
 	util.LogWithGray("DKG consensus", "successfully <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< New Epoch", dkg.Epoch)
 	dkg.saveState()
-
 }
 
 func (dkg *DKG) ConsensusIsbusy() bool {
@@ -378,8 +401,6 @@ func (dkg *DKG) ConsensusIsbusy() bool {
 	return time.Now().Unix()-dkg.lastConsensusTime < 90
 }
 
-// TrySetConsensusBusy atomically checks if consensus is busy and sets it if not.
-// Returns true if successfully set, false if already busy.
 func (dkg *DKG) TrySetConsensusBusy() bool {
 	dkg.mu.Lock()
 	defer dkg.mu.Unlock()
@@ -388,12 +409,6 @@ func (dkg *DKG) TrySetConsensusBusy() bool {
 	}
 	dkg.lastConsensusTime = time.Now().Unix()
 	return true
-}
-
-func (dkg *DKG) setConsensusBusy() {
-	dkg.mu.Lock()
-	dkg.lastConsensusTime = time.Now().Unix()
-	dkg.mu.Unlock()
 }
 
 func (dkg *DKG) setConsensusFree() {

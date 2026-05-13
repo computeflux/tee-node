@@ -8,8 +8,8 @@
     "securityVersion": 1,
     "mounts": [
         {
-            "source": "/chain_data",
-            "target": "/chain_data",
+            "source": "/token_chain_data",
+            "target": "/token_chain_data",
             "type": "hostfs",
             "readOnly": false
         }

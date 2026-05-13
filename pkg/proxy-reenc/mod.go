@@ -189,8 +189,8 @@ func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey model
 	return nil
 }
 
-func Recover(ste suites.Suite, xncSki []*share.PubShare, t int, n int) (kyber.Point, error) {
-	if len(xncSki) < t {
+func Recover(ste suites.Suite, xncSki []*share.PubShare, t uint32, n uint32) (kyber.Point, error) {
+	if len(xncSki) < int(t) {
 		return nil, nil
 	}
 

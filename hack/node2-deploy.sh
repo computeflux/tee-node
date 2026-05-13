@@ -11,7 +11,7 @@ cd $DIR/../
 img=$(cat ./hack/.version)
 
 export DSECRET_IMAGE=$img
-export DSECRET_DIR=/srv/node2/chain_data
+export DSECRET_DIR=/srv/token_node2/token_chain_data
 export NAME=dsecret-2
 
 export SIDE_CHAIN_PORT=30130

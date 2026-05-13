@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -58,39 +57,38 @@ func (s *SideChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*mode
 		return teeCalls[i].Time < teeCalls[j].Time
 	})
 
-	// Initialize a slice to hold the decoded types.Call objects.
-	calls := make([]types.Call, 0, len(teeCalls))
-	// Iterate through each index call and decode it into a types.Call object.
+	// Initialize a slice to hold ChainCall objects.
+	var calls []model.ChainCall
+	// Iterate through each index call and decode it.
 	for _, c := range teeCalls {
-		call, err := chain.TEECallToCall(c, s.dkg.DkgPubKey.AccountID())
+		call, err := chain.TEECallToCall(c, s.dkg.DkgPubKeys[chain.GetCipher()].Byte())
 		if err != nil {
 			return errors.Wrap(err, "TEECallToHubCall error")
 		}
-
-		// Send the partial signature to the proposer vi
-		// Decode the byte slice of the index call into the types.Call object.
 		calls = append(calls, *call)
 	}
 
-	// Get the client for the main chain.
-	client := chains.MainChain.GetClient()
-	// Create a batch call using the decoded calls.
-	call, err := client.BatchCall("batch_all", calls)
+	// Create a batch call.
+	call, err := chains.MainChain.BatchCall("batch_all", calls)
 	if err != nil {
 		return errors.Wrap(err, "BatchCall error")
 	}
 
 	// Create a new DSS signer using the DKG instance.
-	signer := dkg.NewDssSigner(s.dkg, tx_index)
+	signer := dkg.NewDssSigner(s.dkg, tx_index, chain.GetCipher())
 	// Partially sign the batch call using the signer.
-	sig, err := client.PartialSign(signer, *call)
+	sig, err := chains.MainChain.PartialSign(signer, *call)
 	if err != nil {
 		return errors.Wrap(err, "PartialSign error")
 	}
 
 	// Create a new BlockPartialSign object with the partial signature and transaction index.
+	p2pId := s.dkg.P2PId()
+	if p2pId == nil {
+		return errors.New("P2PId not found in validator set")
+	}
 	psig := &model.BlockPartialSign{
-		From:    s.dkg.P2PId().String(),
+		From:    p2pId.String(),
 		HubSig:  sig,
 		TxIndex: tx_index,
 	}

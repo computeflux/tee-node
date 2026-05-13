@@ -2,8 +2,22 @@
 
 package graph
 
-// This file will not be regenerated automatically.
-//
-// It serves as dependency injection for your app, add any dependencies you require here.
+import (
+	"github.com/computeflux/tee-provider/pkg/api/auth"
+	sidechain "github.com/computeflux/tee-provider/side-chain"
+	authsvc "github.com/computeflux/tee-provider/services/auth"
+	"github.com/computeflux/tee-provider/services/wallet"
+)
 
-type Resolver struct{}
+// Resolver 作为 GraphQL 的依赖注入容器
+type Resolver struct {
+	SideChain *sidechain.SideChain
+
+	// Web3Auth 服务
+	AuthCfg   *auth.AuthConfig
+	WalletSvc *wallet.WalletService
+	JWTSvc    *authsvc.JWTService
+	EmailSvc  authsvc.EmailService
+	OAuthSvc  *authsvc.OAuthService
+	OTPSvc    *authsvc.OTPService
+}

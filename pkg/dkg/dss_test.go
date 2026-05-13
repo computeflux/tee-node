@@ -17,7 +17,7 @@ import (
 )
 
 func TestDSS(t *testing.T) {
-	os.RemoveAll("./chain_data")
+	os.RemoveAll("./token_chain_data")
 
 	db, err := model.NewDB()
 	if err != nil {
@@ -30,10 +30,10 @@ func TestDSS(t *testing.T) {
 	validators := []*model.Validator{}
 	for _, s := range peerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublic())
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublic(),
-			P2pId:       *nodeSecret.GetPublic(),
+			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
 		})
 	}
 
@@ -98,12 +98,12 @@ func TestDSS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	isok := ed25519.Verify(dkgs[0].GetDkgPubKey().Ed25519PublicKey(), msg, sigbt)
+	isok := ed25519.Verify(dkgs[0].GetDkgPubKey(model.SuiteEd25519).Ed25519PublicKey(), msg, sigbt)
 	fmt.Println("ed25519.Verify", isok)
 }
 
 func TestDssSubmitTx(t *testing.T) {
-	os.RemoveAll("./chain_data")
+	os.RemoveAll("./token_chain_data")
 
 	db, err := model.NewDB()
 	if err != nil {
@@ -137,10 +137,10 @@ func TestDssSubmitTx(t *testing.T) {
 	validators := []*model.Validator{}
 	for _, s := range peerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublic())
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublic(),
-			P2pId:       *nodeSecret.GetPublic(),
+			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
 		})
 	}
 
@@ -172,13 +172,12 @@ func TestDssSubmitTx(t *testing.T) {
 		Epoch:      1,
 	}, func(signer *DssSigner, nodeId uint64) {
 		util.LogWithBlue("CONSENSUS SUCCESS", nodeId)
-		call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.AccountID())
+		call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.ChainAccountID())
 		if err != nil {
 			panic(err)
 		}
 
-		client := chains.MainChain.GetClient()
-		err = client.SignAndSubmit(signer, *call, false, 0)
+		err = chains.MainChain.SignAndSubmit(signer, *call, false, 0)
 		fmt.Println(err)
 
 		for _, dkg := range dkgs {

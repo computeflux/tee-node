@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	abci "github.com/cometbft/cometbft/abci/typeux/tee-provider/pkg/model"
+	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	"github.com/pkg/errors"oi"
-	"gthub.com/pkg/errrs
+	"github.com/pkg/errors"
 )
 
 func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, proposer []byte) ([]*abci.ExecTxResult, error) {
@@ -81,7 +81,11 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 			_ = app.DeleteSigOfTx(p.SyncTxRetry)
 
 			// 重新发起部分签名收集：本节点向当前 proposer 发送部分签名，其他节点同样会在 FinalizeTx 中发送
-			err = app.sendPartialSign(stored.HubCalls[0].ChainId, p.SyncTxRetry, stored.HubCalls, app.ProposerAddressToNodeKey(proposer))
+			propNode, err := app.ProposerAddressToNodeKey(proposer)
+			if err != nil {
+				return nil, errors.Wrap(err, "SyncTxRetry: ProposerAddressToNodeKey")
+			}
+			err = app.sendPartialSign(stored.HubCalls[0].ChainId, p.SyncTxRetry, stored.HubCalls, propNode)
 			if err != nil {
 				return nil, errors.Wrap(err, "SyncTxRetry: sendPartialSign")
 			}
@@ -106,7 +110,11 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 
 	// if hub tx, send partial sign
 	if txIndex > 0 && len(hubCalls) > 0 && hubCalls[0] != nil && app.dkg != nil {
-		err := app.sendPartialSign(hubCalls[0].ChainId, txIndex, hubCalls, app.ProposerAddressToNodeKey(proposer))
+		propNode, err := app.ProposerAddressToNodeKey(proposer)
+		if err != nil {
+			return nil, err
+		}
+		err = app.sendPartialSign(hubCalls[0].ChainId, txIndex, hubCalls, propNode)
 		if err != nil {
 			return nil, err
 		}

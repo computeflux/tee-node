@@ -3,6 +3,6 @@ WORKDIR /
 
 ADD hack/build/dsecret  /
 
-RUN mkdir -p /chain_data
+RUN mkdir -p /token_chain_data
 
 CMD ["/bin/sh", "-c" ,"ego run dsecret"]

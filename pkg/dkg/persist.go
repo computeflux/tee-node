@@ -16,17 +16,17 @@ type DKGStore struct {
 	Epoch uint32
 
 	// DistPubKey globle public key
-	DkgPubKey *model.PubKey
+	DkgPubKeys map[model.SuiteType]*model.PubKey
 	// DistKeyShare is the node private share
-	DkgKeyShare  *model.DistKeyShare
+	DkgKeyShares map[model.SuiteType]*model.DistKeyShare
 	SideKeyPub   types.AccountID
 	SideKeyShare []byte
 
 	// next epoch data
 	NewNodes        []*model.Validator
 	NewEpoch        uint32
-	NewDkgPubKey    *model.PubKey // dkg key
-	NewDkgKeyShare  *model.DistKeyShare
+	NewDkgPubKeys   map[model.SuiteType]*model.PubKey // dkg key
+	NewDkgKeyShares map[model.SuiteType]*model.DistKeyShare
 	NewSideKeyPub   types.AccountID // side key
 	NewSideKeyShare []byte
 
@@ -35,7 +35,7 @@ type DKGStore struct {
 
 // Restore dkg state
 func (dkg *DKG) reState() error {
-	from, err := model.GetJson[DKGStore]("DKG", dkg.Signer.GetPublic().SS58())
+	from, err := model.GetJson[DKGStore]("DKG", dkg.Signer.GetPublicForSuite(model.SuiteEd25519).SS58())
 	if err != nil {
 		return fmt.Errorf("get dkg: %w", err)
 	}
@@ -50,13 +50,13 @@ func (dkg *DKG) reState() error {
 	to.Epoch = from.Epoch
 	to.status = from.status
 	to.Nodes = from.Nodes
-	to.DkgPubKey = from.DkgPubKey
-	to.DkgKeyShare = from.DkgKeyShare
+	to.DkgPubKeys = from.DkgPubKeys
+	to.DkgKeyShares = from.DkgKeyShares
 
 	to.NewNodes = from.NewNodes
 	to.NewEpoch = from.NewEpoch
-	to.NewDkgPubKey = from.NewDkgPubKey
-	to.NewDkgKeyShare = from.NewDkgKeyShare
+	to.NewDkgPubKeys = from.NewDkgPubKeys
+	to.NewDkgKeyShares = from.NewDkgKeyShares
 
 	return nil
 }
@@ -69,13 +69,13 @@ func (dkg *DKG) saveState() error {
 	to.Epoch = from.Epoch
 	to.status = from.status
 	to.Nodes = from.Nodes
-	to.DkgPubKey = from.DkgPubKey
-	to.DkgKeyShare = from.DkgKeyShare
+	to.DkgPubKeys = from.DkgPubKeys
+	to.DkgKeyShares = from.DkgKeyShares
 
 	to.NewNodes = from.NewNodes
 	to.NewEpoch = from.NewEpoch
-	to.NewDkgPubKey = from.NewDkgPubKey
-	to.NewDkgKeyShare = from.NewDkgKeyShare
+	to.NewDkgPubKeys = from.NewDkgPubKeys
+	to.NewDkgKeyShares = from.NewDkgKeyShares
 
-	return model.SetJson("DKG", dkg.Signer.GetPublic().SS58(), &to)
+	return model.SetJson("DKG", dkg.Signer.GetPublicForSuite(model.SuiteEd25519).SS58(), &to)
 }

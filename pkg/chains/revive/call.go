@@ -8,7 +8,9 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
-func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey types.AccountID) (*types.Call, error) {
+// teeCallToSubstrateCall produces a Substrate-native *types.Call from a TeeCall.
+// This is used internally by the chain-agnostic TEECallToCall wrapper in mod.go.
+func teeCallToSubstrateCall(c *Contract, tcall *model.TeeCall, dkgKey types.AccountID) (*types.Call, error) {
 	callWrap := tcall.Tx
 	switch tx := callWrap.(type) {
 	case *model.TeeCall_PodStart:
@@ -30,7 +32,7 @@ func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey types.AccountID) (
 		pod := tx.PodMint
 		call, err := c.TxCallOfMintPod(pod.Id, types.NewH256(pod.ReportHash), dkgKey)
 		if err != nil {
-			util.LogError("TxCallOfStartPod", err)
+			util.LogError("TxCallOfMintPod", err)
 			return nil, err
 		}
 
@@ -53,7 +55,6 @@ func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey types.AccountID) (
 		}
 
 		return call, nil
-		// case *model.TeeCall_BridgeCall:
 	}
 	return nil, errors.New("invalid tee call")
 }

@@ -50,6 +50,8 @@ func GetList(namespace string, subkey string, cursor []byte, size int) ([][]byte
 	var lastKey []byte
 
 	// 有游标：从游标之后开始
+	// SeekGE positions at first key >= cursor. If cursor key exists,
+	// we skip it; if it doesn't exist, we're already past it.
 	if len(cursor) > 0 {
 		if !iter.SeekGE(cursor) {
 			return list, nil, nil

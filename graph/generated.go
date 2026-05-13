@@ -14,11 +14,10 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	m/computeflucomputeflux/tee-proxid/r/ptgpmodel"
-	rovider/p gqlparser "github.com/vektah/gqser/v2"
-	"github.com/vekhah/gqq/avst"v2ast
+	"github.com/computeflux/tee-provider/pkg/model"
+	gqlparser "github.com/vektah/gqlparser/v2"
+	"github.com/vektah/gqlparser/v2/ast"
 )
-
 // region    ************************** generated!.gotpl **************************
 
 // NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.

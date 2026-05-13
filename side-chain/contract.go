@@ -54,7 +54,7 @@ func (app *SideChain) ContractQuery(caller []byte, callerType uint32, contract s
 	}
 
 	runtime := contracts.NewRuntime(height, txn, address, model.UniAddr{
-		V: app.dkg.DkgPubKey.Byte(),
+		V: app.dkg.SystemPubKey().Byte(),
 	})
 
 	data, err = contracts.Query(&model.ContractCall{
@@ -84,7 +84,7 @@ func (app *SideChain) ContractDryRun(caller []byte, callerType uint32, call *mod
 	}
 
 	runtime := contracts.NewRuntime(height, txn, address, model.UniAddr{
-		V: app.dkg.DkgPubKey.Byte(),
+		V: app.dkg.SystemPubKey().Byte(),
 	})
 
 	err = contracts.Mutation(call, runtime)

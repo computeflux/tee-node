@@ -29,7 +29,7 @@ Dockerfile.cross
 *.swo
 *~
 
-**/chain_data
+**/token_chain_data
 **/db/
 **/nohup.out
 **/dsecret

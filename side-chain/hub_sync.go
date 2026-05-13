@@ -3,7 +3,6 @@
 package sidechain
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/pkg/errors"
 )
 
 // Submit sync tx to polkadot hub
@@ -23,17 +23,28 @@ func (s *SideChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 		return errors.New("sync to polkadot hub error: call not found call data")
 	}
 
+	stored, err := model.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+	if err != nil || stored == nil || len(stored.HubCalls) == 0 {
+		LogWithTime("SyncToHub", "hubCalls not found for txIndex:", txIndex)
+		return errors.New("sync to polkadot hub error: hubCalls not found")
+	}
+
+	chainId := stored.HubCalls[0].ChainId
+	chain, err := s.getChain(chainId)
+	if err != nil {
+		return errors.Wrap(err, "getChain error")
+	}
+
 	// Aggregate signature
 	util.LogWithGray("Sync to polkadot hub", "sync sigs = ", len(sigs))
-	signer := dkg.NewDssSigner(s.dkg, txIndex)
+	signer := dkg.NewDssSigner(s.dkg, txIndex, chain.GetCipher())
 	signer.SetSigs(sigs)
 
 	// submit sync tx to polkadot hub
-	client := chains.MainChain.GetClient()
-	err = client.SignAndSubmit(signer, *call, false, 0)
+	err = chains.MainChain.SignAndSubmit(signer, model.ChainCall{Data: call.Args}, false, 0)
 	if err != nil {
 		util.LogWithRed("Sync to polkadot hub", "error => ", err.Error())
-		fmt.Println("                    ", " SS58 => ", s.dkg.DkgPubKey.SS58())
+		fmt.Println("                    ", " SS58 => ", s.dkg.DkgPubKeys[chain.GetCipher()])
 		fmt.Println("                    ", " SYNC at batch tx id", txIndex)
 		// 提交失败时，将 SyncTxRetry 提交到 mempool，由下一轮 proposer 打包进块
 		// （只有本节点会执行 SyncToHub，故只提交一次；mempool 会广播给其他节点）
@@ -78,7 +89,9 @@ type AsyncBatchState struct {
 func IsHubSyncRuning() bool {
 	tx, err := model.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
 	if err != nil {
-		return true
+		// Fail open: on DB error, allow hub calls to be processed.
+		LogWithTime("IsHubSyncRuning get error: " + err.Error())
+		return false
 	}
 	if tx == nil {
 		tx = &AsyncBatchState{

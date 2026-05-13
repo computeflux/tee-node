@@ -60,7 +60,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(), &call)
+	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}
@@ -117,7 +117,7 @@ func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user s
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(), &call)
+	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 func TestRandomShareGeneration(t *testing.T) {
-	os.RemoveAll("./chain_data")
+	os.RemoveAll("./token_chain_data")
 
 	db, err := model.NewDB()
 	require.NoError(t, err)
@@ -27,10 +27,10 @@ func TestRandomShareGeneration(t *testing.T) {
 	validators := []*model.Validator{}
 	for _, s := range peerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublic())
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublic(),
-			P2pId:       *nodeSecret.GetPublic(),
+			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
 		})
 	}
 
@@ -73,7 +73,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	// Trigger random share generation explicitly on node 0 only.
 	// The P2P broadcast ensures all nodes receive the deals/responses.
 	for _, d := range dkgs {
-		d.RandomPool.SetShares(nil) // ensure pool is empty so generation triggers
+		d.RandomPools[model.SuiteEd25519].SetShares(nil) // ensure pool is empty so generation triggers
 	}
 	start := time.Now()
 	dkgs[0].StartRandomShareGeneration(10)
@@ -83,7 +83,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	for {
 		allDone := true
 		for _, d := range dkgs {
-			if d.RandomPool.Len() < 10 {
+			if d.RandomPools[model.SuiteEd25519].Len() < 10 {
 				allDone = false
 				break
 			}
@@ -101,18 +101,18 @@ func TestRandomShareGeneration(t *testing.T) {
 
 	// Verify each DKG has at least 10 random shares.
 	for i, d := range dkgs {
-		require.GreaterOrEqual(t, d.RandomPool.Len(), 10, "node %d should have random shares", i)
+		require.GreaterOrEqual(t, d.RandomPools[model.SuiteEd25519].Len(), 10, "node %d should have random shares", i)
 	}
 
 	// Verify all nodes have the same commitments for randomIndex 1.
 	var expectedPubKey string
 	var expectedCommits []string
 	for i, d := range dkgs {
-		share, err := d.RandomPool.Acquire(1)
+		share, err := d.RandomPools[model.SuiteEd25519].Acquire(1)
 		require.NoError(t, err, "node %d should have randomIndex 1", i)
 		require.NotNil(t, share, "node %d random share should not be nil", i)
 		// Verify random share differs from long share.
-		require.NotEqual(t, d.DkgKeyShare.PriShare().V.String(), share.PriShare().V.String(),
+		require.NotEqual(t, d.DkgKeyShares[model.SuiteEd25519].PriShare().V.String(), share.PriShare().V.String(),
 			"node %d: random share should differ from long share", i)
 
 		pubKeyStr := share.CommitsWrap.Public[0].String()
@@ -138,7 +138,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	partialSigs := make([][]byte, 0, len(dkgs))
 
 	for _, d := range dkgs {
-		signer := NewDssSigner(d, 1)
+		signer := NewDssSigner(d, 1, model.SuiteEd25519)
 		require.NotNil(t, signer.randomShare, "signer should have acquired a random share")
 		sig, err := signer.PartialSign(msg)
 		require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify with Ed25519.
-	isok := ed25519.Verify(dkgs[0].GetDkgPubKey().Ed25519PublicKey(), msg, aggregated)
+	isok := ed25519.Verify(dkgs[0].GetDkgPubKey(model.SuiteEd25519).Ed25519PublicKey(), msg, aggregated)
 	require.True(t, isok, "aggregated signature should verify")
 
 	fmt.Println("RandomSharePool tests passed!")

@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 
+	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/util"
 	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
@@ -22,23 +23,24 @@ func init() {
 	var err error
 	rsaKey, err = rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		panic(fmt.Errorf("生成私钥失败: %v", err))
+		panic(fmt.Errorf("generate RSA key: %v", err))
 	}
-
 }
 
-// 启动GraphQL服务器
-// StartServer starts the GraphQL server.
+// StartServer starts the GraphQL server with an empty resolver (legacy).
 func StartServer(s *sidechain.SideChain, port int) {
+	StartServerWithResolver(s, port, &Resolver{})
+}
+
+// StartServerWithResolver starts the GraphQL + Auth REST + Gateway REST server.
+func StartServerWithResolver(s *sidechain.SideChain, port int, resolver *Resolver) {
 	sideChain = s
 
-	// 创建路由
+	// Phase 2: seed data
+	gateway.InitSeedData()
+
 	router := chi.NewRouter()
-
-	// 添加认证中间件
 	router.Use(AuthMiddleware())
-
-	// 添加跨域中间件
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -48,21 +50,29 @@ func StartServer(s *sidechain.SideChain, port int) {
 		MaxAge:           300,
 	}))
 
-	// graphql playground
+	// GraphQL playground
 	router.Handle("/", playground.Handler("WeTEE-DSECRET", "/gql"))
+
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{
-		Resolvers:  &Resolver{},
+		Resolvers:  resolver,
 		Directives: NewDirectiveRoot(),
 	}))
-
-	// main graphql
 	router.Handle("/gql", srv)
 
-	if util.IsFileExists("./chain_data/ssl/ser.pem") && util.IsFileExists("./chain_data/ssl/ser.key") {
-		util.LogWithBlue("GraphQL    ", "https://0.0.0.0:"+fmt.Sprint(port))
-		http.ListenAndServeTLS(":"+fmt.Sprint(port), "./chain_data/ssl/ser.pem", "./chain_data/ssl/ser.key", router)
+	// Gateway REST routes (OpenAI SDK compatible)
+	gateway.RegisterGatewayRoutes(router)
+
+	util.LogWithBlue("API", "  /gql        -> GraphQL")
+	util.LogWithBlue("API", "  /auth/*     -> REST (web3auth)")
+	util.LogWithBlue("API", "  /wallet/*   -> REST (wallet)")
+	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")
+	util.LogWithBlue("API", "  /health     -> health check")
+
+	if util.IsFileExists("./token_chain_data/ssl/ser.pem") && util.IsFileExists("./token_chain_data/ssl/ser.key") {
+		util.LogWithBlue("Listen", fmt.Sprintf("https://0.0.0.0:%d", port))
+		http.ListenAndServeTLS(":"+fmt.Sprint(port), "./token_chain_data/ssl/ser.pem", "./token_chain_data/ssl/ser.key", router)
 	} else {
-		util.LogWithBlue("GraphQL    ", "http://0.0.0.0:"+fmt.Sprint(port))
+		util.LogWithBlue("Listen", fmt.Sprintf("http://0.0.0.0:%d", port))
 		http.ListenAndServe(":"+fmt.Sprint(port), router)
 	}
 }

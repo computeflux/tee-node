@@ -30,6 +30,7 @@ type randomDkgState struct {
 	result      *model.DistKeyShare
 	done        bool
 	doneCh      chan struct{} // closed when DKG completes (success or failure)
+	closeOnce   sync.Once     // ensures doneCh is closed exactly once
 	respReady   bool          // response generated but not yet sent
 	respData    []byte        // serialized response
 	respSent    bool          // response has been broadcast
@@ -83,19 +84,19 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 		if _, exists := dkg.randomDkgStates[randomIndex]; exists {
 			continue
 		}
-		if dkg.RandomPool != nil {
-			if _, err := dkg.RandomPool.Acquire(int64(randomIndex)); err == nil {
+		if dkg.RandomPools[model.SuiteEd25519] != nil {
+			if _, err := dkg.RandomPools[model.SuiteEd25519].Acquire(int64(randomIndex)); err == nil {
 				continue // already in pool
 			}
 		}
 
 		conf := pedersen.Config{
-			Suite:     dkg.Suite,
+			Suite:     dkg.Suites[model.SuiteEd25519],
 			NewNodes:  nodes,
-			Threshold: threshold,
-			Auth:      schnorr.NewScheme(dkg.Suite),
+			Threshold: uint32(threshold),
+			Auth:      schnorr.NewScheme(dkg.Suites[model.SuiteEd25519]),
 			FastSync:  true,
-			Longterm:  dkg.Signer.Scalar(),
+			Longterm:  dkg.Signer.Scalar(model.SuiteEd25519),
 			Nonce:     randomNonce(randomIndex),
 			Log:       dkg.log,
 		}
@@ -122,7 +123,11 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 			continue
 		}
 
-		dealData, _ := json.Marshal(&model.DealBundle{DealBundle: deal})
+		dealData, err := json.Marshal(&model.DealBundle{DealBundle: deal})
+		if err != nil {
+			dkg.randomDkgMu.Unlock()
+			return err
+		}
 		batch = append(batch, RandomDkgPayload{
 			RandomIndex: randomIndex,
 			Data:        dealData,
@@ -134,7 +139,10 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 		return nil
 	}
 
-	batchData, _ := json.Marshal(batch)
+	batchData, err := json.Marshal(batch)
+	if err != nil {
+		return err
+	}
 	return dkg.sendToNode(model.SendToNodes(dkg.NetIds()), &model.DkgMessage{
 		Type:    "random_deal_batch",
 		Payload: batchData,
@@ -191,7 +199,7 @@ func (dkg *DKG) cleanupRandomState(randomIndex uint32) {
 	delete(dkg.randomDkgStates, randomIndex)
 	dkg.randomDkgMu.Unlock()
 	if ok && state != nil && state.doneCh != nil {
-		close(state.doneCh)
+		state.closeOnce.Do(func() { close(state.doneCh) })
 	}
 }
 
@@ -230,19 +238,19 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 		if _, exists := dkg.randomDkgStates[item.RandomIndex]; exists {
 			continue
 		}
-		if dkg.RandomPool != nil {
-			if _, err := dkg.RandomPool.Acquire(int64(item.RandomIndex)); err == nil {
+		if dkg.RandomPools[model.SuiteEd25519] != nil {
+			if _, err := dkg.RandomPools[model.SuiteEd25519].Acquire(int64(item.RandomIndex)); err == nil {
 				continue // already in pool
 			}
 		}
 
 		conf := pedersen.Config{
-			Suite:     dkg.Suite,
+			Suite:     dkg.Suites[model.SuiteEd25519],
 			NewNodes:  nodes,
-			Threshold: threshold,
-			Auth:      schnorr.NewScheme(dkg.Suite),
+			Threshold: uint32(threshold),
+			Auth:      schnorr.NewScheme(dkg.Suites[model.SuiteEd25519]),
 			FastSync:  true,
-			Longterm:  dkg.Signer.Scalar(),
+			Longterm:  dkg.Signer.Scalar(model.SuiteEd25519),
 			Nonce:     randomNonce(item.RandomIndex),
 			Log:       dkg.log,
 		}
@@ -272,11 +280,15 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 
 	// Broadcast our deals for newly created states.
 	if len(ourBatch) > 0 {
-		batchData, _ := json.Marshal(ourBatch)
-		_ = dkg.sendToNode(model.SendToNodes(dkg.NetIds()), &model.DkgMessage{
-			Type:    "random_deal_batch",
-			Payload: batchData,
-		})
+		batchData, err := json.Marshal(ourBatch)
+		if err != nil {
+			util.LogError("RandomDKG", "marshal deal batch error:", err)
+		} else {
+			_ = dkg.sendToNode(model.SendToNodes(dkg.NetIds()), &model.DkgMessage{
+				Type:    "random_deal_batch",
+				Payload: batchData,
+			})
+		}
 	}
 
 	// Second pass: store received deals.
@@ -359,11 +371,15 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 
 	// Broadcast response batch.
 	if len(respBatch) > 0 {
-		batchData, _ := json.Marshal(respBatch)
-		_ = dkg.sendToNode(model.SendToNodes(dkg.NetIds()), &model.DkgMessage{
-			Type:    "random_deal_resp_batch",
-			Payload: batchData,
-		})
+		batchData, err := json.Marshal(respBatch)
+		if err != nil {
+			util.LogError("RandomDKG", "marshal resp batch error:", err)
+		} else {
+			_ = dkg.sendToNode(model.SendToNodes(dkg.NetIds()), &model.DkgMessage{
+				Type:    "random_deal_resp_batch",
+				Payload: batchData,
+			})
+		}
 		for _, state := range states {
 			state.mu.Lock()
 			if state.respReady {
@@ -443,11 +459,11 @@ func (dkg *DKG) handleRandomDealRespBatch(from string, payload []byte) error {
 				PriShareWrap: model.PriShare{PriShare: r.Key.Share},
 			}
 			state.done = true
-			if dkg.RandomPool != nil {
-				dkg.RandomPool.AddShare(state.randomIndex, state.result)
+			if dkg.RandomPools[model.SuiteEd25519] != nil {
+				dkg.RandomPools[model.SuiteEd25519].AddShare(state.randomIndex, state.result)
 			}
 			if state.doneCh != nil {
-				close(state.doneCh)
+				state.closeOnce.Do(func() { close(state.doneCh) })
 			}
 			dkg.randomDkgMu.Lock()
 			delete(dkg.randomDkgStates, state.randomIndex)

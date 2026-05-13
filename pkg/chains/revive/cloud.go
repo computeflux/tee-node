@@ -4,9 +4,9 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	chain "github.com/wetee-dao/ink.go"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/cloud"
 	"github.com/computeflux/tee-provider/pkg/model"
-	chain "github.com/wetee-dao/ink.go"
 )
 
 func (c *Contract) GetPodsVersionByWorker(workerId uint64) ([]model.PodVersion, error) {

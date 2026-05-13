@@ -7,7 +7,6 @@ import (
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 	"go.dedis.ch/kyber/v4"
-	"go.dedis.ch/kyber/v4/group/edwards25519"
 	"go.dedis.ch/kyber/v4/share"
 )
 
@@ -71,8 +70,9 @@ func (d PriShare) MarshalJSON() ([]byte, error) {
 // Custom JSON deserialization
 func (d *PriShare) UnmarshalJSON(bt []byte) error {
 	jsonData := struct {
-		I uint32
-		V []byte
+		I     uint32
+		V     []byte
+		Suite string `json:"suite,omitempty"`
 	}{}
 
 	err := json.Unmarshal(bt, &jsonData)
@@ -80,8 +80,17 @@ func (d *PriShare) UnmarshalJSON(bt []byte) error {
 		return err
 	}
 
-	group := edwards25519.NewBlakeSHA256Ed25519()
-	key := group.Scalar()
+	// Default to ed25519 for backward compatibility.
+	st := SuiteEd25519
+	if jsonData.Suite != "" {
+		var parseErr error
+		st, parseErr = SuiteTypeFromString(jsonData.Suite)
+		if parseErr != nil {
+			st = SuiteEd25519
+		}
+	}
+
+	key := NewSuite(st).Scalar()
 	err = key.UnmarshalBinary(jsonData.V)
 	if err != nil {
 		return err

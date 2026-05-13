@@ -40,9 +40,14 @@ func (c *PersistChan[T]) load() error {
 
 	list := make([]T, 0)
 	json.Unmarshal(bt, &list)
-	for _, v := range list {
-		c.Push(v)
-	}
+	// Append to list for persistence tracking, and feed into channel
+	// asynchronously to avoid blocking NewPersistChan before Start() is called.
+	c.list = append(c.list, list...)
+	go func() {
+		for _, v := range list {
+			c.listChan <- v
+		}
+	}()
 
 	return nil
 }

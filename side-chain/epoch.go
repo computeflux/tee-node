@@ -47,13 +47,13 @@ func (app *SideChain) CheckEpochFromValidator() []byte {
 			})
 		}
 
-		commits, _ := json.Marshal(app.dkg.NewDkgKeyShare.CommitsWrap)
+		commits, _ := json.Marshal(app.dkg.NewDkgKeyShares[model.SuiteEd25519].CommitsWrap)
 		tx := &model.SysCall{
 			Payload: &model.SysCall_EpochEnd{
 				EpochEnd: &model.EpochEnd{
 					Epoch:      epoch,
 					Validators: sideValidators,
-					DkgPub:     app.dkg.DkgPubKey.PublicKey,
+					DkgPub:     app.dkg.SystemPubKey().PublicKey,
 					DkgCommits: commits,
 				},
 			},
@@ -118,20 +118,19 @@ func (app *SideChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
 	}
 
 	// submit new epoch to main chain
-	call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.AccountID())
+	call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.ChainAccountID())
 	if err != nil {
 		util.LogWithRed("NewEpoch TxCallOfSetNextEpoch", err.Error())
 		return
 	}
 
-	client := chains.MainChain.GetClient()
-	err = client.SignAndSubmit(signer, *call, false, 0)
+	err = chains.MainChain.SignAndSubmit(signer, *call, false, 0)
 	if err != nil {
 		util.LogWithRed("NewEpoch client.SignAndSubmit", err.Error())
 	}
 }
 
-// Callback when DKG consensus failed
+// Callback when DKG consensus failed009
 func (app *SideChain) newEpochFail(err error) {
 	util.LogWithYellow("NewEpoch", "P2 Error", err.Error())
 }

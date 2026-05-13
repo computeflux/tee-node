@@ -13,17 +13,28 @@ require (
 	github.com/edgelesssys/ego v1.7.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-chi/cors v1.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-sev-guest v0.13.0
 	github.com/hashicorp/vault v1.19.0
 	github.com/ipfs/go-cid v0.5.0
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vedhavyas/go-subkey/v2 v2.0.0
 	github.com/vektah/gqlparser/v2 v2.5.27
 	github.com/wetee-dao/ink.go v0.1.39
 	go.dedis.ch/kyber/v4 v4.0.0-pre2.0.20250414164612-66d4dee8d2e6
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.48.0
 	google.golang.org/protobuf v1.36.6
+)
+
+require (
+	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/rjeczalik/notify v0.9.1 // indirect
+	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
+	github.com/tklauser/go-sysconf v0.3.10 // indirect
+	github.com/tklauser/numcpus v0.4.0 // indirect
 )
 
 require (
@@ -31,26 +42,25 @@ require (
 	github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.13.0 // indirect
+	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.0 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cockroachdb/errors v1.11.3
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/cometbft/cometbft-db v0.14.1 // indirect
-	github.com/consensys/bavard v0.1.13 // indirect
-	github.com/consensys/gnark-crypto v0.12.1 // indirect
+	github.com/consensys/gnark-crypto v0.19.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dgraph-io/badger/v4 v4.5.1 // indirect
 	github.com/dgraph-io/ristretto/v2 v2.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ethereum/go-ethereum v1.10.20 // indirect
+	github.com/ethereum/go-ethereum v1.10.20
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
@@ -85,7 +95,6 @@ require (
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/minio/highwayhash v1.0.4 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
-	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
@@ -118,18 +127,18 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
-	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
-	golang.org/x/tools v0.33.0 // indirect
+	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
-	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
 // replace github.com/wetee-dao/ink.go => ../ink.go
+replace go.dedis.ch/kyber/v4 => ../../wetee/kyber

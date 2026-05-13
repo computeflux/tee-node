@@ -14,11 +14,11 @@ import (
 )
 
 // snp issue
-func SnpIssue(pk *chain.Signer, call *TeeCall) error {
+func SnpIssue(pk chain.SignerType, call *TeeCall) error {
 	timestamp := time.Now().Unix()
 	var buf bytes.Buffer
 	buf.Write(Int64ToBytes(timestamp))
-	buf.Write(pk.PublicKey)
+	buf.Write(pk.Public())
 	if call.Tx != nil {
 		txbuf := make([]byte, call.Tx.Size())
 		call.Tx.MarshalTo(txbuf)
@@ -39,7 +39,8 @@ func SnpIssue(pk *chain.Signer, call *TeeCall) error {
 	if len(sig) < 64 {
 		return errors.New("signature length must be at least 64 bytes")
 	}
-	sig64 := *(*[64]byte)(sig[:64])
+	var sig64 [64]byte
+	copy(sig64[:], sig[:64])
 	attestationReport, err := client.GetExtendedReport(device, sig64)
 	if err != nil {
 		return errors.New("client.GetExtendedReport:" + err.Error())
@@ -54,7 +55,7 @@ func SnpIssue(pk *chain.Signer, call *TeeCall) error {
 	call.Time = timestamp
 	call.TeeType = 1
 	call.Report = data
-	call.Caller = pk.PublicKey
+	call.Caller = pk.Public()
 
 	return nil
 }
@@ -88,8 +89,11 @@ func SnpVerify(callData *TeeCall) (result *TeeVerifyResult, err error) {
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(signer)
 	payload := callData.Tx
-	msgBytes := make([]byte, payload.Size())
-	payload.MarshalTo(msgBytes)
+	var msgBytes []byte
+	if payload != nil {
+		msgBytes = make([]byte, payload.Size())
+		payload.MarshalTo(msgBytes)
+	}
 	if len(msgBytes) > 0 {
 		buf.Write(msgBytes)
 	}

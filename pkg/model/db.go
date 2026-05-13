@@ -7,16 +7,16 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/cockroachdb/pebbleer/pkg/model/protoio"
+	"github.com/cockroachdb/pebble"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/cosmos/gogoproto/proto""
-	"github.com/cosmos/gogoproto/proto
+	"github.com/cosmos/gogoproto/proto"
 )
 
 var DBINS *DB
 
 const (
-	dbPath = "./chain_data/wetee"
+	dbPath = "./token_chain_data/wetee"
 )
 
 type DB struct {
@@ -40,14 +40,23 @@ func NewDB() (*DB, error) {
 }
 
 func Set(key string, value []byte) error {
+	if DBINS == nil {
+		return errors.New("db not initialized")
+	}
 	return SetKey("", key, value)
 }
 
 func Get(key string) ([]byte, error) {
+	if DBINS == nil {
+		return nil, errors.New("db not initialized")
+	}
 	return GetKey("", key)
 }
 
 func SetKey(namespace, key string, value []byte) error {
+	if DBINS == nil {
+		return errors.New("db not initialized")
+	}
 	val, err := util.SealWithProductKey(value, nil)
 	if err != nil {
 		return err
@@ -101,6 +110,9 @@ func GetCodecOrDefault[T any](namespace, key string, defaultVal T) (T, error) {
 }
 
 func GetKey(namespace, key string) ([]byte, error) {
+	if DBINS == nil {
+		return nil, errors.New("db not initialized")
+	}
 	value, _, err := DBINS.Get([]byte(comboKey(namespace, key)))
 	if err != nil {
 		return nil, err
@@ -198,6 +210,10 @@ func GetProtoMessageList[T any](namespace, key string) ([]*T, [][]byte, error) {
 		err = protoio.ReadMessage(bytes.NewBuffer(value), val)
 		if err == nil {
 			list = append(list, val)
+		} else {
+			// Log but don't fail the whole query; one corrupt entry
+			// shouldn't block reading of others.
+			fmt.Printf("GetProtoMessageList: skip corrupt entry at key %x: %v\n", iter.Key(), err)
 		}
 	}
 

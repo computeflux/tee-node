@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,19 +14,22 @@ import (
 )
 
 // create dss signer from dkg
-func NewDssSigner(dkg *DKG, txIndex int64) *DssSigner {
+func NewDssSigner(dkg *DKG, txIndex int64, suite model.SuiteType) *DssSigner {
 	signer := &DssSigner{
-		dkg:  dkg,
-		sigs: make([]*dss.PartialSig, 0),
+		dkg:   dkg,
+		suite: suite,
+		sigs:  make([]*dss.PartialSig, 0),
 	}
 	// Try to acquire an independent random share from the pool.
 	// If the pool is nil, empty, or txIndex <= 0, fallback to using the long share.
-	if dkg.RandomPool != nil && txIndex > 0 {
-		random, err := dkg.RandomPool.Acquire(txIndex)
-		if err == nil {
-			signer.randomShare = random
-		} else {
-			fmt.Println("DssSigner: failed to acquire random share:", err)
+	if dkg.RandomPools != nil && txIndex > 0 {
+		if pool, ok := dkg.RandomPools[suite]; ok && pool != nil {
+			random, err := pool.Acquire(txIndex)
+			if err == nil {
+				signer.randomShare = random
+			} else {
+				fmt.Println("DssSigner: failed to acquire random share:", err)
+			}
 		}
 	}
 	return signer
@@ -34,6 +38,7 @@ func NewDssSigner(dkg *DKG, txIndex int64) *DssSigner {
 // signer for dss
 type DssSigner struct {
 	dkg         *DKG
+	suite       model.SuiteType
 	randomShare *model.DistKeyShare // independent random share from RandomPool; nil means fallback to long share
 	sigs        []*dss.PartialSig
 }
@@ -57,74 +62,96 @@ func (d *DssSigner) SetSigs(btsigs [][]byte) {
 	d.sigs = sigs
 }
 
-// get ed25519 public key
+// get public key for this suite
 func (d *DssSigner) Public() []byte {
 	d.dkg.mu.RLock()
 	defer d.dkg.mu.RUnlock()
-	if d.dkg.DkgPubKey != nil {
-		return d.dkg.DkgPubKey.Byte()
+	if pub, ok := d.dkg.DkgPubKeys[d.suite]; ok && pub != nil {
+		return pub.Byte()
 	}
-	return d.dkg.NewDkgPubKey.Byte()
+	if pub, ok := d.dkg.NewDkgPubKeys[d.suite]; ok && pub != nil {
+		return pub.Byte()
+	}
+	return nil
 }
 
 func (d *DssSigner) AccountID() types.AccountID {
 	d.dkg.mu.RLock()
 	defer d.dkg.mu.RUnlock()
-	if d.dkg.DkgPubKey != nil {
-		return d.dkg.DkgPubKey.AccountID()
+	if pub, ok := d.dkg.DkgPubKeys[d.suite]; ok && pub != nil {
+		return pub.AccountID()
 	}
-	return d.dkg.NewDkgPubKey.AccountID()
+	if pub, ok := d.dkg.NewDkgPubKeys[d.suite]; ok && pub != nil {
+		return pub.AccountID()
+	}
+	return types.AccountID{}
 }
 
-// sign msg aggd share
+// ChainAccountID returns the chain-agnostic account ID.
+func (d *DssSigner) ChainAccountID() model.ChainAccountID {
+	return model.ChainAccountID(d.AccountID())
+}
+
+// sign msg aggregated share
 func (d *DssSigner) Sign(msg []byte) ([]byte, error) {
 	pubs, long, random, threshold := d.PubList()
-	dss, err := dss.NewDSS(
-		d.dkg.Suite,
-		d.dkg.Signer.Scalar(),
+	suite, ok := d.dkg.Suites[d.suite]
+	if !ok {
+		return nil, errors.New("suite not found: " + string(d.suite))
+	}
+
+	dssInst, err := dss.NewDSS(
+		suite,
+		d.dkg.Signer.Scalar(d.suite),
 		pubs,
 		long,
 		random,
 		msg,
-		threshold,
+		uint32(threshold),
 	)
 
-	if dss == nil || err != nil {
+	if dssInst == nil || err != nil {
 		fmt.Println(err)
 		return nil, errors.New("dss.NewDSS failed")
 	}
 
 	for _, sig := range d.sigs {
-		err = dss.ProcessPartialSig(sig)
+		err = dssInst.ProcessPartialSig(sig)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return dss.Signature()
+	return dssInst.Signature()
 }
 
 // partial sign msg
 func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 	pubs, long, random, threshold := d.PubList()
-	dss, err := dss.NewDSS(
-		d.dkg.Suite,
-		d.dkg.Signer.Scalar(),
+	suite, ok := d.dkg.Suites[d.suite]
+	if !ok {
+		return nil, errors.New("suite not found: " + string(d.suite))
+	}
+
+	dssInst, err := dss.NewDSS(
+		suite,
+		d.dkg.Signer.Scalar(d.suite),
 		pubs,
 		long,
 		random,
 		msg,
-		threshold,
+		uint32(threshold),
 	)
 
-	if dss == nil || err != nil {
+	if dssInst == nil || err != nil {
 		return nil, errors.New("dss.NewDSS failed")
 	}
 
-	sig, err := dss.PartialSig()
+	sig, err := dssInst.PartialSig()
 	if err != nil {
 		return nil, errors.New("dss.PartialSig failed")
 	}
+
 	sigWrap := model.PartialSigWrap{
 		Partial:   model.PriShare{PriShare: sig.Partial},
 		SessionID: sig.SessionID,
@@ -141,39 +168,105 @@ func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKeyShare, int) {
 	d.dkg.mu.RLock()
 	defer d.dkg.mu.RUnlock()
+
 	pubs := make([]kyber.Point, 0, len(d.dkg.Nodes))
 	if len(d.dkg.NewNodes) > 0 {
 		for _, k := range d.dkg.NewNodes {
 			pubs = append(pubs, k.ValidatorId.Point())
 		}
+		var longShare *model.DistKeyShare
+		if s, ok := d.dkg.NewDkgKeyShares[d.suite]; ok {
+			longShare = s
+		}
 		random := d.randomShare
 		if random == nil {
-			random = d.dkg.NewDkgKeyShare
+			random = longShare
 		}
-		return pubs, d.dkg.NewDkgKeyShare, random, len(d.dkg.NewNodes) * 2 / 3
+		return pubs, longShare, random, len(d.dkg.NewNodes) * 2 / 3
 	}
 
 	for _, k := range d.dkg.Nodes {
 		pubs = append(pubs, k.ValidatorId.Point())
 	}
+	var longShare *model.DistKeyShare
+	if s, ok := d.dkg.DkgKeyShares[d.suite]; ok {
+		longShare = s
+	}
 	random := d.randomShare
 	if random == nil {
-		random = d.dkg.DkgKeyShare
+		random = longShare
 	}
-	return pubs, d.dkg.DkgKeyShare, random, d.dkg.Threshold
+	return pubs, longShare, random, d.dkg.Threshold
 }
 
 // verify sig
 func (d *DssSigner) Verify(msg []byte, signature []byte) bool {
 	d.dkg.mu.RLock()
 	defer d.dkg.mu.RUnlock()
-	if d.dkg.DkgPubKey == nil {
+
+	pub, ok := d.dkg.DkgPubKeys[d.suite]
+	if !ok || pub == nil {
 		return false
 	}
-	return ed25519.Verify(d.dkg.DkgPubKey.Ed25519PublicKey(), msg, signature)
+
+	switch d.suite {
+	case model.SuiteEd25519:
+		return ed25519.Verify(pub.Ed25519PublicKey(), msg, signature)
+	case model.SuiteSecp256k1:
+		return verifySecp256k1DSSSignature(d.dkg.Suites[d.suite], pub.Point(), msg, signature)
+	default:
+		return false
+	}
 }
 
-// return ed25519 type
+// return signature type: 1 for ed25519, 2 for secp256k1
 func (d *DssSigner) SignType() uint8 {
-	return 1
+	switch d.suite {
+	case model.SuiteEd25519:
+		return 1
+	case model.SuiteSecp256k1:
+		return 2
+	default:
+		return 1
+	}
+}
+
+// verifySecp256k1DSSSignature verifies a DSS signature over the secp256k1 curve.
+// The DSS signature format is R_point_bytes || s_scalar_bytes.
+// For secp256k1, R is 33 bytes (compressed) and s is 32 bytes → 65 bytes total.
+func verifySecp256k1DSSSignature(suite kyber.Group, public kyber.Point, msg, sig []byte) bool {
+	// For secp256k1: R (33 bytes compressed) + s (32 bytes) = 65 bytes
+	if len(sig) != 65 {
+		return false
+	}
+
+	R := suite.Point()
+	if err := R.UnmarshalBinary(sig[:33]); err != nil {
+		return false
+	}
+
+	s := suite.Scalar()
+	if err := s.UnmarshalBinary(sig[33:]); err != nil {
+		return false
+	}
+
+	// Reconstruct challenge: h = H(R || Public || Msg)
+	hash := sha256.New()
+	Rb, _ := R.MarshalBinary()
+	Pb, _ := public.MarshalBinary()
+	hash.Write(Rb)
+	hash.Write(Pb)
+	hash.Write(msg)
+
+	h := suite.Scalar().SetBytes(hash.Sum(nil))
+
+	// Verify: s*G == R + h*Public
+	// s*G
+	sG := suite.Point().Mul(s, nil)
+	// h*Public
+	hPub := suite.Point().Mul(h, public)
+	// R + h*Public
+	R.Add(R, hPub)
+
+	return sG.Equal(R)
 }

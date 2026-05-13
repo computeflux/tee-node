@@ -18,11 +18,11 @@ import (
 )
 
 // sgx issue report
-func SgxIssue(pk *chain.Signer, call *TeeCall) error {
+func SgxIssue(pk chain.SignerType, call *TeeCall) error {
 	timestamp := time.Now().Unix()
 	var buf bytes.Buffer
 	buf.Write(Int64ToBytes(timestamp))
-	buf.Write(pk.PublicKey)
+	buf.Write(pk.Public())
 	if call.Tx != nil {
 		txbuf := make([]byte, call.Tx.Size())
 		call.Tx.MarshalTo(txbuf)
@@ -43,7 +43,7 @@ func SgxIssue(pk *chain.Signer, call *TeeCall) error {
 	call.Time = timestamp
 	call.TeeType = 0
 	call.Report = report
-	call.Caller = pk.PublicKey
+	call.Caller = pk.Public()
 
 	return nil
 }
@@ -76,9 +76,9 @@ func SgxVerify(reportData *TeeCall) (*TeeVerifyResult, error) {
 		return nil, errors.New("invalid report sign")
 	}
 
-	// if report.Debug {
-	// 	return nil, errors.New("debug mode is not allowed")
-	// }
+	if report.Debug {
+		return nil, errors.New("debug mode is not allowed")
+	}
 
 	return &TeeVerifyResult{
 		TeeType:       reportData.TeeType,
@@ -139,9 +139,9 @@ func ClientSgxVerify(reportData *TeeCall) (*TeeVerifyResult, error) {
 		return nil, errors.New("invalid sgx report")
 	}
 
-	// if report.Debug {
-	// 	return nil, errors.New("debug mode is not allowed")
-	// }
+	if report.Debug {
+		return nil, errors.New("debug mode is not allowed")
+	}
 
 	return &TeeVerifyResult{
 		TeeType:       reportData.TeeType,

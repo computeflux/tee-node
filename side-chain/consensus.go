@@ -8,12 +8,12 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/version"
-	"github.com/copputefluxetee-/tevider/pkg/m-delprovidioer/pkg/model/protoio"
-	"github.com/cossospgogo/prt
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/cosmos/gogoproto/proto"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
-	"github.com/computeflux/tee-provider/pkg/model"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
@@ -205,7 +205,7 @@ func (app *SideChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote)
 	}
 
 	// 生成 TEE 证明
-	signer := app.dkg.Signer.ToSigner()
+	signer := app.dkg.Signer.ToSigner(model.SuiteEd25519)
 	if err := model.IssueReport(signer, teeCall); err != nil {
 		LogWithTime("💊 ExtendVote: IssueReport error: " + err.Error())
 		return &abci.ResponseExtendVote{VoteExtension: []byte("")}, nil

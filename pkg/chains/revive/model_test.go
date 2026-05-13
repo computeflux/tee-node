@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	chain "github.com/wetee-dao/ink.go"
+	"github.com/wetee-dao/ink.go/util"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/cloud"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	"github.com/computeflux/tee-provider/pkg/model"
-	chain "github.com/wetee-dao/ink.go"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 func TestMain(m *testing.M) {

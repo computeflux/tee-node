@@ -33,7 +33,7 @@ func main() {
 
 	fmt.Println("publicKey.Point():", publicKey.Point())
 
-	sPriv := privateKey.Scalar()
+	sPriv := privateKey.Scalar(model.SuiteEd25519)
 	fmt.Println("sPriv: ", sPriv)
 	sPub := suite.Point().Mul(sPriv, nil)
 	fmt.Println("sPub: ", sPub)

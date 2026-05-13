@@ -1,71 +1,76 @@
 package chains
 
 import (
-	// pallets "github.com/computeflux/tee-provider/pkg/chains/pallets"
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/computeflux/tee-provider/pkg/chains/evm"
 	revive "github.com/computeflux/tee-provider/pkg/chains/revive"
 	"github.com/computeflux/tee-provider/pkg/model"
-	chain "github.com/wetee-dao/ink.go"
+	"github.com/wetee-dao/ink.go"
 )
 
 var MainChain MainChainApi
 
-// ChainApi is the interface for the chain
+// ── ChainApi ──────────────────────────────────────────────
+
+// ChainApi is the minimal interface for any side-chain (Substrate, EVM, etc.).
 type ChainApi interface {
-	// query pods by worker
-	GetPodsVersionByWorker(workerId uint64) ([]model.PodVersion, error)
-	GetPodsByIds(podIds []uint64) ([]model.Pod, error)
-	GetWorker(workerId uint64) (*model.K8sCluster, error)
-	ResigerCluster(name []byte, p2p_id [32]byte, ip model.Ip, port uint32, level byte, region_id uint32) error
+	// ChainType returns the chain type string ("substrate", "evm", …).
+	ChainType() string
+	// GetCipher returns the signing suite used by this chain.
+	GetCipher() model.SuiteType
 
-	// POD
-	GetMintInterval() (uint32, error)
+	// TEECallToCall converts a TEE attestation into a chain call payload.
+	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error)
 
-	TxCallOfStartPod(nodeId uint64, pod_key types.AccountID, signer types.AccountID) (*types.Call, error)
-	DryStartPod(nodeId uint64, pod_key types.AccountID, signer types.AccountID) error
+	// Points / token tracking.
+	SyncRecharge(user model.UniAddr, amount uint64, txHash []byte) error
+	SyncWithdraw(user model.UniAddr, amount uint64, txHash []byte) error
+	RecordSpend(user model.UniAddr, amount uint64) error
+	GetTotalRecharged(user model.UniAddr) (uint64, error)
 
-	TxCallOfMintPod(nodeId uint64, hash types.H256, signer types.AccountID) (*types.Call, error)
-	DryMintPod(nodeId uint64, hash types.H256, signer types.AccountID) error
+	// Event sync from chain logs.
+	SyncRechargeEvents(fromBlock uint64) ([]model.RechargeEvent, error)
+	SyncWithdrawEvents(fromBlock uint64) ([]model.WithdrawEvent, error)
 
-	// secret
-	TxCallOfUploadSecret(user types.H160, index uint64, signer types.AccountID) (*types.Call, error)
-	DryUploadSecret(user types.H160, index uint64, signer types.AccountID) error
-
-	// disk
-	TxCallOfInitDisk(user types.H160, index uint64, hash types.H256, signer types.AccountID) (*types.Call, error)
-	DryInitDisk(user types.H160, index uint64, hash types.H256, signer types.AccountID) error
-
-	// TEE call to call
-	TEECallToCall(tcall *model.TeeCall, dkgKey types.AccountID) (*types.Call, error)
+	// Provider / model registration.
+	SyncProviderRegister(provider model.UniAddr, name string, endpoint string) error
+	SyncModelRegister(provider model.UniAddr, modelName string, pointsPer1K uint64) error
 }
 
-// MainChainApi is the interface for the main chain
+// ── MainChainApi ──────────────────────────────────────────
+
+// MainChainApi extends ChainApi with methods needed for the main / governance chain.
 type MainChainApi interface {
 	ChainApi
 
-	// get chain client
-	GetClient() *chain.ChainClient
 	GetChainUrls() []string
 	GetSignerAddress() string
 
-	// nodes
+	// Node / validator discovery.
 	GetBootPeers() ([]model.P2PAddr, error)
 	GetNodes() ([]*model.Validator, []*model.PubKey, error)
 	GetValidatorList() ([]*model.Validator, error)
 
-	// epoch
-	GetEpoch() (uint32, uint32, uint32, uint32, types.H160, error)
+	// Epoch management.
+	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, sideChainPub model.ChainH160, err error)
 	GetNextEpochValidatorList() ([]*model.Validator, error)
 	SetNewEpoch(nodeId uint64) error
-	TxCallOfSetNextEpoch(nodeId uint64, signer types.AccountID) (*types.Call, error)
 
-	/// query node id
-	GetMintWorker(user types.AccountID) (*model.K8sCluster, error)
+	// Extrinsic construction helpers.
+	TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccountID) (*model.ChainCall, error)
+	BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error)
+	CheckMapAccount(addr model.ChainH160) (bool, error)
+	CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCall, error)
+
+	// Signing / submission.
+	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
+	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
 }
 
-// ConnectMainChain 连接核心主链
+// ── Factory ───────────────────────────────────────────────
+
+// ConnectMainChain creates or reuses the singleton main-chain connection.
 func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
 	config := model.GetChainConfig(env)
 	if config == nil {
@@ -73,14 +78,35 @@ func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
 	}
 
 	var err error
-	MainChain, err = revive.NewContract(config, pk)
+	MainChain, err = connectMainChain(config, pk)
 	return MainChain, err
 }
 
-// ConnectChain 连接主链
+// ConnectChain creates a side-chain connection.
 func ConnectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, error) {
-	var err error
+	return connectChain(config, pk)
+}
 
-	chain, err := revive.NewContract(config, pk)
-	return chain, err
+// connectMainChain creates a MainChainApi for the given config.
+func connectMainChain(config *model.ChainConfigType, pk *model.PrivKey) (MainChainApi, error) {
+	switch config.ChainType {
+	case "evm":
+		return evm.NewContract(config, pk)
+	case "substrate":
+		return revive.NewContract(config, pk)
+	default:
+		return evm.NewContract(config, pk)
+	}
+}
+
+// connectChain creates a ChainApi for the given config.
+func connectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, error) {
+	switch config.ChainType {
+	case "evm":
+		return evm.NewContract(config, pk)
+	case "substrate":
+		return revive.NewContract(config, pk)
+	default:
+		return evm.NewContract(config, pk)
+	}
 }

@@ -60,8 +60,8 @@ func InitSideChain(
 	rpcConf.CORSAllowedOrigins = []string{"*"}
 	rpcConf.ListenAddress = "tcp://0.0.0.0:" + fmt.Sprint(chainPort+1)
 	// rpcConf.ListenAddress = ""
-	rpcConf.TLSCertFile = "/chain_data/ssl/ser.pem"
-	rpcConf.TLSKeyFile = "/chain_data/ssl/ser.key"
+	rpcConf.TLSCertFile = "/token_chain_data/ssl/ser.pem"
+	rpcConf.TLSKeyFile = "/token_chain_data/ssl/ser.key"
 
 	// init BFT node config
 	config := &cfg.Config{
@@ -90,7 +90,7 @@ func InitSideChain(
 		TxIndex:         cfg.DefaultTxIndexConfig(),
 		Instrumentation: cfg.DefaultInstrumentationConfig(),
 	}
-	config.SetRoot("./chain_data")
+	config.SetRoot("./token_chain_data")
 
 	// init sidechain node key
 	nodeKey, err := p2p.LoadNodeKey(config.NodeKeyFile())
@@ -99,7 +99,7 @@ func InitSideChain(
 	}
 
 	_, p2pKey, _ := model.GetP2PKey()
-	P2PKey = p2pKey.GetPublic()
+	P2PKey = p2pKey.GetPublicForSuite(model.SuiteEd25519)
 
 	// add boot nodes
 	seeds := []string{}

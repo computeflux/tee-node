@@ -9,7 +9,7 @@ import (
 )
 
 func TestPersistChan(t *testing.T) {
-	os.RemoveAll("./chain_data")
+	os.RemoveAll("./token_chain_data")
 	db, err := NewDB()
 	if err != nil {
 		require.NoErrorf(t, err, "failed store.InitDB")
@@ -42,7 +42,7 @@ func TestPersistChan(t *testing.T) {
 }
 
 func TestPersistChanLoad(t *testing.T) {
-	// os.RemoveAll("./chain_data")
+	// os.RemoveAll("./token_chain_data")
 	db, err := NewDB()
 	if err != nil {
 		require.NoErrorf(t, err, "failed store.InitDB")

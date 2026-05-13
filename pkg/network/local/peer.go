@@ -15,7 +15,7 @@ var (
 )
 
 func NewNetwork(priv *model.PrivKey, boots []string, nodes []*model.PubKey, tcp, udp uint32) (*Peer, error) {
-	id := priv.GetPublic().String()
+	id := priv.GetPublicForSuite(model.SuiteEd25519).String()
 
 	// 创建 P2P 网络实例
 	peer := &Peer{

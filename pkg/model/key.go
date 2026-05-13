@@ -8,8 +8,8 @@ import (
 )
 
 // GetKey get p2p key
-func GetP2PKey() (*chain.Signer, *PrivKey, error) {
-	nodeKey, err := p2p.LoadNodeKey("./chain_data/config/node_key.json")
+func GetP2PKey() (chain.SignerType, *PrivKey, error) {
+	nodeKey, err := p2p.LoadNodeKey("./token_chain_data/config/node_key.json")
 	if err != nil {
 		fmt.Println("failed to load node key:", err)
 		return nil, nil, err
@@ -21,5 +21,5 @@ func GetP2PKey() (*chain.Signer, *PrivKey, error) {
 		return nil, nil, err
 	}
 
-	return privateKey.ToSigner(), privateKey, nil
+	return privateKey.ToSigner(SuiteEd25519), privateKey, nil
 }

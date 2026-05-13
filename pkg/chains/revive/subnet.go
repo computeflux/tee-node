@@ -5,9 +5,9 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	chain "github.com/wetee-dao/ink.go"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	"github.com/computeflux/tee-provider/pkg/model"
-	chain "github.com/wetee-dao/ink.go"
 )
 
 func (c *Contract) GetMintWorker(user types.AccountID) (*model.K8sCluster, error) {

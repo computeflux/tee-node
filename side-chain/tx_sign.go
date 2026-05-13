@@ -35,7 +35,7 @@ func (s *SideChain) SubmitCallFromNode(call *model.SysCall) error {
 		return errors.Errorf("BytesForSig: %v", err)
 	}
 
-	signer := s.NodePriv.ToSigner()
+	signer := s.NodePriv.ToSigner(model.SuiteEd25519)
 	signature, err := signer.Sign(sigbt)
 	if err != nil {
 		return errors.Errorf("Sign: %v", err)
@@ -44,7 +44,7 @@ func (s *SideChain) SubmitCallFromNode(call *model.SysCall) error {
 	buf := new(bytes.Buffer)
 	protoio.WriteMessage(call, buf)
 	tx := &model.Tx{
-		Caller:     signer.PublicKey,
+		Caller:     signer.Public(),
 		Call:       buf.Bytes(),
 		CallerType: 0,
 		Signature:  signature,
@@ -63,7 +63,7 @@ func (s *SideChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 		return nil, errors.Errorf("DKG signer not initialized")
 	}
 
-	signer := dkg.Signer.ToSigner()
+	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
 	signature, err := signer.Sign(sigbt)
 	if err != nil {
 		return nil, errors.Errorf("Sign: %v", err)
@@ -72,7 +72,7 @@ func (s *SideChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	protoio.WriteMessage(call, buf)
 	tx := &model.Tx{
-		Caller:     signer.PublicKey,
+		Caller:     signer.Public(),
 		Call:       buf.Bytes(),
 		CallerType: 0,
 		Signature:  signature,

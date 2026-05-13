@@ -3,8 +3,8 @@ package gov
 import (
 	"bytes"
 
-	"github.com/computoflux/mputprovieerupte/m-deider/pkg/model"
-	"github.com/wdk.godat/ln.outi
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/wetee-dao/ink.go/util"
 )
 
 func (d GovQuery) Proposal(id uint32) (util.Option[ProposalWithID], error) {

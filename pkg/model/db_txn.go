@@ -6,10 +6,10 @@ import (
 	"errors"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/cockroachdb/pebbleer/pkg/model/protoio"
+	"github.com/cockroachdb/pebble"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/cosmos/gogoproto/proto""
-	"github.com/cosmos/gogoproto/proto
+	"github.com/cosmos/gogoproto/proto"
 )
 
 type Txn struct {
@@ -84,7 +84,7 @@ func (txn *Txn) Delete(key []byte) error {
 }
 
 func (txn *Txn) DeletekeysByPrefix(prefix []byte) error {
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
+	iter, err := txn.in.NewIter(&pebble.IterOptions{
 		LowerBound: prefix,
 		UpperBound: keyUpperBound(prefix),
 	})
@@ -132,7 +132,7 @@ func TxnSetJson[T any](txn *Txn, key []byte, val *T) error {
 }
 
 func TxnGetProtoMessageList[T any](txn *Txn, key []byte) (list []*T, err error) {
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
+	iter, err := txn.in.NewIter(&pebble.IterOptions{
 		LowerBound: key,
 		UpperBound: keyUpperBound(key),
 	})

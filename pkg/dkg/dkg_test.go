@@ -25,7 +25,7 @@ var newPeerSecret = []string{
 }
 
 func TestNetwork(t *testing.T) {
-	os.RemoveAll("./chain_data")
+	os.RemoveAll("./token_chain_data")
 
 	db, err := model.NewDB()
 	if err != nil {
@@ -41,10 +41,10 @@ func TestNetwork(t *testing.T) {
 	validators := []*model.Validator{}
 	for _, s := range peerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublic())
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublic(),
-			P2pId:       *nodeSecret.GetPublic(),
+			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
 		})
 	}
 
@@ -90,12 +90,12 @@ func TestNetwork(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare()
+		ks := d.GetDkgKeyShare(model.SuiteEd25519)
 		if ks != nil {
 			util.LogWithYellow("V0 |||", ks.PriShare().String())
 		}
 	}
-	dkg_pubkey = dkgs[0].GetDkgPubKey()
+	dkg_pubkey = dkgs[0].GetDkgPubKey(model.SuiteEd25519)
 
 	util.LogWithGreen("----------------------------------------------------------------------------------------------------")
 
@@ -103,10 +103,10 @@ func TestNetwork(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 
 		// new peer
-		nodes = append(nodes, nodeSecret.GetPublic())
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublic(),
-			P2pId:       *nodeSecret.GetPublic(),
+			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
 		})
 	}
 
@@ -156,7 +156,7 @@ func TestNetwork(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare()
+		ks := d.GetDkgKeyShare(model.SuiteEd25519)
 		if ks != nil {
 			util.LogWithCyan("V1 |||", ks.PriShare().String())
 		}
@@ -182,16 +182,16 @@ func TestNetwork(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare()
+		ks := d.GetDkgKeyShare(model.SuiteEd25519)
 		if ks != nil {
 			util.LogWithCyan("V2 |||", ks.PriShare().String())
 		}
 	}
 
-	pk := dkgs[0].GetDkgPubKey()
+	pk := dkgs[0].GetDkgPubKey(model.SuiteEd25519)
 	fmt.Println("dkg pubkey", pk.SS58())
 	fmt.Println("dkg pubkey", dkg_pubkey.SS58())
-	if dkgs[0].DkgPubKey.SS58() != dkg_pubkey.SS58() {
+	if pk.SS58() != dkg_pubkey.SS58() {
 		t.Fatal("dkg pubkey error")
 	}
 }
