@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm"
-	revive "github.com/computeflux/tee-provider/pkg/chains/revive"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/wetee-dao/ink.go"
 )
@@ -26,16 +25,11 @@ type ChainApi interface {
 	// Points / token tracking.
 	SyncRecharge(user model.UniAddr, amount uint64, txHash []byte) error
 	SyncWithdraw(user model.UniAddr, amount uint64, txHash []byte) error
-	RecordSpend(user model.UniAddr, amount uint64) error
 	GetTotalRecharged(user model.UniAddr) (uint64, error)
 
 	// Event sync from chain logs.
 	SyncRechargeEvents(fromBlock uint64) ([]model.RechargeEvent, error)
 	SyncWithdrawEvents(fromBlock uint64) ([]model.WithdrawEvent, error)
-
-	// Provider / model registration.
-	SyncProviderRegister(provider model.UniAddr, name string, endpoint string) error
-	SyncModelRegister(provider model.UniAddr, modelName string, pointsPer1K uint64) error
 }
 
 // ── MainChainApi ──────────────────────────────────────────
@@ -93,7 +87,7 @@ func connectMainChain(config *model.ChainConfigType, pk *model.PrivKey) (MainCha
 	case "evm":
 		return evm.NewContract(config, pk)
 	case "substrate":
-		return revive.NewContract(config, pk)
+		return nil, fmt.Errorf("substrate chain support not yet available")
 	default:
 		return evm.NewContract(config, pk)
 	}
@@ -105,7 +99,7 @@ func connectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, e
 	case "evm":
 		return evm.NewContract(config, pk)
 	case "substrate":
-		return revive.NewContract(config, pk)
+		return nil, fmt.Errorf("substrate chain support not yet available")
 	default:
 		return evm.NewContract(config, pk)
 	}
