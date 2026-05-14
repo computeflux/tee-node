@@ -135,15 +135,6 @@ func (dkg *DKG) SystemPubKey() *model.PubKey {
 	return dkg.DkgPubKeys[model.SuiteEd25519]
 }
 
-// Suite 返回 Ed25519 suite（向后兼容）
-func (dkg *DKG) Suite() suites.Suite {
-	if s, ok := dkg.Suites[model.SuiteEd25519]; ok {
-		return s
-	}
-	// fallback
-	return dkg.Suites[model.SuiteEd25519]
-}
-
 // out dkg event Handler
 func (dkg *DKG) DkgOutHandler(data any) error {
 	msg, ok := data.(*model.DkgMessage)

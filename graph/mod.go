@@ -62,9 +62,12 @@ func StartServerWithResolver(s *sidechain.SideChain, port int, resolver *Resolve
 	// Gateway REST routes (OpenAI SDK compatible)
 	gateway.RegisterGatewayRoutes(router)
 
-	util.LogWithBlue("API", "  /gql        -> GraphQL")
-	util.LogWithBlue("API", "  /auth/*     -> REST (web3auth)")
-	util.LogWithBlue("API", "  /wallet/*   -> REST (wallet)")
+	// REST routes for dapp (Web3Auth SDK compatible)
+	restMux := http.NewServeMux()
+	RegisterRESTRoutes(restMux, resolver)
+	router.Mount("/", restMux)
+
+	util.LogWithBlue("API", "  /gql        -> GraphQL (auth, wallet, secrets)")
 	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")
 	util.LogWithBlue("API", "  /health     -> health check")
 

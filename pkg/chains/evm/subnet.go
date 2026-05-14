@@ -3,6 +3,7 @@ package evm
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
@@ -132,15 +133,49 @@ func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*model.Validat
 }
 
 func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
-	vals, err := e.GetValidatorList()
+	// 获取所有 workers（与旧版 ink! 逻辑一致）
+	workers, _, err := e.subnet.GetWorkers(&bind.CallOpts{}, 0, 5000)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("GetWorkers: %w", err)
 	}
-	var pubs []*model.PubKey
-	for _, v := range vals {
-		pubs = append(pubs, &v.ValidatorId)
+
+	// 获取所有 secrets（与旧版 ink! QuerySecrets 逻辑一致）
+	// 注意：getSecrets(start, size) 是从 start 往 0 降序遍历，
+	// start 必须 >= total 才能拿到全部。传一个大数让合约自动 clamp 到 total-1。
+	bigStart := big.NewInt(1 << 60) // 足够大，合约会 clamp 到 nextSecretId-1
+	bigSize := big.NewInt(5000)
+	secretsResult, err := e.subnet.GetSecrets(&bind.CallOpts{}, bigStart, bigSize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetSecrets: %w", err)
 	}
-	return vals, pubs, nil
+
+	nodes := make([]*model.PubKey, 0, len(workers)+len(secretsResult.Nodes))
+	validators := make([]*model.Validator, 0, len(secretsResult.Nodes))
+
+	// Workers → P2P nodes
+	for _, w := range workers {
+		var p2pId [32]byte
+		copy(p2pId[:], w.P2pId[:])
+		nodes = append(nodes, model.PubKeyFromByte(p2pId[:]))
+	}
+
+	// Secrets → P2P nodes + validators（排除已终止的）
+	for _, s := range secretsResult.Nodes {
+		if s.TerminalBlock.Sign() > 0 {
+			continue
+		}
+		var vId, pId [32]byte
+		copy(vId[:], s.ValidatorId[:])
+		copy(pId[:], s.P2pId[:])
+		nodes = append(nodes, model.PubKeyFromByte(pId[:]))
+		validators = append(validators, &model.Validator{
+			NodeID:      s.Id,
+			P2pId:       *model.PubKeyFromByte(pId[:]),
+			ValidatorId: *model.PubKeyFromByte(vId[:]),
+		})
+	}
+
+	return validators, nodes, nil
 }
 
 // ── Subnet: MapAccount ────────────────────────────────────

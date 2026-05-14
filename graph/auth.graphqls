@@ -87,6 +87,9 @@ extend type Mutation {
 
   """完成恢复"""
   completeRecovery(recoveryToken: String!, passwordHash: String!): RecoveryResult!
+
+  """领取订单 API Token"""
+  claimOrderToken(address: String!, signature: String!, timestamp: Int!, orderId: Int!): AuthResponse!
 }
 
 # ── Query ───────────────────────────────────────────────

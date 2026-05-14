@@ -8,27 +8,25 @@ import (
 )
 
 var (
-	ErrLowBalance        = errors.New("low balance")
-	ErrModelNotFound     = errors.New("model not found")
-	ErrChannelNotFound   = errors.New("channel not found")
-	ErrTokenNotFound     = errors.New("token not found")
-	ErrNotOwner          = errors.New("not owner")
+	ErrLowBalance       = errors.New("low balance")
+	ErrModelNotFound    = errors.New("model not found")
+	ErrProviderNotFound = errors.New("provider not found")
+	ErrTokenNotFound    = errors.New("token not found")
+	ErrNotOwner         = errors.New("not owner")
 )
 
 // Gateway API 网关合约
 type Gateway struct {
 	api model.ContractApi
 
-	balances         *model.StoreMapping[string, uint64]       // user -> balance
-	models           *model.StoreMapping[uint64, ModelInfo]    // modelId -> ModelInfo
-	providerBalances *model.StoreMapping[uint64, uint64]       // modelId -> providerBalance
-	channels         *model.StoreMapping[uint64, ChannelInfo]  // channelId -> ChannelInfo
-	tokens           *model.StoreMapping[uint64, TokenInfo]    // tokenId -> TokenInfo
-	usages           *model.StoreMapping[string, DailyUsage]   // "{tokenId}_{day}" -> DailyUsage
+	balances         *model.StoreMapping[string, uint64]
+	models           *model.IndexedList[uint64, ModelInfo]    // tag 索引 + 自增 id + 分页
+	providers *model.IndexedList[uint64, ProviderInfo] // 自增 id + 分页
+	providerBalances *model.StoreMapping[uint64, uint64]
+	tokens           *model.StoreMapping[uint64, TokenInfo]
+	usages           *model.StoreMapping[string, DailyUsage]
 
-	nextModelID   *model.StoreValue[uint64]
-	nextProviderID *model.StoreValue[uint64]
-	nextTokenID   *model.StoreValue[uint64]
+	nextTokenID *model.StoreValue[uint64]
 }
 
 type GatewayQuery struct{ Gateway }
@@ -37,77 +35,113 @@ type GatewayMutation struct{ Gateway }
 // ── Init ─────────────────────────────────────────────────
 
 func (g GatewayMutation) Init() error {
-	g.nextModelID.Set(g.api.GetTxn(), 0)
-	g.nextProviderID.Set(g.api.GetTxn(), 0)
 	return g.nextTokenID.Set(g.api.GetTxn(), 0)
 }
 
 // ── Model ────────────────────────────────────────────────
 
-func (g GatewayMutation) RegisterModel(owner model.UniAddr, name string, pointsPer1K uint64) (uint64, error) {
-	id, _ := g.nextModelID.Get(g.api.GetTxn())
-	if id == nil {
-		id = new(uint64)
-	}
-
-	if err := g.models.Set(g.api.GetTxn(), *id, ModelInfo{
-		Name: name, Owner: owner, PointsPer1K: pointsPer1K,
-		IsActive: true, CreatedAt: uint64(g.api.GetHeight()),
+func (g GatewayMutation) RegisterModel(
+	owner model.UniAddr, name string, pointsPer1K uint64,
+	inputModalities uint8, contextLength uint64, promptPricing uint64,
+) error {
+	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
+		Name:            name,
+		Owner:           owner,
+		PointsPer1K:     pointsPer1K,
+		IsActive:        true,
+		CreatedAt:       uint64(g.api.GetHeight()),
+		InputModalities: inputModalities,
+		ContextLength:   contextLength,
+		PromptPricing:   promptPricing,
 	}); err != nil {
-		return 0, err
+		return err
 	}
-
-	g.nextModelID.Set(g.api.GetTxn(), *id+1)
-	return *id, nil
+	return nil
 }
 
-func (g GatewayMutation) UpdateModel(modelID uint64, pointsPer1K uint64) error {
-	m, err := g.models.Get(g.api.GetTxn(), modelID)
-	if err != nil || m == nil {
-		return ErrModelNotFound
-	}
-	m.PointsPer1K = pointsPer1K
-	return g.models.Set(g.api.GetTxn(), modelID, *m)
+func (g GatewayMutation) UpdateModel(
+	modelID uint64, pointsPer1K uint64,
+	inputModalities uint8, contextLength uint64, promptPricing uint64,
+) error {
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.PointsPer1K = pointsPer1K
+		m.InputModalities = inputModalities
+		m.ContextLength = contextLength
+		m.PromptPricing = promptPricing
+	})
 }
 
 func (g GatewayMutation) DeactivateModel(modelID uint64) error {
-	m, err := g.models.Get(g.api.GetTxn(), modelID)
-	if err != nil || m == nil {
-		return ErrModelNotFound
-	}
-	m.IsActive = false
-	return g.models.Set(g.api.GetTxn(), modelID, *m)
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.IsActive = false
+	})
 }
 
-// ── Provider ──────────────────────────────────────────────
+// ── Provider / Channel ───────────────────────────────────
 
-func (g GatewayMutation) CreateProvider(owner model.UniAddr, name, baseURL string, modelIds []uint64, priority uint32) (uint64, error) {
-	id, _ := g.nextProviderID.Get(g.api.GetTxn())
-	if id == nil {
-		id = new(uint64)
-	}
-
-	if err := g.channels.Set(g.api.GetTxn(), *id, ChannelInfo{
-		Name: name, BaseURL: baseURL, ModelIds: modelIds,
-		Priority: priority, IsActive: true, Owner: owner,
+func (g GatewayMutation) CreateProvider(
+	owner model.UniAddr,
+	name, logoURL, description, website string,
+	baseURL string, modelIds []uint64,
+	region uint8, deposit uint64, feeRate uint32,
+	priority uint32, uptimeSLA uint32,
+) error {
+	if _, err := g.providers.Insert(g.api.GetTxn(), ProviderInfo{
+		Owner:       owner,
+		Name:        name,
+		LogoURL:     logoURL,
+		Description: description,
+		Website:     website,
+		BaseURL:     baseURL,
+		ModelIds:    modelIds,
+		Region:      region,
+		Deposit:     deposit,
+		FeeRate:     feeRate,
+		Priority:    priority,
+		UptimeSLA:   uptimeSLA,
+		IsActive:    true,
+		CreatedAt:   uint64(g.api.GetHeight()),
 	}); err != nil {
-		return 0, err
+		return err
 	}
-
-	g.nextProviderID.Set(g.api.GetTxn(), *id+1)
-	return *id, nil
+	return nil
 }
 
-func (g GatewayMutation) UpdateProvider(providerID uint64, modelIds []uint64, priority uint32) error {
-	ch, err := g.channels.Get(g.api.GetTxn(), providerID)
-	if err != nil || ch == nil {
-		return ErrChannelNotFound
-	}
-	if modelIds != nil {
-		ch.ModelIds = modelIds
-	}
-	ch.Priority = priority
-	return g.channels.Set(g.api.GetTxn(), providerID, *ch)
+func (g GatewayMutation) UpdateProvider(
+	providerID uint64,
+	name, logoURL, description, website string,
+	modelIds []uint64, region uint8, feeRate uint32,
+	priority uint32, uptimeSLA uint32,
+) error {
+	return g.providers.UpdateFn(g.api.GetTxn(), providerID, func(ch *ProviderInfo) {
+		if name != "" {
+			ch.Name = name
+		}
+		if logoURL != "" {
+			ch.LogoURL = logoURL
+		}
+		if description != "" {
+			ch.Description = description
+		}
+		if website != "" {
+			ch.Website = website
+		}
+		if modelIds != nil {
+			ch.ModelIds = modelIds
+		}
+		if region != 0 {
+			ch.Region = region
+		}
+		if feeRate != 0 {
+			ch.FeeRate = feeRate
+		}
+		if priority != 0 {
+			ch.Priority = priority
+		}
+		if uptimeSLA != 0 {
+			ch.UptimeSLA = uptimeSLA
+		}
+	})
 }
 
 // ── Points ───────────────────────────────────────────────
@@ -123,25 +157,21 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 }
 
 func (g GatewayMutation) Consume(tokenID, providerID, modelID uint64, tokensUsed uint64) error {
-	// 查 token owner
 	tk, err := g.tokens.Get(g.api.GetTxn(), tokenID)
 	if err != nil || tk == nil {
 		return ErrTokenNotFound
 	}
 
-	// 查模型价格
 	m, err := g.models.Get(g.api.GetTxn(), modelID)
 	if err != nil || m == nil {
 		return ErrModelNotFound
 	}
 
-	// 计算费用
-	cost := (tokensUsed + 999) / 1000 * m.PointsPer1K
+	cost := (tokensUsed+999)/1000*m.PointsPer1K + m.PromptPricing
 	if cost < 1 {
 		cost = 1
 	}
 
-	// 扣用户余额
 	key := string(tk.Owner.V)
 	bal, _ := g.balances.Get(g.api.GetTxn(), key)
 	if bal == nil || *bal < cost {
@@ -150,7 +180,6 @@ func (g GatewayMutation) Consume(tokenID, providerID, modelID uint64, tokensUsed
 	*bal -= cost
 	g.balances.Set(g.api.GetTxn(), key, *bal)
 
-	// 加供应商收益
 	pb, _ := g.providerBalances.Get(g.api.GetTxn(), modelID)
 	if pb == nil {
 		pb = new(uint64)
@@ -158,8 +187,7 @@ func (g GatewayMutation) Consume(tokenID, providerID, modelID uint64, tokensUsed
 	*pb += cost
 	g.providerBalances.Set(g.api.GetTxn(), modelID, *pb)
 
-	// 记录用量
-	dayKey := fmt.Sprintf("%d_%d_%s", tokenID, modelID, "today") // simplified
+	dayKey := fmt.Sprintf("%d_%d_%s", tokenID, modelID, "today")
 	usage, _ := g.usages.Get(g.api.GetTxn(), dayKey)
 	if usage == nil {
 		usage = &DailyUsage{TokenID: tokenID, ProviderID: providerID, ModelID: modelID}
@@ -184,7 +212,7 @@ func (g GatewayMutation) Withdraw(modelID uint64, amount uint64) error {
 
 // ── Token ────────────────────────────────────────────────
 
-func (g GatewayMutation) CreateToken(owner model.UniAddr, rateLimit uint32) (uint64, error) {
+func (g GatewayMutation) CreateToken(owner model.UniAddr, rateLimit uint32) error {
 	id, _ := g.nextTokenID.Get(g.api.GetTxn())
 	if id == nil {
 		id = new(uint64)
@@ -194,11 +222,11 @@ func (g GatewayMutation) CreateToken(owner model.UniAddr, rateLimit uint32) (uin
 		Owner: owner, RateLimit: rateLimit, IsActive: true,
 		CreatedAt: uint64(g.api.GetHeight()),
 	}); err != nil {
-		return 0, err
+		return err
 	}
 
 	g.nextTokenID.Set(g.api.GetTxn(), *id+1)
-	return *id, nil
+	return nil
 }
 
 func (g GatewayMutation) RevokeToken(tokenID uint64) error {
@@ -210,7 +238,7 @@ func (g GatewayMutation) RevokeToken(tokenID uint64) error {
 	return g.tokens.Set(g.api.GetTxn(), tokenID, *tk)
 }
 
-// ── Query ────────────────────────────────────────────────
+// ── Query: Single ────────────────────────────────────────
 
 func (g GatewayQuery) GetBalance(user model.UniAddr) (uint64, error) {
 	bal, err := g.balances.Get(g.api.GetTxn(), string(user.V))
@@ -224,8 +252,8 @@ func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
 	return g.models.Get(g.api.GetTxn(), modelID)
 }
 
-func (g GatewayQuery) GetChannel(providerID uint64) (*ChannelInfo, error) {
-	return g.channels.Get(g.api.GetTxn(), providerID)
+func (g GatewayQuery) GetProvider(providerID uint64) (*ProviderInfo, error) {
+	return g.providers.Get(g.api.GetTxn(), providerID)
 }
 
 func (g GatewayQuery) GetToken(tokenID uint64) (*TokenInfo, error) {
@@ -238,4 +266,188 @@ func (g GatewayQuery) GetProviderBalance(modelID uint64) (uint64, error) {
 		return 0, nil
 	}
 	return *bal, nil
+}
+
+// ── Query: Count ─────────────────────────────────────────
+
+func (g GatewayQuery) GetModelCount() (uint64, error) {
+	return g.models.Len(g.api.GetTxn())
+}
+
+func (g GatewayQuery) GetProviderCount() (uint64, error) {
+	return g.providers.Len(g.api.GetTxn())
+}
+
+func (g GatewayQuery) GetTokenCount() (uint64, error) {
+	id, err := g.nextTokenID.Get(g.api.GetTxn())
+	if err != nil || id == nil {
+		return 0, nil
+	}
+	return *id, nil
+}
+
+// ── Query: Paginated list (StoreList 原生分页) ───────────
+
+func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	_, vals, err := g.models.List(g.api.GetTxn(), offset, limit)
+	return vals, err
+}
+
+func (g GatewayQuery) ListProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
+	_, vals, err := g.providers.List(g.api.GetTxn(), offset, limit)
+	return vals, err
+}
+
+func (g GatewayQuery) ListTokens(offset uint64, limit uint32) ([]TokenInfo, error) {
+	return g.paginateTokens(offset, limit, nil)
+}
+
+// ── Query: Active-only list ──────────────────────────────
+
+func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	return g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool { return m.IsActive })
+}
+
+func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
+	return g.listProvidersFiltered(offset, limit, func(ch *ProviderInfo) bool { return ch.IsActive })
+}
+
+func (g GatewayQuery) ListActiveTokens(offset uint64, limit uint32) ([]TokenInfo, error) {
+	return g.paginateTokens(offset, limit, func(tk *TokenInfo) bool { return tk.IsActive })
+}
+
+// ── Query: Combined filter ───────────────────────────────
+
+func (g GatewayQuery) QueryModels(
+	modalities uint8, minContext uint64, maxContext uint64,
+	maxPrice uint64, offset uint64, limit uint32,
+) ([]ModelInfo, error) {
+	txn := g.api.GetTxn()
+
+	filter := map[string]any{}
+	if modalities != 0 {
+		filter["InputModalities"] = uint64(modalities)
+	}
+	if minContext > 0 || maxContext > 0 {
+		filter["ContextLength"] = model.Range{Min: minContext, Max: maxContext}
+	}
+	if maxPrice > 0 {
+		filter["PromptPricing"] = model.Range{Min: 0, Max: maxPrice}
+	}
+
+	if len(filter) == 0 {
+		return g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool {
+			return m.IsActive
+		})
+	}
+
+	ids, err := g.models.Query(txn, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]ModelInfo, 0, limit)
+	var skipped, collected uint64
+	for _, id := range ids {
+		m, err := g.models.Get(txn, id)
+		if err != nil || m == nil || !m.IsActive {
+			continue
+		}
+		if minContext > 0 && m.ContextLength < minContext {
+			continue
+		}
+		if maxContext > 0 && m.ContextLength > maxContext {
+			continue
+		}
+		if maxPrice > 0 && m.PromptPricing > maxPrice {
+			continue
+		}
+		if skipped < offset {
+			skipped++
+			continue
+		}
+		out = append(out, *m)
+		collected++
+		if collected >= uint64(limit) {
+			break
+		}
+	}
+	return out, nil
+}
+
+// ── Internal pagination helpers ──────────────────────────
+
+func (g GatewayQuery) listModelsFiltered(
+	offset uint64, limit uint32, fn func(*ModelInfo) bool,
+) ([]ModelInfo, error) {
+	txn := g.api.GetTxn()
+	total, _ := g.models.Len(txn)
+	out := make([]ModelInfo, 0, limit)
+	var skipped, collected uint64
+	for i := uint64(0); i < total && collected < uint64(limit); i++ {
+		m, err := g.models.Get(txn, i)
+		if err != nil || m == nil {
+			continue
+		}
+		if fn != nil && !fn(m) {
+			continue
+		}
+		if skipped < offset {
+			skipped++
+			continue
+		}
+		out = append(out, *m)
+		collected++
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) listProvidersFiltered(
+	offset uint64, limit uint32, fn func(*ProviderInfo) bool,
+) ([]ProviderInfo, error) {
+	txn := g.api.GetTxn()
+	total, _ := g.providers.Len(txn)
+	out := make([]ProviderInfo, 0, limit)
+	var skipped, collected uint64
+	for i := uint64(0); i < total && collected < uint64(limit); i++ {
+		ch, err := g.providers.Get(txn, i)
+		if err != nil || ch == nil {
+			continue
+		}
+		if fn != nil && !fn(ch) {
+			continue
+		}
+		if skipped < offset {
+			skipped++
+			continue
+		}
+		out = append(out, *ch)
+		collected++
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) paginateTokens(
+	offset uint64, limit uint32, fn func(*TokenInfo) bool,
+) ([]TokenInfo, error) {
+	txn := g.api.GetTxn()
+	total, _ := g.GetTokenCount()
+	out := make([]TokenInfo, 0, limit)
+	var skipped, collected uint64
+	for i := uint64(0); i < total && collected < uint64(limit); i++ {
+		tk, err := g.tokens.Get(txn, i)
+		if err != nil || tk == nil {
+			continue
+		}
+		if fn != nil && !fn(tk) {
+			continue
+		}
+		if skipped < offset {
+			skipped++
+			continue
+		}
+		out = append(out, *tk)
+		collected++
+	}
+	return out, nil
 }

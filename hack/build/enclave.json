@@ -30,6 +30,82 @@
         {
             "name": "CHAIN_ENV",
             "fromHost": true
+        },
+        {
+            "name": "JWT_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "SEED_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "MOCK_EMAIL",
+            "fromHost": true
+        },
+        {
+            "name": "CORS_ORIGINS",
+            "fromHost": true
+        },
+        {
+            "name": "GOOGLE_CLIENT_ID",
+            "fromHost": true
+        },
+        {
+            "name": "GOOGLE_CLIENT_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "GOOGLE_REDIRECT_URL",
+            "fromHost": true
+        },
+        {
+            "name": "GITHUB_CLIENT_ID",
+            "fromHost": true
+        },
+        {
+            "name": "GITHUB_CLIENT_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "GITHUB_REDIRECT_URL",
+            "fromHost": true
+        },
+        {
+            "name": "TWITTER_CLIENT_ID",
+            "fromHost": true
+        },
+        {
+            "name": "TWITTER_CLIENT_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "TWITTER_REDIRECT_URL",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_HOST",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_PORT",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_USER",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_PASSWORD",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_FROM",
+            "fromHost": true
+        },
+        {
+            "name": "SMTP_FROM_NAME",
+            "fromHost": true
         }
     ],
     "files": [

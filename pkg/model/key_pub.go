@@ -112,6 +112,9 @@ func (p *PubKey) String() string {
 
 // SideChainNodeID returns the CometBFT P2P node ID (ed25519 only).
 func (p *PubKey) SideChainNodeID() p2p.ID {
+	if !p.IsEd25519() {
+		panic("not an ed25519 key")
+	}
 	return p2p.ID(hex.EncodeToString(crypto.AddressHash(p.PublicKey)))
 }
 

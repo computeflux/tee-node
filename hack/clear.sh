@@ -12,6 +12,7 @@ cd $ROOT_DIR/node0
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal
+mkdir -p ./token_chain_data/data
 cat <<EOF > ./token_chain_data/data/priv_validator_state.json
 {
   "height": "0",
@@ -24,6 +25,7 @@ cd $ROOT_DIR/node1
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal
+mkdir -p ./token_chain_data/data
 cat <<EOF > ./token_chain_data/data/priv_validator_state.json
 {
   "height": "0",
@@ -36,6 +38,7 @@ cd $ROOT_DIR/node2
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal
+mkdir -p ./token_chain_data/data
 cat <<EOF > ./token_chain_data/data/priv_validator_state.json
 {
   "height": "0",

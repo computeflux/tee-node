@@ -9,99 +9,168 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
-func (a AuthMutation) ExecCall(call *model.ContractCall) error {
+// ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。
+func (d AuthMutation) ExecCall(call *model.ContractCall) error {
+	auth := NewAuth(d.api)
+	m := AuthMutation{Auth: *auth}
+
 	methodSel := [4]byte(call.Method[:4])
 	args := call.Args
-
 	switch methodSel {
-	case model.MethodToSelector("Init"):
-		if err := model.RequireArgLen(args, 3, "Init"); err != nil {
+	case [4]byte{0xe2, 0xfd, 0x6c, 0x98}:
+		if err := model.RequireArgLen(args, 2, "approve_recovery"); err != nil {
+			return err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return fmt.Errorf("approve_recovery: emailHash: %w", err)
+		}
+		guardian, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("approve_recovery: guardian: %w", err)
+		}
+		return m.ApproveRecovery(emailHash, guardian)
+	case [4]byte{0xba, 0x72, 0xe1, 0x68}:
+		if err := model.RequireArgLen(args, 2, "complete_recovery"); err != nil {
+			return err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return fmt.Errorf("complete_recovery: emailHash: %w", err)
+		}
+		newShareRoot, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("complete_recovery: newShareRoot: %w", err)
+		}
+		return m.CompleteRecovery(emailHash, newShareRoot)
+	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
+		if err := model.RequireArgLen(args, 3, "init"); err != nil {
 			return err
 		}
 		dkgPubKey, err := model.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
-			return fmt.Errorf("Init: dkgPubKey: %w", err)
+			return fmt.Errorf("init: dkgPubKey: %w", err)
 		}
 		threshold, err := model.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
-			return fmt.Errorf("Init: threshold: %w", err)
+			return fmt.Errorf("init: threshold: %w", err)
 		}
 		totalNodes, err := model.DecodeScaleArgBytes[uint32](args[2])
 		if err != nil {
-			return fmt.Errorf("Init: totalNodes: %w", err)
+			return fmt.Errorf("init: totalNodes: %w", err)
 		}
-		return a.Init(dkgPubKey, threshold, totalNodes)
-
-	case model.MethodToSelector("RegisterUser"):
-		if err := model.RequireArgLen(args, 3, "RegisterUser"); err != nil {
+		return m.Init(dkgPubKey, threshold, totalNodes)
+	case [4]byte{0xd0, 0x26, 0x71, 0x9d}:
+		if err := model.RequireArgLen(args, 3, "register_user"); err != nil {
 			return err
 		}
 		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
-			return fmt.Errorf("RegisterUser: emailHash: %w", err)
+			return fmt.Errorf("register_user: emailHash: %w", err)
 		}
 		shareRoot, err := model.DecodeScaleArgBytes[[]byte](args[1])
 		if err != nil {
-			return fmt.Errorf("RegisterUser: shareRoot: %w", err)
+			return fmt.Errorf("register_user: shareRoot: %w", err)
 		}
 		address, err := model.DecodeScaleArgBytes[[]byte](args[2])
 		if err != nil {
-			return fmt.Errorf("RegisterUser: address: %w", err)
+			return fmt.Errorf("register_user: address: %w", err)
 		}
-		return a.RegisterUser(emailHash, shareRoot, address)
-
-	case model.MethodToSelector("SetRecovery"):
-		if err := model.RequireArgLen(args, 2, "SetRecovery"); err != nil {
+		return m.RegisterUser(emailHash, shareRoot, address)
+	case [4]byte{0x59, 0xe9, 0xe0, 0x63}:
+		if err := model.RequireArgLen(args, 2, "request_recovery"); err != nil {
 			return err
 		}
 		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
-			return fmt.Errorf("SetRecovery: emailHash: %w", err)
+			return fmt.Errorf("request_recovery: emailHash: %w", err)
+		}
+		newRoot, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("request_recovery: newRoot: %w", err)
+		}
+		return m.RequestRecovery(emailHash, newRoot)
+	case [4]byte{0x35, 0x5d, 0x07, 0x2a}:
+		if err := model.RequireArgLen(args, 2, "set_recovery"); err != nil {
+			return err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return fmt.Errorf("set_recovery: emailHash: %w", err)
 		}
 		cfg, err := model.DecodeScaleArgBytes[RecoveryConfig](args[1])
 		if err != nil {
-			return fmt.Errorf("SetRecovery: cfg: %w", err)
+			return fmt.Errorf("set_recovery: cfg: %w", err)
 		}
-		return a.SetRecovery(emailHash, cfg)
-
+		return m.SetRecovery(emailHash, cfg)
+	case [4]byte{0xbd, 0x35, 0xb7, 0x50}:
+		if err := model.RequireArgLen(args, 2, "update_share_root"); err != nil {
+			return err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return fmt.Errorf("update_share_root: emailHash: %w", err)
+		}
+		newRoot, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("update_share_root: newRoot: %w", err)
+		}
+		return m.UpdateShareRoot(emailHash, newRoot)
 	default:
 		return fmt.Errorf("auth: unknown method %q", methodSel)
 	}
 }
 
-func (a AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
+// ExecuteQuery 按 method 将字符串参数解析为合约查询实参，返回 SCALE 编码结果。
+func (q AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 	args := call.Args
 	methodSel := [4]byte(call.Method[:4])
-
 	switch methodSel {
-	case model.MethodToSelector("GetUser"):
-		if err := model.RequireArgLen(args, 1, "GetUser"); err != nil {
-			return nil, err
-		}
-		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("GetUser: emailHash: %w", err)
-		}
-		out, err := a.GetUser(emailHash)
+	case [4]byte{0xca, 0x06, 0xe5, 0xad}:
+		out, err := q.GetDKGPublicKey()
 		if err != nil {
 			return nil, err
 		}
 		return codec.Encode(out)
-
-	case model.MethodToSelector("HasKey"):
-		if err := model.RequireArgLen(args, 1, "HasKey"); err != nil {
+	case [4]byte{0x7d, 0x24, 0x4c, 0x3f}:
+		if err := model.RequireArgLen(args, 1, "get_recovery"); err != nil {
 			return nil, err
 		}
 		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
-			return nil, fmt.Errorf("HasKey: emailHash: %w", err)
+			return nil, fmt.Errorf("get_recovery: emailHash: %w", err)
 		}
-		out, err := a.HasKey(emailHash)
+		out, err := q.GetRecovery(emailHash)
 		if err != nil {
 			return nil, err
 		}
 		return codec.Encode(out)
-
+	case [4]byte{0x62, 0x76, 0x14, 0x9a}:
+		if err := model.RequireArgLen(args, 1, "get_user"); err != nil {
+			return nil, err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_user: emailHash: %w", err)
+		}
+		out, err := q.GetUser(emailHash)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x03, 0x2c, 0x9f, 0x3b}:
+		if err := model.RequireArgLen(args, 1, "has_key"); err != nil {
+			return nil, err
+		}
+		emailHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("has_key: emailHash: %w", err)
+		}
+		out, err := q.HasKey(emailHash)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
 	default:
 		return nil, fmt.Errorf("auth: unknown query method %q", methodSel)
 	}
@@ -111,11 +180,18 @@ func NewAuth(api model.ContractApi) *Auth {
 	return &Auth{
 		api:          api,
 		users:        &model.StoreMapping[[]byte, UserInfo]{Namespace: "auth", KeyPrefix: "user_"},
-		shareRoots:   &model.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_"},
-		recoveries:   &model.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "rec_"},
-		recoveryReqs: &model.StoreMapping[[]byte, RecoveryRequest]{Namespace: "auth", KeyPrefix: "recq_"},
-		dkgPubKey:    &model.StoreValue[[]byte]{Namespace: "auth", Key: "dkg_pub"},
+		shareRoots:   &model.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_root_"},
+		recoveries:   &model.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "recoverie_"},
+		recoveryReqs: &model.StoreMapping[[]byte, RecoveryRequest]{Namespace: "auth", KeyPrefix: "recovery_req_"},
+		dkgPubKey:    &model.StoreValue[[]byte]{Namespace: "auth", Key: "dkg_pub_key"},
 		threshold:    &model.StoreValue[uint32]{Namespace: "auth", Key: "threshold"},
 		totalNodes:   &model.StoreValue[uint32]{Namespace: "auth", Key: "total_nodes"},
 	}
+}
+
+var MethodMap = map[[4]byte]string{
+	[4]byte{0xca, 0x06, 0xe5, 0xad}: "get_d_k_g_public_key",
+	[4]byte{0x7d, 0x24, 0x4c, 0x3f}: "get_recovery",
+	[4]byte{0x62, 0x76, 0x14, 0x9a}: "get_user",
+	[4]byte{0x03, 0x2c, 0x9f, 0x3b}: "has_key",
 }

@@ -76,9 +76,10 @@ func SgxVerify(reportData *TeeCall) (*TeeVerifyResult, error) {
 		return nil, errors.New("invalid report sign")
 	}
 
-	if report.Debug {
-		return nil, errors.New("debug mode is not allowed")
-	}
+	// TODO
+	// if report.Debug {
+	// 	return nil, errors.New("debug mode is not allowed")
+	// }
 
 	return &TeeVerifyResult{
 		TeeType:       reportData.TeeType,

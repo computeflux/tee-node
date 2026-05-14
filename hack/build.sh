@@ -20,7 +20,7 @@ ego sign dsecret
 cd $DIR/../
 
 # 构建镜像
-docker build -t wetee/dsecret:$tag .
-docker push wetee/dsecret:$tag
+docker build -t wetee/tee-provider:$tag .
+docker push wetee/tee-provider:$tag
 
-echo "wetee/dsecret:$tag" > ./hack/.version
+echo "wetee/tee-provider:$tag" > ./hack/.version

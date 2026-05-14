@@ -220,6 +220,8 @@ func (r *BTFReactor) PrintPeers(event string) {
 		}
 	}
 
+	util.LogWithGreen("pubkeys", pubkeys)
+
 	// save all nodekeys and validators
 	r.nodekeys = pubkeys
 	validators := make([]*model.PubKey, len(validatorWrap))

@@ -84,7 +84,7 @@ func (app *SideChain) CheckEpochFromValidator() []byte {
 				return nil
 			}
 
-			util.LogWithYellow("NewEpoch", "P1 at epoch", epoch)
+			util.LogWithYellow("NewEpoch", "P1 at epoch", epoch, "len(validators)", len(validators))
 			err = app.dkg.TryEpochConsensus(model.ConsensusMsg{
 				Validators: validators,
 				Epoch:      epoch + 1,

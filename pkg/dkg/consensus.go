@@ -31,8 +31,8 @@ func (dkg *DKG) TryEpochConsensus(
 	available := dkg.AvailableNodeLen()
 	threshold := dkg.Threshold
 	dkg.mu.RUnlock()
-	if available <= threshold {
-		util.LogError("DKG Consensus", "validator node exapect >", threshold, ", got:", available)
+	if available < threshold {
+		util.LogError("DKG Consensus", "old validator node exapect >", threshold, ", got:", available)
 		return fmt.Errorf("old validators count <= dkg.Threshold")
 	}
 
