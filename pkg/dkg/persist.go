@@ -5,6 +5,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 type DKGStore struct {
@@ -52,6 +53,14 @@ func (dkg *DKG) reState() error {
 	to.Nodes = from.Nodes
 	to.DkgPubKeys = from.DkgPubKeys
 	to.DkgKeyShares = from.DkgKeyShares
+
+	if to.DkgPubKeys != nil {
+		for _, pubKey := range to.DkgPubKeys {
+			if pubKey != nil {
+				util.LogWithCyan("DKG PUBKEY", pubKey.AccountString())
+			}
+		}
+	}
 
 	to.NewNodes = from.NewNodes
 	to.NewEpoch = from.NewEpoch

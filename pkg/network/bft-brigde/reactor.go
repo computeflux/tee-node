@@ -71,6 +71,11 @@ func NewBTFReactor(name string) *BTFReactor {
 	return r
 }
 
+// SetID 设置本节点的公钥标识，应在 P2P 启动前调用。
+func (r *BTFReactor) SetID(id *model.PubKey) {
+	r.id = id
+}
+
 // SetOnSwitchReady 设置P2P网络就绪回调
 func (r *BTFReactor) SetOnSwitchReady(callback func()) {
 	r.onSwitchReady = callback
@@ -138,11 +143,11 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
-			util.LogWithRed("P2P PubkeyFromPeerID", "Receive unknown node", e.Src.ID())
-			return
+			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
+			msg.From = string(e.Src.ID())
+		} else {
+			msg.From = pub.String()
 		}
-
-		msg.From = pub.String()
 		err = r.dkgHandler(msg)
 		if err != nil {
 			util.LogWithRed("P2P Receive error", "dkgHandler", err)
@@ -160,10 +165,11 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
-			util.LogWithRed("P2P PubkeyFromPeerID", "Receive unknown node", e.Src.ID())
+			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
+			msg.From = string(e.Src.ID())
+		} else {
+			msg.From = pub.String()
 		}
-
-		msg.From = pub.String()
 		err = r.blockPartialSignHandler(msg)
 		if err != nil {
 			util.LogWithRed("P2P Receive error", "blockPartialSignHandler", err)
@@ -175,10 +181,11 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
-			util.LogWithRed("P2P PubkeyFromPeerID", "Receive unknown node", e.Src.ID())
+			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
+			msg.From = string(e.Src.ID())
+		} else {
+			msg.From = pub.String()
 		}
-
-		msg.From = pub.String()
 		err = r.secretHandler(msg)
 		if err != nil {
 			util.LogWithRed("P2P Receive error", "secretHandler", err)
@@ -219,8 +226,6 @@ func (r *BTFReactor) PrintPeers(event string) {
 			r.id = v
 		}
 	}
-
-	util.LogWithGreen("pubkeys", pubkeys)
 
 	// save all nodekeys and validators
 	r.nodekeys = pubkeys

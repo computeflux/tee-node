@@ -253,18 +253,6 @@ func (dkg *DKG) longtermForSuite(st model.SuiteType) kyber.Scalar {
 	return dkg.Signer.Scalar(st)
 }
 
-// Get node by string id
-func (dkg *DKG) getNode(nodeId string) *model.PubKey {
-	nodes := dkg.Peer.AvailableNodes()
-	for _, node := range nodes {
-		if node.String() == nodeId {
-			return node
-		}
-	}
-
-	return nil
-}
-
 // epoch to nonce
 func epochToNonce(v uint32) []byte {
 	var nonce [pedersen.NonceLength]byte

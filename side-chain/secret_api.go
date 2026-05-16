@@ -109,7 +109,7 @@ func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRe
 	}
 
 	nameSpace := types.H160(req.NameSpace)
-	dkgPubKey, err := GetDkgPubkey()
+	dkgPubKey, err := s.GetDkgPubkey()
 	if err != nil {
 		return nil, fmt.Errorf("get dkg pubkey: %w", err)
 	}

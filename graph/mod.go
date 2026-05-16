@@ -39,8 +39,14 @@ func StartServerWithResolver(s *sidechain.SideChain, port int, resolver *Resolve
 	// Phase 2: seed data
 	gateway.InitSeedData()
 
+	// Build JWT validator from resolver (may be nil for legacy StartServer).
+	var validateJWT JWTValidator
+	if resolver != nil && resolver.JWTSvc != nil {
+		validateJWT = resolver.JWTSvc.ParseToken
+	}
+
 	router := chi.NewRouter()
-	router.Use(AuthMiddleware())
+	router.Use(AuthMiddleware(validateJWT))
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

@@ -41,9 +41,8 @@ func SuiteTypeFromString(s string) (SuiteType, error) {
 }
 
 // AllSuites returns all supported suite types.
-// TODO: re-enable SuiteSecp256k1 when Validator struct supports per-suite public keys.
 func AllSuites() []SuiteType {
-	return []SuiteType{SuiteEd25519}
+	return []SuiteType{SuiteEd25519, SuiteSecp256k1}
 }
 
 // NewSuite 根据类型创建 kyber Suite

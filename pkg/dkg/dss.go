@@ -102,7 +102,7 @@ func (d *DssSigner) Sign(msg []byte) ([]byte, error) {
 
 	dssInst, err := dss.NewDSS(
 		suite,
-		d.dkg.Signer.Scalar(d.suite),
+		d.dkg.longtermForSuite(d.suite),
 		pubs,
 		long,
 		random,
@@ -135,7 +135,7 @@ func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 
 	dssInst, err := dss.NewDSS(
 		suite,
-		d.dkg.Signer.Scalar(d.suite),
+		d.dkg.longtermForSuite(d.suite),
 		pubs,
 		long,
 		random,
@@ -172,12 +172,18 @@ func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKe
 	pubs := make([]kyber.Point, 0, len(d.dkg.Nodes))
 	if len(d.dkg.NewNodes) > 0 {
 		for _, k := range d.dkg.NewNodes {
-			pubs = append(pubs, k.ValidatorId.Point())
+			pub := k.ValidatorId.Point()
+			if d.suite == model.SuiteSecp256k1 {
+				pub = k.ValidatorIdSecp.Point()
+			}
+			pubs = append(pubs, pub)
 		}
+
 		var longShare *model.DistKeyShare
 		if s, ok := d.dkg.NewDkgKeyShares[d.suite]; ok {
 			longShare = s
 		}
+
 		random := d.randomShare
 		if random == nil {
 			random = longShare
@@ -186,7 +192,11 @@ func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKe
 	}
 
 	for _, k := range d.dkg.Nodes {
-		pubs = append(pubs, k.ValidatorId.Point())
+		pub := k.ValidatorId.Point()
+		if d.suite == model.SuiteSecp256k1 {
+			pub = k.ValidatorIdSecp.Point()
+		}
+		pubs = append(pubs, pub)
 	}
 	var longShare *model.DistKeyShare
 	if s, ok := d.dkg.DkgKeyShares[d.suite]; ok {
@@ -206,6 +216,9 @@ func (d *DssSigner) Verify(msg []byte, signature []byte) bool {
 
 	pub, ok := d.dkg.DkgPubKeys[d.suite]
 	if !ok || pub == nil {
+		pub = d.dkg.NewDkgPubKeys[d.suite]
+	}
+	if pub == nil {
 		return false
 	}
 
@@ -219,16 +232,8 @@ func (d *DssSigner) Verify(msg []byte, signature []byte) bool {
 	}
 }
 
-// return signature type: 1 for ed25519, 2 for secp256k1
 func (d *DssSigner) SignType() uint8 {
-	switch d.suite {
-	case model.SuiteEd25519:
-		return 1
-	case model.SuiteSecp256k1:
-		return 2
-	default:
-		return 1
-	}
+	return 0
 }
 
 // verifySecp256k1DSSSignature verifies a DSS signature over the secp256k1 curve.

@@ -20,7 +20,7 @@ func (app *SideChain) ContractMutation(caller []byte, callerType uint32, txn *mo
 		V: caller,
 	}
 
-	pub, err := GetDkgPubkey()
+	pub, err := app.GetDkgPubkey()
 	if err != nil {
 		return fmt.Errorf("get dkg pubkey: %w", err)
 	}

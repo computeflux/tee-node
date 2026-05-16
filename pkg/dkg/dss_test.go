@@ -32,8 +32,9 @@ func TestDSS(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
 		})
 	}
 
@@ -60,22 +61,34 @@ func TestDSS(t *testing.T) {
 		dkgs = append(dkgs, dkg)
 	}
 
+	done := make(chan struct{})
+	consensusOk := false
 	err = dkgs[0].TryEpochConsensus(model.ConsensusMsg{
 		Validators: validators,
 		Epoch:      1,
 	}, func(signer *DssSigner, nodeId uint64) {
 		util.LogWithBlue("CONSENSUS SUCCESS", nodeId)
+		consensusOk = true
 		for _, dkg := range dkgs {
 			dkg.ToNewEpoch()
 		}
-	}, func(error) {
-		util.LogWithBlue("CONSENSUS Error", err.Error())
+		close(done)
+	}, func(e error) {
+		util.LogWithBlue("CONSENSUS Error", e.Error())
+		close(done)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second * 1)
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("DKG consensus timeout")
+	}
+	if !consensusOk {
+		t.Fatal("DKG consensus failed")
+	}
 
 	msg := []byte("hello word")
 	signers := []DssSigner{}
@@ -130,7 +143,7 @@ func TestDssSubmitTx(t *testing.T) {
 	_, err = chains.ConnectMainChain("local", nodePriv)
 	if err != nil {
 		fmt.Println("Connect to chain error:", err)
-		t.Fatal(err)
+		t.Skip("skipping: blockchain RPC not available")
 	}
 
 	nodes := []*model.PubKey{}
@@ -139,8 +152,9 @@ func TestDssSubmitTx(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
 		})
 	}
 
@@ -183,8 +197,8 @@ func TestDssSubmitTx(t *testing.T) {
 		for _, dkg := range dkgs {
 			dkg.ToNewEpoch()
 		}
-	}, func(error) {
-		util.LogWithBlue("CONSENSUS Error", err.Error())
+	}, func(e error) {
+		util.LogWithBlue("CONSENSUS Error", e.Error())
 	})
 	if err != nil {
 		t.Fatal(err)

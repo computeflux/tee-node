@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -57,6 +58,7 @@ func main() {
 	}
 
 	util.LogWithYellow("Mainchain Key", nodePriv.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogWithYellow("Secp256k1 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(model.SuiteSecp256k1).Secp256k1CompressPubkey()))
 	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(model.SuiteEd25519).SS58())
 
 	chainConfig := model.GetChainConfig(chainEnv)
@@ -90,10 +92,6 @@ func main() {
 	}
 	go dkgIns.Start()
 	defer dkgIns.Stop()
-
-	if dkgIns.SystemPubKey() != nil {
-		util.LogWithYellow("DKG PubKey", dkgIns.SystemPubKey().SS58())
-	}
 
 	// Set DKG to sideChain
 	sideChain.SetDKG(dkgIns)

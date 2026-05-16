@@ -36,7 +36,16 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 		return err
 	}
 	dkg.SaveSponsor(newMsg)
+	// 仅当 epoch 匹配时才处理，跳过过期 deal
+	if dkg.Epoch >= newMsg.Epoch {
+		return nil
+	}
 	dkg.startConsensus(*newMsg)
+
+	// 再次检查：startConsensus 可能更新了 Epoch
+	if dkg.Epoch >= newMsg.Epoch {
+		return nil
+	}
 
 	// 为每个 suite 存储 deal
 	for _, st := range model.AllSuites() {
@@ -49,31 +58,27 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 		dkg.mu.Unlock()
 	}
 
-	// 检查是否收集了所有 deals（以 ed25519 为例判断）
+	// 检查是否收集了所有 deals
 	dkg.mu.RLock()
-	edDeals := dkg.deals[model.SuiteEd25519]
+	edCount := len(dkg.deals[model.SuiteEd25519])
 	mustDeals := len(dkg.Nodes)
 	if pmessage.Epoch > StartEpoch {
 		mustDeals = pmessage.ConsensusNodeNum
 	}
-	ready := len(edDeals) >= mustDeals
 	dkg.mu.RUnlock()
+	ready := edCount >= mustDeals
 
 	if !ready {
 		return nil
 	}
 
-	// 为每个 suite 处理 deal
+	// 为每个 suite 处理 deal，并缓存响应用于后续发送
+	cachedResps := make(map[model.SuiteType]*pedersen.ResponseBundle)
 	for _, st := range model.AllSuites() {
 		dkg.mu.RLock()
 		suiteDeals := make([]*pedersen.DealBundle, 0, len(dkg.deals[st]))
 		for _, d := range dkg.deals[st] {
-			new, err := model.DeepCopyIf(*d)
-			if err != nil {
-				dkg.mu.RUnlock()
-				return err
-			}
-			suiteDeals = append(suiteDeals, new.DealBundle)
+			suiteDeals = append(suiteDeals, d.DealBundle)
 		}
 		gen := dkg.DistKeyGens[st]
 		dkg.mu.RUnlock()
@@ -107,32 +112,15 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 			dkg.finishDkgConsensusStep(false, "errNum > 0 for:"+st.String())
 			return fmt.Errorf("ProcessDeals error for %s: errNum > 0", st)
 		}
+
+		cachedResps[st] = resp
 	}
 
-	// 收集所有 suite 的 response 一起发送
+	// 收集所有 suite 的 response 一起发送（使用缓存的结果，避免二次调用 ProcessDeals）
 	respMsg := &model.ConsensusRespMsg{
 		Responses: make(map[model.SuiteType][]byte),
 	}
-	for _, st := range model.AllSuites() {
-		dkg.mu.RLock()
-		gen := dkg.DistKeyGens[st]
-		dkg.mu.RUnlock()
-		if gen == nil {
-			continue
-		}
-		// 重新获取 response（因为 ProcessDeals 后需要再次获取）
-		// 实际上 response 已经在上面处理过了，需要重新从 deals 生成
-		dkg.mu.RLock()
-		suiteDeals := make([]*pedersen.DealBundle, 0, len(dkg.deals[st]))
-		for _, d := range dkg.deals[st] {
-			suiteDeals = append(suiteDeals, d.DealBundle)
-		}
-		dkg.mu.RUnlock()
-
-		resp, err := gen.ProcessDeals(suiteDeals)
-		if err != nil || resp == nil {
-			continue
-		}
+	for st, resp := range cachedResps {
 		bt, err := json.Marshal(resp)
 		if err != nil {
 			continue
@@ -153,6 +141,7 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 		util.LogError("DEAL", "Send deal_resp error", err)
 	}
 
+	util.LogOk("DEAL", "Sent deal responses for epoch", dkg.Epoch)
 	return nil
 }
 
@@ -184,17 +173,17 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 		dkg.responses[st][OrgId] = resp
 	}
 
-	// 检查是否收集了所有 responses（以 ed25519 为例判断）
-	edResps := dkg.responses[model.SuiteEd25519]
-	ready := len(edResps) >= len(dkg.NewNodes)
+	// 检查是否收集了所有 responses
+	edCount := len(dkg.responses[model.SuiteEd25519])
 	dkg.mu.Unlock()
+	ready := edCount >= len(dkg.NewNodes)
 
 	if !ready {
 		return nil
 	}
 
 	// 为每个 suite 处理 response
-	allDone := true
+	allDone := 0
 	for _, st := range model.AllSuites() {
 		dkg.mu.RLock()
 		responses := make([]*pedersen.ResponseBundle, 0, len(dkg.responses[st]))
@@ -217,7 +206,7 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 		if res != nil {
 			dkg.mu.Lock()
 			dkg.NewDkgKeyShares[st] = &model.DistKeyShare{
-				CommitsWrap:  model.KyberPoints{Public: res.Key.Commits},
+				CommitsWrap:  model.KyberPoints{Public: res.Key.Commits, Suite: st.String()},
 				PriShareWrap: model.PriShare{PriShare: res.Key.Share},
 			}
 			pub, err := model.PubKeyFromPointWithSuite(res.Key.Public(), st)
@@ -226,8 +215,11 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 				dkg.finishDkgConsensusStep(false, "PubKeyFromPoint:"+st.String())
 				return fmt.Errorf("PubKeyFromPoint for %s: %w", st, err)
 			}
+
 			dkg.NewDkgPubKeys[st] = pub
 			dkg.mu.Unlock()
+
+			allDone++
 			continue
 		}
 
@@ -236,7 +228,7 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 			if err == nil && res != nil {
 				dkg.mu.Lock()
 				dkg.NewDkgKeyShares[st] = &model.DistKeyShare{
-					CommitsWrap:  model.KyberPoints{Public: res.Key.Commits},
+					CommitsWrap:  model.KyberPoints{Public: res.Key.Commits, Suite: st.String()},
 					PriShareWrap: model.PriShare{PriShare: res.Key.Share},
 				}
 				pub, err := model.PubKeyFromPointWithSuite(res.Key.Public(), st)
@@ -247,18 +239,18 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 				}
 				dkg.NewDkgPubKeys[st] = pub
 				dkg.mu.Unlock()
+
+				allDone++
 				continue
 			}
 		}
-
-		allDone = false
 	}
 
-	if allDone {
+	if allDone == len(model.AllSuites()) {
 		dkg.finishDkgConsensusStep(true, "")
-	} else {
-		dkg.finishDkgConsensusStep(false, "HandleDealResp not completed for all suites")
 	}
+	// 注意：未完成时不调用 finishDkgConsensusStep(false)，
+	// 否则会清空已收集的 deals/responses，导致永远无法完成。
 
 	return nil
 }

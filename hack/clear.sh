@@ -8,7 +8,7 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 ROOT_DIR=/srv
 
-cd $ROOT_DIR/node0
+cd $ROOT_DIR/token_node0
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal
@@ -21,7 +21,7 @@ cat <<EOF > ./token_chain_data/data/priv_validator_state.json
 }
 EOF
 
-cd $ROOT_DIR/node1
+cd $ROOT_DIR/token_node1
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal
@@ -34,7 +34,7 @@ cat <<EOF > ./token_chain_data/data/priv_validator_state.json
 }
 EOF
 
-cd $ROOT_DIR/node2
+cd $ROOT_DIR/token_node2
 rm -rf ./token_chain_data/BFT
 rm -rf ./token_chain_data/wetee
 rm -rf ./token_chain_data/data/cs.wal

@@ -4,6 +4,7 @@ import (
 	gocrypto "crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -48,11 +49,31 @@ func (p *PubKey) Suite() suites.Suite {
 	return NewSuite(p.suiteType)
 }
 
+func (p *PubKey) AccountString() string {
+	if p.IsEd25519() {
+		return p.SS58()
+	}
+	return hex.EncodeToString(p.PublicKey)
+}
+
 // Point returns the kyber Point representation of this public key.
 // Returns nil if unmarshaling fails. Callers must check for nil.
 // TODO: change signature to (kyber.Point, error) for better error propagation.
 func (p *PubKey) Point() kyber.Point {
 	buf := p.PublicKey
+	if p.IsSecp256k1() {
+		ecpub, err := decompressSecp256k1Pub(buf)
+		if err != nil {
+			return nil
+		}
+		// 用标准库 Marshal 得到 04||x||y 后走 UnmarshalBinary
+		raw := elliptic.Marshal(ecpub.Curve, ecpub.X, ecpub.Y)
+		point := p.Suite().Point()
+		if err := point.UnmarshalBinary(raw); err != nil {
+			return nil
+		}
+		return point
+	}
 	point := p.Suite().Point()
 	if err := point.UnmarshalBinary(buf); err != nil {
 		return nil
@@ -103,6 +124,33 @@ func (p *PubKey) Secp256k1PublicKey() []byte {
 		return p.PublicKey
 	}
 	return nil
+}
+
+func (p *PubKey) Secp256k1CompressPubkey() []byte {
+	if !p.IsSecp256k1() {
+		return nil
+	}
+	switch len(p.PublicKey) {
+	case 33:
+		// 已经是压缩格式
+		return p.PublicKey
+	case 65:
+		// 未压缩 04||x||y → 压缩 02/03||x
+		pub, err := ethcrypto.UnmarshalPubkey(p.PublicKey)
+		if err != nil {
+			return nil
+		}
+		return ethcrypto.CompressPubkey(pub)
+	case 64:
+		// 未压缩缺 0x04 前缀
+		pub, err := ethcrypto.UnmarshalPubkey(append([]byte{0x04}, p.PublicKey...))
+		if err != nil {
+			return nil
+		}
+		return ethcrypto.CompressPubkey(pub)
+	default:
+		return nil
+	}
 }
 
 // String returns the hex-encoded public key.

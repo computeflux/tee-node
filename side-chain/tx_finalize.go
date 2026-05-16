@@ -31,7 +31,7 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 
 		switch p := call.Payload.(type) {
 		case *model.SysCall_Empty:
-			LogWithTime("Empty TX:", p.Empty)
+			LogWithTime("📭 Empty TX:", p.Empty)
 		case *model.SysCall_EpochStart: // set epoch last time
 			err := app.SetEpochStatus(p.EpochStart)
 			if err != nil {

@@ -33,19 +33,23 @@ func (p *BTFReactor) doSend(msg *model.PeerMsg) error {
 	sendData.Src = LocalPeer{id: p.Switch.NodeInfo().ID()}
 
 	// 根据 payload 类型设置 channel 和 message
+	// 注意：复制消息体以避免修改原始消息（原始消息可能被 pending 队列引用）
 	switch payload := msg.Payload.(type) {
 	case *model.PeerMsg_DkgMessage:
 		sendData.ChannelID = topics["dkg"].ID
-		payload.DkgMessage.To = msg.To
-		sendData.Message = payload.DkgMessage
+		dkgMsgCopy := *payload.DkgMessage
+		dkgMsgCopy.To = msg.To
+		sendData.Message = &dkgMsgCopy
 	case *model.PeerMsg_BlockPartialSign:
 		sendData.ChannelID = topics["block-partial-sign"].ID
-		payload.BlockPartialSign.To = msg.To
-		sendData.Message = payload.BlockPartialSign
+		blockMsgCopy := *payload.BlockPartialSign
+		blockMsgCopy.To = msg.To
+		sendData.Message = &blockMsgCopy
 	case *model.PeerMsg_SecretBox:
 		sendData.ChannelID = topics["secret"].ID
-		payload.SecretBox.To = msg.To
-		sendData.Message = payload.SecretBox
+		secretMsgCopy := *payload.SecretBox
+		secretMsgCopy.To = msg.To
+		sendData.Message = &secretMsgCopy
 	default:
 		return fmt.Errorf("unknown message type: %T", payload)
 	}
@@ -56,6 +60,14 @@ func (p *BTFReactor) doSend(msg *model.PeerMsg) error {
 
 	p.Switch.Broadcast(sendData)
 	return nil
+}
+
+// pendingMsgKey 返回节点特定的持久化 key，避免多实例冲突。
+func (p *BTFReactor) pendingMsgKey() string {
+	if p.id != nil {
+		return pendingMsgKey + "_" + p.id.String()
+	}
+	return pendingMsgKey
 }
 
 // savePendingMsg 将消息持久化到数据库
@@ -70,7 +82,7 @@ func (p *BTFReactor) savePendingMsg(msg *model.PeerMsg) error {
 	store.Msgs = append(store.Msgs, msg)
 
 	// 保存到数据库
-	if err := model.SetJson("", pendingMsgKey, store); err != nil {
+	if err := model.SetJson("", p.pendingMsgKey(), store); err != nil {
 		return fmt.Errorf("save pending msgs failed: %w", err)
 	}
 
@@ -84,7 +96,7 @@ type pendingMsgsStore struct {
 
 // loadPendingMsgsStore 从数据库加载待发送消息
 func (p *BTFReactor) loadPendingMsgsStore() (*pendingMsgsStore, error) {
-	store, err := model.GetJson[pendingMsgsStore]("", pendingMsgKey)
+	store, err := model.GetJson[pendingMsgsStore]("", p.pendingMsgKey())
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +128,7 @@ func (p *BTFReactor) loadPendingMsgs() {
 
 // clearPendingMsgs 清空数据库中的待发送消息
 func (p *BTFReactor) clearPendingMsgs() error {
-	return model.DeleteKey("", pendingMsgKey)
+	return model.DeleteKey("", p.pendingMsgKey())
 }
 
 // flushPendingMsgs 发送所有暂存的消息（P2P就绪后调用）

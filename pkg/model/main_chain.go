@@ -75,9 +75,11 @@ type K8sCluster struct {
 
 type Validator struct {
 	// node id
-	NodeID uint64
-	// account32
-	ValidatorId PubKey
-	// account32
-	P2pId PubKey
+	NodeID uint64 `json:"NodeID"`
+	// ed25519 public key (from chain)
+	ValidatorId PubKey `json:"ValidatorId"`
+	// ed25519 P2P public key (from chain)
+	P2pId PubKey `json:"P2pId"`
+	// secp256k1 public key for DKG (from chain, 33 bytes compressed, optional)
+	ValidatorIdSecp PubKey `json:"ValidatorIdSecp,omitempty"`
 }

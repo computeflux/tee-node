@@ -119,14 +119,17 @@ func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*model.Validat
 	validators := make([]*model.Validator, 0, len(ids))
 	for i, id := range ids {
 		var vId, pId [32]byte
+		var valSecp []byte
 		if i < len(nodes) {
 			copy(vId[:], nodes[i].ValidatorId[:])
 			copy(pId[:], nodes[i].P2pId[:])
+			valSecp = nodes[i].ValidatorSecp
 		}
 		validators = append(validators, &model.Validator{
-			NodeID:      id,
-			ValidatorId: *model.PubKeyFromByte(vId[:]),
-			P2pId:       *model.PubKeyFromByte(pId[:]),
+			NodeID:          id,
+			ValidatorId:     *model.PubKeyFromByte(vId[:]),
+			P2pId:           *model.PubKeyFromByte(pId[:]),
+			ValidatorIdSecp: *model.PubKeyFromByte(valSecp),
 		})
 	}
 	return validators
@@ -168,11 +171,14 @@ func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 		copy(vId[:], s.ValidatorId[:])
 		copy(pId[:], s.P2pId[:])
 		nodes = append(nodes, model.PubKeyFromByte(pId[:]))
-		validators = append(validators, &model.Validator{
-			NodeID:      s.Id,
-			P2pId:       *model.PubKeyFromByte(pId[:]),
-			ValidatorId: *model.PubKeyFromByte(vId[:]),
-		})
+
+		v := &model.Validator{
+			NodeID:          s.Id,
+			P2pId:           *model.PubKeyFromByte(pId[:]),
+			ValidatorId:     *model.PubKeyFromByte(vId[:]),
+			ValidatorIdSecp: *model.PubKeyFromByte(s.ValidatorSecp),
+		}
+		validators = append(validators, v)
 	}
 
 	return validators, nodes, nil

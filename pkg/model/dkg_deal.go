@@ -30,7 +30,7 @@ type ConsensusMsg struct {
 	DealBundles      map[SuiteType]*DealBundle
 	Epoch            uint32
 	EpochTime        int64
-	ShareCommits     KyberPoints
+	ShareCommits     map[SuiteType]KyberPoints
 	OldValidators    []*Validator
 	Validators       []*Validator
 	ConsensusNodeNum int
@@ -42,7 +42,7 @@ type jsonConsensusMsg struct {
 	DealBundles      map[string]*DealBundle `json:"DealBundles,omitempty"`
 	Epoch            uint32                 `json:"Epoch"`
 	EpochTime        int64                  `json:"EpochTime"`
-	ShareCommits     KyberPoints            `json:"ShareCommits"`
+	ShareCommits     map[string]KyberPoints `json:"ShareCommits"`
 	OldValidators    []*Validator           `json:"OldValidators,omitempty"`
 	Validators       []*Validator           `json:"Validators,omitempty"`
 	ConsensusNodeNum int                    `json:"ConsensusNodeNum"`
@@ -53,12 +53,16 @@ func (c ConsensusMsg) MarshalJSON() ([]byte, error) {
 	for st, bundle := range c.DealBundles {
 		stringBundles[st.String()] = bundle
 	}
+	stringCommits := make(map[string]KyberPoints, len(c.ShareCommits))
+	for st, commits := range c.ShareCommits {
+		stringCommits[st.String()] = commits
+	}
 	return json.Marshal(jsonConsensusMsg{
 		Sponsor:          c.Sponsor,
 		DealBundles:      stringBundles,
 		Epoch:            c.Epoch,
 		EpochTime:        c.EpochTime,
-		ShareCommits:     c.ShareCommits,
+		ShareCommits:     stringCommits,
 		OldValidators:    c.OldValidators,
 		Validators:       c.Validators,
 		ConsensusNodeNum: c.ConsensusNodeNum,
@@ -81,7 +85,14 @@ func (c *ConsensusMsg) UnmarshalJSON(bt []byte) error {
 	}
 	c.Epoch = raw.Epoch
 	c.EpochTime = raw.EpochTime
-	c.ShareCommits = raw.ShareCommits
+	c.ShareCommits = make(map[SuiteType]KyberPoints, len(raw.ShareCommits))
+	for stStr, commits := range raw.ShareCommits {
+		st, err := SuiteTypeFromString(stStr)
+		if err != nil {
+			continue // skip unknown suite types
+		}
+		c.ShareCommits[st] = commits
+	}
 	c.OldValidators = raw.OldValidators
 	c.Validators = raw.Validators
 	c.ConsensusNodeNum = raw.ConsensusNodeNum

@@ -126,7 +126,7 @@ func (app *SideChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
 
 	err = chains.MainChain.SignAndSubmit(signer, *call, false, 0)
 	if err != nil {
-		util.LogWithRed("NewEpoch client.SignAndSubmit", err.Error())
+		util.LogWithRed("NewEpoch error SignAndSubmit", err.Error())
 	}
 }
 

@@ -48,7 +48,7 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 // DecryptPrivateKey 用用户密码解密私钥
 func (s *WalletService) DecryptPrivateKey(email, passwordHash string) (*ecdsa.PrivateKey, error) {
 	record, err := model.GetEncryptedKey(email)
-	if err != nil {
+	if err != nil || record == nil {
 		return nil, fmt.Errorf("no encrypted key found — set a transaction password first")
 	}
 

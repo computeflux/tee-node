@@ -22,8 +22,8 @@ var TestChainConfig = ChainConfigType{
 	ChainType:     "evm",
 	Cipher:        SuiteSecp256k1,
 	Urls:          []string{"https://eth-rpc-testnet.polkadot.io"},
-	SubnetAddress: "0x9EFCDA0410f51F5E67817e091C157B8f45b9483e",
-	TokenAddress:  "0x04b51cC7482E8BC010Aa59EfffaC247D3AA16FE4",
+	SubnetAddress: "0x6Ee5a17efe1019C13cc24fb45aB301ED809F2EBd",
+	TokenAddress:  "0x9aa727B291c63A78E088E44674317A72F12902F5",
 	NetworkLabel:  "Paseo (Asset Hub)",
 }
 

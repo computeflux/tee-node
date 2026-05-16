@@ -33,7 +33,7 @@ func (dkg *DKG) TryEpochConsensus(
 	dkg.mu.RUnlock()
 	if available < threshold {
 		util.LogError("DKG Consensus", "old validator node exapect >", threshold, ", got:", available)
-		return fmt.Errorf("old validators count <= dkg.Threshold")
+		return fmt.Errorf("old validators count < dkg.Threshold")
 	}
 
 	// check new nodes validators length
@@ -56,17 +56,22 @@ func (dkg *DKG) TryEpochConsensus(
 	}
 
 	// init consensus msg
+	// 注：ShareCommits 按 suite 携带，每个 suite 的 reConsensus 都需要 PublicCoeffs
+	msg.ShareCommits = make(map[model.SuiteType]model.KyberPoints)
 	if edShare != nil {
-		// Use ed25519 commits as representative
-		commitsCopy, err := model.DeepCopyIf(edShare.CommitsWrap)
-		if err != nil {
-			return err
+		for _, st := range model.AllSuites() {
+			share := dkg.GetDkgKeyShare(st)
+			if share != nil {
+				commitsCopy, err := model.DeepCopyIf(share.CommitsWrap)
+				if err != nil {
+					return err
+				}
+				msg.ShareCommits[st] = *commitsCopy
+			}
 		}
-		msg.ShareCommits = *commitsCopy
 		msg.ConsensusNodeNum = nodeCount
 		msg.OldValidators = nodesCopy
 	} else {
-		msg.ShareCommits = model.KyberPoints{Public: []kyber.Point{}}
 		msg.ConsensusNodeNum = 0
 	}
 
@@ -118,8 +123,20 @@ func (dkg *DKG) startConsensus(msg model.ConsensusMsg) error {
 
 	dkg.addConsensusTimeout()
 
-	if len(msg.ShareCommits.Public) == 0 {
+	hasShareCommits := false
+	for _, st := range model.AllSuites() {
+		if len(msg.ShareCommits[st].Public) > 0 {
+			hasShareCommits = true
+			break
+		}
+	}
+	if !hasShareCommits {
 		util.LogWithGray("InitConsensus Epoch ======> ", msg.Epoch)
+		// 只允许首次初始化，避免异步 deal 重复触发 initConsensus 覆盖 DistKeyGens
+		if dkg.status == 1 && dkg.Epoch == msg.Epoch {
+			dkg.setConsensusFree()
+			return nil
+		}
 		return dkg.initConsensus(msg)
 	}
 
@@ -132,13 +149,9 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 	dkg.mu.Lock()
 	dkg.Nodes = msg.Validators
 	dkg.NewNodes = msg.Validators
+	dkg.NewEpoch = msg.Epoch
 	dkg.Threshold = len(msg.Validators) - (len(msg.Validators)-1)/3
 	dkg.mu.Unlock()
-
-	// 如果已经初始化，则直接返回
-	if dkg.status == 1 {
-		return nil
-	}
 
 	// 为所有 suite 并行生成 deal
 	newMsg, err := model.DeepCopyIf(msg)
@@ -146,7 +159,7 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 		return err
 	}
 	newMsg.DealBundles = make(map[model.SuiteType]*model.DealBundle)
-	newMsg.ShareCommits = model.KyberPoints{}
+	newMsg.ShareCommits = make(map[model.SuiteType]model.KyberPoints)
 
 	for _, st := range model.AllSuites() {
 		suite := dkg.Suites[st]
@@ -154,9 +167,20 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 		// Build node list.
 		nodes := make([]pedersen.Node, 0, len(dkg.Nodes))
 		for i, p := range dkg.Nodes {
+			var pub kyber.Point
+			if st == model.SuiteSecp256k1 {
+				pub = p.ValidatorIdSecp.Point()
+			} else {
+				pub = p.ValidatorId.Point()
+			}
+
+			if pub == nil {
+				dkg.finishDkgConsensusStep(false, "failed to get public key for:"+st.String())
+				return fmt.Errorf("failed to get public key for validator %d suite %s", i, st)
+			}
 			nodes = append(nodes, pedersen.Node{
 				Index:  uint32(i),
-				Public: p.ValidatorId.Point(),
+				Public: pub,
 			})
 		}
 		signer := schnorr.NewScheme(suite)
@@ -179,16 +203,16 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 			dkg.finishDkgConsensusStep(false, "pedersen.NewDistKeyHandler:"+st.String())
 			return fmt.Errorf("failed to initialize DKG protocol for %s: %w", st, err)
 		}
-		dkg.DistKeyGens[st] = gen
 
-		// 获取当前节点的 deal
+		// 获取当前节点的 deal（必须在设置 DistKeyGens 之前，确保成功后才对外可见）
 		deal, err := gen.Deals()
 		if err != nil {
 			dkg.finishDkgConsensusStep(false, "Deals:"+st.String())
 			return fmt.Errorf("failed to generate key shares for %s: %w", st, err)
 		}
 
-		newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal}
+		dkg.DistKeyGens[st] = gen
+		newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal, Suite: st.String()}
 	}
 
 	// 发送包含所有 suite deal 的消息
@@ -226,18 +250,38 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 		// new DKG 节点列表
 		newNodes := make([]pedersen.Node, 0, len(msg.Validators))
 		for i, p := range msg.Validators {
+			var pub kyber.Point
+			if st == model.SuiteSecp256k1 {
+				pub = p.ValidatorIdSecp.Point()
+			} else {
+				pub = p.ValidatorId.Point()
+			}
+			if pub == nil {
+				dkg.finishDkgConsensusStep(false, "re: failed to get public key for:"+st.String())
+				return fmt.Errorf("re: failed to get public key for validator %d suite %s", i, st)
+			}
 			newNodes = append(newNodes, pedersen.Node{
 				Index:  uint32(i),
-				Public: p.ValidatorId.Point(),
+				Public: pub,
 			})
 		}
 
 		// 获取旧节点列表
 		oldNodes := make([]pedersen.Node, 0, len(dkg.Nodes))
 		for i, p := range dkg.Nodes {
+			var pub kyber.Point
+			if st == model.SuiteSecp256k1 {
+				pub = p.ValidatorIdSecp.Point()
+			} else {
+				pub = p.ValidatorId.Point()
+			}
+			if pub == nil {
+				dkg.finishDkgConsensusStep(false, "re: failed to get old public key for:"+st.String())
+				return fmt.Errorf("re: failed to get old public key for validator %d suite %s", i, st)
+			}
 			oldNodes = append(oldNodes, pedersen.Node{
 				Index:  uint32(i),
-				Public: p.ValidatorId.Point(),
+				Public: pub,
 			})
 		}
 
@@ -261,8 +305,8 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 				Commits: oldShare.Commitments(),
 				Share:   oldShare.PriShare(),
 			}
-		} else {
-			conf.PublicCoeffs = msg.ShareCommits.Public
+		} else if commits, ok := msg.ShareCommits[st]; ok && len(commits.Public) > 0 {
+			conf.PublicCoeffs = commits.Public
 		}
 
 		gen, err := pedersen.NewDistKeyHandler(&conf)
@@ -271,16 +315,16 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 			fmt.Println("unable to create DistKeyGenerator for", st, err.Error())
 			return err
 		}
-		dkg.DistKeyGens[st] = gen
 
-		// old node with share issues deals
+		dkg.DistKeyGens[st] = gen
 		if oldShare != nil {
+			// only old validators can generate deals during resharing
 			deal, err := gen.Deals()
 			if err != nil {
 				dkg.finishDkgConsensusStep(false, "re-Deals:"+st.String())
 				return fmt.Errorf("failed to generate key shares for %s: %w", st, err)
 			}
-			newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal}
+			newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal, Suite: st.String()}
 		}
 	}
 
@@ -339,6 +383,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	}
 
 	dkg.saveState()
+
 	// 首次完成：迁移 new → current
 	dkg.mu.Lock()
 	edPub := dkg.SystemPubKey()
@@ -352,6 +397,9 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 		}
 	}
 	dkg.mu.Unlock()
+
+	dkg.saveState()
+	util.LogOk("DKG consensus", "state migrated", "epoch", dkg.Epoch, "threshold", dkg.Threshold)
 	dkg.SendNewEpochPartialSigToSponsor()
 }
 

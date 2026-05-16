@@ -3,6 +3,7 @@ package dkg
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -24,6 +25,38 @@ var newPeerSecret = []string{
 	"66dfdf585852c8aa4b111c15b69d4b40ad6db7cfabd7ae0b25384c950f5018cb2b4c0a71a9d97d6eb9bfcb29acc0d71df41015c5c5cc697d9471728a2a508a8a",
 }
 
+func runEpoch(t *testing.T, dkgs []*DKG, validators []*model.Validator, epoch uint32, tag string) (*model.PubKey, *model.PubKey) {
+	t.Helper()
+
+	done := make(chan struct{})
+	err := dkgs[0].TryEpochConsensus(model.ConsensusMsg{
+		Validators: validators,
+		Epoch:      epoch,
+	}, func(signer *DssSigner, nodeId uint64) {
+		util.LogWithBlue("CONSENSUS SUCCESS "+tag, nodeId)
+		for _, d := range dkgs {
+			d.ToNewEpoch()
+		}
+		close(done)
+	}, func(e error) {
+		util.LogWithBlue("CONSENSUS Error "+tag, e.Error())
+		close(done)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("DKG consensus timeout for " + tag)
+	}
+
+	edPub := dkgs[0].GetDkgPubKey(model.SuiteEd25519)
+	secpPub := dkgs[0].GetDkgPubKey(model.SuiteSecp256k1)
+	return edPub, secpPub
+}
+
 func TestNetwork(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
@@ -34,7 +67,6 @@ func TestNetwork(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Skip partial sign
 	skipPartialSign = true
 
 	nodes := []*model.PubKey{}
@@ -43,155 +75,72 @@ func TestNetwork(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
 		})
-	}
-
-	peers := make([]*local.Peer, 0, len(nodes))
-	for _, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
-
-		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
-		require.NoErrorf(t, err, "failed peer.NewNetwork")
-
-		peers = append(peers, peer)
 	}
 
 	dkgs := make([]*DKG, 0, len(nodes))
 	for i, s := range peerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-
-		dkg, err := NewDKG(nodeSecret, peers[i], Logger{
-			NodeTag: "NODE " + fmt.Sprint(i),
-		})
+		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
+		require.NoErrorf(t, err, "failed peer.NewNetwork")
+		dkg, err := NewDKG(nodeSecret, peer, Logger{NodeTag: "NODE " + fmt.Sprint(i)})
 		require.NoErrorf(t, err, "failed NewDKG")
 		go dkg.Start()
-
 		dkgs = append(dkgs, dkg)
 	}
 
-	dkg_pubkey := new(model.PubKey)
-	err = dkgs[0].TryEpochConsensus(model.ConsensusMsg{
-		Validators: validators,
-		Epoch:      1,
-	}, func(signer *DssSigner, nodeId uint64) {
-		util.LogWithBlue("CONSENSUS SUCCESS", nodeId)
-		for _, dkg := range dkgs {
-			dkg.ToNewEpoch()
-		}
-	}, func(error) {
-		util.LogWithBlue("CONSENSUS Error", err.Error())
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Epoch 1
+	edPub1, secpPub1 := runEpoch(t, dkgs, validators, 1, "E1")
+	require.NotNil(t, edPub1, "ed25519 DKG pubkey should not be nil")
+	require.NotNil(t, secpPub1, "secp256k1 DKG pubkey should not be nil")
+	fmt.Println("E1 OK | ed25519 =", edPub1.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub1.Secp256k1CompressPubkey()))
 
-	time.Sleep(time.Second * 1)
-
-	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare(model.SuiteEd25519)
-		if ks != nil {
-			util.LogWithYellow("V0 |||", ks.PriShare().String())
-		}
-	}
-	dkg_pubkey = dkgs[0].GetDkgPubKey(model.SuiteEd25519)
-
-	util.LogWithGreen("----------------------------------------------------------------------------------------------------")
-
+	// Epoch 2 — add 2 new peers
 	for _, s := range newPeerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-
-		// new peer
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId: *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:       *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
 		})
-	}
-
-	for _, s := range newPeerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
-
-		// 启动 P2P 网络
-		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
-		require.NoErrorf(t, err, "failed peer.NewNetwork")
-
-		peers = append(peers, peer)
-	}
-
-	// set nodes
-	for _, peer := range peers {
-		peer.SetNodes(nodes)
 	}
 
 	for i, s := range newPeerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
-
-		// 创建 DKG 实例
-		dkg, err := NewDKG(nodeSecret, peers[3+i], Logger{
-			NodeTag: "NODE " + fmt.Sprint(3+i),
-		})
+		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
+		require.NoErrorf(t, err, "failed peer.NewNetwork")
+		dkg, err := NewDKG(nodeSecret, peer, Logger{NodeTag: "NODE " + fmt.Sprint(3+i)})
 		require.NoErrorf(t, err, "failed NewDKG")
 		go dkg.Start()
-
 		dkgs = append(dkgs, dkg)
 	}
-
-	err = dkgs[0].TryEpochConsensus(model.ConsensusMsg{
-		Validators: validators,
-		Epoch:      2,
-	}, func(signer *DssSigner, nodeId uint64) {
-		// util.LogWithBlue("CONSENSUS SUCCESS", pub, sig, "====", Sr25519Verify(pubkey, pub.ToBytes(), sig))
-		for _, dkg := range dkgs {
-			dkg.ToNewEpoch()
-		}
-	}, func(error) {
-		util.LogWithBlue("CONSENSUS Error", err.Error())
-	})
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(time.Second * 1)
-
 	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare(model.SuiteEd25519)
-		if ks != nil {
-			util.LogWithCyan("V1 |||", ks.PriShare().String())
+		if lp, ok := d.Peer.(*local.Peer); ok {
+			lp.SetNodes(nodes)
 		}
 	}
+	// Ensure new goroutines are scheduled and ready
+	runtime.Gosched()
+	time.Sleep(500 * time.Millisecond)
 
-	util.LogWithGreen("----------------------------------------------------------------------------------------------------")
+	edPub2, secpPub2 := runEpoch(t, dkgs, validators, 2, "E2")
+	require.NotNil(t, edPub2, "ed25519 DKG pubkey should not be nil")
+	require.NotNil(t, secpPub2, "secp256k1 DKG pubkey should not be nil")
+	fmt.Println("E2 OK | ed25519 =", edPub2.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub2.Secp256k1CompressPubkey()))
+	require.Equal(t, edPub1.SS58(), edPub2.SS58(), "ed25519 pubkey must be consistent")
+	require.Equal(t, secpPub1.Secp256k1CompressPubkey(), secpPub2.Secp256k1CompressPubkey(), "secp256k1 pubkey must be consistent")
 
-	err = dkgs[0].TryEpochConsensus(model.ConsensusMsg{
-		Validators: validators,
-		Epoch:      3,
-	}, func(signer *DssSigner, nodeId uint64) {
-		// util.LogWithBlue("CONSENSUS SUCCESS", pub, sig, "====", Sr25519Verify(pubkey, pub.ToBytes(), sig))
-		for _, dkg := range dkgs {
-			dkg.ToNewEpoch()
-		}
-	}, func(error) {
-		util.LogWithBlue("CONSENSUS Error", err.Error())
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(time.Second * 1)
-
-	for _, d := range dkgs {
-		ks := d.GetDkgKeyShare(model.SuiteEd25519)
-		if ks != nil {
-			util.LogWithCyan("V2 |||", ks.PriShare().String())
-		}
-	}
-
-	pk := dkgs[0].GetDkgPubKey(model.SuiteEd25519)
-	fmt.Println("dkg pubkey", pk.SS58())
-	fmt.Println("dkg pubkey", dkg_pubkey.SS58())
-	if pk.SS58() != dkg_pubkey.SS58() {
-		t.Fatal("dkg pubkey error")
-	}
+	// Epoch 3
+	runtime.Gosched()
+	time.Sleep(200 * time.Millisecond)
+	edPub3, secpPub3 := runEpoch(t, dkgs, validators, 3, "E3")
+	require.NotNil(t, edPub3, "ed25519 DKG pubkey should not be nil")
+	require.NotNil(t, secpPub3, "secp256k1 DKG pubkey should not be nil")
+	fmt.Println("E3 OK | ed25519 =", edPub3.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub3.Secp256k1CompressPubkey()))
+	require.Equal(t, edPub1.SS58(), edPub3.SS58(), "ed25519 pubkey must be consistent")
+	require.Equal(t, secpPub1.Secp256k1CompressPubkey(), secpPub3.Secp256k1CompressPubkey(), "secp256k1 pubkey must be consistent")
 }

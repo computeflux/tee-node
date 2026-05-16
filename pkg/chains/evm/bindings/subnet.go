@@ -92,11 +92,12 @@ type SecretNode struct {
 	Port          uint32
 	Status        uint8
 	P2pId         [32]byte
+	ValidatorSecp []byte
 }
 
 // SubnetMetaData contains all meta data concerning the Subnet contract.
 var SubnetMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"CloudContractNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DepositNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EpochNotExpired\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InsufficientPoints\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSideChainCaller\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MortgageNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustCallByMainContract\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NodeIsRunning\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NodeNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RegionNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ResourceNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SlashAmountTooLarge\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TokenContractNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TransferFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerMortgageNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerNotOwnedByCaller\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerStatusNotReady\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"id\",\"type\":\"uint32\"}],\"name\":\"asset\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"internalType\":\"structAssetInfo\",\"name\":\"\",\"type\":\"tuple\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"assetInfos\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"assetPrices\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"bootNodes\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"bootNodesLen\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"cloudContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epoch\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"uint32\",\"name\":\"epoch\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"epochSlot\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"lastEpochBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint32\",\"name\":\"now\",\"type\":\"uint32\"},{\"internalType\":\"address\",\"name\":\"sideChainPub\",\"type\":\"address\"}],\"internalType\":\"structEpochInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochSlot\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBootNodes\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCloudContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"}],\"name\":\"getLevelMinMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"}],\"name\":\"getLevelPrice\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"internalType\":\"structRunPrice\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMinMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getPendingSecrets\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRegions\",\"outputs\":[{\"internalType\":\"uint32[]\",\"name\":\"ids\",\"type\":\"uint32[]\"},{\"internalType\":\"bytes[]\",\"name\":\"names\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"start\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"size\",\"type\":\"uint256\"}],\"name\":\"getSecrets\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"ids\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"nodes\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getValidators\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"getWorker\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"start\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"size\",\"type\":\"uint64\"}],\"name\":\"getWorkers\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"govContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"init\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastEpochBlock\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"levelMinMortgages\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"levelPrices\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"minMortgageAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintOfWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"id\",\"type\":\"bytes32\"}],\"name\":\"mintWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextAssetId\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextEpochValidators\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextRegionId\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextSecretId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextWorkerId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"ownerOfWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"pendingValidatorIds\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"pendingValidators\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"id\",\"type\":\"uint32\"}],\"name\":\"region\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"regionWorkers\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"regions\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"runningValidatorIds\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"runningValidators\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"secretDelete\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"uint256\",\"name\":\"deposit\",\"type\":\"uint256\"}],\"name\":\"secretDeposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"secretMortgages\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"secretOfUser\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"}],\"name\":\"secretRegister\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"}],\"name\":\"secretUpdate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"secrets\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"internalType\":\"structAssetInfo\",\"name\":\"info\",\"type\":\"tuple\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"name\":\"setAsset\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64[]\",\"name\":\"nodes\",\"type\":\"uint64[]\"}],\"name\":\"setBootNodes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setCloudContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"_epochSlot\",\"type\":\"uint32\"}],\"name\":\"setEpochSlot\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"setLevelMinMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"internalType\":\"structRunPrice\",\"name\":\"price\",\"type\":\"tuple\"}],\"name\":\"setLevelPrice\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"setMinMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"setNextEpoch\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"}],\"name\":\"setRegion\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"setTokenContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"sideChainKey\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"sideChainMultiKey\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"slashWorkerMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"tokenContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"userWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"validatorDelete\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"validatorJoin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"ethAmount\",\"type\":\"uint256\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"uint32\",\"name\":\"cpu\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"mem\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"cvmCpu\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"cvmMem\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"disk\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"gpu\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"deposit\",\"type\":\"uint256\"}],\"name\":\"workerMortgage\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"}],\"name\":\"workerRegister\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"workerStart\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"workerStatus\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"workerStop\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"}],\"name\":\"workerTotalMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"}],\"name\":\"workerTotalResources\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"mortgageId\",\"type\":\"uint64\"}],\"name\":\"workerUnmortgage\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"}],\"name\":\"workerUpdate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"workers\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"CloudContractNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"DepositNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"EpochNotExpired\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InsufficientPoints\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSideChainCaller\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MortgageNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustCallByMainContract\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NodeIsRunning\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NodeNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"RegionNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ResourceNotEnough\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SlashAmountTooLarge\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TokenContractNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"TransferFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerMortgageNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerNotExist\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerNotOwnedByCaller\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"WorkerStatusNotReady\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"beacon\",\"type\":\"address\"}],\"name\":\"BeaconUpgraded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"version\",\"type\":\"uint8\"}],\"name\":\"Initialized\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"id\",\"type\":\"uint32\"}],\"name\":\"asset\",\"outputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"internalType\":\"structAssetInfo\",\"name\":\"\",\"type\":\"tuple\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"assetInfos\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"assetPrices\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"bootNodes\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"bootNodesLen\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"cloudContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epoch\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochInfo\",\"outputs\":[{\"components\":[{\"internalType\":\"uint32\",\"name\":\"epoch\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"epochSlot\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"lastEpochBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint32\",\"name\":\"now\",\"type\":\"uint32\"},{\"internalType\":\"address\",\"name\":\"sideChainPub\",\"type\":\"address\"}],\"internalType\":\"structEpochInfo\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"epochSlot\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBootNodes\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCloudContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"}],\"name\":\"getLevelMinMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"}],\"name\":\"getLevelPrice\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"internalType\":\"structRunPrice\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getMinMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getPendingSecrets\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRegions\",\"outputs\":[{\"internalType\":\"uint32[]\",\"name\":\"ids\",\"type\":\"uint32[]\"},{\"internalType\":\"bytes[]\",\"name\":\"names\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"start\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"size\",\"type\":\"uint256\"}],\"name\":\"getSecrets\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"ids\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"nodes\",\"type\":\"tuple[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getValidators\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"getWorker\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"start\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"size\",\"type\":\"uint64\"}],\"name\":\"getWorkers\",\"outputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"govContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_govContract\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_sideChainMultiKey\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"lastEpochBlock\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"levelMinMortgages\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"levelPrices\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"minMortgageAmount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"mintOfWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"id\",\"type\":\"bytes32\"}],\"name\":\"mintWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextAssetId\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextEpochValidators\",\"outputs\":[{\"internalType\":\"uint64[]\",\"name\":\"\",\"type\":\"uint64[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"internalType\":\"structSecretNode[]\",\"name\":\"\",\"type\":\"tuple[]\"},{\"internalType\":\"uint32[]\",\"name\":\"\",\"type\":\"uint32[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextRegionId\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextSecretId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"nextWorkerId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"ownerOfWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"pendingValidatorIds\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"pendingValidators\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"proxiableUUID\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"id\",\"type\":\"uint32\"}],\"name\":\"region\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"regionWorkers\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"name\":\"regions\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"runningValidatorIds\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"runningValidators\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"secretDelete\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"uint256\",\"name\":\"deposit\",\"type\":\"uint256\"}],\"name\":\"secretDeposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"secretMortgages\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"secretOfUser\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"name\":\"secretRegister\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"name\":\"secretSetSecpKey\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"}],\"name\":\"secretUpdate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"secrets\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"validatorId\",\"type\":\"bytes32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"validatorSecp\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"string\",\"name\":\"name\",\"type\":\"string\"},{\"internalType\":\"uint8\",\"name\":\"assetType\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"totalSupply\",\"type\":\"uint256\"}],\"internalType\":\"structAssetInfo\",\"name\":\"info\",\"type\":\"tuple\"},{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"}],\"name\":\"setAsset\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64[]\",\"name\":\"nodes\",\"type\":\"uint64[]\"}],\"name\":\"setBootNodes\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setCloudContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint32\",\"name\":\"_epochSlot\",\"type\":\"uint32\"}],\"name\":\"setEpochSlot\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"setLevelMinMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"cpu\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"mem\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"storageAmount\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"network\",\"type\":\"uint256\"}],\"internalType\":\"structRunPrice\",\"name\":\"price\",\"type\":\"tuple\"}],\"name\":\"setLevelPrice\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"setMinMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"setNextEpoch\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"}],\"name\":\"setRegion\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_token\",\"type\":\"address\"}],\"name\":\"setTokenContract\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"sideChainKey\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"sideChainMultiKey\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"slashWorkerMortgage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"tokenContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"}],\"name\":\"upgradeTo\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newImplementation\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"upgradeToAndCall\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"}],\"name\":\"userWorker\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"internalType\":\"structK8sCluster\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"validatorDelete\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"validatorJoin\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"ethAmount\",\"type\":\"uint256\"}],\"name\":\"withdrawToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"uint32\",\"name\":\"cpu\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"mem\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"cvmCpu\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"cvmMem\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"disk\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"gpu\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"deposit\",\"type\":\"uint256\"}],\"name\":\"workerMortgage\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"}],\"name\":\"workerRegister\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"workerStart\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"workerStatus\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"}],\"name\":\"workerStop\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"}],\"name\":\"workerTotalMortgage\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"}],\"name\":\"workerTotalResources\",\"outputs\":[{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"\",\"type\":\"uint32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"workerId\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"mortgageId\",\"type\":\"uint64\"}],\"name\":\"workerUnmortgage\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"}],\"name\":\"workerUpdate\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"name\":\"workers\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"id\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"name\",\"type\":\"bytes\"},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"level\",\"type\":\"uint8\"},{\"internalType\":\"uint32\",\"name\":\"regionId\",\"type\":\"uint32\"},{\"internalType\":\"uint256\",\"name\":\"startBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"stopBlock\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"terminalBlock\",\"type\":\"uint256\"},{\"components\":[{\"internalType\":\"uint8\",\"name\":\"a\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"b\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"c\",\"type\":\"uint8\"},{\"internalType\":\"uint8\",\"name\":\"d\",\"type\":\"uint8\"}],\"internalType\":\"structIp\",\"name\":\"ip\",\"type\":\"tuple\"},{\"internalType\":\"uint32\",\"name\":\"port\",\"type\":\"uint32\"},{\"internalType\":\"uint8\",\"name\":\"status\",\"type\":\"uint8\"},{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
 }
 
 // SubnetABI is the input ABI used to generate the binding from.
@@ -546,7 +547,7 @@ func (_Subnet *SubnetCallerSession) EpochSlot() (uint32, error) {
 
 // GetBootNodes is a free data retrieval call binding the contract method 0x45d1d988.
 //
-// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[])
+// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[])
 func (_Subnet *SubnetCaller) GetBootNodes(opts *bind.CallOpts) ([]SecretNode, error) {
 	var out []interface{}
 	err := _Subnet.contract.Call(opts, &out, "getBootNodes")
@@ -563,14 +564,14 @@ func (_Subnet *SubnetCaller) GetBootNodes(opts *bind.CallOpts) ([]SecretNode, er
 
 // GetBootNodes is a free data retrieval call binding the contract method 0x45d1d988.
 //
-// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[])
+// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[])
 func (_Subnet *SubnetSession) GetBootNodes() ([]SecretNode, error) {
 	return _Subnet.Contract.GetBootNodes(&_Subnet.CallOpts)
 }
 
 // GetBootNodes is a free data retrieval call binding the contract method 0x45d1d988.
 //
-// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[])
+// Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[])
 func (_Subnet *SubnetCallerSession) GetBootNodes() ([]SecretNode, error) {
 	return _Subnet.Contract.GetBootNodes(&_Subnet.CallOpts)
 }
@@ -778,7 +779,7 @@ func (_Subnet *SubnetCallerSession) GetRegions() (struct {
 
 // GetSecrets is a free data retrieval call binding the contract method 0xfc9e6f56.
 //
-// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[] nodes)
+// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[] nodes)
 func (_Subnet *SubnetCaller) GetSecrets(opts *bind.CallOpts, start *big.Int, size *big.Int) (struct {
 	Ids   []uint64
 	Nodes []SecretNode
@@ -803,7 +804,7 @@ func (_Subnet *SubnetCaller) GetSecrets(opts *bind.CallOpts, start *big.Int, siz
 
 // GetSecrets is a free data retrieval call binding the contract method 0xfc9e6f56.
 //
-// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[] nodes)
+// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[] nodes)
 func (_Subnet *SubnetSession) GetSecrets(start *big.Int, size *big.Int) (struct {
 	Ids   []uint64
 	Nodes []SecretNode
@@ -813,7 +814,7 @@ func (_Subnet *SubnetSession) GetSecrets(start *big.Int, size *big.Int) (struct 
 
 // GetSecrets is a free data retrieval call binding the contract method 0xfc9e6f56.
 //
-// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[] nodes)
+// Solidity: function getSecrets(uint256 start, uint256 size) view returns(uint64[] ids, (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[] nodes)
 func (_Subnet *SubnetCallerSession) GetSecrets(start *big.Int, size *big.Int) (struct {
 	Ids   []uint64
 	Nodes []SecretNode
@@ -823,7 +824,7 @@ func (_Subnet *SubnetCallerSession) GetSecrets(start *big.Int, size *big.Int) (s
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCaller) GetValidators(opts *bind.CallOpts) ([]uint64, []SecretNode, []uint32, error) {
 	var out []interface{}
 	err := _Subnet.contract.Call(opts, &out, "getValidators")
@@ -842,14 +843,14 @@ func (_Subnet *SubnetCaller) GetValidators(opts *bind.CallOpts) ([]uint64, []Sec
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetSession) GetValidators() ([]uint64, []SecretNode, []uint32, error) {
 	return _Subnet.Contract.GetValidators(&_Subnet.CallOpts)
 }
 
 // GetValidators is a free data retrieval call binding the contract method 0xb7ab4db5.
 //
-// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCallerSession) GetValidators() ([]uint64, []SecretNode, []uint32, error) {
 	return _Subnet.Contract.GetValidators(&_Subnet.CallOpts)
 }
@@ -1192,7 +1193,7 @@ func (_Subnet *SubnetCallerSession) NextAssetId() (uint32, error) {
 
 // NextEpochValidators is a free data retrieval call binding the contract method 0xfdce0cc0.
 //
-// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCaller) NextEpochValidators(opts *bind.CallOpts) ([]uint64, []SecretNode, []uint32, error) {
 	var out []interface{}
 	err := _Subnet.contract.Call(opts, &out, "nextEpochValidators")
@@ -1211,14 +1212,14 @@ func (_Subnet *SubnetCaller) NextEpochValidators(opts *bind.CallOpts) ([]uint64,
 
 // NextEpochValidators is a free data retrieval call binding the contract method 0xfdce0cc0.
 //
-// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetSession) NextEpochValidators() ([]uint64, []SecretNode, []uint32, error) {
 	return _Subnet.Contract.NextEpochValidators(&_Subnet.CallOpts)
 }
 
 // NextEpochValidators is a free data retrieval call binding the contract method 0xfdce0cc0.
 //
-// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint32[])
+// Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCallerSession) NextEpochValidators() ([]uint64, []SecretNode, []uint32, error) {
 	return _Subnet.Contract.NextEpochValidators(&_Subnet.CallOpts)
 }
@@ -1407,6 +1408,37 @@ func (_Subnet *SubnetSession) PendingValidators(arg0 uint64) (uint32, error) {
 // Solidity: function pendingValidators(uint64 ) view returns(uint32)
 func (_Subnet *SubnetCallerSession) PendingValidators(arg0 uint64) (uint32, error) {
 	return _Subnet.Contract.PendingValidators(&_Subnet.CallOpts, arg0)
+}
+
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_Subnet *SubnetCaller) ProxiableUUID(opts *bind.CallOpts) ([32]byte, error) {
+	var out []interface{}
+	err := _Subnet.contract.Call(opts, &out, "proxiableUUID")
+
+	if err != nil {
+		return *new([32]byte), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new([32]byte)).(*[32]byte)
+
+	return out0, err
+
+}
+
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_Subnet *SubnetSession) ProxiableUUID() ([32]byte, error) {
+	return _Subnet.Contract.ProxiableUUID(&_Subnet.CallOpts)
+}
+
+// ProxiableUUID is a free data retrieval call binding the contract method 0x52d1902d.
+//
+// Solidity: function proxiableUUID() view returns(bytes32)
+func (_Subnet *SubnetCallerSession) ProxiableUUID() ([32]byte, error) {
+	return _Subnet.Contract.ProxiableUUID(&_Subnet.CallOpts)
 }
 
 // Region is a free data retrieval call binding the contract method 0x2f49b117.
@@ -1628,7 +1660,7 @@ func (_Subnet *SubnetCallerSession) SecretOfUser(arg0 common.Address) (uint64, e
 
 // Secrets is a free data retrieval call binding the contract method 0xf9df5b78.
 //
-// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId)
+// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId, bytes validatorSecp)
 func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 	Id            uint64
 	Name          []byte
@@ -1643,6 +1675,7 @@ func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 	Port          uint32
 	Status        uint8
 	P2pId         [32]byte
+	ValidatorSecp []byte
 }, error) {
 	var out []interface{}
 	err := _Subnet.contract.Call(opts, &out, "secrets", arg0)
@@ -1661,6 +1694,7 @@ func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 		Port          uint32
 		Status        uint8
 		P2pId         [32]byte
+		ValidatorSecp []byte
 	})
 	if err != nil {
 		return *outstruct, err
@@ -1679,6 +1713,7 @@ func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 	outstruct.Port = *abi.ConvertType(out[10], new(uint32)).(*uint32)
 	outstruct.Status = *abi.ConvertType(out[11], new(uint8)).(*uint8)
 	outstruct.P2pId = *abi.ConvertType(out[12], new([32]byte)).(*[32]byte)
+	outstruct.ValidatorSecp = *abi.ConvertType(out[13], new([]byte)).(*[]byte)
 
 	return *outstruct, err
 
@@ -1686,7 +1721,7 @@ func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 
 // Secrets is a free data retrieval call binding the contract method 0xf9df5b78.
 //
-// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId)
+// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId, bytes validatorSecp)
 func (_Subnet *SubnetSession) Secrets(arg0 uint64) (struct {
 	Id            uint64
 	Name          []byte
@@ -1701,13 +1736,14 @@ func (_Subnet *SubnetSession) Secrets(arg0 uint64) (struct {
 	Port          uint32
 	Status        uint8
 	P2pId         [32]byte
+	ValidatorSecp []byte
 }, error) {
 	return _Subnet.Contract.Secrets(&_Subnet.CallOpts, arg0)
 }
 
 // Secrets is a free data retrieval call binding the contract method 0xf9df5b78.
 //
-// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId)
+// Solidity: function secrets(uint64 ) view returns(uint64 id, bytes name, address owner, bytes32 validatorId, uint8 level, uint32 regionId, uint256 startBlock, uint256 stopBlock, uint256 terminalBlock, (uint8,uint8,uint8,uint8) ip, uint32 port, uint8 status, bytes32 p2pId, bytes validatorSecp)
 func (_Subnet *SubnetCallerSession) Secrets(arg0 uint64) (struct {
 	Id            uint64
 	Name          []byte
@@ -1722,6 +1758,7 @@ func (_Subnet *SubnetCallerSession) Secrets(arg0 uint64) (struct {
 	Port          uint32
 	Status        uint8
 	P2pId         [32]byte
+	ValidatorSecp []byte
 }, error) {
 	return _Subnet.Contract.Secrets(&_Subnet.CallOpts, arg0)
 }
@@ -2044,25 +2081,25 @@ func (_Subnet *SubnetCallerSession) Workers(arg0 uint64) (struct {
 	return _Subnet.Contract.Workers(&_Subnet.CallOpts, arg0)
 }
 
-// Init is a paid mutator transaction binding the contract method 0xe1c7392a.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function init() returns()
-func (_Subnet *SubnetTransactor) Init(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _Subnet.contract.Transact(opts, "init")
+// Solidity: function initialize(address _govContract, address _sideChainMultiKey) returns()
+func (_Subnet *SubnetTransactor) Initialize(opts *bind.TransactOpts, _govContract common.Address, _sideChainMultiKey common.Address) (*types.Transaction, error) {
+	return _Subnet.contract.Transact(opts, "initialize", _govContract, _sideChainMultiKey)
 }
 
-// Init is a paid mutator transaction binding the contract method 0xe1c7392a.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function init() returns()
-func (_Subnet *SubnetSession) Init() (*types.Transaction, error) {
-	return _Subnet.Contract.Init(&_Subnet.TransactOpts)
+// Solidity: function initialize(address _govContract, address _sideChainMultiKey) returns()
+func (_Subnet *SubnetSession) Initialize(_govContract common.Address, _sideChainMultiKey common.Address) (*types.Transaction, error) {
+	return _Subnet.Contract.Initialize(&_Subnet.TransactOpts, _govContract, _sideChainMultiKey)
 }
 
-// Init is a paid mutator transaction binding the contract method 0xe1c7392a.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function init() returns()
-func (_Subnet *SubnetTransactorSession) Init() (*types.Transaction, error) {
-	return _Subnet.Contract.Init(&_Subnet.TransactOpts)
+// Solidity: function initialize(address _govContract, address _sideChainMultiKey) returns()
+func (_Subnet *SubnetTransactorSession) Initialize(_govContract common.Address, _sideChainMultiKey common.Address) (*types.Transaction, error) {
+	return _Subnet.Contract.Initialize(&_Subnet.TransactOpts, _govContract, _sideChainMultiKey)
 }
 
 // SecretDelete is a paid mutator transaction binding the contract method 0x8250f3c0.
@@ -2107,25 +2144,46 @@ func (_Subnet *SubnetTransactorSession) SecretDeposit(id uint64, deposit *big.In
 	return _Subnet.Contract.SecretDeposit(&_Subnet.TransactOpts, id, deposit)
 }
 
-// SecretRegister is a paid mutator transaction binding the contract method 0x5a3dac73.
+// SecretRegister is a paid mutator transaction binding the contract method 0x9b7797d7.
 //
-// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port) returns(uint64)
-func (_Subnet *SubnetTransactor) SecretRegister(opts *bind.TransactOpts, name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32) (*types.Transaction, error) {
-	return _Subnet.contract.Transact(opts, "secretRegister", name, validatorId, p2pId, ip, port)
+// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port, bytes validatorSecp) returns(uint64)
+func (_Subnet *SubnetTransactor) SecretRegister(opts *bind.TransactOpts, name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.contract.Transact(opts, "secretRegister", name, validatorId, p2pId, ip, port, validatorSecp)
 }
 
-// SecretRegister is a paid mutator transaction binding the contract method 0x5a3dac73.
+// SecretRegister is a paid mutator transaction binding the contract method 0x9b7797d7.
 //
-// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port) returns(uint64)
-func (_Subnet *SubnetSession) SecretRegister(name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32) (*types.Transaction, error) {
-	return _Subnet.Contract.SecretRegister(&_Subnet.TransactOpts, name, validatorId, p2pId, ip, port)
+// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port, bytes validatorSecp) returns(uint64)
+func (_Subnet *SubnetSession) SecretRegister(name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.SecretRegister(&_Subnet.TransactOpts, name, validatorId, p2pId, ip, port, validatorSecp)
 }
 
-// SecretRegister is a paid mutator transaction binding the contract method 0x5a3dac73.
+// SecretRegister is a paid mutator transaction binding the contract method 0x9b7797d7.
 //
-// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port) returns(uint64)
-func (_Subnet *SubnetTransactorSession) SecretRegister(name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32) (*types.Transaction, error) {
-	return _Subnet.Contract.SecretRegister(&_Subnet.TransactOpts, name, validatorId, p2pId, ip, port)
+// Solidity: function secretRegister(bytes name, bytes32 validatorId, bytes32 p2pId, (uint8,uint8,uint8,uint8) ip, uint32 port, bytes validatorSecp) returns(uint64)
+func (_Subnet *SubnetTransactorSession) SecretRegister(name []byte, validatorId [32]byte, p2pId [32]byte, ip Ip, port uint32, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.SecretRegister(&_Subnet.TransactOpts, name, validatorId, p2pId, ip, port, validatorSecp)
+}
+
+// SecretSetSecpKey is a paid mutator transaction binding the contract method 0x5c92cef8.
+//
+// Solidity: function secretSetSecpKey(uint64 id, bytes validatorSecp) returns()
+func (_Subnet *SubnetTransactor) SecretSetSecpKey(opts *bind.TransactOpts, id uint64, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.contract.Transact(opts, "secretSetSecpKey", id, validatorSecp)
+}
+
+// SecretSetSecpKey is a paid mutator transaction binding the contract method 0x5c92cef8.
+//
+// Solidity: function secretSetSecpKey(uint64 id, bytes validatorSecp) returns()
+func (_Subnet *SubnetSession) SecretSetSecpKey(id uint64, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.SecretSetSecpKey(&_Subnet.TransactOpts, id, validatorSecp)
+}
+
+// SecretSetSecpKey is a paid mutator transaction binding the contract method 0x5c92cef8.
+//
+// Solidity: function secretSetSecpKey(uint64 id, bytes validatorSecp) returns()
+func (_Subnet *SubnetTransactorSession) SecretSetSecpKey(id uint64, validatorSecp []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.SecretSetSecpKey(&_Subnet.TransactOpts, id, validatorSecp)
 }
 
 // SecretUpdate is a paid mutator transaction binding the contract method 0x4f579c6d.
@@ -2380,6 +2438,48 @@ func (_Subnet *SubnetTransactorSession) SlashWorkerMortgage(workerId uint64, amo
 	return _Subnet.Contract.SlashWorkerMortgage(&_Subnet.TransactOpts, workerId, amount, to)
 }
 
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_Subnet *SubnetTransactor) UpgradeTo(opts *bind.TransactOpts, newImplementation common.Address) (*types.Transaction, error) {
+	return _Subnet.contract.Transact(opts, "upgradeTo", newImplementation)
+}
+
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_Subnet *SubnetSession) UpgradeTo(newImplementation common.Address) (*types.Transaction, error) {
+	return _Subnet.Contract.UpgradeTo(&_Subnet.TransactOpts, newImplementation)
+}
+
+// UpgradeTo is a paid mutator transaction binding the contract method 0x3659cfe6.
+//
+// Solidity: function upgradeTo(address newImplementation) returns()
+func (_Subnet *SubnetTransactorSession) UpgradeTo(newImplementation common.Address) (*types.Transaction, error) {
+	return _Subnet.Contract.UpgradeTo(&_Subnet.TransactOpts, newImplementation)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_Subnet *SubnetTransactor) UpgradeToAndCall(opts *bind.TransactOpts, newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _Subnet.contract.Transact(opts, "upgradeToAndCall", newImplementation, data)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_Subnet *SubnetSession) UpgradeToAndCall(newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.UpgradeToAndCall(&_Subnet.TransactOpts, newImplementation, data)
+}
+
+// UpgradeToAndCall is a paid mutator transaction binding the contract method 0x4f1ef286.
+//
+// Solidity: function upgradeToAndCall(address newImplementation, bytes data) payable returns()
+func (_Subnet *SubnetTransactorSession) UpgradeToAndCall(newImplementation common.Address, data []byte) (*types.Transaction, error) {
+	return _Subnet.Contract.UpgradeToAndCall(&_Subnet.TransactOpts, newImplementation, data)
+}
+
 // ValidatorDelete is a paid mutator transaction binding the contract method 0xa63dd16c.
 //
 // Solidity: function validatorDelete(uint64 id) returns()
@@ -2588,4 +2688,561 @@ func (_Subnet *SubnetSession) Receive() (*types.Transaction, error) {
 // Solidity: receive() payable returns()
 func (_Subnet *SubnetTransactorSession) Receive() (*types.Transaction, error) {
 	return _Subnet.Contract.Receive(&_Subnet.TransactOpts)
+}
+
+// SubnetAdminChangedIterator is returned from FilterAdminChanged and is used to iterate over the raw logs and unpacked data for AdminChanged events raised by the Subnet contract.
+type SubnetAdminChangedIterator struct {
+	Event *SubnetAdminChanged // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *SubnetAdminChangedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SubnetAdminChanged)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(SubnetAdminChanged)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *SubnetAdminChangedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *SubnetAdminChangedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// SubnetAdminChanged represents a AdminChanged event raised by the Subnet contract.
+type SubnetAdminChanged struct {
+	PreviousAdmin common.Address
+	NewAdmin      common.Address
+	Raw           types.Log // Blockchain specific contextual infos
+}
+
+// FilterAdminChanged is a free log retrieval operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_Subnet *SubnetFilterer) FilterAdminChanged(opts *bind.FilterOpts) (*SubnetAdminChangedIterator, error) {
+
+	logs, sub, err := _Subnet.contract.FilterLogs(opts, "AdminChanged")
+	if err != nil {
+		return nil, err
+	}
+	return &SubnetAdminChangedIterator{contract: _Subnet.contract, event: "AdminChanged", logs: logs, sub: sub}, nil
+}
+
+// WatchAdminChanged is a free log subscription operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_Subnet *SubnetFilterer) WatchAdminChanged(opts *bind.WatchOpts, sink chan<- *SubnetAdminChanged) (event.Subscription, error) {
+
+	logs, sub, err := _Subnet.contract.WatchLogs(opts, "AdminChanged")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(SubnetAdminChanged)
+				if err := _Subnet.contract.UnpackLog(event, "AdminChanged", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseAdminChanged is a log parse operation binding the contract event 0x7e644d79422f17c01e4894b5f4f588d331ebfa28653d42ae832dc59e38c9798f.
+//
+// Solidity: event AdminChanged(address previousAdmin, address newAdmin)
+func (_Subnet *SubnetFilterer) ParseAdminChanged(log types.Log) (*SubnetAdminChanged, error) {
+	event := new(SubnetAdminChanged)
+	if err := _Subnet.contract.UnpackLog(event, "AdminChanged", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// SubnetBeaconUpgradedIterator is returned from FilterBeaconUpgraded and is used to iterate over the raw logs and unpacked data for BeaconUpgraded events raised by the Subnet contract.
+type SubnetBeaconUpgradedIterator struct {
+	Event *SubnetBeaconUpgraded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *SubnetBeaconUpgradedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SubnetBeaconUpgraded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(SubnetBeaconUpgraded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *SubnetBeaconUpgradedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *SubnetBeaconUpgradedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// SubnetBeaconUpgraded represents a BeaconUpgraded event raised by the Subnet contract.
+type SubnetBeaconUpgraded struct {
+	Beacon common.Address
+	Raw    types.Log // Blockchain specific contextual infos
+}
+
+// FilterBeaconUpgraded is a free log retrieval operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_Subnet *SubnetFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beacon []common.Address) (*SubnetBeaconUpgradedIterator, error) {
+
+	var beaconRule []interface{}
+	for _, beaconItem := range beacon {
+		beaconRule = append(beaconRule, beaconItem)
+	}
+
+	logs, sub, err := _Subnet.contract.FilterLogs(opts, "BeaconUpgraded", beaconRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SubnetBeaconUpgradedIterator{contract: _Subnet.contract, event: "BeaconUpgraded", logs: logs, sub: sub}, nil
+}
+
+// WatchBeaconUpgraded is a free log subscription operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_Subnet *SubnetFilterer) WatchBeaconUpgraded(opts *bind.WatchOpts, sink chan<- *SubnetBeaconUpgraded, beacon []common.Address) (event.Subscription, error) {
+
+	var beaconRule []interface{}
+	for _, beaconItem := range beacon {
+		beaconRule = append(beaconRule, beaconItem)
+	}
+
+	logs, sub, err := _Subnet.contract.WatchLogs(opts, "BeaconUpgraded", beaconRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(SubnetBeaconUpgraded)
+				if err := _Subnet.contract.UnpackLog(event, "BeaconUpgraded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseBeaconUpgraded is a log parse operation binding the contract event 0x1cf3b03a6cf19fa2baba4df148e9dcabedea7f8a5c07840e207e5c089be95d3e.
+//
+// Solidity: event BeaconUpgraded(address indexed beacon)
+func (_Subnet *SubnetFilterer) ParseBeaconUpgraded(log types.Log) (*SubnetBeaconUpgraded, error) {
+	event := new(SubnetBeaconUpgraded)
+	if err := _Subnet.contract.UnpackLog(event, "BeaconUpgraded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// SubnetInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the Subnet contract.
+type SubnetInitializedIterator struct {
+	Event *SubnetInitialized // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *SubnetInitializedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SubnetInitialized)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(SubnetInitialized)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *SubnetInitializedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *SubnetInitializedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// SubnetInitialized represents a Initialized event raised by the Subnet contract.
+type SubnetInitialized struct {
+	Version uint8
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterInitialized is a free log retrieval operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_Subnet *SubnetFilterer) FilterInitialized(opts *bind.FilterOpts) (*SubnetInitializedIterator, error) {
+
+	logs, sub, err := _Subnet.contract.FilterLogs(opts, "Initialized")
+	if err != nil {
+		return nil, err
+	}
+	return &SubnetInitializedIterator{contract: _Subnet.contract, event: "Initialized", logs: logs, sub: sub}, nil
+}
+
+// WatchInitialized is a free log subscription operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_Subnet *SubnetFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *SubnetInitialized) (event.Subscription, error) {
+
+	logs, sub, err := _Subnet.contract.WatchLogs(opts, "Initialized")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(SubnetInitialized)
+				if err := _Subnet.contract.UnpackLog(event, "Initialized", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseInitialized is a log parse operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
+//
+// Solidity: event Initialized(uint8 version)
+func (_Subnet *SubnetFilterer) ParseInitialized(log types.Log) (*SubnetInitialized, error) {
+	event := new(SubnetInitialized)
+	if err := _Subnet.contract.UnpackLog(event, "Initialized", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+// SubnetUpgradedIterator is returned from FilterUpgraded and is used to iterate over the raw logs and unpacked data for Upgraded events raised by the Subnet contract.
+type SubnetUpgradedIterator struct {
+	Event *SubnetUpgraded // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *SubnetUpgradedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SubnetUpgraded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(SubnetUpgraded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *SubnetUpgradedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *SubnetUpgradedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// SubnetUpgraded represents a Upgraded event raised by the Subnet contract.
+type SubnetUpgraded struct {
+	Implementation common.Address
+	Raw            types.Log // Blockchain specific contextual infos
+}
+
+// FilterUpgraded is a free log retrieval operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_Subnet *SubnetFilterer) FilterUpgraded(opts *bind.FilterOpts, implementation []common.Address) (*SubnetUpgradedIterator, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _Subnet.contract.FilterLogs(opts, "Upgraded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SubnetUpgradedIterator{contract: _Subnet.contract, event: "Upgraded", logs: logs, sub: sub}, nil
+}
+
+// WatchUpgraded is a free log subscription operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_Subnet *SubnetFilterer) WatchUpgraded(opts *bind.WatchOpts, sink chan<- *SubnetUpgraded, implementation []common.Address) (event.Subscription, error) {
+
+	var implementationRule []interface{}
+	for _, implementationItem := range implementation {
+		implementationRule = append(implementationRule, implementationItem)
+	}
+
+	logs, sub, err := _Subnet.contract.WatchLogs(opts, "Upgraded", implementationRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(SubnetUpgraded)
+				if err := _Subnet.contract.UnpackLog(event, "Upgraded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseUpgraded is a log parse operation binding the contract event 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b.
+//
+// Solidity: event Upgraded(address indexed implementation)
+func (_Subnet *SubnetFilterer) ParseUpgraded(log types.Log) (*SubnetUpgraded, error) {
+	event := new(SubnetUpgraded)
+	if err := _Subnet.contract.UnpackLog(event, "Upgraded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }

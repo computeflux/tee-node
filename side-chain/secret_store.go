@@ -21,7 +21,7 @@ const (
 func (s *SideChain) Encrypt(data []byte) ([]byte, error) {
 	// 获取DKG的公钥，用于加密过程
 	suite := suites.MustFind("Ed25519")
-	dkgPubKey, err := GetDkgPubkey()
+	dkgPubKey, err := s.GetDkgPubkey()
 	if err != nil {
 		return nil, fmt.Errorf("get dkg pubkey: %w", err)
 	}

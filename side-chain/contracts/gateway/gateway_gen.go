@@ -272,19 +272,6 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0x28, 0x74, 0xff, 0x0c}:
-		if err := model.RequireArgLen(args, 1, "get_provider"); err != nil {
-			return nil, err
-		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("get_provider: providerID: %w", err)
-		}
-		out, err := q.GetProvider(providerID)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
 	case [4]byte{0xd3, 0xff, 0x81, 0xe9}:
 		if err := model.RequireArgLen(args, 1, "get_model"); err != nil {
 			return nil, err
@@ -294,6 +281,25 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("get_model: modelID: %w", err)
 		}
 		out, err := q.GetModel(modelID)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x05, 0xed, 0xba, 0xf5}:
+		out, err := q.GetModelCount()
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xb3, 0x4c, 0x16, 0xd8}:
+		if err := model.RequireArgLen(args, 1, "get_provider"); err != nil {
+			return nil, err
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_provider: providerID: %w", err)
+		}
+		out, err := q.GetProvider(providerID)
 		if err != nil {
 			return nil, err
 		}
@@ -311,6 +317,12 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
+	case [4]byte{0x46, 0x7c, 0x95, 0xd9}:
+		out, err := q.GetProviderCount()
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
 	case [4]byte{0x07, 0x65, 0xdc, 0xf3}:
 		if err := model.RequireArgLen(args, 1, "get_token"); err != nil {
 			return nil, err
@@ -324,76 +336,13 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xa1, 0xb2, 0xc3, 0x01}:
-		out, err := q.GetModelCount()
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0xa1, 0xb2, 0xc3, 0x02}:
-		out, err := q.GetProviderCount()
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0xa1, 0xb2, 0xc3, 0x03}:
+	case [4]byte{0xb4, 0xb3, 0x7d, 0x0d}:
 		out, err := q.GetTokenCount()
 		if err != nil {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xb1, 0xb2, 0xc3, 0x01}:
-		if err := model.RequireArgLen(args, 2, "list_models"); err != nil {
-			return nil, err
-		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("list_models: offset: %w", err)
-		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
-		if err != nil {
-			return nil, fmt.Errorf("list_models: limit: %w", err)
-		}
-		out, err := q.ListModels(offset, limit)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0xb1, 0xb2, 0xc3, 0x02}:
-		if err := model.RequireArgLen(args, 2, "list_providers"); err != nil {
-			return nil, err
-		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("list_providers: offset: %w", err)
-		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
-		if err != nil {
-			return nil, fmt.Errorf("list_providers: limit: %w", err)
-		}
-		out, err := q.ListProviders(offset, limit)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0xb1, 0xb2, 0xc3, 0x03}:
-		if err := model.RequireArgLen(args, 2, "list_tokens"); err != nil {
-			return nil, err
-		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("list_tokens: offset: %w", err)
-		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
-		if err != nil {
-			return nil, fmt.Errorf("list_tokens: limit: %w", err)
-		}
-		out, err := q.ListTokens(offset, limit)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0xc1, 0xb2, 0xc3, 0x01}:
+	case [4]byte{0xda, 0xa1, 0xc2, 0xd5}:
 		if err := model.RequireArgLen(args, 2, "list_active_models"); err != nil {
 			return nil, err
 		}
@@ -410,7 +359,7 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xc1, 0xb2, 0xc3, 0x02}:
+	case [4]byte{0xbd, 0x24, 0x20, 0x9b}:
 		if err := model.RequireArgLen(args, 2, "list_active_providers"); err != nil {
 			return nil, err
 		}
@@ -427,7 +376,7 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xc1, 0xb2, 0xc3, 0x03}:
+	case [4]byte{0xe6, 0x4c, 0x84, 0x64}:
 		if err := model.RequireArgLen(args, 2, "list_active_tokens"); err != nil {
 			return nil, err
 		}
@@ -444,7 +393,58 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xd1, 0xb2, 0xc3, 0x01}:
+	case [4]byte{0xc1, 0x51, 0x1f, 0xbf}:
+		if err := model.RequireArgLen(args, 2, "list_models"); err != nil {
+			return nil, err
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_models: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_models: limit: %w", err)
+		}
+		out, err := q.ListModels(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x36, 0xe0, 0x90, 0x37}:
+		if err := model.RequireArgLen(args, 2, "list_providers"); err != nil {
+			return nil, err
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_providers: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_providers: limit: %w", err)
+		}
+		out, err := q.ListProviders(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x8b, 0x57, 0x0d, 0x5d}:
+		if err := model.RequireArgLen(args, 2, "list_tokens"); err != nil {
+			return nil, err
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_tokens: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_tokens: limit: %w", err)
+		}
+		out, err := q.ListTokens(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x60, 0xd0, 0x0c, 0x96}:
 		if err := model.RequireArgLen(args, 6, "query_models"); err != nil {
 			return nil, err
 		}
@@ -486,9 +486,7 @@ func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
 		api:              api,
 		balances:         &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "balance_"},
-		models:           model.NewIndexedList[uint64, ModelInfo]("gateway", "next_model_id", "model_"),
 		providerBalances: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_balance_"},
-		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "next_provider_id", "provider_"),
 		tokens:           &model.StoreMapping[uint64, TokenInfo]{Namespace: "gateway", KeyPrefix: "token_"},
 		usages:           &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
 		nextTokenID:      &model.StoreValue[uint64]{Namespace: "gateway", Key: "next_token_id"},
@@ -497,18 +495,18 @@ func NewGateway(api model.ContractApi) *Gateway {
 
 var MethodMap = map[[4]byte]string{
 	[4]byte{0x37, 0x44, 0xe4, 0xb0}: "get_balance",
-	[4]byte{0x28, 0x74, 0xff, 0x0c}: "get_provider",
 	[4]byte{0xd3, 0xff, 0x81, 0xe9}: "get_model",
+	[4]byte{0x05, 0xed, 0xba, 0xf5}: "get_model_count",
+	[4]byte{0xb3, 0x4c, 0x16, 0xd8}: "get_provider",
 	[4]byte{0xd3, 0xaf, 0x56, 0xaa}: "get_provider_balance",
+	[4]byte{0x46, 0x7c, 0x95, 0xd9}: "get_provider_count",
 	[4]byte{0x07, 0x65, 0xdc, 0xf3}: "get_token",
-	[4]byte{0xa1, 0xb2, 0xc3, 0x01}: "get_model_count",
-	[4]byte{0xa1, 0xb2, 0xc3, 0x02}: "get_provider_count",
-	[4]byte{0xa1, 0xb2, 0xc3, 0x03}: "get_token_count",
-	[4]byte{0xb1, 0xb2, 0xc3, 0x01}: "list_models",
-	[4]byte{0xb1, 0xb2, 0xc3, 0x02}: "list_providers",
-	[4]byte{0xb1, 0xb2, 0xc3, 0x03}: "list_tokens",
-	[4]byte{0xc1, 0xb2, 0xc3, 0x01}: "list_active_models",
-	[4]byte{0xc1, 0xb2, 0xc3, 0x02}: "list_active_providers",
-	[4]byte{0xc1, 0xb2, 0xc3, 0x03}: "list_active_tokens",
-	[4]byte{0xd1, 0xb2, 0xc3, 0x01}: "query_models",
+	[4]byte{0xb4, 0xb3, 0x7d, 0x0d}: "get_token_count",
+	[4]byte{0xda, 0xa1, 0xc2, 0xd5}: "list_active_models",
+	[4]byte{0xbd, 0x24, 0x20, 0x9b}: "list_active_providers",
+	[4]byte{0xe6, 0x4c, 0x84, 0x64}: "list_active_tokens",
+	[4]byte{0xc1, 0x51, 0x1f, 0xbf}: "list_models",
+	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
+	[4]byte{0x8b, 0x57, 0x0d, 0x5d}: "list_tokens",
+	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
 }

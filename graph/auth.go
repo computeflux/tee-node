@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/vedhavyas/go-subkey/v2"
 	"github.com/vedhavyas/go-subkey/v2/sr25519"
@@ -22,6 +23,9 @@ var (
 type contextKey struct {
 	name string
 }
+
+// JWTValidator parses a JWT token string and returns claims.
+type JWTValidator func(tokenStr string) (*auth.JWTClaims, error)
 
 // AuthCheck checks the user's role and timestamp
 func AuthCheck(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
@@ -39,11 +43,13 @@ func AuthCheck(ctx context.Context, obj interface{}, next graphql.Resolver) (res
 	return next(ctx)
 }
 
-// Middleware decodes the share session cookie and packs the session into context
-func AuthMiddleware() func(http.Handler) http.Handler {
+// AuthMiddleware creates a middleware that decodes the Authorization header
+// and packs the user into context. Supports both the legacy Polkadot (||)
+// format and JWT Bearer tokens.
+func AuthMiddleware(validateJWT JWTValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := InitUser(w, r)
+			user := InitUser(r, validateJWT)
 
 			// put it in context
 			ctx := context.WithValue(r.Context(), loginStatCtxKey, user)
@@ -55,22 +61,55 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
-// InitUser decodes the share session cookie and packs the session into context
-func InitUser(w http.ResponseWriter, r *http.Request) *model.PublicUser {
+// InitUser decodes the Authorization header. Supports:
+//   - Legacy Polkadot format: hex(JSON{address,timestamp})||hex(signature)
+//   - JWT Bearer format: Bearer <jwt>
+func InitUser(r *http.Request, validateJWT JWTValidator) *model.PublicUser {
 	header := r.Header
 	token, ok := header["Authorization"]
 	if !ok || len(token) == 0 {
 		return nil
 	}
 
-	return decodeToken(token[0])
+	raw := token[0]
+
+	// 1. Try JWT Bearer token first.
+	if strings.HasPrefix(raw, "Bearer ") {
+		return decodeJWT(strings.TrimPrefix(raw, "Bearer "), validateJWT)
+	}
+
+	// 2. Try legacy Polkadot || format.
+	if strings.Contains(raw, "||") {
+		return decodeLegacyToken(raw)
+	}
+
+	// 3. Fallback: could be a bare JWT.
+	if validateJWT != nil {
+		return decodeJWT(raw, validateJWT)
+	}
+
+	return nil
 }
 
-// decodeToken decodes the share session cookie and packs the session into context
-func decodeToken(tokenStr string) *model.PublicUser {
+// decodeJWT parses a JWT token and returns a PublicUser.
+func decodeJWT(tokenStr string, validateJWT JWTValidator) *model.PublicUser {
+	if validateJWT == nil {
+		return nil
+	}
+	claims, err := validateJWT(tokenStr)
+	if err != nil {
+		return nil
+	}
+	return &model.PublicUser{
+		Address:   claims.Address,
+		Timestamp: time.Now().Unix(),
+	}
+}
+
+// decodeLegacyToken decodes the legacy Polkadot ||-separated token format.
+func decodeLegacyToken(tokenStr string) *model.PublicUser {
 	token := strings.Split(tokenStr, "||")
 	if len(token) != 2 {
-		fmt.Println("token length error => ", len(token))
 		return nil
 	}
 

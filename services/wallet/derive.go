@@ -86,7 +86,7 @@ func (s *WalletService) encryptWithServerKey(email string, keyBytes []byte) erro
 // DecryptWithServerKey 用服务端密钥解密私钥
 func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
 	record, err := model.GetEncryptedKey(email)
-	if err != nil {
+	if err != nil || record == nil {
 		return nil, fmt.Errorf("no stored key for %s", email)
 	}
 	ciphertext, _ := hex.DecodeString(record.Blob)
@@ -101,6 +101,6 @@ func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
 
 // HasEncryptedKey 检查用户是否已有加密存储的密钥
 func (s *WalletService) HasEncryptedKey(email string) bool {
-	_, err := model.GetEncryptedKey(email)
-	return err == nil
+	record, err := model.GetEncryptedKey(email)
+	return err == nil && record != nil
 }

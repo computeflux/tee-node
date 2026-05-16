@@ -47,9 +47,13 @@ func (s *SideChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, er
 	return nil, errors.New("ProposerAddress not in DKG")
 }
 
-func GetDkgPubkey() (*types.AccountID, error) {
+func (s *SideChain) GetDkgPubkey() (*types.AccountID, error) {
 	key, err := model.GetKey(GLOABL_STATE, DKG_PUB_KEY)
 	if err != nil {
+		if s.dkg.SystemPubKey() != nil {
+			a := s.dkg.SystemPubKey().AccountID()
+			return &a, nil
+		}
 		return nil, errors.New("get G-dkg_pub_key error")
 	}
 	account, err := types.NewAccountID(key)

@@ -131,6 +131,9 @@ func InitSideChain(
 
 	// add DKG to chain node
 	p2pReactor := bftbrigde.NewBTFReactor("DKG")
+	if P2PKey != nil {
+		p2pReactor.SetID(P2PKey)
+	}
 
 	var StartSideChain = func() (*nm.Node, error) {
 		// init BFT node

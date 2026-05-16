@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 23
+        "type": 29
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 24
+        "type": 30
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -55,6 +55,21 @@
       "type": 9
     },
     "messages": [
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "get_model_count",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 16
+        },
+        "selector": "0x05edbaf5"
+      },
       {
         "args": [
           {
@@ -95,6 +110,46 @@
           },
           {
             "docs": [],
+            "label": "name",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "logo_u_r_l",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "description",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "website",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
             "label": "model_ids",
             "type": {
               "displayName": [
@@ -105,7 +160,37 @@
           },
           {
             "docs": [],
+            "label": "region",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "docs": [],
+            "label": "fee_rate",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
             "label": "priority",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "uptime_s_l_a",
             "type": {
               "displayName": [
                 "u32"
@@ -243,6 +328,36 @@
               ],
               "type": 3
             }
+          },
+          {
+            "docs": [],
+            "label": "input_modalities",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "docs": [],
+            "label": "context_length",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "prompt_pricing",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
           }
         ],
         "default": false,
@@ -258,32 +373,6 @@
           "type": 11
         },
         "selector": "0x1e9a0f5e"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
-            "label": "provider_i_d",
-            "type": {
-              "displayName": [
-                "u64"
-              ],
-              "type": 3
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "get_channel",
-        "mutates": false,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "Result"
-          ],
-          "type": 18
-        },
-        "selector": "0x2874ff0c"
       },
       {
         "args": [
@@ -316,6 +405,36 @@
               ],
               "type": 3
             }
+          },
+          {
+            "docs": [],
+            "label": "input_modalities",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "docs": [],
+            "label": "context_length",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "prompt_pricing",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
           }
         ],
         "default": false,
@@ -331,6 +450,42 @@
           "type": 11
         },
         "selector": "0x32253e95"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_providers",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 26
+        },
+        "selector": "0x36e09037"
       },
       {
         "args": [
@@ -357,6 +512,21 @@
           "type": 16
         },
         "selector": "0x3744e4b0"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "get_provider_count",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 16
+        },
+        "selector": "0x467c95d9"
       },
       {
         "args": [],
@@ -442,6 +612,82 @@
         "args": [
           {
             "docs": [],
+            "label": "modalities",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "docs": [],
+            "label": "min_context",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "max_context",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "max_price",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "query_models",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 24
+        },
+        "selector": "0x60d00c96"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "owner",
             "type": {
               "displayName": [
@@ -453,6 +699,36 @@
           {
             "docs": [],
             "label": "name",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "logo_u_r_l",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "description",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "website",
             "type": {
               "displayName": [
                 "string"
@@ -482,7 +758,47 @@
           },
           {
             "docs": [],
+            "label": "region",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          },
+          {
+            "docs": [],
+            "label": "deposit",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "fee_rate",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
             "label": "priority",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "uptime_s_l_a",
             "type": {
               "displayName": [
                 "u32"
@@ -504,6 +820,42 @@
           "type": 11
         },
         "selector": "0x7eedb405"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_tokens",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 28
+        },
+        "selector": "0x8b570d5d"
       },
       {
         "args": [
@@ -546,6 +898,47 @@
         "args": [
           {
             "docs": [],
+            "label": "provider_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "get_provider",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 20
+        },
+        "selector": "0xb34c16d8"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "get_token_count",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 16
+        },
+        "selector": "0xb4b37d0d"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "token_i_d",
             "type": {
               "displayName": [
@@ -568,6 +961,78 @@
           "type": 11
         },
         "selector": "0xb9d04c81"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_active_providers",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 26
+        },
+        "selector": "0xbd24209b"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_models",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 24
+        },
+        "selector": "0xc1511fbf"
       },
       {
         "args": [
@@ -617,9 +1082,81 @@
           "displayName": [
             "Result"
           ],
-          "type": 20
+          "type": 18
         },
         "selector": "0xd3ff81e9"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_active_models",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 24
+        },
+        "selector": "0xdaa1c2d5"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_active_tokens",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 28
+        },
+        "selector": "0xe64c8464"
       }
     ]
   },
@@ -738,22 +1275,22 @@
               {
                 "fields": [],
                 "index": 0,
-                "name": "ChannelNotFound"
-              },
-              {
-                "fields": [],
-                "index": 1,
                 "name": "LowBalance"
               },
               {
                 "fields": [],
-                "index": 2,
+                "index": 1,
                 "name": "ModelNotFound"
               },
               {
                 "fields": [],
-                "index": 3,
+                "index": 2,
                 "name": "NotOwner"
+              },
+              {
+                "fields": [],
+                "index": 3,
+                "name": "ProviderNotFound"
               },
               {
                 "fields": [],
@@ -925,30 +1462,38 @@
                 "type": 14
               },
               {
-                "name": "BaseURL",
-                "type": 14
+                "name": "Owner",
+                "type": 13
               },
               {
-                "name": "ModelIds",
-                "type": 15
-              },
-              {
-                "name": "Priority",
-                "type": 2
+                "name": "PointsPer1K",
+                "type": 3
               },
               {
                 "name": "IsActive",
                 "type": 6
               },
               {
-                "name": "Owner",
-                "type": 13
+                "name": "CreatedAt",
+                "type": 3
+              },
+              {
+                "name": "InputModalities",
+                "type": 0
+              },
+              {
+                "name": "ContextLength",
+                "type": 3
+              },
+              {
+                "name": "PromptPricing",
+                "type": 3
               }
             ]
           }
         },
         "path": [
-          "ChannelInfo"
+          "ModelInfo"
         ]
       }
     },
@@ -1001,16 +1546,64 @@
           "composite": {
             "fields": [
               {
-                "name": "Name",
-                "type": 14
-              },
-              {
                 "name": "Owner",
                 "type": 13
               },
               {
-                "name": "PointsPer1K",
+                "name": "Name",
+                "type": 14
+              },
+              {
+                "name": "LogoURL",
+                "type": 14
+              },
+              {
+                "name": "Description",
+                "type": 14
+              },
+              {
+                "name": "Website",
+                "type": 14
+              },
+              {
+                "name": "BaseURL",
+                "type": 14
+              },
+              {
+                "name": "ModelIds",
+                "type": 15
+              },
+              {
+                "name": "Region",
+                "type": 0
+              },
+              {
+                "name": "Deposit",
                 "type": 3
+              },
+              {
+                "name": "FeeRate",
+                "type": 2
+              },
+              {
+                "name": "Priority",
+                "type": 2
+              },
+              {
+                "name": "TotalRequests",
+                "type": 3
+              },
+              {
+                "name": "SuccessRate",
+                "type": 2
+              },
+              {
+                "name": "AvgLatency",
+                "type": 2
+              },
+              {
+                "name": "UptimeSLA",
+                "type": 2
               },
               {
                 "name": "IsActive",
@@ -1024,7 +1617,7 @@
           }
         },
         "path": [
-          "ModelInfo"
+          "ProviderInfo"
         ]
       }
     },
@@ -1146,6 +1739,189 @@
       "id": 23,
       "type": {
         "def": {
+          "sequence": {
+            "type": 17
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 17
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 23
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 23
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 19
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 19
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 25
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 25
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 21
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 21
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 27
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 27
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "type": {
+        "def": {
           "primitive": "u128"
         },
         "path": [
@@ -1154,7 +1930,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 30,
       "type": {
         "def": {
           "composite": {
