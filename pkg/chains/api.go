@@ -30,6 +30,10 @@ type ChainApi interface {
 	// Event sync from chain logs.
 	SyncRechargeEvents(fromBlock uint64) ([]model.RechargeEvent, error)
 	SyncWithdrawEvents(fromBlock uint64) ([]model.WithdrawEvent, error)
+
+	// Signing / submission.
+	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
+	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
 }
 
 // ── MainChainApi ──────────────────────────────────────────
@@ -56,10 +60,6 @@ type MainChainApi interface {
 	BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error)
 	CheckMapAccount(addr model.ChainH160) (bool, error)
 	CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCall, error)
-
-	// Signing / submission.
-	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
-	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
 }
 
 // ── Factory ───────────────────────────────────────────────
