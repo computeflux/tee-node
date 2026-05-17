@@ -31,6 +31,7 @@ type Error struct { // Enum
 	SlashAmountTooLarge       *bool // 19
 	CloudContractNotSet       *bool // 20
 	ResourceNotEnough         *bool // 21
+	InvalidBlsKey             *bool // 22
 }
 
 func (ty Error) Encode(encoder scale.Encoder) (err error) {
@@ -209,6 +210,14 @@ func (ty Error) Encode(encoder scale.Encoder) (err error) {
 		}
 		return nil
 	}
+
+	if ty.InvalidBlsKey != nil {
+		err = encoder.PushByte(22)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	return fmt.Errorf("unrecognized enum")
 }
 
@@ -306,6 +315,10 @@ func (ty *Error) Decode(decoder scale.Decoder) (err error) {
 		t := true
 		ty.ResourceNotEnough = &t
 		return
+	case 22: // Base
+		t := true
+		ty.InvalidBlsKey = &t
+		return
 	default:
 		return fmt.Errorf("unrecognized enum")
 	}
@@ -397,6 +410,10 @@ func (ty *Error) Error() string {
 
 	if ty.ResourceNotEnough != nil {
 		return "ResourceNotEnough"
+	}
+
+	if ty.InvalidBlsKey != nil {
+		return "InvalidBlsKey"
 	}
 	return "Unknown"
 }
@@ -541,6 +558,7 @@ type SecretNode struct { // Composite
 	Ip            Ip
 	Port          uint32
 	Status        byte
+	Bls           []byte
 }
 type Tuple_58 struct { // Tuple
 	F0 uint64

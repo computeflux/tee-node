@@ -133,14 +133,6 @@ func (p *PubKey) H160() types.H160 {
 	return H160FromPublicKey(p.PublicKey)
 }
 
-// ChainH160 returns the H160 address as a chain-agnostic type.
-func (p *PubKey) ChainH160() ChainH160 {
-	h := H160FromPublicKey(p.PublicKey)
-	var out ChainH160
-	copy(out[:], h[:])
-	return out
-}
-
 // AccountID returns the 32-byte account ID.
 //   - SuiteEd25519  → first 32 bytes of public key (truncated)
 //   - SuiteBLS12381 → blake2b(public_key)

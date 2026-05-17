@@ -27,7 +27,7 @@ func (e *EvmChain) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.Ch
 	return &model.ChainCall{EVM: model.EvmCall{Method: "tee_attest"}}, nil
 }
 
-func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccountID) (*model.ChainCall, error) {
+func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error) {
 	abi, err := bindings.SubnetMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("get ABI: %w", err)
@@ -56,7 +56,7 @@ func (e *EvmChain) BatchCall(method string, calls []model.ChainCall) (*model.Cha
 	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: method}}, nil
 }
 
-func (e *EvmChain) CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCall, error) {
+func (e *EvmChain) CallOfMapAccount(signer model.PubKey) (*model.ChainCall, error) {
 	abi, err := bindings.SubnetMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("get ABI: %w", err)

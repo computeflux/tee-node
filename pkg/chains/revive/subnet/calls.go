@@ -1570,7 +1570,7 @@ func (c *Subnet) QuerySecrets(
 }
 
 func (c *Subnet) DryRunSecretRegister(
-	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, __ink_params chain.DryRunParams,
+	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, bls []byte, __ink_params chain.DryRunParams,
 ) (*util.Result[uint64, Error], *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
@@ -1584,7 +1584,7 @@ func (c *Subnet) DryRunSecretRegister(
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
 			Selector: "0xa95b15c7",
-			Args:     []any{name, validator_id, p2p_id, ip, port},
+			Args:     []any{name, validator_id, p2p_id, ip, port, bls},
 		},
 	)
 	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
@@ -1598,11 +1598,11 @@ func (c *Subnet) DryRunSecretRegister(
 }
 
 func (c *Subnet) ExecSecretRegister(
-	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, __ink_params chain.ExecParams,
+	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, bls []byte, __ink_params chain.ExecParams,
 ) error {
 	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
 	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunSecretRegister(name, validator_id, p2p_id, ip, port, _param)
+	_, gas, err := c.DryRunSecretRegister(name, validator_id, p2p_id, ip, port, bls, _param)
 	if err != nil {
 		return err
 	}
@@ -1612,16 +1612,16 @@ func (c *Subnet) ExecSecretRegister(
 		gas.StorageDeposit,
 		util.InkContractInput{
 			Selector: "0xa95b15c7",
-			Args:     []any{name, validator_id, p2p_id, ip, port},
+			Args:     []any{name, validator_id, p2p_id, ip, port, bls},
 		},
 		__ink_params,
 	)
 }
 
 func (c *Subnet) CallOfSecretRegister(
-	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, __ink_params chain.DryRunParams,
+	name []byte, validator_id util.AccountId, p2p_id util.AccountId, ip Ip, port uint32, bls []byte, __ink_params chain.DryRunParams,
 ) (*types.Call, error) {
-	_, gas, err := c.DryRunSecretRegister(name, validator_id, p2p_id, ip, port, __ink_params)
+	_, gas, err := c.DryRunSecretRegister(name, validator_id, p2p_id, ip, port, bls, __ink_params)
 	if err != nil {
 		return nil, err
 	}
@@ -1632,7 +1632,7 @@ func (c *Subnet) CallOfSecretRegister(
 		gas.StorageDeposit,
 		util.InkContractInput{
 			Selector: "0xa95b15c7",
-			Args:     []any{name, validator_id, p2p_id, ip, port},
+			Args:     []any{name, validator_id, p2p_id, ip, port, bls},
 		},
 	)
 }

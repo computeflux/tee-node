@@ -118,7 +118,7 @@ func (app *SideChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
 	}
 
 	// submit new epoch to main chain
-	call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.ChainAccountID())
+	call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, *signer.Pubkey())
 	if err != nil {
 		util.LogWithRed("NewEpoch TxCallOfSetNextEpoch", err.Error())
 		return

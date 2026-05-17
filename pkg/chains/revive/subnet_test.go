@@ -33,7 +33,7 @@ func TestQueryWorkers(t *testing.T) {
 
 	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
 	if err != nil {
-		util.LogWithPurple("InitCloudContract", err)
+		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)
 	}
 
@@ -77,7 +77,7 @@ func TestSetSubnetSolt(t *testing.T) {
 		panic(err)
 	}
 
-	pk, err := chain.Sr25519PairFromSecret("//Alice", 42)
+	pk, err := chain.Sr25519PairFromSecret("0x43c0defe545b31e6f64ee9c17b35c6444a8c3527f0c68160203717c51367512d", 42)
 	if err != nil {
 		util.LogWithPurple("Sr25519PairFromSecret", err)
 		panic(err)
@@ -85,7 +85,7 @@ func TestSetSubnetSolt(t *testing.T) {
 
 	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
 	if err != nil {
-		util.LogWithPurple("InitCloudContract", err)
+		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)
 	}
 

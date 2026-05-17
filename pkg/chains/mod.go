@@ -55,15 +55,15 @@ type MainChainApi interface {
 	GetValidatorList() ([]*model.Validator, error)
 
 	// Epoch management.
-	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, sideChainPub model.ChainH160, err error)
+	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, sideChainPub model.PubKey, err error)
 	GetNextEpochValidatorList() ([]*model.Validator, error)
 	SetNewEpoch(nodeId uint64) error
 
 	// Extrinsic construction helpers.
-	TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccountID) (*model.ChainCall, error)
+	TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error)
 	BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error)
-	CheckMapAccount(addr model.ChainH160) (bool, error)
-	CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCall, error)
+	CheckMapAccount(addr model.PubKey) (bool, error)
+	CallOfMapAccount(signer model.PubKey) (*model.ChainCall, error)
 }
 
 // ── Factory ───────────────────────────────────────────────

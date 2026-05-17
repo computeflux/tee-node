@@ -1,8 +1,8 @@
 package revive
 
-//go:generate go-ink-gen -json subnet.json
-//go:generate go-ink-gen -json token.json
-//go:generate go-ink-gen -json proxy.json
+// go:generate go-ink-gen -json subnet.json
+// go:generate go-ink-gen -json token.json
+// go:generate go-ink-gen -json proxy.json
 
 import (
 	"errors"
@@ -103,9 +103,4 @@ func (c *Contract) ChainType() string {
 // GetCipher returns the signing suite used by this chain.
 func (c *Contract) GetCipher() model.SuiteType {
 	return model.SuiteEd25519
-}
-
-// TEECallToCall converts a TEE attestation into a chain call payload.
-func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error) {
-	return nil, errors.New("not implemented")
 }

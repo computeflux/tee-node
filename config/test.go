@@ -5,9 +5,9 @@ import "github.com/computeflux/tee-provider/pkg/model"
 var TestChainConfig = model.ChainConfigType{
 	ChainType:     "substrate",
 	Cipher:        model.SuiteEd25519,
-	Urls:          []string{"wss://asset-hub-paseo-rpc.n.dwellir.com"},
-	SubnetAddress: "0x8ad5985c9114cf948ee3eca182b680d2f33f9198",
-	TokenAddress:  "0xb832e0ac0a1979e15a250aba0c8b4dec40803bd0",
+	Urls:          []string{"wss://asset-hub-paseo.ibp.network"},
+	SubnetAddress: "0x9312de1b99c69d80112b112bcefd2776c06b1ac6",
+	TokenAddress:  "0xe701aeca672b5e1fd177df8096ac8888796e6427",
 	NetworkLabel:  "Paseo (Asset Hub)",
 }
 

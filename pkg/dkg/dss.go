@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing"
@@ -84,11 +86,6 @@ func (d *DssSigner) Pubkey() *model.PubKey {
 	}
 
 	return nil
-}
-
-// ChainAccountID returns the chain-agnostic account ID.
-func (d *DssSigner) ChainAccountID() model.ChainAccountID {
-	return model.ChainAccountID(d.AccountID())
 }
 
 // sign msg aggregated share
@@ -318,11 +315,13 @@ func validatorPubForSuite(v *model.Validator, st model.SuiteType) kyber.Point {
 		if p := v.ValidatorIdBLS.Point(); p != nil {
 			return p
 		}
-		// Fall back to ValidatorId if BLS key is not yet populated.
-		return v.ValidatorId.Point()
-	default:
+	case model.SuiteEd25519:
 		return v.ValidatorId.Point()
 	}
+
+	util.LogError("DKG", "validatorPubForSuite: failed to get pub for validator", st.String())
+	os.Exit(1)
+	return nil
 }
 
 // verify sig

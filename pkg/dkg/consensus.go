@@ -372,7 +372,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	edPub := dkg.SystemPubKey()
 	if edPub == nil {
 		dkg.Nodes = dkg.NewNodes
-		dkg.Epoch = dkg.NewEpoch
+		// dkg.Epoch = dkg.NewEpoch
 		dkg.Threshold = len(dkg.NewNodes) - (len(dkg.NewNodes)-1)/3
 		for _, st := range model.AllSuites() {
 			dkg.DkgPubKeys[st] = dkg.NewDkgPubKeys[st]
@@ -381,7 +381,6 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	}
 	dkg.mu.Unlock()
 
-	dkg.saveState()
 	util.LogOk("DKG consensus", "state migrated", "epoch", dkg.Epoch, "threshold", dkg.Threshold)
 	dkg.SendNewEpochPartialSigToSponsor()
 }

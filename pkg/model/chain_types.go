@@ -40,23 +40,6 @@ type EvmCall struct {
 	Data   []byte
 }
 
-// ChainAccountID is a 32-byte account identifier (Substrate AccountId32).
-type ChainAccountID [32]byte
-
-// ChainH160 is a 20-byte Ethereum-style address.
-type ChainH160 [20]byte
-
-// Hex returns the hex-encoded address with 0x prefix.
-func (a ChainH160) Hex() string {
-	const hex = "0123456789abcdef"
-	out := make([]byte, 40)
-	for i := 0; i < 20; i++ {
-		out[i*2] = hex[a[i]>>4]
-		out[i*2+1] = hex[a[i]&0xf]
-	}
-	return "0x" + string(out)
-}
-
 // ── Cross-chain Points Events ─────────────────────────────
 
 type RechargeEvent struct {

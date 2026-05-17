@@ -138,9 +138,10 @@ func (c *Contract) GetValidatorList() ([]*model.Validator, error) {
 	validators := make([]*model.Validator, 0, len(*dsecrets))
 	for _, v := range *dsecrets {
 		validators = append(validators, &model.Validator{
-			NodeID:      uint64(v.F0),
-			P2pId:       *model.PubKeyFromByte(v.F1.P2pId[:]),
-			ValidatorId: *model.PubKeyFromByte(v.F1.ValidatorId[:]),
+			NodeID:         uint64(v.F0),
+			P2pId:          *model.PubKeyFromByte(v.F1.P2pId[:]),
+			ValidatorId:    *model.PubKeyFromByte(v.F1.ValidatorId[:]),
+			ValidatorIdBLS: *model.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
 		})
 	}
 
@@ -148,13 +149,13 @@ func (c *Contract) GetValidatorList() ([]*model.Validator, error) {
 }
 
 // epoch
-func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, model.ChainH160, error) {
+func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, error) {
 	d, _, err := c.subnet.QueryEpochInfo(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
-		return 0, 0, 0, 0, model.ChainH160{}, err
+		return 0, 0, 0, 0, model.PubKey{}, err
 	}
 
-	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, model.ChainH160(d.SideChainPub), nil
+	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *model.PubKeyFromByte(d.SideChainPub[:]), nil
 }
 
 // go to new epoch
@@ -165,9 +166,9 @@ func (c *Contract) SetNewEpoch(nodeId uint64) error {
 	})
 }
 
-func (c *Contract) TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccountID) (*model.ChainCall, error) {
+func (c *Contract) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error) {
 	call, err := c.subnet.CallOfSetNextEpoch(nodeId, chain.DryRunParams{
-		Origin:    types.AccountID(signer),
+		Origin:    types.AccountID(signer.AccountID()),
 		PayAmount: types.NewU128(*big.NewInt(0)),
 	})
 	if err != nil {
@@ -185,9 +186,10 @@ func (c *Contract) GetNextEpochValidatorList() ([]*model.Validator, error) {
 	validators := make([]*model.Validator, 0, len(dsecrets.V))
 	for _, v := range dsecrets.V {
 		validators = append(validators, &model.Validator{
-			NodeID:      v.F0,
-			P2pId:       *model.PubKeyFromByte(v.F1.P2pId[:]),
-			ValidatorId: *model.PubKeyFromByte(v.F1.ValidatorId[:]),
+			NodeID:         v.F0,
+			P2pId:          *model.PubKeyFromByte(v.F1.P2pId[:]),
+			ValidatorId:    *model.PubKeyFromByte(v.F1.ValidatorId[:]),
+			ValidatorIdBLS: *model.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
 		})
 	}
 

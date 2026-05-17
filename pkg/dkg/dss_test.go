@@ -186,7 +186,7 @@ func TestDssSubmitTx(t *testing.T) {
 		Epoch:      1,
 	}, func(signer *DssSigner, nodeId uint64) {
 		util.LogWithBlue("CONSENSUS SUCCESS", nodeId)
-		call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, signer.ChainAccountID())
+		call, err := chains.MainChain.TxCallOfSetNextEpoch(nodeId, *signer.Pubkey())
 		if err != nil {
 			panic(err)
 		}

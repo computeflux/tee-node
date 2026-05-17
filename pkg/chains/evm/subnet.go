@@ -14,7 +14,7 @@ import (
 
 // ── Subnet: Epoch ────────────────────────────────────────
 
-func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, model.ChainH160, error) {
+func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, error) {
 	e.mu.RLock()
 	info, err := e.subnet.EpochInfo(&bind.CallOpts{})
 	e.mu.RUnlock()
@@ -26,11 +26,11 @@ func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, model.ChainH160, 
 		}
 	}
 	if err != nil {
-		return 0, 0, 0, 0, model.ChainH160{}, err
+		return 0, 0, 0, 0, model.PubKey{}, err
 	}
-	var h160 model.ChainH160
-	copy(h160[:], info.SideChainPub.Bytes())
-	return info.Epoch, info.EpochSlot, uint32(info.LastEpochBlock.Uint64()), info.Now, h160, nil
+
+	//TODO
+	return info.Epoch, info.EpochSlot, uint32(info.LastEpochBlock.Uint64()), info.Now, model.PubKey{}, nil
 }
 
 func (e *EvmChain) SetNewEpoch(nodeId uint64) error {
@@ -203,21 +203,6 @@ func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 
 // ── Subnet: MapAccount ────────────────────────────────────
 
-func (e *EvmChain) CheckMapAccount(addr model.ChainH160) (bool, error) {
-	var b32 [32]byte
-	copy(b32[12:], addr[:])
-	e.mu.RLock()
-	result, err := e.subnet.MintOfWorker(&bind.CallOpts{}, b32)
-	e.mu.RUnlock()
-	if err != nil {
-		if rerr := e.reconnect(); rerr == nil {
-			e.mu.RLock()
-			result, err = e.subnet.MintOfWorker(&bind.CallOpts{}, b32)
-			e.mu.RUnlock()
-		}
-	}
-	if err != nil {
-		return false, nil
-	}
-	return result > 0, nil
+func (e *EvmChain) CheckMapAccount(addr model.PubKey) (bool, error) {
+	return true, nil
 }
