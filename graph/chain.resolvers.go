@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
@@ -34,7 +35,7 @@ func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
 // ChainInfo is the resolver for the chain_info field.
 func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, error) {
 	chainEnv := util.GetEnv("CHAIN_ENV", "local")
-	chainConfig := model.GetChainConfig(chainEnv)
+	chainConfig := config.GetChainConfig(chainEnv)
 	if chainConfig == nil {
 		return nil, gqlerror.Errorf("%s", "ChainInfo is nil")
 	}

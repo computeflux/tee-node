@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
@@ -25,7 +24,7 @@ import (
 // ── Extrinsic helpers ──────────────────────────────────────
 
 func (e *EvmChain) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error) {
-	return &model.ChainCall{Method: "tee_attest"}, nil
+	return &model.ChainCall{EVM: model.EvmCall{Method: "tee_attest"}}, nil
 }
 
 func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccountID) (*model.ChainCall, error) {
@@ -37,13 +36,13 @@ func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.ChainAccount
 	if err != nil {
 		return nil, fmt.Errorf("pack setNextEpoch: %w", err)
 	}
-	return &model.ChainCall{Data: data, Method: "setNextEpoch"}, nil
+	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: "setNextEpoch"}}, nil
 }
 
 func (e *EvmChain) BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error) {
 	datas := make([][]byte, len(calls))
 	for i, c := range calls {
-		datas[i] = c.Data
+		datas[i] = c.EVM.Data
 	}
 	bytesArrType, err := abi.NewType("bytes[]", "", nil)
 	if err != nil {
@@ -54,7 +53,7 @@ func (e *EvmChain) BatchCall(method string, calls []model.ChainCall) (*model.Cha
 	if err != nil {
 		return nil, fmt.Errorf("pack batch: %w", err)
 	}
-	return &model.ChainCall{Data: data, Method: method}, nil
+	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: method}}, nil
 }
 
 func (e *EvmChain) CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCall, error) {
@@ -66,7 +65,7 @@ func (e *EvmChain) CallOfMapAccount(signer model.ChainAccountID) (*model.ChainCa
 	if err != nil {
 		return nil, fmt.Errorf("pack mapAccount: %w", err)
 	}
-	return &model.ChainCall{Data: data, Method: "mapAccount"}, nil
+	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: "mapAccount"}}, nil
 }
 
 // ── Signing ────────────────────────────────────────────────
@@ -155,7 +154,7 @@ func isHex(c byte) bool {
 }
 
 func (e *EvmChain) PartialSign(signer chain.PartialSignerType, call model.ChainCall) ([]byte, error) {
-	return signer.PartialSign(call.Data)
+	return signer.PartialSign(call.EVM.Data)
 }
 
 // blsEIP2537Signer is a local interface to avoid importing pkg/dkg
@@ -177,12 +176,13 @@ func (e *EvmChain) getBLSSigner(signer chain.SignerType) (blsEIP2537Signer, erro
 	return blsSigner, nil
 }
 
-func (e *EvmChain) blsSign(signer chain.SignerType, msgHash []byte) (sig, negSig, hmG1 []byte, err error) {
+func (e *EvmChain) blsSign(signer chain.SignerType, msg []byte) (sig, negSig []byte, err error) {
 	blsSigner, err := e.getBLSSigner(signer)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return blsSigner.BLSSignEIP2537(msgHash)
+	sig, negSig, _, err = blsSigner.BLSSignEIP2537(msg)
+	return sig, negSig, err
 }
 
 func (e *EvmChain) sendBLSTx(submitData []byte, untilFinalized bool, nonce uint64) error {
@@ -254,7 +254,7 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call model.ChainCall, 
 	// Try to decode as bytes[] (produced by BatchCall)
 	var datas [][]byte
 	bytesArrType, _ := abi.NewType("bytes[]", "", nil)
-	decoded, err := abi.Arguments{{Type: bytesArrType}}.Unpack(call.Data)
+	decoded, err := abi.Arguments{{Type: bytesArrType}}.Unpack(call.EVM.Data)
 	if err == nil && len(decoded) > 0 {
 		if d, ok := decoded[0].([][]byte); ok && len(d) > 0 {
 			datas = d
@@ -266,18 +266,15 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call model.ChainCall, 
 	// on-chain.  We use call.Data directly (no extra keccak256) to stay
 	// compatible with PartialSign(signer, call).
 	var blsFunc string
-	var msgHash [32]byte
 	if len(datas) > 1 {
 		blsFunc = "batchSubmit"
-		msgHash = crypto.Keccak256Hash(call.Data)
 	} else {
 		if len(datas) == 0 {
-			datas = [][]byte{call.Data}
+			datas = [][]byte{call.EVM.Data}
 		}
 		blsFunc = "submit"
-		msgHash = crypto.Keccak256Hash(call.Data)
 	}
-	sig, negSig, hmG1, err := e.blsSign(signer, call.Data)
+	sig, negSig, err := e.blsSign(signer, call.EVM.Data)
 	if err != nil {
 		return fmt.Errorf("BLS sign: %w", err)
 	}
@@ -287,7 +284,6 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call model.ChainCall, 
 		"calls:", len(datas),
 		"sig_len:", len(sig),
 		"negSig_len:", len(negSig),
-		"hmG1_len:", len(hmG1),
 	)
 
 	blsABI, err := bindings.BLSMetaData.GetAbi()
@@ -297,9 +293,9 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call model.ChainCall, 
 
 	var submitData []byte
 	if blsFunc == "batchSubmit" {
-		submitData, err = blsABI.Pack("batchSubmit", datas, negSig, hmG1, msgHash)
+		submitData, err = blsABI.Pack("batchSubmit", datas, negSig)
 	} else {
-		submitData, err = blsABI.Pack("submit", datas[0], negSig, hmG1, msgHash)
+		submitData, err = blsABI.Pack("submit", datas[0], negSig)
 	}
 	if err != nil {
 		return fmt.Errorf("pack BLS.%s: %w", blsFunc, err)

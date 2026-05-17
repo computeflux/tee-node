@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -17,7 +16,7 @@ import (
 // Submit sync tx to polkadot hub
 func (s *SideChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex)
-	call, err := model.GetCodec[types.Call](GLOABL_STATE, baseKey+TxIndexCallSuffix)
+	call, err := model.GetCodec[model.ChainCall](GLOABL_STATE, baseKey+TxIndexCallSuffix)
 	if err != nil || call == nil {
 		util.LogWithRed("Sync to polkadot hub", "error: call not found call data")
 		return errors.New("sync to polkadot hub error: call not found call data")
@@ -41,7 +40,7 @@ func (s *SideChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	signer.SetSigs(sigs)
 
 	// submit sync tx to polkadot hub
-	err = chains.MainChain.SignAndSubmit(signer, model.ChainCall{Data: call.Args}, false, 0)
+	err = chains.MainChain.SignAndSubmit(signer, *call, false, 0)
 	if err != nil {
 		util.LogWithRed("Sync to polkadot hub", "error => ", err.Error())
 		fmt.Println("                    ", " SS58 => ", s.dkg.DkgPubKeys[chain.GetCipher()])

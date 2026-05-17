@@ -2,9 +2,13 @@ package chains
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/chains/evm"
+	"github.com/computeflux/tee-provider/pkg/chains/revive"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/wetee-dao/ink.go"
 )
 
@@ -66,7 +70,7 @@ type MainChainApi interface {
 
 // ConnectMainChain creates or reuses the singleton main-chain connection.
 func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
-	config := model.GetChainConfig(env)
+	config := config.GetChainConfig(env)
 	if config == nil {
 		return nil, fmt.Errorf("invalid environment: %s", env)
 	}
@@ -87,10 +91,12 @@ func connectMainChain(config *model.ChainConfigType, pk *model.PrivKey) (MainCha
 	case "evm":
 		return evm.NewContract(config, pk)
 	case "substrate":
-		return nil, fmt.Errorf("substrate chain support not yet available")
+		return revive.NewContract(config, pk)
 	default:
-		return evm.NewContract(config, pk)
+		util.LogError("CHAIN", "unsupported chain type", config.ChainType)
+		os.Exit(1)
 	}
+	return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 }
 
 // connectChain creates a ChainApi for the given config.
@@ -99,8 +105,10 @@ func connectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, e
 	case "evm":
 		return evm.NewContract(config, pk)
 	case "substrate":
-		return nil, fmt.Errorf("substrate chain support not yet available")
+		return revive.NewContract(config, pk)
 	default:
-		return evm.NewContract(config, pk)
+		util.LogError("CHAIN", "unsupported chain type", config.ChainType)
+		os.Exit(1)
 	}
+	return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 }

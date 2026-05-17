@@ -54,6 +54,7 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		return
 	}
 
+	// 获取当前签名对象
 	signer := NewDssSigner(dkg, 0, cipher)
 	call, err := chains.MainChain.TxCallOfSetNextEpoch(dkg.NewEpochSponsor.NodeID, signer.ChainAccountID())
 	if err != nil {
@@ -61,16 +62,18 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		return
 	}
 
+	// 计算当前签名
 	sig, err := chains.MainChain.PartialSign(signer, *call)
 	if err != nil {
 		util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "PartialSign error:"+err.Error())
 		return
 	}
-
 	msg := model.NewEpochMsg{
 		Time:       dkg.NewEpochTime,
 		PartialSig: sig,
 	}
+
+	// 格式化消息并发送给共识发起者
 	bt, err := json.Marshal(msg)
 	if err != nil {
 		util.LogError("DKG", "marshal NewEpochMsg error:", err)

@@ -31,7 +31,7 @@ var (
 
 // BLSMetaData contains all meta data concerning the BLS contract.
 var BLSMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"_g2Generator\",\"type\":\"bytes\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"BLSSignatureInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"CallFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidGeneratorLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidHmG1Length\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidMsgHash\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidPubkeyLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSignatureLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustCallByTarget\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PairingCallFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PubkeyNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"aggPubkey\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"datas\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"negSig\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"hmG1\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"msgHash\",\"type\":\"bytes32\"}],\"name\":\"batchSubmit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"g2Generator\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"_aggPubkey\",\"type\":\"bytes\"}],\"name\":\"setAggPubkey\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_target\",\"type\":\"address\"}],\"name\":\"setTarget\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"negSig\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"hmG1\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"msgHash\",\"type\":\"bytes32\"}],\"name\":\"submit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"target\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_target\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"_g2Generator\",\"type\":\"bytes\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"BLSSignatureInvalid\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"CallFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidGeneratorLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidHmG1Length\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidPubkeyLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"InvalidSignatureLength\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MapFpToG1Failed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"MustCallByTarget\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PairingCallFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"PubkeyNotSet\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"aggPubkey\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"datas\",\"type\":\"bytes[]\"},{\"internalType\":\"bytes\",\"name\":\"negSig\",\"type\":\"bytes\"}],\"name\":\"batchSubmit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"g2Generator\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"_aggPubkey\",\"type\":\"bytes\"}],\"name\":\"setAggPubkey\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_target\",\"type\":\"address\"}],\"name\":\"setTarget\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"negSig\",\"type\":\"bytes\"}],\"name\":\"submit\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"target\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // BLSABI is the input ABI used to generate the binding from.
@@ -273,25 +273,25 @@ func (_BLS *BLSCallerSession) Target() (common.Address, error) {
 	return _BLS.Contract.Target(&_BLS.CallOpts)
 }
 
-// BatchSubmit is a paid mutator transaction binding the contract method 0x8d242160.
+// BatchSubmit is a paid mutator transaction binding the contract method 0x408a9a2c.
 //
-// Solidity: function batchSubmit(bytes[] datas, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSTransactor) BatchSubmit(opts *bind.TransactOpts, datas [][]byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.contract.Transact(opts, "batchSubmit", datas, negSig, hmG1, msgHash)
+// Solidity: function batchSubmit(bytes[] datas, bytes negSig) returns()
+func (_BLS *BLSTransactor) BatchSubmit(opts *bind.TransactOpts, datas [][]byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.contract.Transact(opts, "batchSubmit", datas, negSig)
 }
 
-// BatchSubmit is a paid mutator transaction binding the contract method 0x8d242160.
+// BatchSubmit is a paid mutator transaction binding the contract method 0x408a9a2c.
 //
-// Solidity: function batchSubmit(bytes[] datas, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSSession) BatchSubmit(datas [][]byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.Contract.BatchSubmit(&_BLS.TransactOpts, datas, negSig, hmG1, msgHash)
+// Solidity: function batchSubmit(bytes[] datas, bytes negSig) returns()
+func (_BLS *BLSSession) BatchSubmit(datas [][]byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.Contract.BatchSubmit(&_BLS.TransactOpts, datas, negSig)
 }
 
-// BatchSubmit is a paid mutator transaction binding the contract method 0x8d242160.
+// BatchSubmit is a paid mutator transaction binding the contract method 0x408a9a2c.
 //
-// Solidity: function batchSubmit(bytes[] datas, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSTransactorSession) BatchSubmit(datas [][]byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.Contract.BatchSubmit(&_BLS.TransactOpts, datas, negSig, hmG1, msgHash)
+// Solidity: function batchSubmit(bytes[] datas, bytes negSig) returns()
+func (_BLS *BLSTransactorSession) BatchSubmit(datas [][]byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.Contract.BatchSubmit(&_BLS.TransactOpts, datas, negSig)
 }
 
 // SetAggPubkey is a paid mutator transaction binding the contract method 0x6b78491b.
@@ -336,23 +336,23 @@ func (_BLS *BLSTransactorSession) SetTarget(_target common.Address) (*types.Tran
 	return _BLS.Contract.SetTarget(&_BLS.TransactOpts, _target)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x78907af8.
+// Submit is a paid mutator transaction binding the contract method 0x39b973ad.
 //
-// Solidity: function submit(bytes data, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSTransactor) Submit(opts *bind.TransactOpts, data []byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.contract.Transact(opts, "submit", data, negSig, hmG1, msgHash)
+// Solidity: function submit(bytes data, bytes negSig) returns()
+func (_BLS *BLSTransactor) Submit(opts *bind.TransactOpts, data []byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.contract.Transact(opts, "submit", data, negSig)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x78907af8.
+// Submit is a paid mutator transaction binding the contract method 0x39b973ad.
 //
-// Solidity: function submit(bytes data, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSSession) Submit(data []byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.Contract.Submit(&_BLS.TransactOpts, data, negSig, hmG1, msgHash)
+// Solidity: function submit(bytes data, bytes negSig) returns()
+func (_BLS *BLSSession) Submit(data []byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.Contract.Submit(&_BLS.TransactOpts, data, negSig)
 }
 
-// Submit is a paid mutator transaction binding the contract method 0x78907af8.
+// Submit is a paid mutator transaction binding the contract method 0x39b973ad.
 //
-// Solidity: function submit(bytes data, bytes negSig, bytes hmG1, bytes32 msgHash) returns()
-func (_BLS *BLSTransactorSession) Submit(data []byte, negSig []byte, hmG1 []byte, msgHash [32]byte) (*types.Transaction, error) {
-	return _BLS.Contract.Submit(&_BLS.TransactOpts, data, negSig, hmG1, msgHash)
+// Solidity: function submit(bytes data, bytes negSig) returns()
+func (_BLS *BLSTransactorSession) Submit(data []byte, negSig []byte) (*types.Transaction, error) {
+	return _BLS.Contract.Submit(&_BLS.TransactOpts, data, negSig)
 }

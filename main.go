@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/cometbft/cometbft/privval"
+	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/graph"
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
@@ -62,7 +63,7 @@ func main() {
 	util.LogWithYellow("BLS12381 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(model.SuiteBLS12381).Byte()))
 	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(model.SuiteEd25519).SS58())
 
-	chainConfig := model.GetChainConfig(chainEnv)
+	chainConfig := config.GetChainConfig(chainEnv)
 	if chainConfig == nil {
 		fmt.Println("Invalid chain environment:", chainEnv)
 		os.Exit(1)

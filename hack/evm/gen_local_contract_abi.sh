@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generate *_gen.go (ExecCall / ExecQuery) and side-chain/abis/*.json
 # for all contracts: gov, auth, gateway.
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../../" && pwd)"
 cd "$ROOT"
 
 GEN="$ROOT/tools/contractgen"

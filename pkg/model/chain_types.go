@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	chain "github.com/wetee-dao/ink.go"
 )
@@ -12,6 +13,17 @@ type ChainClient struct {
 	EVM       *ethclient.Client
 }
 
+type ChainConfigType struct {
+	ChainType     string
+	Cipher        SuiteType
+	Urls          []string
+	SubnetAddress string
+	TokenAddress  string
+	CloudAddress  string // Substrate Cloud contract address
+	BLSAddress    string // BLS gateway contract address
+	NetworkLabel  string
+}
+
 // ── Chain-agnostic types ──────────────────────────────────
 
 // ChainCall is a chain-agnostic extrinsic call.
@@ -19,8 +31,13 @@ type ChainClient struct {
 //	Substrate: Data contains SCALE-encoded (CallIndex || Args).
 //	EVM:       Data contains ABI-encoded calldata.
 type ChainCall struct {
-	Data   []byte // encoded call payload
-	Method string // optional method name (for logging/debugging)
+	EVM       EvmCall
+	Substrate types.Call
+}
+
+type EvmCall struct {
+	Method string
+	Data   []byte
 }
 
 // ChainAccountID is a 32-byte account identifier (Substrate AccountId32).

@@ -10,8 +10,8 @@ while [ -h "$SOURCE" ]; do
     [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
-ROOT="$( cd "$DIR/../" && pwd )"
-CONTRACT_DIR="$ROOT/../contract"
+ROOT="$( cd "$DIR/../../" && pwd )"
+CONTRACT_DIR="$ROOT/../../contract"
 
 echo "=== Deploy Subnet + Token ==="
 echo "Contract dir: $CONTRACT_DIR"
