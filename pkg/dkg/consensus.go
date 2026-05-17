@@ -8,7 +8,6 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"go.dedis.ch/kyber/v4"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
 	"go.dedis.ch/kyber/v4/sign/schnorr"
 )
@@ -167,13 +166,7 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 		// Build node list.
 		nodes := make([]pedersen.Node, 0, len(dkg.Nodes))
 		for i, p := range dkg.Nodes {
-			var pub kyber.Point
-			if st == model.SuiteSecp256k1 {
-				pub = p.ValidatorIdSecp.Point()
-			} else {
-				pub = p.ValidatorId.Point()
-			}
-
+			pub := validatorPubForSuite(p, st)
 			if pub == nil {
 				dkg.finishDkgConsensusStep(false, "failed to get public key for:"+st.String())
 				return fmt.Errorf("failed to get public key for validator %d suite %s", i, st)
@@ -250,12 +243,7 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 		// new DKG 节点列表
 		newNodes := make([]pedersen.Node, 0, len(msg.Validators))
 		for i, p := range msg.Validators {
-			var pub kyber.Point
-			if st == model.SuiteSecp256k1 {
-				pub = p.ValidatorIdSecp.Point()
-			} else {
-				pub = p.ValidatorId.Point()
-			}
+			pub := validatorPubForSuite(p, st)
 			if pub == nil {
 				dkg.finishDkgConsensusStep(false, "re: failed to get public key for:"+st.String())
 				return fmt.Errorf("re: failed to get public key for validator %d suite %s", i, st)
@@ -269,12 +257,7 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 		// 获取旧节点列表
 		oldNodes := make([]pedersen.Node, 0, len(dkg.Nodes))
 		for i, p := range dkg.Nodes {
-			var pub kyber.Point
-			if st == model.SuiteSecp256k1 {
-				pub = p.ValidatorIdSecp.Point()
-			} else {
-				pub = p.ValidatorId.Point()
-			}
+			pub := validatorPubForSuite(p, st)
 			if pub == nil {
 				dkg.finishDkgConsensusStep(false, "re: failed to get old public key for:"+st.String())
 				return fmt.Errorf("re: failed to get old public key for validator %d suite %s", i, st)

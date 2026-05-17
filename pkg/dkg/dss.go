@@ -2,15 +2,18 @@ package dkg
 
 import (
 	"crypto/ed25519"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/bls12381"
 	"go.dedis.ch/kyber/v4"
+	"go.dedis.ch/kyber/v4/pairing"
+	"go.dedis.ch/kyber/v4/share"
 	"go.dedis.ch/kyber/v4/sign/dss"
+	"go.dedis.ch/kyber/v4/sign/tbls"
 )
 
 // create dss signer from dkg
@@ -18,11 +21,12 @@ func NewDssSigner(dkg *DKG, txIndex int64, suite model.SuiteType) *DssSigner {
 	signer := &DssSigner{
 		dkg:   dkg,
 		suite: suite,
-		sigs:  make([]*dss.PartialSig, 0),
+		sigs:  make([][]byte, 0),
 	}
 	// Try to acquire an independent random share from the pool.
 	// If the pool is nil, empty, or txIndex <= 0, fallback to using the long share.
-	if dkg.RandomPools != nil && txIndex > 0 {
+	// BLS12-381 does not use random shares (tbls signs directly with the long-term share).
+	if suite == model.SuiteEd25519 && dkg.RandomPools != nil && txIndex > 0 {
 		if pool, ok := dkg.RandomPools[suite]; ok && pool != nil {
 			random, err := pool.Acquire(txIndex)
 			if err == nil {
@@ -40,26 +44,12 @@ type DssSigner struct {
 	dkg         *DKG
 	suite       model.SuiteType
 	randomShare *model.DistKeyShare // independent random share from RandomPool; nil means fallback to long share
-	sigs        []*dss.PartialSig
+	sigs        [][]byte            // raw partial signature bytes (format depends on suite)
 }
 
 // set shares for dss
 func (d *DssSigner) SetSigs(btsigs [][]byte) {
-	sigs := make([]*dss.PartialSig, 0, len(btsigs))
-	for _, bt := range btsigs {
-		sig := &model.PartialSigWrap{}
-		err := json.Unmarshal(bt, sig)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		sigs = append(sigs, &dss.PartialSig{
-			Partial:   sig.Partial.PriShare,
-			SessionID: sig.SessionID,
-			Signature: sig.Signature,
-		})
-	}
-	d.sigs = sigs
+	d.sigs = btsigs
 }
 
 // get public key for this suite
@@ -100,6 +90,17 @@ func (d *DssSigner) Sign(msg []byte) ([]byte, error) {
 		return nil, errors.New("suite not found: " + string(d.suite))
 	}
 
+	switch d.suite {
+	case model.SuiteEd25519:
+		return d.signEd25519(suite, pubs, long, random, threshold, msg)
+	case model.SuiteBLS12381:
+		return d.signBLS12381(suite.(pairing.Suite), long, threshold, len(pubs), msg)
+	default:
+		return nil, errors.New("unsupported suite: " + d.suite.String())
+	}
+}
+
+func (d *DssSigner) signEd25519(suite dss.Suite, pubs []kyber.Point, long, random *model.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
 	dssInst, err := dss.NewDSS(
 		suite,
 		d.dkg.longtermForSuite(d.suite),
@@ -109,20 +110,41 @@ func (d *DssSigner) Sign(msg []byte) ([]byte, error) {
 		msg,
 		uint32(threshold),
 	)
-
 	if dssInst == nil || err != nil {
 		fmt.Println(err)
 		return nil, errors.New("dss.NewDSS failed")
 	}
 
-	for _, sig := range d.sigs {
-		err = dssInst.ProcessPartialSig(sig)
-		if err != nil {
+	for _, bt := range d.sigs {
+		sig := &model.PartialSigWrap{}
+		if err := json.Unmarshal(bt, sig); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		ps := &dss.PartialSig{
+			Partial:   sig.Partial.PriShare,
+			SessionID: sig.SessionID,
+			Signature: sig.Signature,
+		}
+		if err := dssInst.ProcessPartialSig(ps); err != nil {
 			return nil, err
 		}
 	}
 
 	return dssInst.Signature()
+}
+
+func (d *DssSigner) signBLS12381(suite pairing.Suite, long *model.DistKeyShare, threshold, n int, msg []byte) ([]byte, error) {
+	if long == nil {
+		return nil, errors.New("long-term share not available")
+	}
+	scheme := tbls.NewThresholdSchemeOnG1(suite)
+	pubPoly := share.NewPubPoly(suite.G2(), suite.G2().Point().Base(), long.Commitments())
+	sig, err := scheme.Recover(pubPoly, msg, d.sigs, uint32(threshold), uint32(n))
+	if err != nil {
+		return nil, fmt.Errorf("tbls recover: %w", err)
+	}
+	return sig, nil
 }
 
 // partial sign msg
@@ -133,6 +155,17 @@ func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 		return nil, errors.New("suite not found: " + string(d.suite))
 	}
 
+	switch d.suite {
+	case model.SuiteEd25519:
+		return d.partialSignEd25519(suite, pubs, long, random, threshold, msg)
+	case model.SuiteBLS12381:
+		return d.partialSignBLS12381(suite.(pairing.Suite), long, msg)
+	default:
+		return nil, errors.New("unsupported suite: " + d.suite.String())
+	}
+}
+
+func (d *DssSigner) partialSignEd25519(suite dss.Suite, pubs []kyber.Point, long, random *model.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
 	dssInst, err := dss.NewDSS(
 		suite,
 		d.dkg.longtermForSuite(d.suite),
@@ -142,7 +175,6 @@ func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 		msg,
 		uint32(threshold),
 	)
-
 	if dssInst == nil || err != nil {
 		return nil, errors.New("dss.NewDSS failed")
 	}
@@ -157,8 +189,19 @@ func (d *DssSigner) PartialSign(msg []byte) ([]byte, error) {
 		SessionID: sig.SessionID,
 		Signature: sig.Signature,
 	}
-
 	return json.Marshal(sigWrap)
+}
+
+func (d *DssSigner) partialSignBLS12381(suite pairing.Suite, long *model.DistKeyShare, msg []byte) ([]byte, error) {
+	if long == nil {
+		return nil, errors.New("long-term share not available")
+	}
+	scheme := tbls.NewThresholdSchemeOnG1(suite)
+	sig, err := scheme.Sign(long.PriShare(), msg)
+	if err != nil {
+		return nil, fmt.Errorf("tbls sign: %w", err)
+	}
+	return sig, nil
 }
 
 // pub list returns the participant public keys, the long-term share,
@@ -172,11 +215,7 @@ func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKe
 	pubs := make([]kyber.Point, 0, len(d.dkg.Nodes))
 	if len(d.dkg.NewNodes) > 0 {
 		for _, k := range d.dkg.NewNodes {
-			pub := k.ValidatorId.Point()
-			if d.suite == model.SuiteSecp256k1 {
-				pub = k.ValidatorIdSecp.Point()
-			}
-			pubs = append(pubs, pub)
+			pubs = append(pubs, validatorPubForSuite(k, d.suite))
 		}
 
 		var longShare *model.DistKeyShare
@@ -192,11 +231,7 @@ func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKe
 	}
 
 	for _, k := range d.dkg.Nodes {
-		pub := k.ValidatorId.Point()
-		if d.suite == model.SuiteSecp256k1 {
-			pub = k.ValidatorIdSecp.Point()
-		}
-		pubs = append(pubs, pub)
+		pubs = append(pubs, validatorPubForSuite(k, d.suite))
 	}
 	var longShare *model.DistKeyShare
 	if s, ok := d.dkg.DkgKeyShares[d.suite]; ok {
@@ -207,6 +242,19 @@ func (d *DssSigner) PubList() ([]kyber.Point, *model.DistKeyShare, *model.DistKe
 		random = longShare
 	}
 	return pubs, longShare, random, d.dkg.Threshold
+}
+
+func validatorPubForSuite(v *model.Validator, st model.SuiteType) kyber.Point {
+	switch st {
+	case model.SuiteBLS12381:
+		if p := v.ValidatorIdBLS.Point(); p != nil {
+			return p
+		}
+		// Fall back to ValidatorId if BLS key is not yet populated.
+		return v.ValidatorId.Point()
+	default:
+		return v.ValidatorId.Point()
+	}
 }
 
 // verify sig
@@ -225,53 +273,92 @@ func (d *DssSigner) Verify(msg []byte, signature []byte) bool {
 	switch d.suite {
 	case model.SuiteEd25519:
 		return ed25519.Verify(pub.Ed25519PublicKey(), msg, signature)
-	case model.SuiteSecp256k1:
-		return verifySecp256k1DSSSignature(d.dkg.Suites[d.suite], pub.Point(), msg, signature)
+	case model.SuiteBLS12381:
+		return d.verifyBLS12381(msg, signature)
 	default:
 		return false
 	}
+}
+
+func (d *DssSigner) verifyBLS12381(msg, signature []byte) bool {
+	suite, ok := d.dkg.Suites[d.suite]
+	if !ok {
+		return false
+	}
+	ps, ok := suite.(pairing.Suite)
+	if !ok {
+		return false
+	}
+
+	pub, ok := d.dkg.DkgPubKeys[d.suite]
+	if !ok || pub == nil {
+		pub = d.dkg.NewDkgPubKeys[d.suite]
+	}
+	if pub == nil {
+		return false
+	}
+
+	scheme := tbls.NewThresholdSchemeOnG1(ps)
+	return scheme.VerifyRecovered(pub.Point(), msg, signature) == nil
 }
 
 func (d *DssSigner) SignType() uint8 {
 	return 0
 }
 
-// verifySecp256k1DSSSignature verifies a DSS signature over the secp256k1 curve.
-// The DSS signature format is R_point_bytes || s_scalar_bytes.
-// For secp256k1, R is 33 bytes (compressed) and s is 32 bytes → 65 bytes total.
-func verifySecp256k1DSSSignature(suite kyber.Group, public kyber.Point, msg, sig []byte) bool {
-	// For secp256k1: R (33 bytes compressed) + s (32 bytes) = 65 bytes
-	if len(sig) != 65 {
-		return false
+// Suite returns the suite type used by this signer.
+func (d *DssSigner) Suite() model.SuiteType {
+	return d.suite
+}
+
+// BLSSignEIP2537 signs a message with BLS and returns the EIP-2537 formatted
+// parameters needed for on-chain verification: the raw signature, the negated
+// signature in EIP-2537 format, and the hash-to-curve G1 point in EIP-2537 format.
+func (d *DssSigner) BLSSignEIP2537(msg []byte) (signature []byte, negSigEIP []byte, hmG1EIP []byte, err error) {
+	if d.suite != model.SuiteBLS12381 {
+		return nil, nil, nil, errors.New("not BLS suite")
 	}
 
-	R := suite.Point()
-	if err := R.UnmarshalBinary(sig[:33]); err != nil {
-		return false
+	// 1. Sign the message
+	sig, err := d.Sign(msg)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("bls sign: %w", err)
 	}
 
-	s := suite.Scalar()
-	if err := s.UnmarshalBinary(sig[33:]); err != nil {
-		return false
+	// 2. Convert signature to EIP-2537 format and negate
+	sigEIP, err := bls12381.G1ToEIP2537(sig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("g1 to eip2537: %w", err)
+	}
+	negSig, err := bls12381.NegateG1EIP2537(sigEIP)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("negate g1: %w", err)
 	}
 
-	// Reconstruct challenge: h = H(R || Public || Msg)
-	hash := sha256.New()
-	Rb, _ := R.MarshalBinary()
-	Pb, _ := public.MarshalBinary()
-	hash.Write(Rb)
-	hash.Write(Pb)
-	hash.Write(msg)
+	// 3. Compute hmG1 (hash-to-curve result)
+	d.dkg.mu.RLock()
+	suite, ok := d.dkg.Suites[d.suite]
+	d.dkg.mu.RUnlock()
+	if !ok {
+		return nil, nil, nil, errors.New("suite not found")
+	}
+	ps, ok := suite.(pairing.Suite)
+	if !ok {
+		return nil, nil, nil, errors.New("not pairing suite")
+	}
+	hashable, ok := ps.G1().Point().(kyber.HashablePoint)
+	if !ok {
+		return nil, nil, nil, errors.New("G1 point does not support Hash")
+	}
+	hmG1 := hashable.Hash(msg)
+	hmG1Bytes, err := hmG1.MarshalBinary()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("marshal hmG1: %w", err)
+	}
+	hmG1EIP, err = bls12381.G1ToEIP2537(hmG1Bytes)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("hmG1 to eip2537: %w", err)
+	}
 
-	h := suite.Scalar().SetBytes(hash.Sum(nil))
-
-	// Verify: s*G == R + h*Public
-	// s*G
-	sG := suite.Point().Mul(s, nil)
-	// h*Public
-	hPub := suite.Point().Mul(h, public)
-	// R + h*Public
-	R.Add(R, hPub)
-
-	return sG.Equal(R)
+	return sig, negSig, hmG1EIP, nil
 }

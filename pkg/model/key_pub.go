@@ -1,10 +1,7 @@
 package model
 
 import (
-	gocrypto "crypto"
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,7 +9,6 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/p2p"
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/suites"
 	"golang.org/x/crypto/blake2b"
@@ -39,9 +35,9 @@ func (p *PubKey) IsEd25519() bool {
 	return p.suiteType == SuiteEd25519
 }
 
-// IsSecp256k1 returns true if this key uses the secp256k1 suite.
-func (p *PubKey) IsSecp256k1() bool {
-	return p.suiteType == SuiteSecp256k1
+// IsBLS12381 returns true if this key uses the BLS12-381 suite.
+func (p *PubKey) IsBLS12381() bool {
+	return p.suiteType == SuiteBLS12381
 }
 
 // Suite returns the kyber suite for this key's type.
@@ -60,52 +56,17 @@ func (p *PubKey) AccountString() string {
 // Returns nil if unmarshaling fails. Callers must check for nil.
 // TODO: change signature to (kyber.Point, error) for better error propagation.
 func (p *PubKey) Point() kyber.Point {
-	buf := p.PublicKey
-	if p.IsSecp256k1() {
-		ecpub, err := decompressSecp256k1Pub(buf)
-		if err != nil {
-			return nil
-		}
-		// 用标准库 Marshal 得到 04||x||y 后走 UnmarshalBinary
-		raw := elliptic.Marshal(ecpub.Curve, ecpub.X, ecpub.Y)
-		point := p.Suite().Point()
-		if err := point.UnmarshalBinary(raw); err != nil {
-			return nil
-		}
-		return point
-	}
 	point := p.Suite().Point()
-	if err := point.UnmarshalBinary(buf); err != nil {
+	if err := point.UnmarshalBinary(p.PublicKey); err != nil {
 		return nil
 	}
 	return point
 }
 
 // Std returns the Go standard-library public key.
-//   - SuiteEd25519   → ed25519.PublicKey
-//   - SuiteSecp256k1 → *ecdsa.PublicKey (decompressed)
-func (p *PubKey) Std() (gocrypto.PublicKey, error) {
-	if p.IsSecp256k1() {
-		return decompressSecp256k1Pub(p.PublicKey)
-	}
+//   - SuiteEd25519 → ed25519.PublicKey
+func (p *PubKey) Std() (any, error) {
 	return p.PublicKey, nil
-}
-
-// decompressSecp256k1Pub decompresses a 33-byte or 65-byte secp256k1 public
-// key into a *ecdsa.PublicKey.
-func decompressSecp256k1Pub(pub []byte) (*ecdsa.PublicKey, error) {
-	switch len(pub) {
-	case 33:
-		// Compressed: decompress via ethcrypto
-		return ethcrypto.DecompressPubkey(pub)
-	case 64:
-		// Uncompressed without 0x04 prefix
-		return ethcrypto.UnmarshalPubkey(append([]byte{0x04}, pub...))
-	case 65:
-		return ethcrypto.UnmarshalPubkey(pub)
-	default:
-		return nil, fmt.Errorf("invalid secp256k1 public key length: %d", len(pub))
-	}
 }
 
 // Ed25519PublicKey returns the ed25519 public key, or nil if this is not an
@@ -117,40 +78,13 @@ func (p *PubKey) Ed25519PublicKey() ed25519.PublicKey {
 	return nil
 }
 
-// Secp256k1PublicKey returns the raw secp256k1 public key bytes (33 or 65
-// bytes), or nil if this is not a secp256k1 key.
-func (p *PubKey) Secp256k1PublicKey() []byte {
-	if p.IsSecp256k1() {
+// BLS12381PublicKey returns the raw BLS12-381 public key bytes (96 bytes),
+// or nil if this is not a BLS12-381 key.
+func (p *PubKey) BLS12381PublicKey() []byte {
+	if p.IsBLS12381() {
 		return p.PublicKey
 	}
 	return nil
-}
-
-func (p *PubKey) Secp256k1CompressPubkey() []byte {
-	if !p.IsSecp256k1() {
-		return nil
-	}
-	switch len(p.PublicKey) {
-	case 33:
-		// 已经是压缩格式
-		return p.PublicKey
-	case 65:
-		// 未压缩 04||x||y → 压缩 02/03||x
-		pub, err := ethcrypto.UnmarshalPubkey(p.PublicKey)
-		if err != nil {
-			return nil
-		}
-		return ethcrypto.CompressPubkey(pub)
-	case 64:
-		// 未压缩缺 0x04 前缀
-		pub, err := ethcrypto.UnmarshalPubkey(append([]byte{0x04}, p.PublicKey...))
-		if err != nil {
-			return nil
-		}
-		return ethcrypto.CompressPubkey(pub)
-	default:
-		return nil
-	}
 }
 
 // String returns the hex-encoded public key.
@@ -172,24 +106,20 @@ func (p *PubKey) Byte() []byte {
 }
 
 // SS58 returns the SS58 address for this key.
-//   - SuiteEd25519   → SS58(public_key, 42)
-//   - SuiteSecp256k1 → SS58(blake2b(public_key), 42)
+//   - SuiteEd25519  → SS58(public_key, 42)
+//   - SuiteBLS12381 → SS58(blake2b(public_key), 42)
 func (p *PubKey) SS58() string {
-	if p.IsSecp256k1() {
-		hash := blake2b.Sum256(p.PublicKey)
-		return SS58Encode(hash[:], 42)
+	if p.IsEd25519() {
+		return SS58Encode(p.PublicKey, 42)
 	}
-	k, err := p.Std()
-	if err != nil {
-		fmt.Printf("PubKey.SS58: Std() error: %v\n", err)
-		return ""
-	}
-	return SS58Encode(k.(ed25519.PublicKey), 42)
+	// For BLS12381 (and any future non-ed25519 suite), hash the pubkey.
+	hash := blake2b.Sum256(p.PublicKey)
+	return SS58Encode(hash[:], 42)
 }
 
 // H160Address returns the H160 (Ethereum-style) address.
-//   - ed25519   → keccak256(pubkey)[12:] per ink.util
-//   - secp256k1 → keccak256(uncompressed_pubkey_without_prefix)[12:]
+//   - ed25519  → keccak256(pubkey)[12:] per ink.util
+//   - bls12381 → keccak256(pubkey)[12:]
 func (p *PubKey) H160Address() types.H160 {
 	h160, err := util.H160FromPublicKey(p.Byte())
 	if err != nil {
@@ -212,16 +142,17 @@ func (p *PubKey) ChainH160() ChainH160 {
 }
 
 // AccountID returns the 32-byte account ID.
-//   - SuiteEd25519   → first 32 bytes of public key (truncated)
-//   - SuiteSecp256k1 → blake2b(public_key) per Substrate convention
+//   - SuiteEd25519  → first 32 bytes of public key (truncated)
+//   - SuiteBLS12381 → blake2b(public_key)
 func (p *PubKey) AccountID() types.AccountID {
-	if p.IsSecp256k1() {
-		hash := blake2b.Sum256(p.PublicKey)
-		return types.AccountID(hash)
+	if p.IsEd25519() {
+		var bt [32]byte
+		copy(bt[:], p.PublicKey)
+		return types.AccountID(bt)
 	}
-	var bt [32]byte
-	copy(bt[:], p.PublicKey)
-	return types.AccountID(bt)
+	// For BLS12381 (and any future non-ed25519 suite), hash the pubkey.
+	hash := blake2b.Sum256(p.PublicKey)
+	return types.AccountID(hash)
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -247,8 +178,8 @@ func suiteTypeFromBytes(pub []byte) SuiteType {
 	switch len(pub) {
 	case 32:
 		return SuiteEd25519
-	case 33, 65:
-		return SuiteSecp256k1
+	case 96:
+		return SuiteBLS12381
 	default:
 		return SuiteEd25519
 	}
@@ -317,15 +248,15 @@ func PubKeyFromByte(pubkey []byte) *PubKey {
 	}
 }
 
-// PubKeyFromSecp256k1Byte creates a PubKey from secp256k1 public key bytes
-// (33 or 65 bytes).
-func PubKeyFromSecp256k1Byte(pubkey []byte) *PubKey {
-	if len(pubkey) != 33 && len(pubkey) != 65 {
+// PubKeyFromBLS12381Byte creates a PubKey from BLS12-381 public key bytes
+// (96 bytes).
+func PubKeyFromBLS12381Byte(pubkey []byte) *PubKey {
+	if len(pubkey) != 96 {
 		return nil
 	}
 	return &PubKey{
 		PublicKey: ed25519.PublicKey(pubkey),
-		suiteType: SuiteSecp256k1,
+		suiteType: SuiteBLS12381,
 	}
 }
 

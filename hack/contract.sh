@@ -39,8 +39,13 @@ case "$CMD" in
         abigen --abi /tmp/subnet_abi.json --pkg bindings --type Subnet --out "$BINDINGS_DIR/subnet.go"
         echo "  subnet.go ($(wc -l < "$BINDINGS_DIR/subnet.go") lines)"
 
+        # BLS
+        python3 -c "import json; json.dump(json.load(open('$CONTRACT_DIR/artifacts/contracts/BLS.sol/BLS.json'))['abi'], open('/tmp/bls_abi.json','w'))"
+        abigen --abi /tmp/bls_abi.json --pkg bindings --type BLS --out "$BINDINGS_DIR/bls.go"
+        echo "  bls.go ($(wc -l < "$BINDINGS_DIR/bls.go") lines)"
+
         # Cleanup
-        rm -f /tmp/token_abi.json /tmp/subnet_abi.json
+        rm -f /tmp/token_abi.json /tmp/subnet_abi.json /tmp/bls_abi.json
 
         echo ""
         echo "=== 3. Verify Go build ==="

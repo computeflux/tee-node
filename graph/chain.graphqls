@@ -1,6 +1,5 @@
 type ChainInfo {
   is_main: Boolean!
-  cloud_contract: String!
   subnet_contract: String!
   """链类型（如 local / test / main）"""
   chain_type: String!

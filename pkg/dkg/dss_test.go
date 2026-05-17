@@ -32,9 +32,9 @@ func TestDSS(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
+			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
 		})
 	}
 
@@ -152,9 +152,9 @@ func TestDssSubmitTx(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
+			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
 		})
 	}
 

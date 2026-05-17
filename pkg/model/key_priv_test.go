@@ -3,7 +3,6 @@ package model
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
@@ -250,38 +249,6 @@ func TestPrivKey_Scalar(t *testing.T) {
 		s3 := NewSuite(SuiteEd25519).Scalar().SetBytes(digest[:32])
 		assert.NotNil(t, s3)
 	})
-
-	t.Run("secp256k1_scalar_is_deterministic", func(t *testing.T) {
-		s1 := priv.Scalar(SuiteSecp256k1)
-		s2 := priv.Scalar(SuiteSecp256k1)
-		require.NotNil(t, s1)
-		require.NotNil(t, s2)
-		assert.True(t, s1.Equal(s2))
-	})
-
-	t.Run("secp256k1_scalar_is_hash_derived", func(t *testing.T) {
-		seed := priv.PrivateKey[:32]
-		h := sha256.New()
-		h.Write([]byte(secp256k1DerivationTag))
-		h.Write(seed)
-
-		s := priv.Scalar(SuiteSecp256k1)
-		b, err := s.MarshalBinary()
-		require.NoError(t, err)
-
-		// The scalar is set from the SHA-256 hash; the byte representation
-		// should match (modulo any suite-specific encoding).
-		expected := h.Sum(nil)
-		assert.Equal(t, expected, b)
-	})
-
-	t.Run("different_suites_give_different_scalars", func(t *testing.T) {
-		ed := priv.Scalar(SuiteEd25519)
-		secp := priv.Scalar(SuiteSecp256k1)
-		edB, _ := ed.MarshalBinary()
-		secpB, _ := secp.MarshalBinary()
-		assert.NotEqual(t, edB, secpB, "scalars from different suites must differ")
-	})
 }
 
 func TestPrivKey_Public(t *testing.T) {
@@ -305,34 +272,6 @@ func TestPrivKey_Public(t *testing.T) {
 		// The public key embedded in the private key bytes [32:] should match
 		assert.Equal(t, []byte(priv.PrivateKey[32:]), b)
 	})
-
-	t.Run("secp256k1_public_point", func(t *testing.T) {
-		pt := priv.Public(SuiteSecp256k1)
-		require.NotNil(t, pt)
-
-		b, err := pt.MarshalBinary()
-		require.NoError(t, err)
-		// secp256k1 public key: 33 (compressed) or 65 (uncompressed)
-		assert.True(t, len(b) == 33 || len(b) == 65, "unexpected secp256k1 pub len: %d", len(b))
-	})
-
-	t.Run("secp256k1_public_is_deterministic", func(t *testing.T) {
-		pt1 := priv.Public(SuiteSecp256k1)
-		pt2 := priv.Public(SuiteSecp256k1)
-		b1, _ := pt1.MarshalBinary()
-		b2, _ := pt2.MarshalBinary()
-		assert.Equal(t, b1, b2)
-	})
-
-	t.Run("secp256k1_public_derived_correctly", func(t *testing.T) {
-		// G * scalar should match the precomputed public point
-		scalar := priv.Scalar(SuiteSecp256k1)
-		suite := NewSuite(SuiteSecp256k1)
-		expectedPub := suite.Point().Mul(scalar, nil)
-
-		actualPub := priv.Public(SuiteSecp256k1)
-		assert.True(t, expectedPub.Equal(actualPub))
-	})
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +287,7 @@ func TestPrivKey_GetPublicForSuite_Ed25519(t *testing.T) {
 
 	t.Run("returns_ed25519_pubkey", func(t *testing.T) {
 		assert.True(t, pub.IsEd25519())
-		assert.False(t, pub.IsSecp256k1())
+		assert.False(t, pub.IsBLS12381())
 	})
 
 	t.Run("public_key_matches_embedded", func(t *testing.T) {
@@ -368,27 +307,6 @@ func TestPrivKey_GetPublicForSuite(t *testing.T) {
 		pub := priv.GetPublicForSuite(SuiteEd25519)
 		require.NotNil(t, pub)
 		assert.True(t, pub.IsEd25519())
-	})
-
-	t.Run("secp256k1_suite", func(t *testing.T) {
-		pub := priv.GetPublicForSuite(SuiteSecp256k1)
-		require.NotNil(t, pub)
-		assert.True(t, pub.IsSecp256k1())
-	})
-
-	t.Run("secp256k1_public_bytes_match_point", func(t *testing.T) {
-		pt := priv.Public(SuiteSecp256k1)
-		ptBytes, err := pt.MarshalBinary()
-		require.NoError(t, err)
-
-		pub := priv.GetPublicForSuite(SuiteSecp256k1)
-		assert.Equal(t, ed25519.PublicKey(ptBytes), pub.PublicKey)
-	})
-
-	t.Run("default_is_ed25519", func(t *testing.T) {
-		pub1 := priv.GetPublicForSuite(SuiteEd25519)
-		pub2 := priv.GetPublicForSuite(SuiteEd25519)
-		assert.Equal(t, pub1.PublicKey, pub2.PublicKey)
 	})
 }
 
@@ -481,368 +399,47 @@ func TestPrivKey_ToSigner(t *testing.T) {
 		assert.Equal(t, uint8(1), signer.SignType())
 		assert.NotEmpty(t, signer.Public())
 	})
-
-	t.Run("secp256k1_valid_key", func(t *testing.T) {
-		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-
-		signer := priv.ToSigner(SuiteSecp256k1)
-		require.NotNil(t, signer)
-		assert.Equal(t, uint8(2), signer.SignType())
-		assert.NotEmpty(t, signer.Public())
-		// secp256k1 compressed pub key is 33 bytes
-		assert.Len(t, signer.Public(), 33)
-	})
-
-	t.Run("secp256k1_sign_verify_roundtrip", func(t *testing.T) {
-		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-
-		signer := priv.ToSigner(SuiteSecp256k1)
-		msg := []byte("hello secp256k1")
-		sig, err := signer.Sign(msg)
-		require.NoError(t, err)
-		assert.Len(t, sig, 64) // [R || S] without recovery ID
-
-		ok := signer.Verify(msg, sig)
-		assert.True(t, ok, "signature must verify")
-
-		// Tampered message must not verify
-		ok = signer.Verify([]byte("tampered"), sig)
-		assert.False(t, ok, "tampered message must not verify")
-	})
-
-	t.Run("secp256k1_deterministic_signer", func(t *testing.T) {
-		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-
-		s1 := priv.ToSigner(SuiteSecp256k1)
-		s2 := priv.ToSigner(SuiteSecp256k1)
-		assert.Equal(t, s1.Public(), s2.Public(), "same seed → same public key")
-
-		msg := []byte("test")
-		sig1, _ := s1.Sign(msg)
-		sig2, _ := s2.Sign(msg)
-		assert.Equal(t, sig1, sig2, "same seed → same signature")
-	})
-
-	t.Run("zero_key_does_not_panic", func(t *testing.T) {
-		priv := &PrivKey{
-			PrivateKey: make(ed25519.PrivateKey, 64),
-		}
-		require.NotPanics(t, func() {
-			_ = priv.ToSigner(SuiteEd25519)
-		})
-	})
-
-	t.Run("unknown_suite_returns_nil", func(t *testing.T) {
-		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-		assert.Nil(t, priv.ToSigner(SuiteType(99)))
-	})
 }
 
 // ---------------------------------------------------------------------------
-// Thread-safety: secp256k1 lazy init (sync.Once)
+// ToSecp256k1Signer
 // ---------------------------------------------------------------------------
 
-func TestPrivKey_ConcurrentSecp256k1Access(t *testing.T) {
-	priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-	require.NoError(t, err)
+func TestPrivKey_ToSecp256k1Signer(t *testing.T) {
+	t.Run("returns_non_nil_signer", func(t *testing.T) {
+		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
+		require.NoError(t, err)
+		signer := priv.ToSecp256k1Signer()
+		require.NotNil(t, signer)
+		assert.Equal(t, uint8(2), signer.SignType())
+		assert.Len(t, signer.Public(), 33)
+	})
 
-	const goroutines = 100
-	done := make(chan bool, goroutines)
+	t.Run("sign_verify_roundtrip", func(t *testing.T) {
+		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
+		require.NoError(t, err)
+		signer := priv.ToSecp256k1Signer()
+		msg := []byte("hello secp256k1")
+		sig, err := signer.Sign(msg)
+		require.NoError(t, err)
+		assert.Len(t, sig, 64)
+		assert.True(t, signer.Verify(msg, sig))
+		assert.False(t, signer.Verify([]byte("tampered"), sig))
+	})
 
-	for i := 0; i < goroutines; i++ {
-		go func() {
-			// Mix scalar and public calls — sync.Once ensures correctness
-			_ = priv.Scalar(SuiteSecp256k1)
-			_ = priv.Public(SuiteSecp256k1)
-			_ = priv.GetPublicForSuite(SuiteSecp256k1)
-			done <- true
-		}()
-	}
-
-	for i := 0; i < goroutines; i++ {
-		<-done
-	}
-
-	// After all goroutines, verify consistency
-	scalar := priv.Scalar(SuiteSecp256k1)
-	pub := priv.Public(SuiteSecp256k1)
-	suite := NewSuite(SuiteSecp256k1)
-	expectedPub := suite.Point().Mul(scalar, nil)
-	assert.True(t, expectedPub.Equal(pub), "G*scalar must equal public point after concurrent access")
+	t.Run("deterministic", func(t *testing.T) {
+		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
+		require.NoError(t, err)
+		s1 := priv.ToSecp256k1Signer()
+		s2 := priv.ToSecp256k1Signer()
+		assert.Equal(t, s1.Public(), s2.Public())
+		msg := []byte("test")
+		sig1, _ := s1.Sign(msg)
+		sig2, _ := s2.Sign(msg)
+		assert.Equal(t, sig1, sig2)
+	})
 }
 
 // ---------------------------------------------------------------------------
 // Consistency between derived keys
 // ---------------------------------------------------------------------------
-
-func TestPrivKey_CrossSuiteConsistency(t *testing.T) {
-	priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-	require.NoError(t, err)
-
-	t.Run("ed25519_point_eq_G_times_scalar", func(t *testing.T) {
-		scalar := priv.Scalar(SuiteEd25519)
-		point := priv.Public(SuiteEd25519)
-
-		suite := NewSuite(SuiteEd25519)
-		expected := suite.Point().Mul(scalar, nil)
-		assert.True(t, expected.Equal(point), "ed25519: G*scalar must equal public point")
-	})
-
-	t.Run("secp256k1_point_eq_G_times_scalar", func(t *testing.T) {
-		scalar := priv.Scalar(SuiteSecp256k1)
-		point := priv.Public(SuiteSecp256k1)
-
-		suite := NewSuite(SuiteSecp256k1)
-		expected := suite.Point().Mul(scalar, nil)
-		assert.True(t, expected.Equal(point), "secp256k1: G*scalar must equal public point")
-	})
-
-	t.Run("different_seeds_produce_different_keys", func(t *testing.T) {
-		priv1, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-		priv2, _, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-
-		// Extremely unlikely to collide
-		assert.NotEqual(t, priv1.PrivateKey, priv2.PrivateKey)
-
-		assert.False(t, priv1.Scalar(SuiteEd25519).Equal(priv2.Scalar(SuiteEd25519)))
-		assert.False(t, priv1.Scalar(SuiteSecp256k1).Equal(priv2.Scalar(SuiteSecp256k1)))
-	})
-}
-
-// ---------------------------------------------------------------------------
-// NewSuite consistency
-// ---------------------------------------------------------------------------
-
-func TestPrivKey_NewSuiteConsistency(t *testing.T) {
-	t.Run("ed25519_suite_is_reproducible", func(t *testing.T) {
-		s1 := NewSuite(SuiteEd25519)
-		s2 := NewSuite(SuiteEd25519)
-		assert.NotNil(t, s1)
-		assert.NotNil(t, s2)
-		// Both are valid ed25519 suites
-		p1 := s1.Point()
-		p2 := s2.Point()
-		assert.NotNil(t, p1)
-		assert.NotNil(t, p2)
-	})
-
-	t.Run("secp256k1_suite_is_reproducible", func(t *testing.T) {
-		s1 := NewSuite(SuiteSecp256k1)
-		s2 := NewSuite(SuiteSecp256k1)
-		assert.NotNil(t, s1)
-		assert.NotNil(t, s2)
-	})
-
-	t.Run("ed25519_scalar_uses_NewSuite_internally", func(t *testing.T) {
-		priv := &PrivKey{
-			PrivateKey: make(ed25519.PrivateKey, 64),
-		}
-		// Should not panic — internally uses NewSuite(SuiteEd25519)
-		s := priv.Scalar(SuiteEd25519)
-		assert.NotNil(t, s)
-	})
-}
-
-// ---------------------------------------------------------------------------
-// Edge cases
-// ---------------------------------------------------------------------------
-
-func TestPrivKey_AllZerosSeed(t *testing.T) {
-	// Construct a private key with an all-zeros seed.
-	// Ed25519 GenerateKey never produces this, but we can construct it manually.
-	zeroSeed := make([]byte, 64)
-	priv := &PrivKey{
-		PrivateKey: zeroSeed,
-	}
-
-	t.Run("ed25519_scalar_not_zero", func(t *testing.T) {
-		// RFC 8032 clamping ensures scalar is never zero even with zero seed
-		s := priv.Scalar(SuiteEd25519)
-		b, _ := s.MarshalBinary()
-		assert.NotEqual(t, make([]byte, 32), b, "clamped scalar should be non-zero")
-	})
-
-	t.Run("secp256k1_scalar_may_be_zero", func(t *testing.T) {
-		// With a zero seed, SHA-256(domain_tag || zero_seed) is non-zero
-		// with overwhelming probability, but the scalar could potentially
-		// be 0 mod N (vanishingly unlikely). We just verify it doesn't panic.
-		s := priv.Scalar(SuiteSecp256k1)
-		require.NotNil(t, s)
-		_ = priv.Public(SuiteSecp256k1) // should not panic
-	})
-}
-
-func TestPrivKey_DomainSeparation(t *testing.T) {
-	// The secp256k1 derivation uses a distinct domain separation tag.
-	// Verify this by checking with a known seed.
-	seed := make([]byte, 32)
-	for i := range seed {
-		seed[i] = 0x42
-	}
-
-	// Expected secp256k1 scalar: SHA-256("secp256k1-v1" || seed)
-	h := sha256.New()
-	h.Write([]byte(secp256k1DerivationTag))
-	h.Write(seed)
-	expectedScalar := h.Sum(nil)
-
-	pk := make([]byte, 64)
-	copy(pk[:32], seed)
-	// Set public key part to something valid (doesn't matter for scalar tests)
-	copy(pk[32:], make([]byte, 32))
-
-	priv := &PrivKey{PrivateKey: pk}
-
-	// ed25519: kyber uses little-endian, so raw digest bytes differ,
-	// but SetBytes deterministically produces the same scalar.
-	ed := priv.Scalar(SuiteEd25519)
-	require.NotNil(t, ed)
-	ed2 := priv.Scalar(SuiteEd25519)
-	edB, _ := ed.MarshalBinary()
-	edB2, _ := ed2.MarshalBinary()
-	assert.Equal(t, edB, edB2, "ed25519 scalar must be deterministic")
-
-	secpBytes, err := priv.Scalar(SuiteSecp256k1).MarshalBinary()
-	require.NoError(t, err)
-	assert.Equal(t, expectedScalar, secpBytes, "secp256k1 scalar should match SHA-256 derivation")
-}
-
-func TestPrivKey_PublicKeyNeverNil(t *testing.T) {
-	priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-	require.NoError(t, err)
-
-	// All public key methods must return non-nil
-	assert.NotNil(t, priv.GetPublicForSuite(SuiteEd25519))
-	assert.NotNil(t, priv.GetPublicForSuite(SuiteSecp256k1))
-	assert.NotNil(t, priv.Public(SuiteEd25519))
-	assert.NotNil(t, priv.Public(SuiteSecp256k1))
-}
-
-func TestPrivKey_ScalarNeverNil(t *testing.T) {
-	priv, _, err := GenerateEd25519KeyPair(rand.Reader)
-	require.NoError(t, err)
-
-	assert.NotNil(t, priv.Scalar(SuiteEd25519))
-	assert.NotNil(t, priv.Scalar(SuiteSecp256k1))
-}
-
-func TestPrivKey_MultipleKeys(t *testing.T) {
-	// Generate many keys and run basic assertions on each
-	for i := 0; i < 20; i++ {
-		priv, pub, err := GenerateEd25519KeyPair(rand.Reader)
-		require.NoError(t, err)
-
-		// Basic invariants
-		assert.Len(t, priv.PrivateKey, 64)
-		assert.Len(t, pub.PublicKey, 32)
-
-		// Embedded public key must match
-		assert.Equal(t, []byte(priv.PrivateKey[32:]), []byte(pub.PublicKey))
-
-		// GetPublicForSuite must return the same public key
-		assert.Equal(t, ed25519.PublicKey(pub.PublicKey), priv.GetPublicForSuite(SuiteEd25519).PublicKey)
-
-		// Scalar for ed25519 must be consistent
-		edScalar := priv.Scalar(SuiteEd25519)
-		edPoint := priv.Public(SuiteEd25519)
-		expectedPoint := NewSuite(SuiteEd25519).Point().Mul(edScalar, nil)
-		assert.True(t, expectedPoint.Equal(edPoint), "iteration %d: G*scalar == point", i)
-
-		// Secp256k1 derivation must work
-		secpScalar := priv.Scalar(SuiteSecp256k1)
-		secpPoint := priv.Public(SuiteSecp256k1)
-		secpSuite := NewSuite(SuiteSecp256k1)
-		expectedSecpPoint := secpSuite.Point().Mul(secpScalar, nil)
-		assert.True(t, expectedSecpPoint.Equal(secpPoint), "iteration %d: G*scalar == point (secp256k1)", i)
-
-		// String round-trip
-		priv2, err := PrivateKeyFromHex(priv.String())
-		require.NoError(t, err)
-		assert.Equal(t, priv.PrivateKey, priv2.PrivateKey)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Benchmarks
-// ---------------------------------------------------------------------------
-
-func BenchmarkGenerateEd25519KeyPair(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, _, err := GenerateEd25519KeyPair(rand.Reader)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkPrivKey_Scalar_Ed25519(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.Scalar(SuiteEd25519)
-	}
-}
-
-func BenchmarkPrivKey_Scalar_Secp256k1(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.Scalar(SuiteSecp256k1)
-	}
-}
-
-func BenchmarkPrivKey_Public_Ed25519(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.Public(SuiteEd25519)
-	}
-}
-
-func BenchmarkPrivKey_Public_Secp256k1(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.Public(SuiteSecp256k1)
-	}
-}
-
-func BenchmarkPrivKey_GetPublicForSuite_Ed25519(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.GetPublicForSuite(SuiteEd25519)
-	}
-}
-
-func BenchmarkPrivKey_GetPublicForSuite_Secp256k1(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = priv.GetPublicForSuite(SuiteSecp256k1)
-	}
-}
-
-func BenchmarkPrivKey_MarshalJSON(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = priv.MarshalJSON()
-	}
-}
-
-func BenchmarkPrivKey_UnmarshalJSON(b *testing.B) {
-	priv, _, _ := GenerateEd25519KeyPair(rand.Reader)
-	data, _ := json.Marshal(priv)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var p PrivKey
-		_ = json.Unmarshal(data, &p)
-	}
-}

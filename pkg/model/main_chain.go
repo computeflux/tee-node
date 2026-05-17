@@ -80,6 +80,6 @@ type Validator struct {
 	ValidatorId PubKey `json:"ValidatorId"`
 	// ed25519 P2P public key (from chain)
 	P2pId PubKey `json:"P2pId"`
-	// secp256k1 public key for DKG (from chain, 33 bytes compressed, optional)
-	ValidatorIdSecp PubKey `json:"ValidatorIdSecp,omitempty"`
+	// BLS12-381 public key for DKG (96 bytes compressed, optional until chain supports it)
+	ValidatorIdBLS PubKey `json:"ValidatorIdBLS,omitempty"`
 }

@@ -2,45 +2,33 @@ package model
 
 import (
 	"crypto/ed25519"
-	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	oed25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	chain "github.com/wetee-dao/ink.go"
 	"go.dedis.ch/kyber/v4"
 )
 
-const secp256k1DerivationTag = "secp256k1-v1"
-
 // PrivKey wraps an ed25519 private key (64 bytes: 32 seed + 32 public).
-// The first 32 bytes serve as a master seed; from it both an ed25519 scalar
-// (RFC 8032 hash+clamp) and a secp256k1 scalar (SHA-256 domain-separated)
-// are deterministically derived.
+// The first 32 bytes serve as a master seed.
 type PrivKey struct {
 	ed25519.PrivateKey
-
-	// Cached secp256k1 derivations (lazy, thread-safe)
-	secpOnce   sync.Once
-	secpScalar kyber.Scalar
-	secpPub    kyber.Point
 }
 
 // Scalar returns the scalar for the given suite type.
 //
-//	SuiteEd25519   → SHA-512(seed), clamped per RFC 8032
-//	SuiteSecp256k1 → SHA-256("secp256k1-v1" || seed) mod N
+//	SuiteEd25519 → SHA-512(seed), clamped per RFC 8032
 func (p *PrivKey) Scalar(st SuiteType) kyber.Scalar {
 	switch st {
-	case SuiteSecp256k1:
-		p.secpOnce.Do(func() { p.deriveSecp256k1() })
-		return p.secpScalar
+	case SuiteEd25519:
+		return p.ed25519Scalar()
+	case SuiteBLS12381:
+		return p.bls12381Scalar()
 	default:
 		return p.ed25519Scalar()
 	}
@@ -49,9 +37,13 @@ func (p *PrivKey) Scalar(st SuiteType) kyber.Scalar {
 // Public returns the public key point for the given suite type.
 func (p *PrivKey) Public(st SuiteType) kyber.Point {
 	switch st {
-	case SuiteSecp256k1:
-		p.secpOnce.Do(func() { p.deriveSecp256k1() })
-		return p.secpPub
+	case SuiteEd25519:
+		return p.ed25519Public()
+	case SuiteBLS12381:
+		// For BLS12-381, derive the scalar and multiply by G2 base.
+		suite := NewSuite(st)
+		scalar := p.Scalar(st)
+		return suite.Point().Mul(scalar, nil)
 	default:
 		return p.ed25519Public()
 	}
@@ -60,20 +52,20 @@ func (p *PrivKey) Public(st SuiteType) kyber.Point {
 // GetPublicForSuite returns a PubKey for the given suite type.
 func (p *PrivKey) GetPublicForSuite(st SuiteType) *PubKey {
 	switch st {
-	case SuiteSecp256k1:
-		pt := p.Public(SuiteSecp256k1)
+	case SuiteEd25519:
+		return &PubKey{
+			PublicKey: p.PrivateKey.Public().(ed25519.PublicKey),
+			suiteType: SuiteEd25519,
+		}
+	case SuiteBLS12381:
+		pt := p.Public(st)
 		buf, err := pt.MarshalBinary()
 		if err != nil {
 			return nil
 		}
 		return &PubKey{
 			PublicKey: ed25519.PublicKey(buf),
-			suiteType: SuiteSecp256k1,
-		}
-	case SuiteEd25519:
-		return &PubKey{
-			PublicKey: p.PrivateKey.Public().(ed25519.PublicKey),
-			suiteType: SuiteEd25519,
+			suiteType: SuiteBLS12381,
 		}
 	default:
 		return nil
@@ -89,20 +81,20 @@ func (p *PrivKey) ed25519Scalar() kyber.Scalar {
 	return NewSuite(SuiteEd25519).Scalar().SetBytes(digest[:32])
 }
 
+func (p *PrivKey) bls12381Scalar() kyber.Scalar {
+	buf := p.PrivateKey
+	digest := sha512.Sum512(buf[:32])
+	digest[0] &= 0xf8
+	digest[31] &= 0x7f
+	digest[31] |= 0x40
+	return NewSuite(SuiteBLS12381).Scalar().SetBytes(digest[:32])
+}
+
 func (p *PrivKey) ed25519Public() kyber.Point {
 	suite := NewSuite(SuiteEd25519)
 	point := suite.Point()
 	point.UnmarshalBinary(p.PrivateKey[32:])
 	return point
-}
-
-func (p *PrivKey) deriveSecp256k1() {
-	suite := NewSuite(SuiteSecp256k1)
-	h := sha256.New()
-	h.Write([]byte(secp256k1DerivationTag))
-	h.Write(p.PrivateKey[:32])
-	p.secpScalar = suite.Scalar().SetBytes(h.Sum(nil))
-	p.secpPub = suite.Point().Mul(p.secpScalar, nil)
 }
 
 func (p *PrivKey) String() string {
@@ -111,8 +103,7 @@ func (p *PrivKey) String() string {
 
 // ToSigner returns a chain.SignerType for the given suite type.
 //
-//	SuiteEd25519   → standard ed25519 signer (P2P/chain identity)
-//	SuiteSecp256k1 → ECDSA secp256k1 signer derived from the master seed
+//	SuiteEd25519 → standard ed25519 signer (P2P/chain identity)
 func (p *PrivKey) ToSigner(st SuiteType) chain.SignerType {
 	switch st {
 	case SuiteEd25519:
@@ -121,25 +112,16 @@ func (p *PrivKey) ToSigner(st SuiteType) chain.SignerType {
 			panic(err)
 		}
 		return &s
-	case SuiteSecp256k1:
-		if p.secpScalar == nil {
-			p.deriveSecp256k1()
-		}
-		scalarBytes, err := p.secpScalar.MarshalBinary()
-		if err != nil {
-			panic(err)
-		}
-		priv, err := ethcrypto.ToECDSA(scalarBytes)
-		if err != nil {
-			panic(err)
-		}
-		return &Secp256k1Signer{
-			priv: priv,
-			pub:  ethcrypto.CompressPubkey(&priv.PublicKey),
-		}
 	default:
 		return nil
 	}
+}
+
+// ToSecp256k1Signer returns an ECDSA secp256k1 signer derived from the master
+// seed. This is kept separate from the suite-type-based ToSigner because
+// secp256k1 is used for EVM transaction signing, not DKG threshold signing.
+func (p *PrivKey) ToSecp256k1Signer() *Secp256k1Signer {
+	return deriveSecp256k1Signer(p.PrivateKey[:32])
 }
 
 func (p *PrivKey) MarshalJSON() ([]byte, error) {

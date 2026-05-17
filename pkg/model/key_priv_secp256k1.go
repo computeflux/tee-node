@@ -2,11 +2,33 @@ package model
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/blake2b"
 )
+
+const secp256k1DerivationTag = "secp256k1-v1"
+
+// deriveSecp256k1Signer deterministically derives a secp256k1 signer from a
+// 32-byte seed. The derivation follows SHA-256("secp256k1-v1" || seed) mod N.
+func deriveSecp256k1Signer(seed []byte) *Secp256k1Signer {
+	h := sha256.New()
+	h.Write([]byte(secp256k1DerivationTag))
+	h.Write(seed)
+	scalar := h.Sum(nil)
+
+	priv, err := ethcrypto.ToECDSA(scalar)
+	if err != nil {
+		// Should never happen with a valid scalar.
+		panic(err)
+	}
+	return &Secp256k1Signer{
+		priv: priv,
+		pub:  ethcrypto.CompressPubkey(&priv.PublicKey),
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Secp256k1Signer — implements chain.SignerType for ECDSA secp256k1

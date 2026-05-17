@@ -4,7 +4,6 @@ package model
 
 type ChainInfo struct {
 	IsMain         bool   `json:"is_main"`
-	CloudContract  string `json:"cloud_contract"`
 	SubnetContract string `json:"subnet_contract"`
 	// 链类型（如 local / test / main）
 	ChainType string `json:"chain_type"`

@@ -57,8 +57,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	util.LogWithYellow("Mainchain Key", nodePriv.GetPublicForSuite(model.SuiteEd25519).SS58())
-	util.LogWithYellow("Secp256k1 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(model.SuiteSecp256k1).Secp256k1CompressPubkey()))
+	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogWithYellow("ETH Key", hex.EncodeToString(nodePriv.ToSecp256k1Signer().Public()))
+	util.LogWithYellow("BLS12381 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(model.SuiteBLS12381).Byte()))
 	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(model.SuiteEd25519).SS58())
 
 	chainConfig := model.GetChainConfig(chainEnv)

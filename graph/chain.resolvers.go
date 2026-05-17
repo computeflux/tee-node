@@ -42,7 +42,6 @@ func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, erro
 	return []*model.ChainInfo{
 		{
 			IsMain:         true,
-			CloudContract:  chainConfig.TokenAddress,
 			SubnetContract: chainConfig.SubnetAddress,
 			NetworkLabel:   chainConfig.NetworkLabel,
 			ChainType:      chainConfig.ChainType,

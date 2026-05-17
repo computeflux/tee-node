@@ -7,6 +7,7 @@ type ChainConfigType struct {
 	SubnetAddress string
 	TokenAddress  string
 	CloudAddress  string // Substrate Cloud contract address
+	BLSAddress    string // BLS gateway contract address
 	NetworkLabel  string
 }
 
@@ -20,7 +21,7 @@ var LocalChainConfig = ChainConfigType{
 
 var TestChainConfig = ChainConfigType{
 	ChainType:     "evm",
-	Cipher:        SuiteSecp256k1,
+	Cipher:        SuiteBLS12381,
 	Urls:          []string{"https://eth-rpc-testnet.polkadot.io"},
 	SubnetAddress: "0x6Ee5a17efe1019C13cc24fb45aB301ED809F2EBd",
 	TokenAddress:  "0x9aa727B291c63A78E088E44674317A72F12902F5",
@@ -29,7 +30,7 @@ var TestChainConfig = ChainConfigType{
 
 var MainChainConfig = ChainConfigType{
 	ChainType:     "evm",
-	Cipher:        SuiteSecp256k1,
+	Cipher:        SuiteBLS12381,
 	Urls:          []string{""},
 	SubnetAddress: "",
 	TokenAddress:  "",

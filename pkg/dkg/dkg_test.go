@@ -53,8 +53,8 @@ func runEpoch(t *testing.T, dkgs []*DKG, validators []*model.Validator, epoch ui
 	}
 
 	edPub := dkgs[0].GetDkgPubKey(model.SuiteEd25519)
-	secpPub := dkgs[0].GetDkgPubKey(model.SuiteSecp256k1)
-	return edPub, secpPub
+	blsPub := dkgs[0].GetDkgPubKey(model.SuiteBLS12381)
+	return edPub, blsPub
 }
 
 func TestNetwork(t *testing.T) {
@@ -75,9 +75,9 @@ func TestNetwork(t *testing.T) {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
+			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
 		})
 	}
 
@@ -93,19 +93,19 @@ func TestNetwork(t *testing.T) {
 	}
 
 	// Epoch 1
-	edPub1, secpPub1 := runEpoch(t, dkgs, validators, 1, "E1")
+	edPub1, blsPub1 := runEpoch(t, dkgs, validators, 1, "E1")
 	require.NotNil(t, edPub1, "ed25519 DKG pubkey should not be nil")
-	require.NotNil(t, secpPub1, "secp256k1 DKG pubkey should not be nil")
-	fmt.Println("E1 OK | ed25519 =", edPub1.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub1.Secp256k1CompressPubkey()))
+	require.NotNil(t, blsPub1, "bls12381 DKG pubkey should not be nil")
+	fmt.Println("E1 OK | ed25519 =", edPub1.SS58(), "| bls12381 =", fmt.Sprintf("0x%x", blsPub1.Byte()))
 
 	// Epoch 2 — add 2 new peers
 	for _, s := range newPeerSecret {
 		nodeSecret, _ := model.PrivateKeyFromHex(s)
 		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
 		validators = append(validators, &model.Validator{
-			ValidatorId:     *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:           *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdSecp: *nodeSecret.GetPublicForSuite(model.SuiteSecp256k1),
+			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
 		})
 	}
 
@@ -127,20 +127,20 @@ func TestNetwork(t *testing.T) {
 	runtime.Gosched()
 	time.Sleep(500 * time.Millisecond)
 
-	edPub2, secpPub2 := runEpoch(t, dkgs, validators, 2, "E2")
+	edPub2, blsPub2 := runEpoch(t, dkgs, validators, 2, "E2")
 	require.NotNil(t, edPub2, "ed25519 DKG pubkey should not be nil")
-	require.NotNil(t, secpPub2, "secp256k1 DKG pubkey should not be nil")
-	fmt.Println("E2 OK | ed25519 =", edPub2.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub2.Secp256k1CompressPubkey()))
+	require.NotNil(t, blsPub2, "bls12381 DKG pubkey should not be nil")
+	fmt.Println("E2 OK | ed25519 =", edPub2.SS58(), "| bls12381 =", fmt.Sprintf("0x%x", blsPub2.Byte()))
 	require.Equal(t, edPub1.SS58(), edPub2.SS58(), "ed25519 pubkey must be consistent")
-	require.Equal(t, secpPub1.Secp256k1CompressPubkey(), secpPub2.Secp256k1CompressPubkey(), "secp256k1 pubkey must be consistent")
+	require.Equal(t, blsPub1.Byte(), blsPub2.Byte(), "bls12381 pubkey must be consistent")
 
 	// Epoch 3
 	runtime.Gosched()
 	time.Sleep(200 * time.Millisecond)
-	edPub3, secpPub3 := runEpoch(t, dkgs, validators, 3, "E3")
+	edPub3, blsPub3 := runEpoch(t, dkgs, validators, 3, "E3")
 	require.NotNil(t, edPub3, "ed25519 DKG pubkey should not be nil")
-	require.NotNil(t, secpPub3, "secp256k1 DKG pubkey should not be nil")
-	fmt.Println("E3 OK | ed25519 =", edPub3.SS58(), "| secp256k1 =", fmt.Sprintf("0x%x", secpPub3.Secp256k1CompressPubkey()))
+	require.NotNil(t, blsPub3, "bls12381 DKG pubkey should not be nil")
+	fmt.Println("E3 OK | ed25519 =", edPub3.SS58(), "| bls12381 =", fmt.Sprintf("0x%x", blsPub3.Byte()))
 	require.Equal(t, edPub1.SS58(), edPub3.SS58(), "ed25519 pubkey must be consistent")
-	require.Equal(t, secpPub1.Secp256k1CompressPubkey(), secpPub3.Secp256k1CompressPubkey(), "secp256k1 pubkey must be consistent")
+	require.Equal(t, blsPub1.Byte(), blsPub3.Byte(), "bls12381 pubkey must be consistent")
 }

@@ -60,9 +60,6 @@ resolver:
 # Optional: set to speed up generation time by not performing a final validation pass.
 # skip_validation: true
 
-# 避免在含无权限文件的仓库中 go mod tidy 失败
-skip_mod_tidy: true
-
 # Optional: set to skip running `go mod tidy` when generating server code
 # skip_mod_tidy: true
 

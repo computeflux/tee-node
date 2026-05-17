@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"go.dedis.ch/kyber/v4"
-	"go.dedis.ch/kyber/v4/group/s256"
+	"go.dedis.ch/kyber/v4/pairing/bls12381/circl"
 	"go.dedis.ch/kyber/v4/suites"
 )
 
@@ -12,8 +12,8 @@ import (
 type SuiteType uint8
 
 const (
-	SuiteEd25519   SuiteType = 0
-	SuiteSecp256k1 SuiteType = 1
+	SuiteEd25519  SuiteType = 0
+	SuiteBLS12381 SuiteType = 1
 )
 
 // String 返回 SuiteType 的字符串表示（日志/JSON 序列化用）
@@ -21,8 +21,8 @@ func (s SuiteType) String() string {
 	switch s {
 	case SuiteEd25519:
 		return "ed25519"
-	case SuiteSecp256k1:
-		return "secp256k1"
+	case SuiteBLS12381:
+		return "bls12381"
 	default:
 		return "unknown"
 	}
@@ -33,8 +33,8 @@ func SuiteTypeFromString(s string) (SuiteType, error) {
 	switch s {
 	case "ed25519":
 		return SuiteEd25519, nil
-	case "secp256k1":
-		return SuiteSecp256k1, nil
+	case "bls12381":
+		return SuiteBLS12381, nil
 	default:
 		return SuiteEd25519, fmt.Errorf("unknown suite type: %s", s)
 	}
@@ -42,7 +42,7 @@ func SuiteTypeFromString(s string) (SuiteType, error) {
 
 // AllSuites returns all supported suite types.
 func AllSuites() []SuiteType {
-	return []SuiteType{SuiteEd25519, SuiteSecp256k1}
+	return []SuiteType{SuiteEd25519, SuiteBLS12381}
 }
 
 // NewSuite 根据类型创建 kyber Suite
@@ -50,8 +50,8 @@ func NewSuite(st SuiteType) suites.Suite {
 	switch st {
 	case SuiteEd25519:
 		return suites.MustFind("Ed25519")
-	case SuiteSecp256k1:
-		return s256.NewSuite()
+	case SuiteBLS12381:
+		return circl.NewSuiteBLS12381()
 	default:
 		return suites.MustFind("Ed25519")
 	}
@@ -80,8 +80,8 @@ func SuiteFromPubKeyBytes(pub []byte) (SuiteType, error) {
 	switch len(pub) {
 	case 32:
 		return SuiteEd25519, nil
-	case 33, 65:
-		return SuiteSecp256k1, nil
+	case 96:
+		return SuiteBLS12381, nil
 	default:
 		return 255, fmt.Errorf("unknown public key length: %d", len(pub))
 	}

@@ -26,6 +26,8 @@ type EvmChain struct {
 	tokenAddr  common.Address
 	subnet     *bindings.Subnet
 	subnetAddr common.Address
+	bls        *bindings.BLS
+	blsAddr    common.Address
 	chainID    *big.Int
 	chainName  string
 	privateKey *ecdsa.PrivateKey
@@ -50,18 +52,11 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*EvmChain, e
 		return nil, fmt.Errorf("chain ID: %w", err)
 	}
 
-	signer := pk.ToSigner(config.Cipher)
-	if signer == nil {
-		return nil, fmt.Errorf("unsupported cipher: %v", config.Cipher)
+	skSigner := pk.ToSecp256k1Signer()
+	if skSigner == nil {
+		return nil, fmt.Errorf("failed to derive secp256k1 signer")
 	}
-
-	var ecdsaKey *ecdsa.PrivateKey
-	if skSigner, ok := signer.(*model.Secp256k1Signer); ok {
-		ecdsaKey = skSigner.PrivateKey()
-	}
-	if ecdsaKey == nil {
-		return nil, fmt.Errorf("failed to extract secp256k1 private key from signer")
-	}
+	ecdsaKey := skSigner.PrivateKey()
 
 	auth, err := bind.NewKeyedTransactorWithChainID(ecdsaKey, chainID)
 	if err != nil {
@@ -80,6 +75,16 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*EvmChain, e
 		return nil, fmt.Errorf("bind Subnet: %w", err)
 	}
 
+	var bls *bindings.BLS
+	var bAddr common.Address
+	if config.BLSAddress != "" {
+		bAddr = common.HexToAddress(config.BLSAddress)
+		bls, err = bindings.NewBLS(bAddr, client)
+		if err != nil {
+			return nil, fmt.Errorf("bind BLS: %w", err)
+		}
+	}
+
 	return &EvmChain{
 		urls:       config.Urls,
 		client:     client,
@@ -87,6 +92,8 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*EvmChain, e
 		tokenAddr:  tAddr,
 		subnet:     subnet,
 		subnetAddr: sAddr,
+		bls:        bls,
+		blsAddr:    bAddr,
 		chainID:    chainID,
 		chainName:  config.NetworkLabel,
 		privateKey: ecdsaKey,
@@ -136,10 +143,19 @@ func (e *EvmChain) reconnect() error {
 			client.Close()
 			continue
 		}
+		var bls *bindings.BLS
+		if e.blsAddr != (common.Address{}) {
+			bls, err = bindings.NewBLS(e.blsAddr, client)
+			if err != nil {
+				client.Close()
+				continue
+			}
+		}
 		e.client.Close()
 		e.client = client
 		e.token = token
 		e.subnet = subnet
+		e.bls = bls
 		return nil
 	}
 	return fmt.Errorf("reconnect: all %d URLs failed", len(e.urls))

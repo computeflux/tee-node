@@ -59,7 +59,6 @@ type ComplexityRoot struct {
 
 	ChainInfo struct {
 		ChainType      func(childComplexity int) int
-		CloudContract  func(childComplexity int) int
 		IsMain         func(childComplexity int) int
 		NetworkLabel   func(childComplexity int) int
 		SubnetContract func(childComplexity int) int
@@ -230,13 +229,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChainInfo.ChainType(childComplexity), true
-
-	case "ChainInfo.cloud_contract":
-		if e.complexity.ChainInfo.CloudContract == nil {
-			break
-		}
-
-		return e.complexity.ChainInfo.CloudContract(childComplexity), true
 
 	case "ChainInfo.is_main":
 		if e.complexity.ChainInfo.IsMain == nil {
@@ -2493,50 +2485,6 @@ func (ec *executionContext) fieldContext_ChainInfo_is_main(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _ChainInfo_cloud_contract(ctx context.Context, field graphql.CollectedField, obj *model.ChainInfo) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ChainInfo_cloud_contract(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CloudContract, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ChainInfo_cloud_contract(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ChainInfo",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _ChainInfo_subnet_contract(ctx context.Context, field graphql.CollectedField, obj *model.ChainInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ChainInfo_subnet_contract(ctx, field)
 	if err != nil {
@@ -3972,8 +3920,6 @@ func (ec *executionContext) fieldContext_Query_chain_info(_ context.Context, fie
 			switch field.Name {
 			case "is_main":
 				return ec.fieldContext_ChainInfo_is_main(ctx, field)
-			case "cloud_contract":
-				return ec.fieldContext_ChainInfo_cloud_contract(ctx, field)
 			case "subnet_contract":
 				return ec.fieldContext_ChainInfo_subnet_contract(ctx, field)
 			case "chain_type":
@@ -7395,11 +7341,6 @@ func (ec *executionContext) _ChainInfo(ctx context.Context, sel ast.SelectionSet
 			out.Values[i] = graphql.MarshalString("ChainInfo")
 		case "is_main":
 			out.Values[i] = ec._ChainInfo_is_main(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "cloud_contract":
-			out.Values[i] = ec._ChainInfo_cloud_contract(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
