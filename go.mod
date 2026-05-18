@@ -22,7 +22,7 @@ require (
 	github.com/vedhavyas/go-subkey/v2 v2.0.0
 	github.com/vektah/gqlparser/v2 v2.5.27
 	github.com/wetee-dao/ink.go v0.1.39
-	go.dedis.ch/kyber/v4 v4.0.0-pre2.0.20250414164612-66d4dee8d2e6
+	go.dedis.ch/kyber/v4 v4.0.2
 	golang.org/x/crypto v0.48.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -140,5 +140,5 @@ require (
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
 
-// replace github.com/wetee-dao/ink.go => ../ink.go
-replace go.dedis.ch/kyber/v4 => ../../wetee/kyber
+replace github.com/wetee-dao/ink.go => ../../wetee/ink.go
+// replace go.dedis.ch/kyber/v4 => ../../wetee/kyber

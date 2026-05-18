@@ -367,7 +367,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 
 	dkg.saveState()
 
-	// 首次完成：迁移 new → current
+	// 首次完成：迁移 new → current 确保下次不会再生成新的 DKG 公私钥对，后续完成：直接使用 new 的公私钥对
 	dkg.mu.Lock()
 	edPub := dkg.SystemPubKey()
 	if edPub == nil {

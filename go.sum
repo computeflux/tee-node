@@ -410,6 +410,8 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.dedis.ch/fixbuf v1.0.3 h1:hGcV9Cd/znUxlusJ64eAlExS+5cJDIyTyEG+otu5wQs=
 go.dedis.ch/fixbuf v1.0.3/go.mod h1:yzJMt34Wa5xD37V5RTdmp38cz3QhMagdGoem9anUalw=
+go.dedis.ch/kyber/v4 v4.0.2 h1:mhkEtisakzGJtzH5qWZL8KfXk28ihrb9YD9/r9eF6Gg=
+go.dedis.ch/kyber/v4 v4.0.2/go.mod h1:lwIPsXtmW8fw5Ap50SBfwgSQiSCvpGByP1gbWJ5XCqw=
 go.etcd.io/bbolt v1.4.0-beta.0 h1:U7Y9yH6ZojEo5/BDFMXDXD1RNx9L7iKxudzqR68jLaM=
 go.etcd.io/bbolt v1.4.0-beta.0/go.mod h1:Qv5yHB6jkQESXT/uVfxJgUPMqgAyhL0GLxcQaz9bSec=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=

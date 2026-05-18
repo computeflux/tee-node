@@ -122,11 +122,12 @@ func TestReencryptAndVerify(t *testing.T) {
 			CommitsWrap: model.KyberPoints{
 				Public: []kyber.Point{dkgCmt},
 			},
-			PriShareWrap: model.PriShare{
+			PriShareWrap: model.PriShareWithSuite{
 				PriShare: &share.PriShare{
 					I: uint32(idx),
 					V: dkgSki,
 				},
+				Suite: "ed25519",
 			},
 		}
 

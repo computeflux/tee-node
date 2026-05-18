@@ -62,7 +62,7 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 			return nil, err
 		}
 
-		util.LogWithYellow("MakeMapAccount", h160)
+		util.LogWithYellow("MakeMapAccount", pk.GetPublicForSuite(model.SuiteEd25519).SS58())
 		err = client.SignAndSubmit(p, call, true, 0)
 		if err != nil {
 			return nil, err

@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
+	"github.com/computeflux/tee-provider/pkg/util"
 	oed25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	chain "github.com/wetee-dao/ink.go"
 	"go.dedis.ch/kyber/v4"
@@ -29,9 +31,10 @@ func (p *PrivKey) Scalar(st SuiteType) kyber.Scalar {
 		return p.ed25519Scalar()
 	case SuiteBLS12381:
 		return p.bls12381Scalar()
-	default:
-		return p.ed25519Scalar()
 	}
+	util.LogWithRed("PrivKey Scalar", "unsupported suite type:", st)
+	os.Exit(1)
+	return nil
 }
 
 // Public returns the public key point for the given suite type.

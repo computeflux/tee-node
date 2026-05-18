@@ -33,7 +33,7 @@ type DistKeyShare struct {
 	// Coefficients of the public polynomial holding the public key
 	CommitsWrap KyberPoints `json:"Commits"`
 	// PriShare of the distributed secret
-	PriShareWrap PriShare `json:"PriShare"`
+	PriShareWrap PriShareWithSuite `json:"PriShare"`
 }
 
 // DistKeyShare
@@ -47,28 +47,31 @@ func (d DistKeyShare) Commitments() []kyber.Point {
 }
 
 // PriShare
-type PriShare struct {
+type PriShareWithSuite struct {
 	*share.PriShare
+	Suite string `json:"suite,omitempty"`
 }
 
 // Custom JSON serialization
-func (d PriShare) MarshalJSON() ([]byte, error) {
+func (d PriShareWithSuite) MarshalJSON() ([]byte, error) {
 	sbuf, err := d.V.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal private share: %w", err)
 	}
 
 	return json.Marshal(struct {
-		I uint32
-		V []byte
+		I     uint32
+		V     []byte
+		Suite string `json:"suite,omitempty"`
 	}{
-		I: d.I,
-		V: sbuf,
+		I:     d.I,
+		V:     sbuf,
+		Suite: d.Suite,
 	})
 }
 
 // Custom JSON deserialization
-func (d *PriShare) UnmarshalJSON(bt []byte) error {
+func (d *PriShareWithSuite) UnmarshalJSON(bt []byte) error {
 	jsonData := struct {
 		I     uint32
 		V     []byte
@@ -80,14 +83,15 @@ func (d *PriShare) UnmarshalJSON(bt []byte) error {
 		return err
 	}
 
+	if jsonData.Suite == "" {
+		return fmt.Errorf("PriShareWithSuite.UnmarshalJSON err: missing suite in PriShareWithSuite JSON")
+	}
 	// Default to ed25519 for backward compatibility.
-	st := SuiteEd25519
-	if jsonData.Suite != "" {
-		var parseErr error
-		st, parseErr = SuiteTypeFromString(jsonData.Suite)
-		if parseErr != nil {
-			st = SuiteEd25519
-		}
+
+	var parseErr error
+	st, parseErr := SuiteTypeFromString(jsonData.Suite)
+	if parseErr != nil {
+		return fmt.Errorf("PriShareWithSuite.UnmarshalJSON err: invalid suite in PriShareWithSuite JSON: %w", parseErr)
 	}
 
 	key := NewSuite(st).Scalar()

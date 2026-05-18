@@ -456,7 +456,7 @@ func (dkg *DKG) handleRandomDealRespBatch(from string, payload []byte) error {
 			}
 			state.result = &model.DistKeyShare{
 				CommitsWrap:  model.KyberPoints{Public: r.Key.Commits},
-				PriShareWrap: model.PriShare{PriShare: r.Key.Share},
+				PriShareWrap: model.PriShareWithSuite{PriShare: r.Key.Share, Suite: "ed25519"},
 			}
 			state.done = true
 			if dkg.RandomPools[model.SuiteEd25519] != nil {

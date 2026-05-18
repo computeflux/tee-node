@@ -77,10 +77,14 @@ func TestSetSubnetSolt(t *testing.T) {
 		panic(err)
 	}
 
-	pk, err := chain.Sr25519PairFromSecret("0x43c0defe545b31e6f64ee9c17b35c6444a8c3527f0c68160203717c51367512d", 42)
+	// pk, err := chain.Sr25519PairFromSecret("//Alice", 42)
+	// if err != nil {
+	// 	util.LogWithPurple("Sr25519PairFromSecret", err)
+	// 	panic(err)
+	// }
+	pk, err := chain.Sr25519PairFromSecret("0x43c0defe545b31e6f64ee9c17b35c6444a8c3527f0c68160203717c51367512d", uint16(42))
 	if err != nil {
-		util.LogWithPurple("Sr25519PairFromSecret", err)
-		panic(err)
+		panic(fmt.Sprintf("init signer: %v", err))
 	}
 
 	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
@@ -89,10 +93,15 @@ func TestSetSubnetSolt(t *testing.T) {
 		panic(err)
 	}
 
-	subnetIns.ExecSetEpochSlot(10, chain.ExecParams{
+	err = subnetIns.ExecSetEpochSlot(72000, chain.ExecParams{
 		Signer:    &pk,
 		PayAmount: types.NewU128(*big.NewInt(0)),
 	})
+
+	if err != nil {
+		util.LogWithPurple("ExecSetEpochSlot", err)
+		panic(err)
+	}
 }
 
 func TestQueryEpochInfo(t *testing.T) {
@@ -127,51 +136,4 @@ func TestCloudUpdate(t *testing.T) {
 
 func TestSubnetUpdate(t *testing.T) {
 	// TODO
-}
-
-func TestWorkerUpdate(t *testing.T) {
-	client, err := chain.InitClient(MainChainConfig.Urls, true)
-	if err != nil {
-		panic(err)
-	}
-
-	pk, err := chain.Sr25519PairFromSecret("//Alice", 42)
-	if err != nil {
-		util.LogWithPurple("Sr25519PairFromSecret", err)
-		panic(err)
-	}
-
-	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
-	if err != nil {
-		util.LogWithPurple("InitSubnetContract", err)
-		panic(err)
-	}
-
-	err = subnetIns.ExecSecretUpdate(0, []byte("v0"), subnet.Ip{
-		Ipv4:   util.NewSome[uint32](3232263885),
-		Ipv6:   util.NewNone[types.U128](),
-		Domain: util.NewNone[[]byte](),
-	}, 31000, chain.ExecParams{
-		Signer:    &pk,
-		PayAmount: types.NewU128(*big.NewInt(0)),
-	})
-	fmt.Println(err)
-
-	subnetIns.ExecSecretUpdate(1, []byte("v1"), subnet.Ip{
-		Ipv4:   util.NewSome[uint32](3232263885),
-		Ipv6:   util.NewNone[types.U128](),
-		Domain: util.NewNone[[]byte](),
-	}, 41000, chain.ExecParams{
-		Signer:    &pk,
-		PayAmount: types.NewU128(*big.NewInt(0)),
-	})
-
-	subnetIns.ExecSecretUpdate(2, []byte("v2"), subnet.Ip{
-		Ipv4:   util.NewSome[uint32](3232263885),
-		Ipv6:   util.NewNone[types.U128](),
-		Domain: util.NewNone[[]byte](),
-	}, 51000, chain.ExecParams{
-		Signer:    &pk,
-		PayAmount: types.NewU128(*big.NewInt(0)),
-	})
 }

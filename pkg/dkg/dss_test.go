@@ -2,6 +2,8 @@ package dkg
 
 import (
 	"crypto/ed25519"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -69,9 +71,9 @@ func TestDSS(t *testing.T) {
 	}, func(signer *DssSigner, nodeId uint64) {
 		util.LogWithBlue("CONSENSUS SUCCESS", nodeId)
 		consensusOk = true
-		for _, dkg := range dkgs {
-			dkg.ToNewEpoch()
-		}
+		// for _, dkg := range dkgs {
+		// 	dkg.ToNewEpoch()
+		// }
 		close(done)
 	}, func(e error) {
 		util.LogWithBlue("CONSENSUS Error", e.Error())
@@ -90,7 +92,7 @@ func TestDSS(t *testing.T) {
 		t.Fatal("DKG consensus failed")
 	}
 
-	msg := []byte("hello word")
+	msg, _ := hex.DecodeString("64070000000000528c1e000f000000d6eec26135305a8ad257a20d003357284c8aa03d0bdb2b357ab0a22371e11ef2d6eec26135305a8ad257a20d003357284c8aa03d0bdb2b357ab0a22371e11ef200")
 	signers := []DssSigner{}
 	sigs := [][]byte{}
 
@@ -101,6 +103,9 @@ func TestDSS(t *testing.T) {
 		}
 		sig, _ := signer.PartialSign(msg)
 		signers = append(signers, signer)
+
+		json.Unmarshal(sig, &model.PartialSigWrap{}) // sanity check
+
 		sigs = append(sigs, sig)
 	}
 	signers[0].SetSigs(sigs)
@@ -111,6 +116,7 @@ func TestDSS(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fmt.Println(dkgs[0].GetDkgPubKey(model.SuiteEd25519).SS58())
 	isok := ed25519.Verify(dkgs[0].GetDkgPubKey(model.SuiteEd25519).Ed25519PublicKey(), msg, sigbt)
 	fmt.Println("ed25519.Verify", isok)
 }

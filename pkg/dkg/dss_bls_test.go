@@ -38,7 +38,7 @@ func TestDssSigner_BLS12381(t *testing.T) {
 		DkgKeyShares: map[model.SuiteType]*model.DistKeyShare{
 			model.SuiteBLS12381: {
 				CommitsWrap:  model.KyberPoints{Public: commitments},
-				PriShareWrap: model.PriShare{PriShare: shares[0]},
+				PriShareWrap: model.PriShareWithSuite{PriShare: shares[0], Suite: "bls12381"},
 			},
 		},
 		Nodes:     make([]*model.Validator, n),
@@ -60,7 +60,7 @@ func TestDssSigner_BLS12381(t *testing.T) {
 		// Manually set the long-term share for this node.
 		dkgInst.DkgKeyShares[model.SuiteBLS12381] = &model.DistKeyShare{
 			CommitsWrap:  model.KyberPoints{Public: commitments},
-			PriShareWrap: model.PriShare{PriShare: shares[i]},
+			PriShareWrap: model.PriShareWithSuite{PriShare: shares[i], Suite: "bls12381"},
 		}
 		sig, err := signer.PartialSign(msg)
 		require.NoError(t, err, "node %d partial sign failed", i)

@@ -1,7 +1,7 @@
 package model
 
 type PartialSigWrap struct {
-	Partial   PriShare
+	Partial   PriShareWithSuite
 	SessionID []byte
 	Signature []byte
 }

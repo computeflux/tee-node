@@ -7,6 +7,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/vedhavyas/go-subkey/v2"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
 )
@@ -17,7 +18,8 @@ func (e *Contract) PartialSign(signer chain.PartialSignerType, call model.ChainC
 
 // SignAndSubmit signs and submits a chain call.
 func (c *Contract) SignAndSubmit(signer chain.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error {
-	return c.ChainClient.SignAndSubmit(signer, call.Substrate, false, 0)
+	util.LogWithPurple("Revive SignAndSubmit", "signer", subkey.SS58Encode(signer.Public(), 42))
+	return c.ChainClient.SignAndSubmit(signer, call.Substrate, true, 0)
 }
 
 var batchMethods = []string{"batch", "batch_all", "force_batch"}

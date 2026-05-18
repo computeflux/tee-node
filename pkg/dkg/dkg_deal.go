@@ -207,7 +207,7 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 			dkg.mu.Lock()
 			dkg.NewDkgKeyShares[st] = &model.DistKeyShare{
 				CommitsWrap:  model.KyberPoints{Public: res.Key.Commits, Suite: st.String()},
-				PriShareWrap: model.PriShare{PriShare: res.Key.Share},
+				PriShareWrap: model.PriShareWithSuite{PriShare: res.Key.Share, Suite: st.String()},
 			}
 			pub, err := model.PubKeyFromPointWithSuite(res.Key.Public(), st)
 			if err != nil {
@@ -229,7 +229,7 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 				dkg.mu.Lock()
 				dkg.NewDkgKeyShares[st] = &model.DistKeyShare{
 					CommitsWrap:  model.KyberPoints{Public: res.Key.Commits, Suite: st.String()},
-					PriShareWrap: model.PriShare{PriShare: res.Key.Share},
+					PriShareWrap: model.PriShareWithSuite{PriShare: res.Key.Share, Suite: st.String()},
 				}
 				pub, err := model.PubKeyFromPointWithSuite(res.Key.Public(), st)
 				if err != nil {
