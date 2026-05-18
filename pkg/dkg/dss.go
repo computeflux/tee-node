@@ -171,9 +171,6 @@ func (d *DssSigner) Verify(msg []byte, signature []byte) bool {
 
 	pub, ok := d.dkg.DkgPubKeys[d.suite]
 	if !ok || pub == nil {
-		pub = d.dkg.NewDkgPubKeys[d.suite]
-	}
-	if pub == nil {
 		util.LogError("DssSigner", "Public key not found for suite", d.suite.String())
 		return false
 	}

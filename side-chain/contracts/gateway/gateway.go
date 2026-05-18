@@ -21,7 +21,7 @@ type Gateway struct {
 
 	balances         *model.StoreMapping[string, uint64]
 	models           *model.IndexedList[uint64, ModelInfo]    // tag 索引 + 自增 id + 分页
-	providers *model.IndexedList[uint64, ProviderInfo] // 自增 id + 分页
+	providers        *model.IndexedList[uint64, ProviderInfo] `store:"keyPfx:providers_v2"`
 	providerBalances *model.StoreMapping[uint64, uint64]
 	tokens           *model.StoreMapping[uint64, TokenInfo]
 	usages           *model.StoreMapping[string, DailyUsage]
@@ -41,9 +41,10 @@ func (g GatewayMutation) Init() error {
 // ── Model ────────────────────────────────────────────────
 
 func (g GatewayMutation) RegisterModel(
-	owner model.UniAddr, name string, pointsPer1K uint64,
+	name string, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
 ) error {
+	owner := g.api.GetCaller()
 	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
 		Name:            name,
 		Owner:           owner,
@@ -80,25 +81,28 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 // ── Provider / Channel ───────────────────────────────────
 
 func (g GatewayMutation) CreateProvider(
-	owner model.UniAddr,
-	name, logoURL, description, website string,
-	baseURL string, modelIds []uint64,
-	region uint8, deposit uint64, feeRate uint32,
-	priority uint32, uptimeSLA uint32,
+	name, logoURL, description string,
+	region uint8, deposit uint64,
 ) error {
+	owner := g.api.GetCaller()
+	// priority 由 deposit 自动计算
+	var priority uint32
+	switch {
+	case deposit >= 10000:
+		priority = 90
+	case deposit >= 1000:
+		priority = 60
+	default:
+		priority = 30
+	}
 	if _, err := g.providers.Insert(g.api.GetTxn(), ProviderInfo{
 		Owner:       owner,
 		Name:        name,
 		LogoURL:     logoURL,
 		Description: description,
-		Website:     website,
-		BaseURL:     baseURL,
-		ModelIds:    modelIds,
 		Region:      region,
 		Deposit:     deposit,
-		FeeRate:     feeRate,
 		Priority:    priority,
-		UptimeSLA:   uptimeSLA,
 		IsActive:    true,
 		CreatedAt:   uint64(g.api.GetHeight()),
 	}); err != nil {
@@ -109,7 +113,7 @@ func (g GatewayMutation) CreateProvider(
 
 func (g GatewayMutation) UpdateProvider(
 	providerID uint64,
-	name, logoURL, description, website string,
+	name, logoURL, description string,
 	modelIds []uint64, region uint8, feeRate uint32,
 	priority uint32, uptimeSLA uint32,
 ) error {
@@ -122,9 +126,6 @@ func (g GatewayMutation) UpdateProvider(
 		}
 		if description != "" {
 			ch.Description = description
-		}
-		if website != "" {
-			ch.Website = website
 		}
 		if modelIds != nil {
 			ch.ModelIds = modelIds

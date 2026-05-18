@@ -140,16 +140,6 @@
           },
           {
             "docs": [],
-            "label": "website",
-            "type": {
-              "displayName": [
-                "string"
-              ],
-              "type": 14
-            }
-          },
-          {
-            "docs": [],
             "label": "model_ids",
             "type": {
               "displayName": [
@@ -376,16 +366,6 @@
       },
       {
         "args": [
-          {
-            "docs": [],
-            "label": "owner",
-            "type": {
-              "displayName": [
-                "UniAddr"
-              ],
-              "type": 13
-            }
-          },
           {
             "docs": [],
             "label": "name",
@@ -688,16 +668,6 @@
         "args": [
           {
             "docs": [],
-            "label": "owner",
-            "type": {
-              "displayName": [
-                "UniAddr"
-              ],
-              "type": 13
-            }
-          },
-          {
-            "docs": [],
             "label": "name",
             "type": {
               "displayName": [
@@ -728,36 +698,6 @@
           },
           {
             "docs": [],
-            "label": "website",
-            "type": {
-              "displayName": [
-                "string"
-              ],
-              "type": 14
-            }
-          },
-          {
-            "docs": [],
-            "label": "base_u_r_l",
-            "type": {
-              "displayName": [
-                "string"
-              ],
-              "type": 14
-            }
-          },
-          {
-            "docs": [],
-            "label": "model_ids",
-            "type": {
-              "displayName": [
-                "Vec"
-              ],
-              "type": 15
-            }
-          },
-          {
-            "docs": [],
             "label": "region",
             "type": {
               "displayName": [
@@ -774,36 +714,6 @@
                 "u64"
               ],
               "type": 3
-            }
-          },
-          {
-            "docs": [],
-            "label": "fee_rate",
-            "type": {
-              "displayName": [
-                "u32"
-              ],
-              "type": 2
-            }
-          },
-          {
-            "docs": [],
-            "label": "priority",
-            "type": {
-              "displayName": [
-                "u32"
-              ],
-              "type": 2
-            }
-          },
-          {
-            "docs": [],
-            "label": "uptime_s_l_a",
-            "type": {
-              "displayName": [
-                "u32"
-              ],
-              "type": 2
             }
           }
         ],
@@ -1559,10 +1469,6 @@
               },
               {
                 "name": "Description",
-                "type": 14
-              },
-              {
-                "name": "Website",
                 "type": 14
               },
               {

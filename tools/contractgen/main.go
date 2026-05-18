@@ -11,6 +11,7 @@ import (
 	"go/printer"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -194,7 +195,6 @@ func main() {
 	fmt.Fprintf(&buf, "import (\n")
 	fmt.Fprintf(&buf, "\t\"fmt\"\n\n")
 	fmt.Fprintf(&buf, "\t\"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec\"\n")
-	fmt.Fprintf(&buf, "\t\"github.com/wetee-dao/ink.go/util\"\n")
 	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/pkg/model\"\n")
 	fmt.Fprintf(&buf, ")\n\n")
 
@@ -219,6 +219,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
+	// Use goimports to remove unused imports and add missing ones
+	if _, err := exec.LookPath("goimports"); err == nil {
+		cmd := exec.Command("goimports", "-w", outPath)
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "contractgen: goimports failed: %v\n", err)
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "contractgen: wrote %s\n", outPath)
 
 	abiOutPath := *abiOut
@@ -742,10 +751,11 @@ type storeField struct {
 }
 
 type storeListField struct {
-	name    string // 字段名
-	keyType string // K 类型
-	valType string // V 类型
-	keyPfx  string // keyPfx tag 值或自动生成的
+	name      string // 字段名
+	keyType   string // K 类型
+	valType   string // V 类型
+	keyPfx    string // keyPfx tag 值或自动生成的
+	isIndexed bool   // 是否为 IndexedList（true）或 StoreList（false）
 }
 
 type storeList2DField struct {
@@ -813,10 +823,29 @@ func parseStructFields(st *ast.StructType, fset *token.FileSet) []storeField {
 			fields = append(fields, storeField{
 				isList: true,
 				list: storeListField{
-					name:    fieldName,
-					keyType: keyType,
-					valType: valType,
-					keyPfx:  keyPfx,
+					name:     fieldName,
+					keyType:  keyType,
+					valType:  valType,
+					keyPfx:   keyPfx,
+					isIndexed: false,
+				},
+			})
+			continue
+		}
+		// 尝试解析 IndexedList 类型（包装 StoreList）
+		if keyType, valType, ok := parseIndexedListType(typStr); ok {
+			keyPfx := extractKeyPrefix(field, "keyPfx")
+			if keyPfx == "" {
+				keyPfx = storeKeyPrefix(fieldName)
+			}
+			fields = append(fields, storeField{
+				isList: true,
+				list: storeListField{
+					name:     fieldName,
+					keyType:  keyType,
+					valType:  valType,
+					keyPfx:   keyPfx,
+					isIndexed: true,
 				},
 			})
 			continue
@@ -913,6 +942,23 @@ func parseStoreListType(typ string) (key, val string, ok bool) {
 	return k, v, true
 }
 
+// parseIndexedListType 解析 *model.IndexedList[K, V] 类型，返回 K, V 类型字符串
+func parseIndexedListType(typ string) (key, val string, ok bool) {
+	// 匹配 *model.IndexedList[K, V] 或 model.IndexedList[K, V]
+	typ = strings.TrimSpace(typ)
+	typ = strings.TrimPrefix(typ, "*")
+	if !strings.HasPrefix(typ, "model.IndexedList[") || !strings.HasSuffix(typ, "]") {
+		return "", "", false
+	}
+	inner := typ[len("model.IndexedList[") : len(typ)-1]
+	// 解析 [K, V] 中的 K 和 V
+	k, v, ok := parseTypePair(inner)
+	if !ok {
+		return "", "", false
+	}
+	return k, v, true
+}
+
 // parseStoreList2DType 解析 *model.StoreList2D[K1, Ix, V] 类型，返回 K1, Ix, V 类型字符串
 func parseStoreList2DType(typ string) (k1, ix, val string, ok bool) {
 	// 匹配 *model.StoreList2D[K1, Ix, V] 或 model.StoreList2D[K1, Ix, V]
@@ -984,6 +1030,10 @@ func extractKeyPrefix(field *ast.Field, keyName string) string {
 				keyPfx = pfx
 			}
 		}
+	}
+	// 确保 keyPfx 以下划线结尾
+	if keyPfx != "" && !strings.HasSuffix(keyPfx, "_") {
+		keyPfx = keyPfx + "_"
 	}
 	return keyPfx
 }
@@ -1066,12 +1116,22 @@ func writeConstructor(buf *bytes.Buffer, structName, ctorName, pkgName string, f
 			fmt.Fprintf(buf, "\t\t%s: &model.StoreValue[%s]{Namespace: %q, Key: %q},\n",
 				f.value.name, f.value.valType, pkgName, f.value.key)
 		} else if f.isList {
-			// StoreList 使用 NewStoreList 构造函数
-			// prefixNextID: "{keyPfx}next_", prefixItems: "{keyPfx}items_"
-			prefixNextID := f.list.keyPfx + "next_"
-			prefixItems := f.list.keyPfx + "items_"
-			fmt.Fprintf(buf, "\t\t%s: model.NewStoreList[%s, %s](%q, %q, %q),\n",
-				f.list.name, f.list.keyType, f.list.valType, pkgName, prefixNextID, prefixItems)
+			if f.list.isIndexed {
+				// IndexedList 使用 NewIndexedList 构造函数
+				// prefixNextID: "{keyPfx}next_id", prefixItems: "{keyPfx}"
+				// keyPfx 已经以 _ 结尾，不需要再加
+				prefixNextID := f.list.keyPfx + "next_id"
+				prefixItems := f.list.keyPfx
+				fmt.Fprintf(buf, "\t\t%s: model.NewIndexedList[%s, %s](%q, %q, %q),\n",
+					f.list.name, f.list.keyType, f.list.valType, pkgName, prefixNextID, prefixItems)
+			} else {
+				// StoreList 使用 NewStoreList 构造函数
+				// prefixNextID: "{keyPfx}next_id", prefixItems: "{keyPfx}"
+				prefixNextID := f.list.keyPfx + "next_id"
+				prefixItems := f.list.keyPfx
+				fmt.Fprintf(buf, "\t\t%s: model.NewStoreList[%s, %s](%q, %q, %q),\n",
+					f.list.name, f.list.keyType, f.list.valType, pkgName, prefixNextID, prefixItems)
+			}
 		} else if f.isList2D {
 			// StoreList2D 使用 NewStoreList2D 构造函数
 			// prefixK1ToID: "{keyPfx}k1_to_id_", prefixK1Length: "{keyPfx}k1_length_"

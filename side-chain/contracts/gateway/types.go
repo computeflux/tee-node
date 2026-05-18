@@ -51,7 +51,6 @@ type ProviderInfo struct {
 	Name        string `json:"name"`        // 提供者名称
 	LogoURL     string `json:"logoUrl"`     // logo 图片 URL (IPFS / HTTPS)
 	Description string `json:"description"` // 介绍
-	Website     string `json:"website"`     // 官网 / 联系方式
 
 	// ── 服务能力 ──
 	BaseURL  string   `json:"baseURL"`  // API 端点

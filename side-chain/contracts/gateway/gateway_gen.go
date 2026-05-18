@@ -39,58 +39,30 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.Consume(tokenID, providerID, modelID, tokensUsed)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
-		if err := model.RequireArgLen(args, 12, "create_provider"); err != nil {
+		if err := model.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err
 		}
-		owner, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
-		if err != nil {
-			return fmt.Errorf("create_provider: owner: %w", err)
-		}
-		name, err := model.DecodeScaleArgBytes[string](args[1])
+		name, err := model.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("create_provider: name: %w", err)
 		}
-		logoURL, err := model.DecodeScaleArgBytes[string](args[2])
+		logoURL, err := model.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return fmt.Errorf("create_provider: logoURL: %w", err)
 		}
-		description, err := model.DecodeScaleArgBytes[string](args[3])
+		description, err := model.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("create_provider: description: %w", err)
 		}
-		website, err := model.DecodeScaleArgBytes[string](args[4])
-		if err != nil {
-			return fmt.Errorf("create_provider: website: %w", err)
-		}
-		baseURL, err := model.DecodeScaleArgBytes[string](args[5])
-		if err != nil {
-			return fmt.Errorf("create_provider: baseURL: %w", err)
-		}
-		modelIds, err := model.DecodeScaleArgBytes[[]uint64](args[6])
-		if err != nil {
-			return fmt.Errorf("create_provider: modelIds: %w", err)
-		}
-		region, err := model.DecodeScaleArgBytes[uint8](args[7])
+		region, err := model.DecodeScaleArgBytes[uint8](args[3])
 		if err != nil {
 			return fmt.Errorf("create_provider: region: %w", err)
 		}
-		deposit, err := model.DecodeScaleArgBytes[uint64](args[8])
+		deposit, err := model.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("create_provider: deposit: %w", err)
 		}
-		feeRate, err := model.DecodeScaleArgBytes[uint32](args[9])
-		if err != nil {
-			return fmt.Errorf("create_provider: feeRate: %w", err)
-		}
-		priority, err := model.DecodeScaleArgBytes[uint32](args[10])
-		if err != nil {
-			return fmt.Errorf("create_provider: priority: %w", err)
-		}
-		uptimeSLA, err := model.DecodeScaleArgBytes[uint32](args[11])
-		if err != nil {
-			return fmt.Errorf("create_provider: uptimeSLA: %w", err)
-		}
-		return m.CreateProvider(owner, name, logoURL, description, website, baseURL, modelIds, region, deposit, feeRate, priority, uptimeSLA)
+		return m.CreateProvider(name, logoURL, description, region, deposit)
 	case [4]byte{0x5a, 0x7c, 0x32, 0x41}:
 		if err := model.RequireArgLen(args, 2, "create_token"); err != nil {
 			return err
@@ -129,34 +101,30 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.Recharge(user, amount)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := model.RequireArgLen(args, 6, "register_model"); err != nil {
+		if err := model.RequireArgLen(args, 5, "register_model"); err != nil {
 			return err
 		}
-		owner, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
-		if err != nil {
-			return fmt.Errorf("register_model: owner: %w", err)
-		}
-		name, err := model.DecodeScaleArgBytes[string](args[1])
+		name, err := model.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("register_model: name: %w", err)
 		}
-		pointsPer1K, err := model.DecodeScaleArgBytes[uint64](args[2])
+		pointsPer1K, err := model.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return fmt.Errorf("register_model: pointsPer1K: %w", err)
 		}
-		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[3])
+		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[2])
 		if err != nil {
 			return fmt.Errorf("register_model: inputModalities: %w", err)
 		}
-		contextLength, err := model.DecodeScaleArgBytes[uint64](args[4])
+		contextLength, err := model.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return fmt.Errorf("register_model: contextLength: %w", err)
 		}
-		promptPricing, err := model.DecodeScaleArgBytes[uint64](args[5])
+		promptPricing, err := model.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("register_model: promptPricing: %w", err)
 		}
-		return m.RegisterModel(owner, name, pointsPer1K, inputModalities, contextLength, promptPricing)
+		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing)
 	case [4]byte{0xb9, 0xd0, 0x4c, 0x81}:
 		if err := model.RequireArgLen(args, 1, "revoke_token"); err != nil {
 			return err
@@ -192,7 +160,7 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
-		if err := model.RequireArgLen(args, 10, "update_provider"); err != nil {
+		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
 		}
 		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
@@ -211,31 +179,27 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_provider: description: %w", err)
 		}
-		website, err := model.DecodeScaleArgBytes[string](args[4])
-		if err != nil {
-			return fmt.Errorf("update_provider: website: %w", err)
-		}
-		modelIds, err := model.DecodeScaleArgBytes[[]uint64](args[5])
+		modelIds, err := model.DecodeScaleArgBytes[[]uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("update_provider: modelIds: %w", err)
 		}
-		region, err := model.DecodeScaleArgBytes[uint8](args[6])
+		region, err := model.DecodeScaleArgBytes[uint8](args[5])
 		if err != nil {
 			return fmt.Errorf("update_provider: region: %w", err)
 		}
-		feeRate, err := model.DecodeScaleArgBytes[uint32](args[7])
+		feeRate, err := model.DecodeScaleArgBytes[uint32](args[6])
 		if err != nil {
 			return fmt.Errorf("update_provider: feeRate: %w", err)
 		}
-		priority, err := model.DecodeScaleArgBytes[uint32](args[8])
+		priority, err := model.DecodeScaleArgBytes[uint32](args[7])
 		if err != nil {
 			return fmt.Errorf("update_provider: priority: %w", err)
 		}
-		uptimeSLA, err := model.DecodeScaleArgBytes[uint32](args[9])
+		uptimeSLA, err := model.DecodeScaleArgBytes[uint32](args[8])
 		if err != nil {
 			return fmt.Errorf("update_provider: uptimeSLA: %w", err)
 		}
-		return m.UpdateProvider(providerID, name, logoURL, description, website, modelIds, region, feeRate, priority, uptimeSLA)
+		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)
 	case [4]byte{0x11, 0xb2, 0xf8, 0x54}:
 		if err := model.RequireArgLen(args, 2, "withdraw"); err != nil {
 			return err
@@ -486,6 +450,8 @@ func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
 		api:              api,
 		balances:         &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "balance_"},
+		models:           model.NewIndexedList[uint64, ModelInfo]("gateway", "model_next_id", "model_"),
+		providers:        model.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_v2_next_id", "providers_v2_"),
 		providerBalances: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_balance_"},
 		tokens:           &model.StoreMapping[uint64, TokenInfo]{Namespace: "gateway", KeyPrefix: "token_"},
 		usages:           &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
