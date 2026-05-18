@@ -131,11 +131,34 @@ func (s *WalletService) SignTx(email string, tx *TxRequest) (string, error) {
 }
 
 // SignMessage 签名消息 (EIP-191)
-func (s *WalletService) SignMessage(email, message string) (string, error) {
-	priv, err := s.DerivePrivateKey(email)
-	if err != nil {
-		return "", err
+// passwordHash: 用户设置的交易密码哈希；若用户未设置密码且使用服务端密钥加密，则传空
+func (s *WalletService) SignMessage(email, message, passwordHash string) (string, error) {
+	var priv *ecdsa.PrivateKey
+	var err error
+
+	if s.HasEncryptedKey(email) {
+		if passwordHash != "" {
+			// 用户设了密码 → 用密码解密
+			priv, err = s.DecryptPrivateKey(email, passwordHash)
+		} else {
+			// 没设密码 → 用服务端密钥解密
+			keyBytes, e := s.DecryptWithServerKey(email)
+			if e != nil {
+				return "", e
+			}
+			priv, err = ethcrypto.ToECDSA(keyBytes)
+		}
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// 没有加密存储 → 从 seed 派生（首次使用）
+		priv, err = s.DerivePrivateKey(email)
+		if err != nil {
+			return "", err
+		}
 	}
+
 	msgBytes := []byte(message)
 	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(msgBytes))
 	hash := ethcrypto.Keccak256Hash(append([]byte(prefix), msgBytes...))

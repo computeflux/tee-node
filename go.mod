@@ -141,4 +141,5 @@ require (
 )
 
 replace github.com/wetee-dao/ink.go => ../../wetee/ink.go
+
 // replace go.dedis.ch/kyber/v4 => ../../wetee/kyber

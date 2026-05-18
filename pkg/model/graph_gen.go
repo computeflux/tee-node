@@ -44,3 +44,10 @@ type SecretEnvWithHash struct {
 	Hash   string     `json:"hash"`
 	Secret *SecretEnv `json:"secret"`
 }
+
+type SignSessionResult struct {
+	Status    string  `json:"status"`
+	SignToken *string `json:"signToken,omitempty"`
+	ExpiresAt *int    `json:"expiresAt,omitempty"`
+	Error     *string `json:"error,omitempty"`
+}

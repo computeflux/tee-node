@@ -14,7 +14,6 @@ func (c *SysCall) BytesForSig() ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
-
 }
 
 func ContractForSig(call *ContractCall) []byte {

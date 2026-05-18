@@ -11,15 +11,23 @@ import (
 	sidechain "github.com/computeflux/tee-provider/side-chain"
 )
 
-// DecodeCaller 支持 32 字节 hex（可带 0x 前缀）或 SS58，返回公钥字节。
+// DecodeCaller 支持以下格式的 caller：
+//   - 20 字节 hex（40 个 hex 字符，可带 0x 前缀）：以太坊地址
+//   - 32 字节 hex（64 个 hex 字符，可带 0x 前缀）：ed25519/sr25519 公钥
+//   - SS58 格式：Polkadot 地址
 func DecodeCaller(s string) ([]byte, error) {
 	s = strings.TrimPrefix(s, "0x")
-	if b, err := hex.DecodeString(s); err == nil && len(b) == 32 {
-		return b, nil
+	if b, err := hex.DecodeString(s); err == nil {
+		switch len(b) {
+		case 20: // 以太坊地址（20 字节）
+			return b, nil
+		case 32: // ed25519/sr25519 公钥
+			return b, nil
+		}
 	}
 	pub, err := model.PubKeyFromSS58(s)
 	if err != nil {
-		return nil, fmt.Errorf("caller 需为 32 字节 hex 或 SS58: %w", err)
+		return nil, fmt.Errorf("caller 需为 20/32 字节 hex 或 SS58: %w", err)
 	}
 	return pub.Byte(), nil
 }

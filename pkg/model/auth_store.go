@@ -18,7 +18,10 @@ type AuthUser struct {
 	Address      string `json:"address"`
 	AuthProvider string `json:"authProvider"`
 	LastLogin    int64  `json:"lastLogin"`
+	PasswordHash string `json:"passwordHash,omitempty"`
 }
+
+
 
 // AuthSession 认证会话
 type AuthSession struct {
@@ -49,11 +52,11 @@ func PutAuthUser(u *AuthUser) error {
 	if err != nil {
 		return err
 	}
-	return SetKey("AUTH", "u:"+u.Email, b)
+	return SetKey("WEB3AUTH", "u:"+u.Email, b)
 }
 
 func GetAuthUser(email string) (*AuthUser, error) {
-	return GetJson[AuthUser]("AUTH", "u:"+email)
+	return GetJson[AuthUser]("WEB3AUTH", "u:"+email)
 }
 
 // ── Session ───────────────────────────────────────────────
@@ -67,21 +70,46 @@ func PutAuthSession(s *AuthSession) error {
 	if err != nil {
 		return err
 	}
-	return SetKey("AUTH", "s:"+tok, b)
+	return SetKey("WEB3AUTH", "s:"+tok, b)
 }
 
 func GetAuthSession(token string) (*AuthSession, error) {
 	if len(token) > 32 {
 		token = token[:32]
 	}
-	return GetJson[AuthSession]("AUTH", "s:"+token)
+	return GetJson[AuthSession]("WEB3AUTH", "s:"+token)
 }
 
 func DeleteAuthSession(token string) error {
 	if len(token) > 32 {
 		token = token[:32]
 	}
-	return DeleteKey("AUTH", "s:"+token)
+	return DeleteKey("WEB3AUTH", "s:"+token)
+}
+
+// SignSession 签名会话（密码验证后的短期授权）
+type SignSession struct {
+	Token     string `json:"token"`
+	Email     string `json:"email"`
+	ExpiresAt int64  `json:"expiresAt"`
+}
+
+// ── SignSession ───────────────────────────────────────────
+
+func PutSignSession(s *SignSession) error {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	return SetKey("WEB3AUTH", "sig:"+s.Token, b)
+}
+
+func GetSignSession(token string) (*SignSession, error) {
+	return GetJson[SignSession]("WEB3AUTH", "sig:"+token)
+}
+
+func DeleteSignSession(token string) error {
+	return DeleteKey("WEB3AUTH", "sig:"+token)
 }
 
 // ── EncryptedKey ──────────────────────────────────────────
@@ -91,25 +119,25 @@ func PutEncryptedKey(k *EncryptedKey) error {
 	if err != nil {
 		return err
 	}
-	return SetKey("AUTH", "k:"+k.Email, b)
+	return SetKey("WEB3AUTH", "k:"+k.Email, b)
 }
 
 func GetEncryptedKey(email string) (*EncryptedKey, error) {
-	return GetJson[EncryptedKey]("AUTH", "k:"+email)
+	return GetJson[EncryptedKey]("WEB3AUTH", "k:"+email)
 }
 
 func DeleteEncryptedKey(email string) error {
-	return DeleteKey("AUTH", "k:"+email)
+	return DeleteKey("WEB3AUTH", "k:"+email)
 }
 
 // ── OTP ───────────────────────────────────────────────────
 
 func PutOTP(email, otp string) error {
-	return SetKey("AUTH", "o:"+email, []byte(otp))
+	return SetKey("WEB3AUTH", "o:"+email, []byte(otp))
 }
 
 func GetOTP(email string) (string, error) {
-	b, err := GetKey("AUTH", "o:"+email)
+	b, err := GetKey("WEB3AUTH", "o:"+email)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +145,7 @@ func GetOTP(email string) (string, error) {
 }
 
 func DeleteOTP(email string) error {
-	return DeleteKey("AUTH", "o:"+email)
+	return DeleteKey("WEB3AUTH", "o:"+email)
 }
 
 // ── Recovery ──────────────────────────────────────────────
@@ -127,11 +155,11 @@ func PutRecoveryConfig(c *RecoveryConfig) error {
 	if err != nil {
 		return err
 	}
-	return SetKey("AUTH", "r:"+c.UserEmail, b)
+	return SetKey("WEB3AUTH", "r:"+c.UserEmail, b)
 }
 
 func GetRecoveryConfig(userEmail string) (*RecoveryConfig, error) {
-	return GetJson[RecoveryConfig]("AUTH", "r:"+userEmail)
+	return GetJson[RecoveryConfig]("WEB3AUTH", "r:"+userEmail)
 }
 
 func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
@@ -141,7 +169,7 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 	}
 	defer iter.Close()
 
-	prefix := []byte(comboKey("AUTH", "r:"))
+	prefix := []byte(comboKey("WEB3AUTH", "r:"))
 	for iter.SeekGE(prefix); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
 		raw, err := util.Unseal(iter.Value(), nil)
 		if err != nil {
@@ -156,11 +184,11 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 }
 
 func PutRecoveryOTP(userEmail, otp string) error {
-	return SetKey("AUTH", "ro:"+userEmail, []byte(otp))
+	return SetKey("WEB3AUTH", "ro:"+userEmail, []byte(otp))
 }
 
 func GetRecoveryOTP(userEmail string) (string, error) {
-	b, err := GetKey("AUTH", "ro:"+userEmail)
+	b, err := GetKey("WEB3AUTH", "ro:"+userEmail)
 	if err != nil {
 		return "", err
 	}
@@ -168,5 +196,5 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 }
 
 func DeleteRecoveryOTP(userEmail string) error {
-	return DeleteKey("AUTH", "ro:"+userEmail)
+	return DeleteKey("WEB3AUTH", "ro:"+userEmail)
 }

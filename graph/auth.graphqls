@@ -30,6 +30,13 @@ type WalletResult {
   error: String
 }
 
+type SignSessionResult {
+  status: String!
+  signToken: String
+  expiresAt: Int
+  error: String
+}
+
 type RecoveryResult {
   status: String!
   recoveryToken: String
@@ -73,11 +80,14 @@ extend type Mutation {
   """设置交易密码"""
   setPassword(token: String!, passwordHash: String!): WalletResult!
 
+  """验证交易密码，返回短期签名 token"""
+  verifyPassword(token: String!, passwordHash: String!): SignSessionResult!
+
   """签名交易"""
   signTransaction(token: String!, tx: TxInput!): WalletResult!
 
   """签名消息"""
-  signMessage(token: String!, message: String!, from: String!): WalletResult!
+  signMessage(token: String!, message: String!, from: String!, passwordHash: String): WalletResult!
 
   """发起社交恢复"""
   requestRecovery(recoveryEmail: String!): RecoveryResult!

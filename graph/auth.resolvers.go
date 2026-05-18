@@ -111,19 +111,76 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
 	}
+	// 加密私钥
 	if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+	}
+	// 存储密码 hash 到用户记录
+	user, _ := model.GetAuthUser(claims.Email)
+	if user != nil {
+		user.PasswordHash = passwordHash
+		model.PutAuthUser(user)
 	}
 	return &auth.WalletResult{Status: "ok"}, nil
 }
 
-// SignTransaction is the resolver for the signTransaction field.
-func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error) {
+// VerifyPassword is the resolver for the verifyPassword field.
+func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error) {
 	claims, err := r.JWTSvc.ParseToken(token)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
+		e := "unauthorized"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
 	}
-	raw, err := r.WalletSvc.SignTx(claims.Email, &wallet.TxRequest{
+
+	// 验证密码 hash
+	user, err := model.GetAuthUser(claims.Email)
+	if err != nil || user == nil {
+		e := "user not found"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	// 如果用户没有设置过密码，先尝试用传入的密码初始化
+	if user.PasswordHash == "" {
+		// 首次设置密码：加密私钥并存储
+		if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
+			e := err.Error()
+			return &model.SignSessionResult{Status: "error", Error: &e}, nil
+		}
+		user.PasswordHash = passwordHash
+		model.PutAuthUser(user)
+	} else if user.PasswordHash != passwordHash {
+		e := "wrong password"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	// 生成短期签名 token（5 分钟有效）
+	signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), claims.Email)
+	expiresAt := time.Now().Add(5 * time.Minute).Unix()
+	if err := model.PutSignSession(&model.SignSession{
+		Token:     signToken,
+		Email:     claims.Email,
+		ExpiresAt: expiresAt,
+	}); err != nil {
+		e := "failed to create session"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	et := int(expiresAt)
+	return &model.SignSessionResult{
+		Status:    "ok",
+		SignToken: &signToken,
+		ExpiresAt: &et,
+	}, nil
+}
+
+// SignTransaction is the resolver for the signTransaction field.
+// token 可以是登录 JWT 或短期签名 token
+func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error) {
+	email, err := r.Resolver.ResolveSignerEmail(token)
+	if err != nil {
+		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+	}
+	raw, err := r.WalletSvc.SignTx(email, &wallet.TxRequest{
 		From:         tx.From,
 		To:           tx.To,
 		Value:        tx.Value,
@@ -141,12 +198,19 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 }
 
 // SignMessage is the resolver for the signMessage field.
-func (r *mutationResolver) SignMessage(ctx context.Context, token string, message string, from string) (*auth.WalletResult, error) {
-	claims, err := r.JWTSvc.ParseToken(token)
+// token 可以是登录 JWT 或短期签名 token
+func (r *mutationResolver) SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error) {
+	email, err := r.Resolver.ResolveSignerEmail(token)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
+		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
-	sig, err := r.WalletSvc.SignMessage(claims.Email, message)
+
+	var pwd string
+	if passwordHash != nil {
+		pwd = *passwordHash
+	}
+
+	sig, err := r.WalletSvc.SignMessage(email, message, pwd)
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}

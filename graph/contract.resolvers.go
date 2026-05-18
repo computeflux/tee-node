@@ -51,8 +51,8 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 			Contract: call,
 		},
 	}
-	// First occurrence: SystemContractInit
 
+	// First occurrence: SystemContractInit
 	sigBytes, err := sysCall.BytesForSig()
 	if err != nil {
 		return false, gqlerror.Errorf("BytesForSig: %v", err)

@@ -79,13 +79,14 @@ type ComplexityRoot struct {
 		RequestOtp         func(childComplexity int, email string, clientID string) int
 		RequestRecovery    func(childComplexity int, recoveryEmail string) int
 		SetPassword        func(childComplexity int, token string, passwordHash string) int
-		SignMessage        func(childComplexity int, token string, message string, from string) int
+		SignMessage        func(childComplexity int, token string, message string, from string, passwordHash *string) int
 		SignTransaction    func(childComplexity int, token string, tx auth.TxInput) int
 		SocialLogin        func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string) int
 		StartEpoch         func(childComplexity int) int
 		SystemContractInit func(childComplexity int, contract string) int
 		UploadSecret       func(childComplexity int, index string, secret string, hash string, user string) int
 		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
+		VerifyPassword     func(childComplexity int, token string, passwordHash string) int
 		VerifyRecovery     func(childComplexity int, recoveryEmail string, otp string) int
 	}
 
@@ -122,6 +123,13 @@ type ComplexityRoot struct {
 		Secret func(childComplexity int) int
 	}
 
+	SignSessionResult struct {
+		Error     func(childComplexity int) int
+		ExpiresAt func(childComplexity int) int
+		SignToken func(childComplexity int) int
+		Status    func(childComplexity int) int
+	}
+
 	UserInfo struct {
 		AggregateVerifier func(childComplexity int) int
 		AuthConnection    func(childComplexity int) int
@@ -146,8 +154,9 @@ type MutationResolver interface {
 	VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error)
 	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string) (*auth.AuthResponse, error)
 	SetPassword(ctx context.Context, token string, passwordHash string) (*auth.WalletResult, error)
+	VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error)
 	SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error)
-	SignMessage(ctx context.Context, token string, message string, from string) (*auth.WalletResult, error)
+	SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error)
 	RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error)
 	VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error)
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
@@ -378,7 +387,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SignMessage(childComplexity, args["token"].(string), args["message"].(string), args["from"].(string)), true
+		return e.complexity.Mutation.SignMessage(childComplexity, args["token"].(string), args["message"].(string), args["from"].(string), args["passwordHash"].(*string)), true
 
 	case "Mutation.signTransaction":
 		if e.complexity.Mutation.SignTransaction == nil {
@@ -446,6 +455,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.VerifyOtp(childComplexity, args["email"].(string), args["otp"].(string), args["clientId"].(string)), true
+
+	case "Mutation.verifyPassword":
+		if e.complexity.Mutation.VerifyPassword == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyPassword_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyPassword(childComplexity, args["token"].(string), args["passwordHash"].(string)), true
 
 	case "Mutation.verifyRecovery":
 		if e.complexity.Mutation.VerifyRecovery == nil {
@@ -599,6 +620,34 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.SecretEnvWithHash.Secret(childComplexity), true
+
+	case "SignSessionResult.error":
+		if e.complexity.SignSessionResult.Error == nil {
+			break
+		}
+
+		return e.complexity.SignSessionResult.Error(childComplexity), true
+
+	case "SignSessionResult.expiresAt":
+		if e.complexity.SignSessionResult.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.SignSessionResult.ExpiresAt(childComplexity), true
+
+	case "SignSessionResult.signToken":
+		if e.complexity.SignSessionResult.SignToken == nil {
+			break
+		}
+
+		return e.complexity.SignSessionResult.SignToken(childComplexity), true
+
+	case "SignSessionResult.status":
+		if e.complexity.SignSessionResult.Status == nil {
+			break
+		}
+
+		return e.complexity.SignSessionResult.Status(childComplexity), true
 
 	case "UserInfo.aggregateVerifier":
 		if e.complexity.UserInfo.AggregateVerifier == nil {
@@ -1358,6 +1407,11 @@ func (ec *executionContext) field_Mutation_signMessage_args(ctx context.Context,
 		return nil, err
 	}
 	args["from"] = arg2
+	arg3, err := ec.field_Mutation_signMessage_argsPasswordHash(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["passwordHash"] = arg3
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_signMessage_argsToken(
@@ -1411,6 +1465,24 @@ func (ec *executionContext) field_Mutation_signMessage_argsFrom(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_signMessage_argsPasswordHash(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["passwordHash"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("passwordHash"))
+	if tmp, ok := rawArgs["passwordHash"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
 	return zeroVal, nil
 }
 
@@ -1754,6 +1826,57 @@ func (ec *executionContext) field_Mutation_verifyOTP_argsClientID(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("clientId"))
 	if tmp, ok := rawArgs["clientId"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyPassword_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_verifyPassword_argsToken(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	arg1, err := ec.field_Mutation_verifyPassword_argsPasswordHash(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["passwordHash"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_verifyPassword_argsToken(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["token"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+	if tmp, ok := rawArgs["token"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyPassword_argsPasswordHash(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["passwordHash"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("passwordHash"))
+	if tmp, ok := rawArgs["passwordHash"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -3013,6 +3136,71 @@ func (ec *executionContext) fieldContext_Mutation_setPassword(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_verifyPassword(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyPassword(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyPassword(rctx, fc.Args["token"].(string), fc.Args["passwordHash"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.SignSessionResult)
+	fc.Result = res
+	return ec.marshalNSignSessionResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐSignSessionResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyPassword(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "status":
+				return ec.fieldContext_SignSessionResult_status(ctx, field)
+			case "signToken":
+				return ec.fieldContext_SignSessionResult_signToken(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_SignSessionResult_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_SignSessionResult_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SignSessionResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyPassword_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_signTransaction(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_signTransaction(ctx, field)
 	if err != nil {
@@ -3090,7 +3278,7 @@ func (ec *executionContext) _Mutation_signMessage(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SignMessage(rctx, fc.Args["token"].(string), fc.Args["message"].(string), fc.Args["from"].(string))
+		return ec.resolvers.Mutation().SignMessage(rctx, fc.Args["token"].(string), fc.Args["message"].(string), fc.Args["from"].(string), fc.Args["passwordHash"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4702,6 +4890,173 @@ func (ec *executionContext) fieldContext_SecretEnvWithHash_secret(_ context.Cont
 				return ec.fieldContext_SecretEnv_files(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SecretEnv", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignSessionResult_status(ctx context.Context, field graphql.CollectedField, obj *model.SignSessionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignSessionResult_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignSessionResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignSessionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignSessionResult_signToken(ctx context.Context, field graphql.CollectedField, obj *model.SignSessionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignSessionResult_signToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SignToken, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignSessionResult_signToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignSessionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignSessionResult_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.SignSessionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignSessionResult_expiresAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpiresAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignSessionResult_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignSessionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignSessionResult_error(ctx context.Context, field graphql.CollectedField, obj *model.SignSessionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignSessionResult_error(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Error, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignSessionResult_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignSessionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7478,6 +7833,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "verifyPassword":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyPassword(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "signTransaction":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_signTransaction(ctx, field)
@@ -7942,6 +8304,51 @@ func (ec *executionContext) _SecretEnvWithHash(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var signSessionResultImplementors = []string{"SignSessionResult"}
+
+func (ec *executionContext) _SignSessionResult(ctx context.Context, sel ast.SelectionSet, obj *model.SignSessionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, signSessionResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SignSessionResult")
+		case "status":
+			out.Values[i] = ec._SignSessionResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "signToken":
+			out.Values[i] = ec._SignSessionResult_signToken(ctx, field, obj)
+		case "expiresAt":
+			out.Values[i] = ec._SignSessionResult_expiresAt(ctx, field, obj)
+		case "error":
+			out.Values[i] = ec._SignSessionResult_error(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8590,6 +8997,20 @@ func (ec *executionContext) marshalNSecretEnv2ᚖgithubᚗcomᚋcomputefluxᚋte
 	return ec._SecretEnv(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNSignSessionResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐSignSessionResult(ctx context.Context, sel ast.SelectionSet, v model.SignSessionResult) graphql.Marshaler {
+	return ec._SignSessionResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSignSessionResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐSignSessionResult(ctx context.Context, sel ast.SelectionSet, v *model.SignSessionResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SignSessionResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8935,6 +9356,24 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
 	return res
 }
 

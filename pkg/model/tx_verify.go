@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	"github.com/wetee-dao/ink.go"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/vedhavyas/go-subkey/v2/ed25519"
 	"github.com/vedhavyas/go-subkey/v2/sr25519"
+	"github.com/wetee-dao/ink.go"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -34,18 +35,6 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 		return nil, err
 	}
 
-	// switch tx.CallerType {
-	// case 0: // node ed25519
-	// 	if !Ed25519SignVerify(caller, call.BytesForSig(), sig) {
-	// 		return nil, errors.Wrap(err, "node")
-	// 	}
-	// case 1: // polkadot sign sr25519 side contract
-	// 	if err := SideContractPolkadotVerify(caller, call.BytesForSig(), sig); err != nil {
-	// 		return nil, errors.Wrap(err, "contract")
-	// 	}
-	// default:
-	// 	return nil, errors.New("unknown caller type")
-	// }
 	err = SideSysCallVerify(caller, tx.CallerType, call, sig)
 	if err != nil {
 		return nil, err
@@ -71,6 +60,14 @@ func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signatur
 		}
 		if err := SideContractPolkadotVerify(caller, sigBytes, signature); err != nil {
 			return errors.Wrap(err, "contract")
+		}
+	case 2: // EVM Wallet signature
+		sigBytes, err := call.BytesForSig()
+		if err != nil {
+			return errors.Wrap(err, "marshal syscall for sig")
+		}
+		if !EVMWalletSignVerify(caller, sigBytes, signature) {
+			return errors.New("invalid signature")
 		}
 	default:
 		return errors.New("unknown caller type")
@@ -126,4 +123,70 @@ func Ed25519SignVerify(pubkeyBt []byte, msg []byte, signature []byte) bool {
 	}
 
 	return pubkey.Verify(msg, signature)
+}
+
+// EVMWalletSignVerify 验证 EVM 钱包签名（EIP-191 personal_sign 格式）
+// caller 可以是 20 字节的以太坊地址，或 33/65 字节的 secp256k1 公钥
+// signature 为 65 字节 [R || S || V]
+func EVMWalletSignVerify(caller []byte, msg []byte, signature []byte) bool {
+	if len(signature) != 65 {
+		return false
+	}
+
+	// EIP-191: \x19Ethereum Signed Message:\n<len><msg>
+	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(msg))
+	prefixedMsg := append([]byte(prefix), msg...)
+	hash := ethcrypto.Keccak256Hash(prefixedMsg)
+
+	// 复制签名并调整 v 值：以太坊使用 27/28，Ecrecover 期望 0/1
+	sig := make([]byte, 65)
+	copy(sig, signature)
+	if sig[64] >= 27 {
+		sig[64] -= 27
+	}
+
+	// 从签名恢复公钥
+	recoveredPub, err := ethcrypto.SigToPub(hash.Bytes(), sig)
+	if err != nil {
+		return false
+	}
+	recoveredAddr := ethcrypto.PubkeyToAddress(*recoveredPub)
+
+	// 根据 caller 长度判断比对方式
+	switch len(caller) {
+	case 20:
+		// caller 是以太坊地址，直接比对
+		return bytes.Equal(recoveredAddr.Bytes(), caller)
+	case 33, 65:
+		// caller 是公钥（压缩或未压缩），从公钥派生地址后比对
+		callerAddr := pubKeyToEVMAddress(caller)
+		return bytes.Equal(recoveredAddr.Bytes(), callerAddr)
+	default:
+		return false
+	}
+}
+
+// pubKeyToEVMAddress 从 secp256k1 公钥派生以太坊地址，返回 20 字节地址
+// 支持 65 字节未压缩公钥（0x04 前缀）、33 字节压缩公钥（0x02/0x03 前缀）
+func pubKeyToEVMAddress(pubKey []byte) []byte {
+	if len(pubKey) == 33 && (pubKey[0] == 0x02 || pubKey[0] == 0x03) {
+		// 压缩公钥：解压为未压缩格式
+		pk, err := ethcrypto.DecompressPubkey(pubKey)
+		if err != nil {
+			return nil
+		}
+		addr := ethcrypto.PubkeyToAddress(*pk)
+		return addr.Bytes()
+	}
+	// 未压缩公钥：移除 0x04 前缀后计算地址
+	var key []byte
+	if len(pubKey) == 65 && pubKey[0] == 0x04 {
+		key = pubKey[1:]
+	} else {
+		key = pubKey
+	}
+	hash := ethcrypto.Keccak256(key)
+	addr := make([]byte, 20)
+	copy(addr, hash[12:])
+	return addr
 }

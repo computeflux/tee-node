@@ -3,7 +3,11 @@
 package graph
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/computeflux/tee-provider/pkg/api/auth"
+	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/services/auth"
 	"github.com/computeflux/tee-provider/services/wallet"
 	sidechain "github.com/computeflux/tee-provider/side-chain"
@@ -20,4 +24,28 @@ type Resolver struct {
 	EmailSvc  authsvc.EmailService
 	OAuthSvc  *authsvc.OAuthService
 	OTPSvc    *authsvc.OTPService
+}
+
+// ResolveSignerEmail 从 token 解析出用户邮箱
+// 支持登录 JWT 和短期签名 token
+func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
+	// 先尝试作为签名 token 解析
+	if len(token) > 4 && token[:4] == "sig_" {
+		session, err := model.GetSignSession(token)
+		if err != nil || session == nil {
+			return "", fmt.Errorf("invalid sign token")
+		}
+		if time.Now().Unix() > session.ExpiresAt {
+			model.DeleteSignSession(token)
+			return "", fmt.Errorf("sign token expired")
+		}
+		return session.Email, nil
+	}
+
+	// 尝试作为 JWT 解析
+	claims, err := r.JWTSvc.ParseToken(token)
+	if err != nil {
+		return "", fmt.Errorf("unauthorized")
+	}
+	return claims.Email, nil
 }
