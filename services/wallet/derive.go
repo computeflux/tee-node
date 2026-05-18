@@ -104,3 +104,40 @@ func (s *WalletService) HasEncryptedKey(email string) bool {
 	record, err := model.GetEncryptedKey(email)
 	return err == nil && record != nil
 }
+
+// decryptKeyByType 根据 BlobType 选择正确的解密方式
+func (s *WalletService) decryptKeyByType(email, passwordHash string) (*ecdsa.PrivateKey, error) {
+	record, err := model.GetEncryptedKey(email)
+	if err != nil || record == nil {
+		return nil, fmt.Errorf("no stored key for %s", email)
+	}
+
+	switch record.BlobType {
+	case "aes-256-gcm":
+		// 用户密码加密
+		if passwordHash == "" {
+			return nil, fmt.Errorf("password required: key is encrypted with user password")
+		}
+		return s.DecryptPrivateKey(email, passwordHash)
+	case "aes-256-gcm-server":
+		// 服务端密钥加密
+		keyBytes, err := s.DecryptWithServerKey(email)
+		if err != nil {
+			return nil, err
+		}
+		return ethcrypto.ToECDSA(keyBytes)
+	default:
+		// 未知类型，尝试两种方式
+		if passwordHash != "" {
+			priv, err := s.DecryptPrivateKey(email, passwordHash)
+			if err == nil {
+				return priv, nil
+			}
+		}
+		keyBytes, err := s.DecryptWithServerKey(email)
+		if err != nil {
+			return nil, fmt.Errorf("cannot decrypt key (unknown blob type %q): %w", record.BlobType, err)
+		}
+		return ethcrypto.ToECDSA(keyBytes)
+	}
+}

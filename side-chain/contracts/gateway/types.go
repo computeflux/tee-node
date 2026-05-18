@@ -26,6 +26,22 @@ const (
 	RegionOceania                        // 0x80 大洋洲
 )
 
+// ── Provider Type ───────────────────────────────────────
+
+// ProviderType 模型供应商类型
+type ProviderType uint16
+
+const (
+	ProviderOpenAI   ProviderType = iota + 1 // 1
+	ProviderClaude                           // 2
+	ProviderGemini                           // 3
+	ProviderAzure                            // 4
+	ProviderDeepSeek                         // 5
+	ProviderLlama                            // 6
+	ProviderMistral                          // 7
+	ProviderCohere                           // 8
+)
+
 // ── Model ────────────────────────────────────────────────
 
 // ModelInfo 独立注册的模型
@@ -38,6 +54,11 @@ type ModelInfo struct {
 	InputModalities uint8         `json:"inputModalities" idx:"exact"`
 	ContextLength   uint64        `json:"contextLength"   idx:"bucket:4000,8000,16000,32000,64000,128000,256000,512000,1000000"`
 	PromptPricing   uint64        `json:"promptPricing"   idx:"bucket:1,5,10,50,100,500,1000,5000,10000"`
+
+	// 供应商配置
+	ProviderType ProviderType `json:"providerType"`      // 供应商类型 (openai, claude, ...)
+	URI          string       `json:"uri,omitempty"`     // 自定义端点，为空则用供应商官方地址
+	APIKeys      []string     `json:"apiKeys,omitempty"` // 多个 API Key，轮询/故障转移
 }
 
 // ── Provider / Channel ──────────────────────────────────
@@ -53,8 +74,11 @@ type ProviderInfo struct {
 	Description string `json:"description"` // 介绍
 
 	// ── 服务能力 ──
-	BaseURL  string   `json:"baseURL"`  // API 端点
-	ModelIds []uint64 `json:"modelIds"` // 支持的模型列表
+	BaseURL      string       `json:"baseURL"`           // API 端点
+	ModelIds     []uint64     `json:"modelIds"`          // 支持的模型列表
+	ProviderType ProviderType `json:"providerType"`      // 供应商类型 (openai, claude, ...)
+	URI          string       `json:"uri,omitempty"`     // 自定义端点，为空则用供应商官方地址
+	APIKeys      []string     `json:"apiKeys,omitempty"` // 多个 API Key，轮询/故障转移
 
 	// ── 地域（用户就近选择） ──
 	Region uint8 `json:"region" idx:"exact"` // 服务区域位掩码

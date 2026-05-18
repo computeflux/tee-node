@@ -31,17 +31,7 @@ func (s *WalletService) SignTx(email string, tx *TxRequest) (string, error) {
 	var err error
 
 	if s.HasEncryptedKey(email) {
-		if tx.PasswordHash != "" {
-			// 用户设了密码 → 用密码解密
-			priv, err = s.DecryptPrivateKey(email, tx.PasswordHash)
-		} else {
-			// 没设密码 → 用服务端密钥解密
-			keyBytes, e := s.DecryptWithServerKey(email)
-			if e != nil {
-				return "", e
-			}
-			priv, err = ethcrypto.ToECDSA(keyBytes)
-		}
+		priv, err = s.decryptKeyByType(email, tx.PasswordHash)
 		if err != nil {
 			return "", err
 		}
@@ -137,17 +127,7 @@ func (s *WalletService) SignMessage(email, message, passwordHash string) (string
 	var err error
 
 	if s.HasEncryptedKey(email) {
-		if passwordHash != "" {
-			// 用户设了密码 → 用密码解密
-			priv, err = s.DecryptPrivateKey(email, passwordHash)
-		} else {
-			// 没设密码 → 用服务端密钥解密
-			keyBytes, e := s.DecryptWithServerKey(email)
-			if e != nil {
-				return "", e
-			}
-			priv, err = ethcrypto.ToECDSA(keyBytes)
-		}
+		priv, err = s.decryptKeyByType(email, passwordHash)
 		if err != nil {
 			return "", err
 		}
@@ -159,7 +139,12 @@ func (s *WalletService) SignMessage(email, message, passwordHash string) (string
 		}
 	}
 
-	msgBytes := []byte(message)
+	// 兼容 MetaMask personal_sign：如果 message 是 hex 字符串，先解码为原始 bytes
+	msgBytes, err := decodeMessage(message)
+	if err != nil {
+		return "", fmt.Errorf("invalid message: %w", err)
+	}
+
 	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(msgBytes))
 	hash := ethcrypto.Keccak256Hash(append([]byte(prefix), msgBytes...))
 	sig, err := ethcrypto.Sign(hash.Bytes(), priv)
@@ -167,6 +152,20 @@ func (s *WalletService) SignMessage(email, message, passwordHash string) (string
 		return "", fmt.Errorf("sign message: %w", err)
 	}
 	return "0x" + hex.EncodeToString(sig), nil
+}
+
+// decodeMessage 解码 personal_sign 的消息参数。
+// MetaMask 行为：如果消息是以 "0x" 开头的 hex 字符串，则解码为原始 bytes；
+// 否则将消息作为普通 UTF-8 字符串处理。
+func decodeMessage(msg string) ([]byte, error) {
+	if strings.HasPrefix(msg, "0x") || strings.HasPrefix(msg, "0X") {
+		decoded, err := hex.DecodeString(cleanHex(msg))
+		if err == nil {
+			return decoded, nil
+		}
+		// 解码失败则回退为普通字符串（如 "0xhello" 不是合法 hex）
+	}
+	return []byte(msg), nil
 }
 
 func cleanHex(s string) string {

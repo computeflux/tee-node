@@ -39,7 +39,7 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.Consume(tokenID, providerID, modelID, tokensUsed)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
-		if err := model.RequireArgLen(args, 5, "create_provider"); err != nil {
+		if err := model.RequireArgLen(args, 8, "create_provider"); err != nil {
 			return err
 		}
 		name, err := model.DecodeScaleArgBytes[string](args[0])
@@ -62,7 +62,19 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("create_provider: deposit: %w", err)
 		}
-		return m.CreateProvider(name, logoURL, description, region, deposit)
+		providerType, err := model.DecodeScaleArgBytes[ProviderType](args[5])
+		if err != nil {
+			return fmt.Errorf("create_provider: providerType: %w", err)
+		}
+		uri, err := model.DecodeScaleArgBytes[string](args[6])
+		if err != nil {
+			return fmt.Errorf("create_provider: uri: %w", err)
+		}
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[7])
+		if err != nil {
+			return fmt.Errorf("create_provider: apiKeys: %w", err)
+		}
+		return m.CreateProvider(name, logoURL, description, region, deposit, providerType, uri, apiKeys)
 	case [4]byte{0x5a, 0x7c, 0x32, 0x41}:
 		if err := model.RequireArgLen(args, 2, "create_token"); err != nil {
 			return err
@@ -101,7 +113,7 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.Recharge(user, amount)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := model.RequireArgLen(args, 5, "register_model"); err != nil {
+		if err := model.RequireArgLen(args, 8, "register_model"); err != nil {
 			return err
 		}
 		name, err := model.DecodeScaleArgBytes[string](args[0])
@@ -124,7 +136,19 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: promptPricing: %w", err)
 		}
-		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing)
+		providerType, err := model.DecodeScaleArgBytes[ProviderType](args[5])
+		if err != nil {
+			return fmt.Errorf("register_model: providerType: %w", err)
+		}
+		uri, err := model.DecodeScaleArgBytes[string](args[6])
+		if err != nil {
+			return fmt.Errorf("register_model: uri: %w", err)
+		}
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[7])
+		if err != nil {
+			return fmt.Errorf("register_model: apiKeys: %w", err)
+		}
+		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing, providerType, uri, apiKeys)
 	case [4]byte{0xb9, 0xd0, 0x4c, 0x81}:
 		if err := model.RequireArgLen(args, 1, "revoke_token"); err != nil {
 			return err
@@ -135,7 +159,7 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.RevokeToken(tokenID)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := model.RequireArgLen(args, 5, "update_model"); err != nil {
+		if err := model.RequireArgLen(args, 8, "update_model"); err != nil {
 			return err
 		}
 		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
@@ -158,9 +182,21 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: promptPricing: %w", err)
 		}
-		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing)
+		providerType, err := model.DecodeScaleArgBytes[ProviderType](args[5])
+		if err != nil {
+			return fmt.Errorf("update_model: providerType: %w", err)
+		}
+		uri, err := model.DecodeScaleArgBytes[string](args[6])
+		if err != nil {
+			return fmt.Errorf("update_model: uri: %w", err)
+		}
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[7])
+		if err != nil {
+			return fmt.Errorf("update_model: apiKeys: %w", err)
+		}
+		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing, providerType, uri, apiKeys)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
-		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
+		if err := model.RequireArgLen(args, 12, "update_provider"); err != nil {
 			return err
 		}
 		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
@@ -199,7 +235,19 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_provider: uptimeSLA: %w", err)
 		}
-		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)
+		providerType, err := model.DecodeScaleArgBytes[ProviderType](args[9])
+		if err != nil {
+			return fmt.Errorf("update_provider: providerType: %w", err)
+		}
+		uri, err := model.DecodeScaleArgBytes[string](args[10])
+		if err != nil {
+			return fmt.Errorf("update_provider: uri: %w", err)
+		}
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[11])
+		if err != nil {
+			return fmt.Errorf("update_provider: apiKeys: %w", err)
+		}
+		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA, providerType, uri, apiKeys)
 	case [4]byte{0x11, 0xb2, 0xf8, 0x54}:
 		if err := model.RequireArgLen(args, 2, "withdraw"); err != nil {
 			return err

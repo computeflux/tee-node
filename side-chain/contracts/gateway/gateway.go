@@ -43,6 +43,7 @@ func (g GatewayMutation) Init() error {
 func (g GatewayMutation) RegisterModel(
 	name string, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
+	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
 	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
@@ -54,6 +55,9 @@ func (g GatewayMutation) RegisterModel(
 		InputModalities: inputModalities,
 		ContextLength:   contextLength,
 		PromptPricing:   promptPricing,
+		ProviderType:    providerType,
+		URI:             uri,
+		APIKeys:         apiKeys,
 	}); err != nil {
 		return err
 	}
@@ -63,12 +67,16 @@ func (g GatewayMutation) RegisterModel(
 func (g GatewayMutation) UpdateModel(
 	modelID uint64, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
+	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
 		m.PointsPer1K = pointsPer1K
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
 		m.PromptPricing = promptPricing
+		m.ProviderType = providerType
+		m.URI = uri
+		m.APIKeys = apiKeys
 	})
 }
 
@@ -83,6 +91,7 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 func (g GatewayMutation) CreateProvider(
 	name, logoURL, description string,
 	region uint8, deposit uint64,
+	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
 	// priority 由 deposit 自动计算
@@ -96,15 +105,18 @@ func (g GatewayMutation) CreateProvider(
 		priority = 30
 	}
 	if _, err := g.providers.Insert(g.api.GetTxn(), ProviderInfo{
-		Owner:       owner,
-		Name:        name,
-		LogoURL:     logoURL,
-		Description: description,
-		Region:      region,
-		Deposit:     deposit,
-		Priority:    priority,
-		IsActive:    true,
-		CreatedAt:   uint64(g.api.GetHeight()),
+		Owner:        owner,
+		Name:         name,
+		LogoURL:      logoURL,
+		Description:  description,
+		Region:       region,
+		Deposit:      deposit,
+		Priority:     priority,
+		ProviderType: providerType,
+		URI:          uri,
+		APIKeys:      apiKeys,
+		IsActive:     true,
+		CreatedAt:    uint64(g.api.GetHeight()),
 	}); err != nil {
 		return err
 	}
@@ -116,6 +128,7 @@ func (g GatewayMutation) UpdateProvider(
 	name, logoURL, description string,
 	modelIds []uint64, region uint8, feeRate uint32,
 	priority uint32, uptimeSLA uint32,
+	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	return g.providers.UpdateFn(g.api.GetTxn(), providerID, func(ch *ProviderInfo) {
 		if name != "" {
@@ -141,6 +154,15 @@ func (g GatewayMutation) UpdateProvider(
 		}
 		if uptimeSLA != 0 {
 			ch.UptimeSLA = uptimeSLA
+		}
+		if providerType != 0 {
+			ch.ProviderType = providerType
+		}
+		if uri != "" {
+			ch.URI = uri
+		}
+		if apiKeys != nil {
+			ch.APIKeys = apiKeys
 		}
 	})
 }

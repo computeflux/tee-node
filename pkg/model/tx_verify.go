@@ -66,6 +66,7 @@ func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signatur
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}
+
 		if !EVMWalletSignVerify(caller, sigBytes, signature) {
 			return errors.New("invalid signature")
 		}
