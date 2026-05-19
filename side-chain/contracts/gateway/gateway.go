@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -11,7 +13,7 @@ var (
 	ErrLowBalance       = errors.New("low balance")
 	ErrModelNotFound    = errors.New("model not found")
 	ErrProviderNotFound = errors.New("provider not found")
-	ErrTokenNotFound    = errors.New("token not found")
+	ErrAPIKeyNotFound   = errors.New("api key not found")
 	ErrNotOwner         = errors.New("not owner")
 )
 
@@ -21,12 +23,11 @@ type Gateway struct {
 
 	balances         *model.StoreMapping[string, uint64]
 	models           *model.IndexedList[uint64, ModelInfo]    // tag 索引 + 自增 id + 分页
-	providers        *model.IndexedList[uint64, ProviderInfo] `store:"keyPfx:providers_v2"`
+	providers        *model.IndexedList[uint64, ProviderInfo] `store:"keyPfx:providers_v3"`
+	providerByOwner  *model.StoreMapping[string, uint64]      // owner → providerID（一人一 provider）
 	providerBalances *model.StoreMapping[uint64, uint64]
-	tokens           *model.StoreMapping[uint64, TokenInfo]
+	apiKeys          *model.StoreMapping[string, APIKeyInfo] // hex(keyHash) → APIKeyInfo
 	usages           *model.StoreMapping[string, DailyUsage]
-
-	nextTokenID *model.StoreValue[uint64]
 }
 
 type GatewayQuery struct{ Gateway }
@@ -35,7 +36,7 @@ type GatewayMutation struct{ Gateway }
 // ── Init ─────────────────────────────────────────────────
 
 func (g GatewayMutation) Init() error {
-	return g.nextTokenID.Set(g.api.GetTxn(), 0)
+	return nil
 }
 
 // ── Model ────────────────────────────────────────────────
@@ -43,18 +44,28 @@ func (g GatewayMutation) Init() error {
 func (g GatewayMutation) RegisterModel(
 	name string, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	providerType ProviderType, uri string, apiKeys []string,
+	modelID string, providerType uint16, uri string, apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
+
+	// 必须已注册 Provider
+	ownerKey := string(owner.V)
+	provID, err := g.providerByOwner.Get(g.api.GetTxn(), ownerKey)
+	if err != nil || provID == nil {
+		return fmt.Errorf("must create a provider before registering models")
+	}
+
 	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
 		Name:            name,
 		Owner:           owner,
+		ProviderID:      *provID,
 		PointsPer1K:     pointsPer1K,
 		IsActive:        true,
 		CreatedAt:       uint64(g.api.GetHeight()),
 		InputModalities: inputModalities,
 		ContextLength:   contextLength,
 		PromptPricing:   promptPricing,
+		ModelID:         modelID,
 		ProviderType:    providerType,
 		URI:             uri,
 		APIKeys:         apiKeys,
@@ -67,13 +78,14 @@ func (g GatewayMutation) RegisterModel(
 func (g GatewayMutation) UpdateModel(
 	modelID uint64, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	providerType ProviderType, uri string, apiKeys []string,
+	modelIDStr string, providerType uint16, uri string, apiKeys []string,
 ) error {
 	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
 		m.PointsPer1K = pointsPer1K
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
 		m.PromptPricing = promptPricing
+		m.ModelID = modelIDStr
 		m.ProviderType = providerType
 		m.URI = uri
 		m.APIKeys = apiKeys
@@ -91,9 +103,15 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 func (g GatewayMutation) CreateProvider(
 	name, logoURL, description string,
 	region uint8, deposit uint64,
-	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
+
+	// 一人只能注册一个 provider
+	ownerKey := string(owner.V)
+	if existing, _ := g.providerByOwner.Get(g.api.GetTxn(), ownerKey); existing != nil {
+		return fmt.Errorf("provider already exists for this account (id=%d)", *existing)
+	}
+
 	// priority 由 deposit 自动计算
 	var priority uint32
 	switch {
@@ -104,20 +122,23 @@ func (g GatewayMutation) CreateProvider(
 	default:
 		priority = 30
 	}
-	if _, err := g.providers.Insert(g.api.GetTxn(), ProviderInfo{
-		Owner:        owner,
-		Name:         name,
-		LogoURL:      logoURL,
-		Description:  description,
-		Region:       region,
-		Deposit:      deposit,
-		Priority:     priority,
-		ProviderType: providerType,
-		URI:          uri,
-		APIKeys:      apiKeys,
-		IsActive:     true,
-		CreatedAt:    uint64(g.api.GetHeight()),
-	}); err != nil {
+	id, err := g.providers.Insert(g.api.GetTxn(), ProviderInfo{
+		Owner:       owner,
+		Name:        name,
+		LogoURL:     logoURL,
+		Description: description,
+		Region:      region,
+		Deposit:     deposit,
+		Priority:    priority,
+		IsActive:    true,
+		CreatedAt:   uint64(g.api.GetHeight()),
+	})
+	if err != nil {
+		return err
+	}
+
+	// 记录 owner → providerID 映射
+	if err := g.providerByOwner.Set(g.api.GetTxn(), ownerKey, id); err != nil {
 		return err
 	}
 	return nil
@@ -128,7 +149,6 @@ func (g GatewayMutation) UpdateProvider(
 	name, logoURL, description string,
 	modelIds []uint64, region uint8, feeRate uint32,
 	priority uint32, uptimeSLA uint32,
-	providerType ProviderType, uri string, apiKeys []string,
 ) error {
 	return g.providers.UpdateFn(g.api.GetTxn(), providerID, func(ch *ProviderInfo) {
 		if name != "" {
@@ -155,15 +175,6 @@ func (g GatewayMutation) UpdateProvider(
 		if uptimeSLA != 0 {
 			ch.UptimeSLA = uptimeSLA
 		}
-		if providerType != 0 {
-			ch.ProviderType = providerType
-		}
-		if uri != "" {
-			ch.URI = uri
-		}
-		if apiKeys != nil {
-			ch.APIKeys = apiKeys
-		}
 	})
 }
 
@@ -179,86 +190,120 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 	return g.balances.Set(g.api.GetTxn(), key, *bal)
 }
 
-func (g GatewayMutation) Consume(tokenID, providerID, modelID uint64, tokensUsed uint64) error {
-	tk, err := g.tokens.Get(g.api.GetTxn(), tokenID)
-	if err != nil || tk == nil {
-		return ErrTokenNotFound
-	}
+// ── Billing ──────────────────────────────────────────────
 
-	m, err := g.models.Get(g.api.GetTxn(), modelID)
-	if err != nil || m == nil {
-		return ErrModelNotFound
-	}
+// SettleUsage 批量结算（仅模型所属 Provider 可调用，每 5 分钟执行一次）
+// TODO: 防重放 — 增加 batchNonce/merkle root + TEE 签名校验，防止 Provider 重复提交同一批结算
+func (g GatewayMutation) SettleUsage(records []Settlement) error {
+	caller := g.api.GetCaller()
 
-	cost := (tokensUsed+999)/1000*m.PointsPer1K + m.PromptPricing
-	if cost < 1 {
-		cost = 1
-	}
+	for _, r := range records {
+		// 校验 provider 归属
+		prov, err := g.providers.Get(g.api.GetTxn(), r.ProviderID)
+		if err != nil || prov == nil {
+			return fmt.Errorf("settle: %w", ErrProviderNotFound)
+		}
+		if !bytes.Equal(prov.Owner.V, caller.V) || prov.Owner.T != caller.T {
+			return fmt.Errorf("settle: provider %d not owned by caller", r.ProviderID)
+		}
 
-	key := string(tk.Owner.V)
-	bal, _ := g.balances.Get(g.api.GetTxn(), key)
-	if bal == nil || *bal < cost {
-		return ErrLowBalance
-	}
-	*bal -= cost
-	g.balances.Set(g.api.GetTxn(), key, *bal)
+		// 校验模型存在
+		m, err := g.models.Get(g.api.GetTxn(), r.ModelID)
+		if err != nil || m == nil {
+			return fmt.Errorf("settle: %w", ErrModelNotFound)
+		}
 
-	pb, _ := g.providerBalances.Get(g.api.GetTxn(), modelID)
-	if pb == nil {
-		pb = new(uint64)
-	}
-	*pb += cost
-	g.providerBalances.Set(g.api.GetTxn(), modelID, *pb)
+		cost := r.Cost
+		if cost == 0 {
+			cost = (r.TokensUsed+999)/1000*m.PointsPer1K + m.PromptPricing
+		}
+		if cost < 1 {
+			cost = 1
+		}
 
-	dayKey := fmt.Sprintf("%d_%d_%s", tokenID, modelID, "today")
-	usage, _ := g.usages.Get(g.api.GetTxn(), dayKey)
-	if usage == nil {
-		usage = &DailyUsage{TokenID: tokenID, ProviderID: providerID, ModelID: modelID}
+		// 扣用户余额
+		userKey := string(r.User.V)
+		bal, _ := g.balances.Get(g.api.GetTxn(), userKey)
+		if bal == nil || *bal < cost {
+			return fmt.Errorf("settle user %x: %w", r.User.V, ErrLowBalance)
+		}
+		*bal -= cost
+		g.balances.Set(g.api.GetTxn(), userKey, *bal)
+
+		// 加 provider 余额
+		pb, _ := g.providerBalances.Get(g.api.GetTxn(), r.ProviderID)
+		if pb == nil {
+			pb = new(uint64)
+		}
+		*pb += cost
+		g.providerBalances.Set(g.api.GetTxn(), r.ProviderID, *pb)
+
+		// 记录每日用量
+		dayKey := fmt.Sprintf("%x_%d_%d_%s", r.User.V, r.ProviderID, r.ModelID, "today")
+		usage, _ := g.usages.Get(g.api.GetTxn(), dayKey)
+		if usage == nil {
+			usage = &DailyUsage{User: r.User, ProviderID: r.ProviderID, ModelID: r.ModelID}
+		}
+		usage.Count++
+		usage.TokensUsed += r.TokensUsed
+		usage.PointsUsed += cost
+		g.usages.Set(g.api.GetTxn(), dayKey, *usage)
 	}
-	usage.Count++
-	usage.TokensUsed += tokensUsed
-	usage.PointsUsed += cost
-	return g.usages.Set(g.api.GetTxn(), dayKey, *usage)
+	return nil
 }
 
-func (g GatewayMutation) Withdraw(modelID uint64, amount uint64) error {
-	pb, err := g.providerBalances.Get(g.api.GetTxn(), modelID)
+func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
+	pb, err := g.providerBalances.Get(g.api.GetTxn(), providerID)
 	if err != nil || pb == nil {
-		return ErrModelNotFound
+		return ErrProviderNotFound
 	}
 	if *pb < amount {
 		return ErrLowBalance
 	}
 	*pb -= amount
-	return g.providerBalances.Set(g.api.GetTxn(), modelID, *pb)
+	return g.providerBalances.Set(g.api.GetTxn(), providerID, *pb)
 }
 
-// ── Token ────────────────────────────────────────────────
+// ── API Key ──────────────────────────────────────────────
 
-func (g GatewayMutation) CreateToken(owner model.UniAddr, rateLimit uint32) error {
-	id, _ := g.nextTokenID.Get(g.api.GetTxn())
-	if id == nil {
-		id = new(uint64)
+// RegisterAPIKey 注册 API Key 哈希（原始 key 绝不上链）
+func (g GatewayMutation) RegisterAPIKey(keyHash []byte, rateLimit uint32) error {
+	if len(keyHash) != 32 {
+		return fmt.Errorf("keyHash must be 32 bytes")
+	}
+	owner := g.api.GetCaller()
+	hexKey := hex.EncodeToString(keyHash)
+
+	if existing, _ := g.apiKeys.Get(g.api.GetTxn(), hexKey); existing != nil {
+		return fmt.Errorf("api key already registered")
 	}
 
-	if err := g.tokens.Set(g.api.GetTxn(), *id, TokenInfo{
-		Owner: owner, RateLimit: rateLimit, IsActive: true,
+	return g.apiKeys.Set(g.api.GetTxn(), hexKey, APIKeyInfo{
+		Owner:     owner,
+		KeyHash:   keyHash,
+		RateLimit: rateLimit,
+		IsActive:  true,
 		CreatedAt: uint64(g.api.GetHeight()),
-	}); err != nil {
-		return err
-	}
-
-	g.nextTokenID.Set(g.api.GetTxn(), *id+1)
-	return nil
+	})
 }
 
-func (g GatewayMutation) RevokeToken(tokenID uint64) error {
-	tk, err := g.tokens.Get(g.api.GetTxn(), tokenID)
-	if err != nil || tk == nil {
-		return ErrTokenNotFound
+// RevokeAPIKey 吊销 API Key
+func (g GatewayMutation) RevokeAPIKey(keyHash []byte) error {
+	if len(keyHash) != 32 {
+		return fmt.Errorf("keyHash must be 32 bytes")
 	}
-	tk.IsActive = false
-	return g.tokens.Set(g.api.GetTxn(), tokenID, *tk)
+	owner := g.api.GetCaller()
+	hexKey := hex.EncodeToString(keyHash)
+
+	info, err := g.apiKeys.Get(g.api.GetTxn(), hexKey)
+	if err != nil || info == nil {
+		return ErrAPIKeyNotFound
+	}
+	if !bytes.Equal(info.Owner.V, owner.V) || info.Owner.T != owner.T {
+		return ErrNotOwner
+	}
+	info.IsActive = false
+	return g.apiKeys.Set(g.api.GetTxn(), hexKey, *info)
 }
 
 // ── Query: Single ────────────────────────────────────────
@@ -279,12 +324,27 @@ func (g GatewayQuery) GetProvider(providerID uint64) (*ProviderInfo, error) {
 	return g.providers.Get(g.api.GetTxn(), providerID)
 }
 
-func (g GatewayQuery) GetToken(tokenID uint64) (*TokenInfo, error) {
-	return g.tokens.Get(g.api.GetTxn(), tokenID)
+// GetProviderByOwner 查询当前用户的 provider
+func (g GatewayQuery) GetProviderByOwner() (uint64, error) {
+	owner := g.api.GetCaller()
+	id, err := g.providerByOwner.Get(g.api.GetTxn(), string(owner.V))
+	if err != nil || id == nil {
+		return 0, nil
+	}
+	return *id, nil
 }
 
-func (g GatewayQuery) GetProviderBalance(modelID uint64) (uint64, error) {
-	bal, err := g.providerBalances.Get(g.api.GetTxn(), modelID)
+// LookupAPIKey TEE 提供方根据 hash 查找 API Key 对应的用户
+func (g GatewayQuery) LookupAPIKey(keyHash []byte) (*APIKeyInfo, error) {
+	if len(keyHash) != 32 {
+		return nil, ErrAPIKeyNotFound
+	}
+	hexKey := hex.EncodeToString(keyHash)
+	return g.apiKeys.Get(g.api.GetTxn(), hexKey)
+}
+
+func (g GatewayQuery) GetProviderBalance(providerID uint64) (uint64, error) {
+	bal, err := g.providerBalances.Get(g.api.GetTxn(), providerID)
 	if err != nil || bal == nil {
 		return 0, nil
 	}
@@ -301,14 +361,6 @@ func (g GatewayQuery) GetProviderCount() (uint64, error) {
 	return g.providers.Len(g.api.GetTxn())
 }
 
-func (g GatewayQuery) GetTokenCount() (uint64, error) {
-	id, err := g.nextTokenID.Get(g.api.GetTxn())
-	if err != nil || id == nil {
-		return 0, nil
-	}
-	return *id, nil
-}
-
 // ── Query: Paginated list (StoreList 原生分页) ───────────
 
 func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
@@ -321,10 +373,6 @@ func (g GatewayQuery) ListProviders(offset uint64, limit uint32) ([]ProviderInfo
 	return vals, err
 }
 
-func (g GatewayQuery) ListTokens(offset uint64, limit uint32) ([]TokenInfo, error) {
-	return g.paginateTokens(offset, limit, nil)
-}
-
 // ── Query: Active-only list ──────────────────────────────
 
 func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
@@ -333,10 +381,6 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 
 func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
 	return g.listProvidersFiltered(offset, limit, func(ch *ProviderInfo) bool { return ch.IsActive })
-}
-
-func (g GatewayQuery) ListActiveTokens(offset uint64, limit uint32) ([]TokenInfo, error) {
-	return g.paginateTokens(offset, limit, func(tk *TokenInfo) bool { return tk.IsActive })
 }
 
 // ── Query: Combined filter ───────────────────────────────
@@ -445,31 +489,6 @@ func (g GatewayQuery) listProvidersFiltered(
 			continue
 		}
 		out = append(out, *ch)
-		collected++
-	}
-	return out, nil
-}
-
-func (g GatewayQuery) paginateTokens(
-	offset uint64, limit uint32, fn func(*TokenInfo) bool,
-) ([]TokenInfo, error) {
-	txn := g.api.GetTxn()
-	total, _ := g.GetTokenCount()
-	out := make([]TokenInfo, 0, limit)
-	var skipped, collected uint64
-	for i := uint64(0); i < total && collected < uint64(limit); i++ {
-		tk, err := g.tokens.Get(txn, i)
-		if err != nil || tk == nil {
-			continue
-		}
-		if fn != nil && !fn(tk) {
-			continue
-		}
-		if skipped < offset {
-			skipped++
-			continue
-		}
-		out = append(out, *tk)
 		collected++
 	}
 	return out, nil

@@ -306,6 +306,8 @@ func (r *inkRegistry) ensureInnerQueryReturn(goType string) (int, error) {
 			return r.goTypeToID["bool"], nil
 		case "byte", "uint8":
 			return r.goTypeToID["u8"], nil
+		case "uint16":
+			return r.goTypeToID["u16"], nil
 		case "int64", "int":
 			return r.goTypeToID["i64"], nil
 		case "uint32":
@@ -512,12 +514,20 @@ func (r *inkRegistry) ensureTypeAlias(name string, underlyingType string) (int, 
 			"path": []any{name},
 		}
 	default:
-		// 其他类型别名生成空的 composite
-		typeDef = map[string]any{
-			"def": map[string]any{
-				"composite": map[string]any{},
-			},
-			"path": []any{name},
+		// 其他类型别名：解析底层类型，复用其 type ID
+		underlyingID, err := r.ensureInnerQueryReturn(underlyingType)
+		if err != nil {
+			// fallback: 空 composite
+			typeDef = map[string]any{
+				"def": map[string]any{
+					"composite": map[string]any{},
+				},
+				"path": []any{name},
+			}
+		} else {
+			// 别名直接引用底层类型 ID，不创建新类型
+			r.goTypeToID[key] = underlyingID
+			return underlyingID, nil
 		}
 	}
 
@@ -573,6 +583,8 @@ func (r *inkRegistry) goTypeToABIRefNamed(goType string) (abiTypeRef, error) {
 		return abiTypeRef{Display: []string{"bool"}, TypeID: r.goTypeToID["bool"]}, nil
 	case "byte", "uint8":
 		return abiTypeRef{Display: []string{"u8"}, TypeID: r.goTypeToID["u8"]}, nil
+	case "uint16":
+		return abiTypeRef{Display: []string{"u16"}, TypeID: r.goTypeToID["u16"]}, nil
 	case "int64", "int":
 		return abiTypeRef{Display: []string{"i64"}, TypeID: r.goTypeToID["i64"]}, nil
 	case "uint32":

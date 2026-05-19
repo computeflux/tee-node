@@ -411,16 +411,12 @@ func collectStructTypes(pkg *ast.Package, fset *token.FileSet) map[string]struct
 					continue
 				}
 
-				// 处理类型别名（如 type ProposalState string）
+				// 处理类型别名（如 type ProposalState string, type ProviderType uint16）
 				if ident, ok := ts.Type.(*ast.Ident); ok {
 					underlyingType := ident.Name
-					// 对于 string 类型的别名，将其作为特殊的结构体处理
-					// 使用一个特殊的字段名 "_alias" 来标识这是类型别名
-					if underlyingType == "string" {
-						structs[typeName] = structType{
-							name:   typeName,
-							fields: []structField{{name: "_alias", typ: "string"}},
-						}
+					structs[typeName] = structType{
+						name:   typeName,
+						fields: []structField{{name: "_alias", typ: underlyingType}},
 					}
 				}
 			}
@@ -823,10 +819,10 @@ func parseStructFields(st *ast.StructType, fset *token.FileSet) []storeField {
 			fields = append(fields, storeField{
 				isList: true,
 				list: storeListField{
-					name:     fieldName,
-					keyType:  keyType,
-					valType:  valType,
-					keyPfx:   keyPfx,
+					name:      fieldName,
+					keyType:   keyType,
+					valType:   valType,
+					keyPfx:    keyPfx,
 					isIndexed: false,
 				},
 			})
@@ -841,10 +837,10 @@ func parseStructFields(st *ast.StructType, fset *token.FileSet) []storeField {
 			fields = append(fields, storeField{
 				isList: true,
 				list: storeListField{
-					name:     fieldName,
-					keyType:  keyType,
-					valType:  valType,
-					keyPfx:   keyPfx,
+					name:      fieldName,
+					keyType:   keyType,
+					valType:   valType,
+					keyPfx:    keyPfx,
 					isIndexed: true,
 				},
 			})
