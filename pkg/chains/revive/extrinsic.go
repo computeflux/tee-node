@@ -46,17 +46,6 @@ func (c *Contract) BatchCall(callMethod string, calls []model.ChainCall) (*model
 
 // TEECallToCall converts a TEE attestation into a chain call payload.
 func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error) {
-	callWrap := tcall.Tx
-	switch callWrap.(type) {
-	case *model.TeeCall_MapAccount:
-		runtimeCall := revive.MakeMapAccountCall()
-		call, err := (runtimeCall).AsCall()
-		if err != nil {
-			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "AsCall error:"+err.Error())
-			return nil, err
-		}
-		return &model.ChainCall{Substrate: call}, nil
-	}
 	return nil, errors.New("invalid tee call")
 }
 

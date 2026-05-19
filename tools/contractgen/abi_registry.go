@@ -570,9 +570,6 @@ func (r *inkRegistry) ensureResultQuery(goType string) (map[string]any, error) {
 
 func (r *inkRegistry) goTypeToABIRefParam(goType string) (abiTypeRef, error) {
 	goType = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(goType), "*"))
-	if goType == "[]byte" {
-		return abiTypeRef{Display: []string{"UniAddr"}, TypeID: r.addressID}, nil
-	}
 	return r.goTypeToABIRefNamed(goType)
 }
 

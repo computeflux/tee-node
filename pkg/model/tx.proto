@@ -23,7 +23,20 @@ message SysCall{
     int64 sync_tx_end = 5;
     int64 sync_tx_retry = 6;
     ContractCall contract = 7;
+    RelaySync relay_sync = 8;
   }
+}
+
+// RelaySync 主链 → 侧链事件同步交易
+message RelaySync {
+  uint32 chain_id = 1;
+  uint64 nonce = 2;
+  uint64 block_num = 3;
+  bytes target_contract = 4;
+  bytes event_type = 5;
+  repeated bytes event_data = 6;
+  repeated bytes proof = 7;
+  uint32 proof_index = 8;
 }
 
 message ContractCall{
@@ -204,14 +217,14 @@ message TeeTrigger {
   repeated uint64 callids = 3;
 }
 
-// api req 
+// api req
 message ApiReq {
   bytes url = 2;
   bytes from = 3;
   bytes data = 4;
 }
 
-// api resp 
+// api resp
 message ApiResp {
   int32 code = 2;
   bytes data = 3;
@@ -221,7 +234,7 @@ message ApiResp {
 message PeerMsg {
   // 目标节点
   To to = 1;
-  
+
   // 消息内容（oneof 确保只能有一种类型）
   oneof payload {
     DkgMessage dkg_message = 2;

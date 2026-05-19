@@ -16,26 +16,18 @@ var MainChain MainChainApi
 
 // ── ChainApi ──────────────────────────────────────────────
 
-// ChainApi is the minimal interface for any side-chain (Substrate, EVM, etc.).
+// ChainApi is the minimal interface for any side-chain (Substrate, EVM, …).
 type ChainApi interface {
-	// ChainType returns the chain type string ("substrate", "evm", …).
 	ChainType() string
-	// GetCipher returns the signing suite used by this chain.
 	GetCipher() model.SuiteType
-
-	// TEECallToCall converts a TEE attestation into a chain call payload.
 	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error)
 
-	// Points / token tracking.
-	SyncRecharge(user model.UniAddr, amount uint64, txHash []byte) error
-	SyncWithdraw(user model.UniAddr, amount uint64, txHash []byte) error
-	GetTotalRecharged(user model.UniAddr) (uint64, error)
+	// Relay 同步 (替代旧的 SyncRecharge/SyncWithdraw/Events)
+	// 主链合约 emit 事件 → relayer 拉取 → 侧链 relay engine 验证执行
+	GetLatestNonce() (uint64, error)
+	GetRelayEvent(nonce uint64) (targetContract, eventType, eventData []byte, err error)
+	GetChainID() uint32
 
-	// Event sync from chain logs.
-	SyncRechargeEvents(fromBlock uint64) ([]model.RechargeEvent, error)
-	SyncWithdrawEvents(fromBlock uint64) ([]model.WithdrawEvent, error)
-
-	// Signing / submission.
 	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
 	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
 }

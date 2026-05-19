@@ -8,6 +8,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/side-chain/relay"
 )
 
 // type ChainState struct {
@@ -73,6 +74,8 @@ func (s *SideChain) LoadChains() error {
 		s.chains[uint32(chainId)] = &chainApi
 	}
 
+	// 初始化 relay engine
+	s.relay = relay.NewEngine(nil) // runtime 在出块时注入
 	return nil
 }
 

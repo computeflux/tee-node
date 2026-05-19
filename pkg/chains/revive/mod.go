@@ -1,14 +1,15 @@
 package revive
 
-// go:generate go-ink-gen -json subnet.json
-// go:generate go-ink-gen -json token.json
-// go:generate go-ink-gen -json proxy.json
+//go:generate go-ink-gen -json ./abi/subnet.json
+//go:generate go-ink-gen -json ./abi/token.json
+//go:generate go-ink-gen -json ./abi/proxy.json
 
 import (
 	"errors"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
+	"github.com/computeflux/tee-provider/pkg/chains/revive/token"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
 	"github.com/wetee-dao/ink.go/util"
@@ -23,6 +24,7 @@ type Contract struct {
 	*chain.ChainClient
 	signer chain.SignerType
 	subnet *subnet.Subnet
+	token  *token.Token
 }
 
 func GetCloudAddress() string {
@@ -42,6 +44,12 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 	subnet, err := subnet.InitSubnetContract(client, config.SubnetAddress)
 	if err != nil {
 		util.LogWithPurple("InitSubnetContract", err)
+		return nil, err
+	}
+
+	token, err := token.InitTokenContract(client, config.TokenAddress)
+	if err != nil {
+		util.LogWithPurple("InitTokenContract", err)
 		return nil, err
 	}
 
@@ -80,6 +88,7 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 		ChainClient: client,
 		signer:      p,
 		subnet:      subnet,
+		token:       token,
 	}, nil
 }
 

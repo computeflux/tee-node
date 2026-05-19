@@ -16,6 +16,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/side-chain/relay"
 )
 
 const ApplicationVersion = 1
@@ -35,6 +36,7 @@ type SideChain struct {
 	currProposerAddress []byte
 
 	chains map[uint32]*chains.ChainApi
+	relay  *relay.Engine
 }
 
 func NewSideChain(light bool) (*SideChain, error) {
@@ -97,9 +99,20 @@ func (app *SideChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abc
 func (app *SideChain) PrepareProposal(_ context.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
 	LogWithTime("🎁 PrepareProposal")
 
+	finalProposal := make([][]byte, 0, len(req.Txs)+32)
+
+	// ── Relay: 出块节点拉取主链事件, 预置到区块头部 ──────
+	if app.relay != nil && app.dkg != nil {
+		relayTxs := app.prepareRelayTxs()
+		finalProposal = append(finalProposal, relayTxs...)
+		if len(relayTxs) > 0 {
+			LogWithTime(fmt.Sprintf("🎁 Relay: %d events", len(relayTxs)))
+		}
+	}
+
 	// Check if the current epoch is valid
 	epochTx := app.CheckEpochFromValidator()
-	finalProposal := make([][]byte, 0, len(req.Txs)+2)
+	// finalProposal 已在上面声明
 	if len(epochTx) > 0 {
 		finalProposal = append(finalProposal, epochTx)
 	}

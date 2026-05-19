@@ -33,6 +33,7 @@ Dockerfile.cross
 **/db/
 **/nohup.out
 **/dsecret
+contractgen
 bin/
 hack/node0/
 hack/node1/

@@ -8,6 +8,8 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/side-chain/contracts"
+	"github.com/computeflux/tee-provider/side-chain/relay"
 	"github.com/pkg/errors"
 )
 
@@ -101,6 +103,18 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 			if err != nil {
 				return nil, errors.Wrap(err, "contract mutation error")
 			}
+		case *model.SysCall_RelaySync:
+			ev := relay.FromRelaySysCall(p.RelaySync)
+			if app.relay != nil {
+				rt := app.runtimeForRelay(height, txn, tx.GetCaller())
+				app.relay.SetRuntime(rt)
+				if err := app.relay.CheckRelayEvent(ev); err != nil {
+					return nil, errors.Wrap(err, "check relay event")
+				}
+				if err := app.relay.ApplyRelayEvent(ev); err != nil {
+					return nil, errors.Wrap(err, "apply relay event")
+				}
+			}
 		default:
 			return nil, errors.New("invalid tx type")
 		}
@@ -120,6 +134,16 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 		}
 	}
 	return res, nil
+}
+
+// runtimeForRelay 为 relay 事件创建 runtime
+func (app *SideChain) runtimeForRelay(height int64, txn *model.Txn, caller []byte) model.ContractApi {
+	pub, err := app.GetDkgPubkey()
+	sudoAddr := model.UniAddr{}
+	if err == nil && pub != nil {
+		sudoAddr.V = pub.ToBytes()
+	}
+	return contracts.NewRuntime(height, txn, model.UniAddr{V: caller}, sudoAddr)
 }
 
 func (app *SideChain) finalizeHubCall(hub *model.HubCall, txn *model.Txn) error {
