@@ -26,7 +26,6 @@ type ChainApi interface {
 	// 主链合约 emit 事件 → relayer 拉取 → 侧链 relay engine 验证执行
 	GetLatestNonce() (uint64, error)
 	GetRelayEvent(nonce uint64) (targetContract, eventType, eventData []byte, err error)
-	GetChainID() uint32
 
 	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
 	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error

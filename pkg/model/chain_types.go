@@ -14,6 +14,7 @@ type ChainClient struct {
 }
 
 type ChainConfigType struct {
+	ChainID       uint32
 	ChainType     string
 	Cipher        SuiteType
 	Urls          []string

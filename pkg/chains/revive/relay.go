@@ -42,31 +42,18 @@ func (c *Contract) GetRelayEvent(nonce uint64) (target, typ, data []byte, err er
 	return rec.TargetContract, rec.EventType, rec.EventData, nil
 }
 
-func (c *Contract) GetChainID() uint32 {
-	param := chain.DefaultParamWithOrigin(c.signer.AccountID())
-	v, _, err := chain.DryRunInk[types.U32](
-		c.token, param.Origin, param.PayAmount,
-		param.GasLimit, param.StorageDepositLimit,
-		util.InkContractInput{Selector: "0x05ac82a3"},
-	)
-	if err != nil || v == nil {
-		return 1
-	}
-	return uint32(*v)
-}
-
-type eventRecord struct {
-	TargetContract types.Bytes
-	EventType      types.Bytes
-	EventData      types.Bytes
-}
-
 func decodeEventRecord(b []byte) (*eventRecord, error) {
 	var rec eventRecord
 	if err := codec.Decode(b, &rec); err != nil {
 		return nil, err
 	}
 	return &rec, nil
+}
+
+type eventRecord struct {
+	TargetContract types.Bytes
+	EventType      types.Bytes
+	EventData      types.Bytes
 }
 
 var _ = big.NewInt
