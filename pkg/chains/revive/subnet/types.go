@@ -9,29 +9,29 @@ import (
 )
 
 type Error struct { // Enum
-	NotEnoughBalance          *bool // 0
-	MustCallByMainContract    *bool // 1
-	WorkerNotExist            *bool // 2
-	WorkerNotOwnedByCaller    *bool // 3
-	WorkerStatusNotReady      *bool // 4
-	WorkerMortgageNotExist    *bool // 5
-	TransferFailed            *bool // 6
-	WorkerIsUseByUser         *bool // 7
-	NodeNotExist              *bool // 8
-	SecretNodeAlreadyExists   *bool // 9
-	SetCodeFailed             *bool // 10
-	EpochNotExpired           *bool // 11
-	InvalidSideChainSignature *bool // 12
-	NodeIsRunning             *bool // 13
-	InvalidSideChainCaller    *bool // 14
-	RegionNotExist            *bool // 15
-	AssetNotExist             *bool // 16
-	DepositNotEnough          *bool // 17
-	MortgageNotEnough         *bool // 18
-	SlashAmountTooLarge       *bool // 19
-	CloudContractNotSet       *bool // 20
-	ResourceNotEnough         *bool // 21
-	InvalidBlsKey             *bool // 22
+	NotEnoughBalance         *bool // 0
+	MustCallByMainContract   *bool // 1
+	WorkerNotExist           *bool // 2
+	WorkerNotOwnedByCaller   *bool // 3
+	WorkerStatusNotReady     *bool // 4
+	WorkerMortgageNotExist   *bool // 5
+	TransferFailed           *bool // 6
+	WorkerIsUseByUser        *bool // 7
+	NodeNotExist             *bool // 8
+	SecretNodeAlreadyExists  *bool // 9
+	SetCodeFailed            *bool // 10
+	EpochNotExpired          *bool // 11
+	InvalidTeeChainSignature *bool // 12
+	NodeIsRunning            *bool // 13
+	InvalidTeeChainCaller    *bool // 14
+	RegionNotExist           *bool // 15
+	AssetNotExist            *bool // 16
+	DepositNotEnough         *bool // 17
+	MortgageNotEnough        *bool // 18
+	SlashAmountTooLarge      *bool // 19
+	CloudContractNotSet      *bool // 20
+	ResourceNotEnough        *bool // 21
+	InvalidBlsKey            *bool // 22
 }
 
 func (ty Error) Encode(encoder scale.Encoder) (err error) {
@@ -131,7 +131,7 @@ func (ty Error) Encode(encoder scale.Encoder) (err error) {
 		return nil
 	}
 
-	if ty.InvalidSideChainSignature != nil {
+	if ty.InvalidTeeChainSignature != nil {
 		err = encoder.PushByte(12)
 		if err != nil {
 			return err
@@ -147,7 +147,7 @@ func (ty Error) Encode(encoder scale.Encoder) (err error) {
 		return nil
 	}
 
-	if ty.InvalidSideChainCaller != nil {
+	if ty.InvalidTeeChainCaller != nil {
 		err = encoder.PushByte(14)
 		if err != nil {
 			return err
@@ -277,7 +277,7 @@ func (ty *Error) Decode(decoder scale.Decoder) (err error) {
 		return
 	case 12: // Base
 		t := true
-		ty.InvalidSideChainSignature = &t
+		ty.InvalidTeeChainSignature = &t
 		return
 	case 13: // Base
 		t := true
@@ -285,7 +285,7 @@ func (ty *Error) Decode(decoder scale.Decoder) (err error) {
 		return
 	case 14: // Base
 		t := true
-		ty.InvalidSideChainCaller = &t
+		ty.InvalidTeeChainCaller = &t
 		return
 	case 15: // Base
 		t := true
@@ -372,16 +372,16 @@ func (ty *Error) Error() string {
 		return "EpochNotExpired"
 	}
 
-	if ty.InvalidSideChainSignature != nil {
-		return "InvalidSideChainSignature"
+	if ty.InvalidTeeChainSignature != nil {
+		return "InvalidTeeChainSignature"
 	}
 
 	if ty.NodeIsRunning != nil {
 		return "NodeIsRunning"
 	}
 
-	if ty.InvalidSideChainCaller != nil {
-		return "InvalidSideChainCaller"
+	if ty.InvalidTeeChainCaller != nil {
+		return "InvalidTeeChainCaller"
 	}
 
 	if ty.RegionNotExist != nil {
@@ -423,7 +423,7 @@ type EpochInfo struct { // Composite
 	EpochSlot      uint32
 	LastEpochBlock uint32
 	Now            uint32
-	SideChainPub   types.H160
+	TeeChainPub    types.H160
 }
 type Tuple_16 struct { // Tuple
 	F0 uint32

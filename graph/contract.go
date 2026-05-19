@@ -8,7 +8,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	sidechain "github.com/computeflux/tee-provider/side-chain"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // DecodeCaller 支持以下格式的 caller：
@@ -73,7 +73,7 @@ func SubmitContractCall(caller []byte, callerType uint32, contract string, metho
 		Signature:  signature,
 	}
 
-	return sidechain.SubmitTx(tx)
+	return teechain.SubmitTx(tx)
 }
 
 // ContractQuery 只读查询
@@ -81,12 +81,12 @@ func ContractDryRun(caller []byte, callerType int, contract string, mut bool, me
 	var err error
 	var out []byte
 	if !mut {
-		out, err = sideChain.ContractQuery(caller, uint32(callerType), contract, method, args)
+		out, err = teeChain.ContractQuery(caller, uint32(callerType), contract, method, args)
 		if err != nil {
 			return "", err
 		}
 	} else {
-		err = sideChain.ContractDryRun(caller, uint32(callerType), &model.ContractCall{
+		err = teeChain.ContractDryRun(caller, uint32(callerType), &model.ContractCall{
 			Name:   []byte(contract),
 			Method: model.MethodToSelectorBytes(method),
 			Args:   args,

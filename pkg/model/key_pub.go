@@ -92,8 +92,8 @@ func (p *PubKey) String() string {
 	return hex.EncodeToString(p.PublicKey)
 }
 
-// SideChainNodeID returns the CometBFT P2P node ID (ed25519 only).
-func (p *PubKey) SideChainNodeID() p2p.ID {
+// TeeChainNodeID returns the CometBFT P2P node ID (ed25519 only).
+func (p *PubKey) TeeChainNodeID() p2p.ID {
 	if !p.IsEd25519() {
 		panic("not an ed25519 key")
 	}

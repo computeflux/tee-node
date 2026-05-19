@@ -1,6 +1,7 @@
-package sidechain
+package teechain
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -16,12 +17,12 @@ import (
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/side-chain/relay"
+	"github.com/computeflux/tee-provider/tee-chain/relay"
 )
 
 const ApplicationVersion = 1
 
-type SideChain struct {
+type TeeChain struct {
 	abci.BaseApplication
 	state AppState
 
@@ -35,17 +36,18 @@ type SideChain struct {
 	onGoingValidators   []abci.ValidatorUpdate
 	currProposerAddress []byte
 
-	chains map[uint32]*chains.ChainApi
-	relay  *relay.Engine
+	chains     map[uint32]*chains.ChainApi
+	relay      *relay.Engine
+	relayCache *relayCache
 }
 
-func NewSideChain(light bool) (*SideChain, error) {
+func NewTeeChain(light bool) (*TeeChain, error) {
 	state, err := loadAppState()
 	if err != nil {
 		return nil, err
 	}
 
-	c := &SideChain{
+	c := &TeeChain{
 		state: state,
 	}
 
@@ -60,7 +62,7 @@ func NewSideChain(light bool) (*SideChain, error) {
 	return c, nil
 }
 
-func (app *SideChain) Info(_ context.Context, info *abci.RequestInfo) (*abci.ResponseInfo, error) {
+func (app *TeeChain) Info(_ context.Context, info *abci.RequestInfo) (*abci.ResponseInfo, error) {
 	return &abci.ResponseInfo{
 		Version:          version.ABCIVersion,
 		AppVersion:       ApplicationVersion,
@@ -69,14 +71,14 @@ func (app *SideChain) Info(_ context.Context, info *abci.RequestInfo) (*abci.Res
 	}, nil
 }
 
-func (app *SideChain) Query(ctx context.Context, query *abci.RequestQuery) (*abci.ResponseQuery, error) {
+func (app *TeeChain) Query(ctx context.Context, query *abci.RequestQuery) (*abci.ResponseQuery, error) {
 	util.LogWithGreen("Query")
 	resp := abci.ResponseQuery{Key: query.Data}
 
 	return &resp, nil
 }
 
-func (app *SideChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+func (app *TeeChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
 	util.LogWithGreen("InitChain")
 	app.initValidators(req.Validators)
 	appHash := app.state.Hash()
@@ -88,7 +90,7 @@ func (app *SideChain) InitChain(_ context.Context, req *abci.RequestInitChain) (
 	return &abci.ResponseInitChain{ConsensusParams: req.ConsensusParams, AppHash: appHash}, nil
 }
 
-func (app *SideChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+func (app *TeeChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
 	fmt.Println()
 	util.LogWithGreen("START BLOCK", "--------------------------------------------------------------")
 	LogWithTime("🚀 CheckTx")
@@ -96,7 +98,7 @@ func (app *SideChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abc
 	return &abci.ResponseCheckTx{Code: app.checkTx(req.Tx)}, nil
 }
 
-func (app *SideChain) PrepareProposal(_ context.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
+func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
 	LogWithTime("🎁 PrepareProposal")
 
 	finalProposal := make([][]byte, 0, len(req.Txs)+32)
@@ -135,14 +137,49 @@ func (app *SideChain) PrepareProposal(_ context.Context, req *abci.RequestPrepar
 	return &abci.ResponsePrepareProposal{Txs: finalProposal}, nil
 }
 
-func (app *SideChain) ProcessProposal(_ context.Context, req *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
+func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcessProposal) (*abci.ResponseProcessProposal, error) {
 	LogWithTime("🌈 ProcessProposal")
+
+	// ── Relay: 验证出块节点预置的 relay tx ──────────────
+	if app.relay != nil {
+		for _, txbt := range req.Txs {
+			if !app.verifyRelayTx(txbt) {
+				LogWithTime("🌈 ProcessProposal: invalid relay tx, REJECT")
+				return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
+			}
+		}
+	}
 
 	status := app.ProcessTx(req.Txs)
 	return &abci.ResponseProcessProposal{Status: status}, nil
 }
 
-func (app *SideChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
+// verifyRelayTx 验证单笔 relay tx (ProcessProposal 调用)
+func (app *TeeChain) verifyRelayTx(txbt []byte) bool {
+	txbox := new(model.Tx)
+	if err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox); err != nil {
+		return true
+	}
+
+	call := new(model.SysCall)
+	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err != nil {
+		return true
+	}
+
+	rs, ok := call.Payload.(*model.SysCall_RelaySync)
+	if !ok {
+		return true // 非 relay tx, 放行
+	}
+
+	ev := relay.FromRelaySysCall(rs.RelaySync)
+	if err := app.relay.CheckRelayEvent(ev); err != nil {
+		LogWithTime("Relay reject:", err)
+		return false
+	}
+	return true
+}
+
+func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	// Iterate over Tx in current block
 	app.onGoingBlock = model.DBINS.NewTransaction()
 	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.ProposerAddress)
@@ -178,7 +215,7 @@ func (app *SideChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalize
 }
 
 // Commit the application state
-func (app *SideChain) Commit(_ context.Context, _ *abci.RequestCommit) (*abci.ResponseCommit, error) {
+func (app *TeeChain) Commit(_ context.Context, _ *abci.RequestCommit) (*abci.ResponseCommit, error) {
 	defer func() {
 		app.onGoingBlock = nil
 	}()
@@ -201,7 +238,7 @@ func (app *SideChain) Commit(_ context.Context, _ *abci.RequestCommit) (*abci.Re
 	return &abci.ResponseCommit{}, nil
 }
 
-func (app *SideChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (*abci.ResponseExtendVote, error) {
+func (app *TeeChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (*abci.ResponseExtendVote, error) {
 	// 检查 DKG 是否初始化
 	if app.dkg == nil || app.dkg.Signer == nil {
 		return &abci.ResponseExtendVote{VoteExtension: []byte("")}, nil
@@ -235,7 +272,7 @@ func (app *SideChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote)
 	return &abci.ResponseExtendVote{VoteExtension: voteExtension}, nil
 }
 
-func (app *SideChain) VerifyVoteExtension(_ context.Context, req *abci.RequestVerifyVoteExtension) (*abci.ResponseVerifyVoteExtension, error) {
+func (app *TeeChain) VerifyVoteExtension(_ context.Context, req *abci.RequestVerifyVoteExtension) (*abci.ResponseVerifyVoteExtension, error) {
 	// 解析 TEE 证明
 	teeCall := &model.TeeCall{}
 	if err := proto.Unmarshal(req.VoteExtension, teeCall); err != nil {

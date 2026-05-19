@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 )
 
 // Process tx
-func (app *SideChain) ProcessTx(txs [][]byte) abci.ResponseProcessProposal_ProposalStatus {
+func (app *TeeChain) ProcessTx(txs [][]byte) abci.ResponseProcessProposal_ProposalStatus {
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
 		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)

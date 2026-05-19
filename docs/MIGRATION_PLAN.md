@@ -203,14 +203,14 @@ tee-provider 已有的 resolver 模式（见 `graph/secret.resolvers.go`、`grap
 package graph
 
 import (
-    sidechain "github.com/computeflux/tee-provider/side-chain"
+    teechain "github.com/computeflux/tee-provider/tee-chain"
     "github.com/computeflux/tee-provider/pkg/api/auth"
     "github.com/computeflux/tee-provider/services/auth"
     "github.com/computeflux/tee-provider/services/wallet"
 )
 
 type Resolver struct{
-    SideChain *sidechain.SideChain
+    TeeChain *teechain.TeeChain
     AuthCfg   *auth.AuthConfig
     WalletSvc *wallet.WalletService
     JWTSvc    *auth.JWTService
@@ -390,7 +390,7 @@ func (r *mutationResolver) buildUserInfo(email, provider string) *auth.UserInfo 
 
 ```go
 func main() {
-    // ... 现有初始化 (db, p2p, dkg, sidechain) 不变 ...
+    // ... 现有初始化 (db, p2p, dkg, teechain) 不变 ...
 
     // 新增：初始化 Web3Auth 服务
     authCfg := auth.LoadConfig()
@@ -402,7 +402,7 @@ func main() {
 
     // 创建 Resolver，注入所有依赖
     resolver := &graph.Resolver{
-        SideChain: sideChain,
+        TeeChain: teeChain,
         AuthCfg:   authCfg,
         WalletSvc: walletSvc,
         JWTSvc:    jwtSvc,
@@ -412,7 +412,7 @@ func main() {
     }
 
     // 启动 GraphQL
-    go graph.StartServerWithResolver(sideChain, gqlPort, resolver)
+    go graph.StartServerWithResolver(teeChain, gqlPort, resolver)
 
     // ... 信号等待 ...
 }
@@ -421,8 +421,8 @@ func main() {
 `graph/mod.go` 中 `StartServer` 改为接受 `*Resolver` 参数：
 
 ```go
-func StartServerWithResolver(s *sidechain.SideChain, port int, resolver *Resolver) {
-    sideChain = s
+func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver) {
+    teeChain = s
     router := chi.NewRouter()
     router.Use(AuthMiddleware())
     router.Use(cors.Handler(cors.Options{...}))
@@ -540,7 +540,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 
     // Phase 3: 合约扣费
     // usage := adaptor.GetUsage(resp)
-    // sideChain.ContractGatewayConsume(tokenId, channelId, modelId, usage.TokensUsed)
+    // teeChain.ContractGatewayConsume(tokenId, channelId, modelId, usage.TokensUsed)
 
     w.Header().Set("Content-Type", "application/json")
     w.Write(resp.Body)
@@ -697,14 +697,14 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, tokenStr string,
     emailHash := sha256.Sum256([]byte(claims.Email))
 
     // 1. 从 Auth 合约查询用户
-    user := r.SideChain.ContractAuthQuery("GetUser", emailHash[:])
+    user := r.TeeChain.ContractAuthQuery("GetUser", emailHash[:])
     if user == nil {
         return &auth.WalletResult{Status: "error", Error: "user not registered"}, nil
     }
 
     // 2. 向所有 DKG 节点广播部分签名请求
     req := &model.SignRequest{EmailHash: emailHash[:], TxHash: txHash(tx)}
-    partialSigs := r.SideChain.BroadcastPartialSign(req)
+    partialSigs := r.TeeChain.BroadcastPartialSign(req)
 
     // 3. 聚合
     fullSig := tss.Aggregate(partialSigs, int(user.Threshold))

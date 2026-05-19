@@ -205,7 +205,7 @@ func (c *Subnet) CallOfSetEpochSlot(
 	)
 }
 
-func (c *Subnet) QuerySideChainKey(
+func (c *Subnet) QueryTeeChainKey(
 	__ink_params chain.DryRunParams,
 ) (*types.H160, *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {

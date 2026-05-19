@@ -1,6 +1,6 @@
 // tx_sync.go 用于记录提交到主链的交易：SyncToHub、tx_index_ 存储（call/hubCalls）、
 // SyncTxStart/End 状态（HubSyncIndexKey、HubSyncStep1/2/End、IsHubSyncRuning）及清理逻辑。
-package sidechain
+package teechain
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 )
 
 // Submit sync tx to polkadot hub
-func (s *SideChain) SyncToHub(txIndex int64, sigs [][]byte) error {
+func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex)
 	call, err := model.GetCodec[model.ChainCall](GLOABL_STATE, baseKey+TxIndexCallSuffix)
 	if err != nil || call == nil {
@@ -103,7 +103,7 @@ func IsHubSyncRuning() bool {
 }
 
 // sync transaction step1
-func HubSyncStep1(s *SideChain) ([]byte, error) {
+func HubSyncStep1(s *TeeChain) ([]byte, error) {
 	tx, err := model.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
 	if err != nil {
 		return nil, err

@@ -10,12 +10,12 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/services/auth"
 	"github.com/computeflux/tee-provider/services/wallet"
-	sidechain "github.com/computeflux/tee-provider/side-chain"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // Resolver 作为 GraphQL 的依赖注入容器
 type Resolver struct {
-	SideChain *sidechain.SideChain
+	TeeChain *teechain.TeeChain
 
 	// Web3Auth 服务
 	AuthCfg   *auth.AuthConfig

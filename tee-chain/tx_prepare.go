@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
-func (s *SideChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, addMainChainTx bool) {
+func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, addMainChainTx bool) {
 	hubtx := make([][]byte, 0, 50)
 	hubCalls := make([]*model.HubCall, 0, 50)
 
@@ -95,7 +95,7 @@ func extractCallersFromHubCall(hub *model.HubCall) map[string]bool {
 }
 
 // deduplicateCallersInBlock 在同一块内去重相同caller的HubCall，只保留第一个
-func (s *SideChain) deduplicateCallersInBlock(hubtx [][]byte, hubCalls []*model.HubCall) [][]byte {
+func (s *TeeChain) deduplicateCallersInBlock(hubtx [][]byte, hubCalls []*model.HubCall) [][]byte {
 	if len(hubtx) == 0 {
 		return hubtx
 	}

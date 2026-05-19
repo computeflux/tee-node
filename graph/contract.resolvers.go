@@ -13,7 +13,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/side-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -26,7 +26,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("contract is inited")
 	}
 
-	if sideChain.GetDKG().SystemPubKey() == nil {
+	if teeChain.GetDKG().SystemPubKey() == nil {
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
 
@@ -40,7 +40,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 	}
 
 	// 获取 DKG Signer
-	dkg := sideChain.GetDKG()
+	dkg := teeChain.GetDKG()
 	if dkg == nil || dkg.Signer == nil {
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
@@ -100,7 +100,7 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 	}
 
 	// 获取 DKG Signer
-	dkg := sideChain.GetDKG()
+	dkg := teeChain.GetDKG()
 	if dkg == nil || dkg.SystemPubKey() == nil {
 		return false, gqlerror.Errorf("DKG not initialized")
 	}

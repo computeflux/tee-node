@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ func LogWithTime(a ...any) {
 	fmt.Println(a...)
 }
 
-func (s *SideChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, error) {
+func (s *TeeChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, error) {
 	if s.dkg == nil {
 		return nil, errors.New("dkg is nil")
 	}
@@ -47,7 +47,7 @@ func (s *SideChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, er
 	return nil, errors.New("ProposerAddress not in DKG")
 }
 
-func (s *SideChain) GetDkgPubkey() (*types.AccountID, error) {
+func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
 	key, err := model.GetKey(GLOABL_STATE, DKG_PUB_KEY)
 	if err != nil {
 		if s.dkg.SystemPubKey() != nil {

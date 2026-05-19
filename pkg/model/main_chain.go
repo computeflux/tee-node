@@ -18,7 +18,7 @@ type P2PAddr struct {
 }
 
 // Get side chain node id
-func (p *P2PAddr) SideChainUrl() string {
+func (p *P2PAddr) TeeChainUrl() string {
 	return hex.EncodeToString(crypto.AddressHash(p.Id[:])) + "@" + p.Ip.ToString() + ":" + fmt.Sprint(p.Port)
 }
 

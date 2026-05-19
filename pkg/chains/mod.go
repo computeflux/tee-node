@@ -47,7 +47,7 @@ type MainChainApi interface {
 	GetValidatorList() ([]*model.Validator, error)
 
 	// Epoch management.
-	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, sideChainPub model.PubKey, err error)
+	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, teeChainPub model.PubKey, err error)
 	GetNextEpochValidatorList() ([]*model.Validator, error)
 	SetNewEpoch(nodeId uint64) error
 

@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -8,12 +8,12 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	"github.com/computeflux/tee-provider/side-chain/contracts"
-	"github.com/computeflux/tee-provider/side-chain/relay"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/relay"
 	"github.com/pkg/errors"
 )
 
-func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, proposer []byte) ([]*abci.ExecTxResult, error) {
+func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
 	hubCalls := make([]*model.HubCall, 0, len(txs))
 	var txIndex int64 = 0
@@ -106,7 +106,7 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				rt := app.runtimeForRelay(height, txn, tx.GetCaller())
+				rt := app.runtimeForContract(height, txn, tx.GetCaller())
 				app.relay.SetRuntime(rt)
 				if err := app.relay.CheckRelayEvent(ev); err != nil {
 					return nil, errors.Wrap(err, "check relay event")
@@ -136,8 +136,8 @@ func (app *SideChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, pro
 	return res, nil
 }
 
-// runtimeForRelay 为 relay 事件创建 runtime
-func (app *SideChain) runtimeForRelay(height int64, txn *model.Txn, caller []byte) model.ContractApi {
+// runtimeForContract 为 relay 事件创建 runtime
+func (app *TeeChain) runtimeForContract(height int64, txn *model.Txn, caller []byte) model.ContractApi {
 	pub, err := app.GetDkgPubkey()
 	sudoAddr := model.UniAddr{}
 	if err == nil && pub != nil {
@@ -146,7 +146,7 @@ func (app *SideChain) runtimeForRelay(height int64, txn *model.Txn, caller []byt
 	return contracts.NewRuntime(height, txn, model.UniAddr{V: caller}, sudoAddr)
 }
 
-func (app *SideChain) finalizeHubCall(hub *model.HubCall, txn *model.Txn) error {
+func (app *TeeChain) finalizeHubCall(hub *model.HubCall, txn *model.Txn) error {
 	for _, callWrap := range hub.Call {
 		switch tx := callWrap.Tx.(type) {
 		case *model.TeeCall_PodStart:

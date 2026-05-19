@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ type hubCallsStore struct {
 // tx_index - The index of the transaction.
 // hubs - A slice of pointers to model.HubCall objects containing the calls to be batched.
 // proposer - A pointer to a model.PubKey object representing the proposer's public key.
-func (s *SideChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model.HubCall, proposer *model.PubKey) error {
+func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model.HubCall, proposer *model.PubKey) error {
 	// Check if the list of hub calls is empty. If so, exit the function early.
 	if len(hubs) == 0 {
 		return errors.New("hubs is empty")
@@ -116,7 +116,7 @@ func (s *SideChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*mode
 }
 
 // HandlePartialSign handles the block partial sign messages received via P2P.
-func (s *SideChain) revPartialSign(msgBox any) error {
+func (s *TeeChain) revPartialSign(msgBox any) error {
 	if s.txCh == nil {
 		return errors.New("txCh is nil")
 	}
@@ -139,7 +139,7 @@ func (s *SideChain) revPartialSign(msgBox any) error {
 //
 // Returns:
 // error - An error object if an error occurs during the process, otherwise nil.
-func (s *SideChain) handlePartialSign(msg *model.BlockPartialSign) error {
+func (s *TeeChain) handlePartialSign(msg *model.BlockPartialSign) error {
 	// Save the received partial signature to the global state using the sender's ID.
 	err := s.SavePartialSig(msg.From, msg)
 	if err != nil {
@@ -187,7 +187,7 @@ func (s *SideChain) handlePartialSign(msg *model.BlockPartialSign) error {
 //
 // Returns:
 // error - An error object if an error occurs during serialization or storage, otherwise nil.
-func (s *SideChain) SavePartialSig(user_id string, msg *model.BlockPartialSign) error {
+func (s *TeeChain) SavePartialSig(user_id string, msg *model.BlockPartialSign) error {
 	// Serialize the BlockPartialSign object into a byte slice.
 	// Ignore the error returned by Marshal as it's not handled in the current implementation.
 	// Note: This should be improved to handle errors properly.
@@ -211,7 +211,7 @@ func (s *SideChain) SavePartialSig(user_id string, msg *model.BlockPartialSign) 
 // Returns:
 // []*model.BlockPartialSign - A slice of pointers to BlockPartialSign objects representing the partial signatures.
 // error - An error object if an error occurs during the process, otherwise nil.
-func (s *SideChain) SigListOfTx(txIndex int64) ([]*model.BlockPartialSign, error) {
+func (s *TeeChain) SigListOfTx(txIndex int64) ([]*model.BlockPartialSign, error) {
 	// Fetch the list of serialized partial signatures from the global state with the given prefix.
 	// The prefix is constructed using the PartialSigPrefix and the transaction index.
 	// The method fetches a maximum of 5000 items starting from the first item.
@@ -246,6 +246,6 @@ func (s *SideChain) SigListOfTx(txIndex int64) ([]*model.BlockPartialSign, error
 	return sigs, nil
 }
 
-func (s *SideChain) DeleteSigOfTx(txIndex int64) error {
+func (s *TeeChain) DeleteSigOfTx(txIndex int64) error {
 	return model.DeletekeysByPrefix(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_")
 }

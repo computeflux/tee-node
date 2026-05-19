@@ -13,10 +13,10 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/util"
-	sidechain "github.com/computeflux/tee-provider/side-chain"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
-var sideChain *sidechain.SideChain
+var teeChain *teechain.TeeChain
 var rsaKey *rsa.PrivateKey
 
 func init() {
@@ -28,13 +28,13 @@ func init() {
 }
 
 // StartServer starts the GraphQL server with an empty resolver (legacy).
-func StartServer(s *sidechain.SideChain, port int) {
+func StartServer(s *teechain.TeeChain, port int) {
 	StartServerWithResolver(s, port, &Resolver{})
 }
 
 // StartServerWithResolver starts the GraphQL + Auth REST + Gateway REST server.
-func StartServerWithResolver(s *sidechain.SideChain, port int, resolver *Resolver) {
-	sideChain = s
+func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver) {
+	teeChain = s
 
 	// Phase 2: seed data
 	gateway.InitSeedData()

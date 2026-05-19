@@ -155,7 +155,7 @@ func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, err
 		return 0, 0, 0, 0, model.PubKey{}, err
 	}
 
-	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *model.PubKeyFromByte(d.SideChainPub[:]), nil
+	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *model.PubKeyFromByte(d.TeeChainPub[:]), nil
 }
 
 // go to new epoch

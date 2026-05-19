@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ const (
 	DiskSpace   = "disk"
 )
 
-func (s *SideChain) Encrypt(data []byte) ([]byte, error) {
+func (s *TeeChain) Encrypt(data []byte) ([]byte, error) {
 	// 获取DKG的公钥，用于加密过程
 	suite := suites.MustFind("Ed25519")
 	dkgPubKey, err := s.GetDkgPubkey()
@@ -58,11 +58,11 @@ func (s *SideChain) Encrypt(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *SideChain) SaveSecret(user types.H160, index uint64, data []byte, txn *model.Txn) error {
+func (s *TeeChain) SaveSecret(user types.H160, index uint64, data []byte, txn *model.Txn) error {
 	return txn.Set(model.ComboNamespaceKey(SecretSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
 }
 
-func (s *SideChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
+func (s *TeeChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
 	list, keys, err := model.GetProtoMessageList[model.SecretStore](SecretSpace, user.Hex())
 	if err != nil {
 		return nil, err
@@ -92,11 +92,11 @@ func (s *SideChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*mo
 	return ids, nil
 }
 
-func (s *SideChain) SaveDiskKey(user types.H160, index uint64, data []byte, txn *model.Txn) error {
+func (s *TeeChain) SaveDiskKey(user types.H160, index uint64, data []byte, txn *model.Txn) error {
 	return txn.Set(model.ComboNamespaceKey(DiskSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
 }
 
-func (s *SideChain) GetDiskKeys(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
+func (s *TeeChain) GetDiskKeys(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
 	list, keys, err := model.GetProtoMessageList[model.SecretStore](DiskSpace, user.Hex())
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ var preRecerve map[uint64]chan *model.DecryptSharesResp = make(map[uint64]chan *
 var preRecerveMu sync.RWMutex
 
 // Recive msg from p2p
-func (s *SideChain) revSecret(m any) error {
+func (s *TeeChain) revSecret(m any) error {
 	mbox, ok := m.(*model.SecretBox)
 	if !ok {
 		return fmt.Errorf("invalid secret box type")
@@ -37,7 +37,7 @@ func (s *SideChain) revSecret(m any) error {
 }
 
 // BroadcastDecryptSecret broadcast decrypt secret request to all nodes
-func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptResp, error) {
+func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptResp, error) {
 	suite := suites.MustFind("Ed25519")
 	validators, err := chains.MainChain.GetValidatorList()
 	if err != nil {
@@ -202,7 +202,7 @@ func (s *SideChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRe
 }
 
 // HandleDecryptSecret 处理解密请求
-func (s *SideChain) HandleReencryptReq(req *model.PodStart, from string) error {
+func (s *TeeChain) HandleReencryptReq(req *model.PodStart, from string) error {
 	dkg := s.dkg
 	if dkg == nil {
 		return fmt.Errorf("dkg is nil")
@@ -292,7 +292,7 @@ func (s *SideChain) HandleReencryptReq(req *model.PodStart, from string) error {
 }
 
 // RevAndVerifyDecryptSecret 验证解密后的秘密
-func (s *SideChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
+func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 	suite := suites.MustFind("Ed25519")
 	req := shares.Req
 
@@ -355,7 +355,7 @@ func (s *SideChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 
 // sendReencryptResp sends the reencrypt response to the preRecerve channel
 // without blocking if the channel has been removed or is full.
-func (s *SideChain) sendReencryptResp(id uint64, shares *model.DecryptSharesResp) error {
+func (s *TeeChain) sendReencryptResp(id uint64, shares *model.DecryptSharesResp) error {
 	preRecerveMu.RLock()
 	ch, ok := preRecerve[id]
 	preRecerveMu.RUnlock()

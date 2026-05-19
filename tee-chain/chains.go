@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/side-chain/relay"
+	"github.com/computeflux/tee-provider/tee-chain/relay"
 )
 
 // type ChainState struct {
@@ -23,7 +23,7 @@ func chainKey(chainId uint32) string {
 	return chainKeyPrefix + strconv.FormatUint(uint64(chainId), 10)
 }
 
-func (s *SideChain) LoadChains() error {
+func (s *TeeChain) LoadChains() error {
 	// 如果 chains map 未初始化，先初始化
 	if s.chains == nil {
 		s.chains = make(map[uint32]*chains.ChainApi)
@@ -75,11 +75,15 @@ func (s *SideChain) LoadChains() error {
 	}
 
 	// 初始化 relay engine
-	s.relay = relay.NewEngine(nil) // runtime 在出块时注入
+	s.relay = relay.NewEngine(nil)
+
+	// 启动 relay 后台拉取 worker
+	s.startRelayWorker()
+
 	return nil
 }
 
-func (s *SideChain) addChain(chainId uint32, chain *model.ChainConfigType) error {
+func (s *TeeChain) addChain(chainId uint32, chain *model.ChainConfigType) error {
 	// 如果 chains map 未初始化，先初始化
 	if s.chains == nil {
 		s.chains = make(map[uint32]*chains.ChainApi)
@@ -113,7 +117,7 @@ func (s *SideChain) addChain(chainId uint32, chain *model.ChainConfigType) error
 	return nil
 }
 
-func (s *SideChain) removeChain(chainId uint32) error {
+func (s *TeeChain) removeChain(chainId uint32) error {
 	// 从内存中删除连接
 	if s.chains != nil {
 		delete(s.chains, chainId)
@@ -128,7 +132,7 @@ func (s *SideChain) removeChain(chainId uint32) error {
 	return nil
 }
 
-func (s *SideChain) getChain(chainId uint32) (chains.ChainApi, error) {
+func (s *TeeChain) getChain(chainId uint32) (chains.ChainApi, error) {
 	if chainId == 0 {
 		return chains.MainChain, nil
 	}

@@ -1,13 +1,13 @@
-package sidechain
+package teechain
 
 import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/side-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
 )
 
-func (app *SideChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -36,7 +36,7 @@ func (app *SideChain) ContractMutation(caller []byte, callerType uint32, txn *mo
 }
 
 // ContractQuery 只读合约查询。contract=dao 时 method 为查询方法名，args 为字符串参数列表（与 ExecuteQuery 约定一致）。
-func (app *SideChain) ContractQuery(caller []byte, callerType uint32, contract string, method string, args [][]byte) (data []byte, err error) {
+func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract string, method string, args [][]byte) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			data = nil
@@ -66,7 +66,7 @@ func (app *SideChain) ContractQuery(caller []byte, callerType uint32, contract s
 	return data, err
 }
 
-func (app *SideChain) ContractDryRun(caller []byte, callerType uint32, call *model.ContractCall) error {
+func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call *model.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {

@@ -44,14 +44,10 @@ func (e *Engine) SetRuntime(api model.ContractApi) {
 
 // ── CheckTx 阶段: 验证 ──────────────────────────────────
 
-// CheckRelayEvent 验证 relay 事件 (CheckTx 调用)
-//
-//	返回 nil 表示验证通过, 可以打包进区块
+// CheckRelayEvent 验证 relay 事件 (CheckTx 调用, 直接读 DB)
 func (e *Engine) CheckRelayEvent(ev SyncEvent) error {
-	txn := e.api.GetTxn()
-
-	// 1. nonce 必须严格递增
-	last, err := getLastNonce(txn, ev.ChainID)
+	// 1. nonce 必须严格递增 (直接读 DB)
+	last, err := getLastNonceBg(ev.ChainID)
 	if err != nil {
 		return err
 	}
@@ -59,8 +55,8 @@ func (e *Engine) CheckRelayEvent(ev SyncEvent) error {
 		return fmt.Errorf("relay: expected nonce %d, got %d", last+1, ev.Nonce)
 	}
 
-	// 2. Merkle proof 校验
-	ok, err := verifyProof(txn, ev)
+	// 2. Merkle proof 校验 (直接读 DB)
+	ok, err := verifyProofBg(ev)
 	if err != nil || !ok {
 		return fmt.Errorf("relay: invalid merkle proof")
 	}
@@ -194,6 +190,20 @@ func getLastNonce(txn *model.Txn, chainID uint32) (uint64, error) {
 	return *n, nil
 }
 
+// getLastNonceBg 后台/CheckTx 读取 nonce (直接读 DB)
+func getLastNonceBg(chainID uint32) (uint64, error) {
+	ns := "RELAY"
+	key := fmt.Sprintf("nonce_%d", chainID)
+	raw, err := model.GetKey(ns, key)
+	if err != nil {
+		return 0, fmt.Errorf("chain %d not registered", chainID)
+	}
+	if len(raw) < 8 {
+		return 0, nil
+	}
+	return decodeUint64(raw), nil
+}
+
 func setLastNonce(txn *model.Txn, chainID uint32, v uint64) error {
 	return model.TxnSetCodec(txn, "RELAY", fmt.Sprintf("nonce_%d", chainID), v)
 }
@@ -230,6 +240,30 @@ func verifyProof(txn *model.Txn, ev SyncEvent) (bool, error) {
 		return false, err
 	}
 	return verifyMerkle(ev, hdr), nil
+}
+
+// verifyProofBg 后台/CheckTx 验证 Merkle proof (直接读 DB)
+func verifyProofBg(ev SyncEvent) (bool, error) {
+	ns := "RELAY"
+	key := fmt.Sprintf("hdr_%d_%d", ev.ChainID, ev.BlockNum)
+	raw, err := model.GetKey(ns, key)
+	if err != nil {
+		return false, err
+	}
+	var hdr [32]byte
+	copy(hdr[:], raw)
+	return verifyMerkle(ev, hdr), nil
+}
+
+func decodeUint64(raw []byte) uint64 {
+	var v uint64
+	for i, b := range raw {
+		if i >= 8 {
+			break
+		}
+		v |= uint64(b) << (i * 8)
+	}
+	return v
 }
 
 func verifyMerkle(ev SyncEvent, hdr [32]byte) bool {

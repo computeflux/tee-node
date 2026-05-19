@@ -47,7 +47,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 	}
 
 	// encrypt secret
-	encData, err := sideChain.Encrypt(msg)
+	encData, err := teeChain.Encrypt(msg)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "EncryptSecret error:"+err.Error())
 	}
@@ -60,7 +60,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
+	err = model.IssueReport(teeChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}
@@ -72,7 +72,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 	}
 
 	// send upload secret call to side chain
-	err = sideChain.SubmitCallFromNode(tx)
+	err = teeChain.SubmitCallFromNode(tx)
 	if err != nil {
 		return false, gqlerror.Errorf("SubmitTx error: %v", err)
 	}
@@ -102,7 +102,7 @@ func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user s
 	}
 
 	// encrypt secret
-	encData, err := sideChain.Encrypt(key)
+	encData, err := teeChain.Encrypt(key)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "EncryptSecret error:"+err.Error())
 	}
@@ -117,7 +117,7 @@ func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user s
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(sideChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
+	err = model.IssueReport(teeChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}
@@ -129,7 +129,7 @@ func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user s
 	}
 
 	// send upload secret call to side chain
-	err = sideChain.SubmitCallFromNode(tx)
+	err = teeChain.SubmitCallFromNode(tx)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "SubmitTx error:"+err.Error())
 	}

@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
-func (app *SideChain) CheckEpochFromValidator() []byte {
+func (app *TeeChain) CheckEpochFromValidator() []byte {
 	if chains.MainChain == nil {
 		util.LogWithRed("CheckEpochFromValidator", "error chains.MainChain is nil")
 		return nil
@@ -110,7 +110,7 @@ func (app *SideChain) CheckEpochFromValidator() []byte {
 }
 
 // STEP2
-func (app *SideChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
+func (app *TeeChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
 	util.LogWithYellow("NewEpoch", "P2 submit tx to main chain")
 	if chains.MainChain == nil {
 		util.LogWithRed("NewEpoch CheckEpochFromValidator", "error chains.MainChain is nil")
@@ -131,12 +131,12 @@ func (app *SideChain) newEpochSucceded(signer *dkg.DssSigner, nodeId uint64) {
 }
 
 // Callback when DKG consensus failed009
-func (app *SideChain) newEpochFail(err error) {
+func (app *TeeChain) newEpochFail(err error) {
 	util.LogWithYellow("NewEpoch", "P2 Error", err.Error())
 }
 
 // Callback when DKG consensus success
-func (app *SideChain) GetEpochStatus() int64 {
+func (app *TeeChain) GetEpochStatus() int64 {
 	bt, err := model.GetKey(GLOABL_STATE, "epoch_status")
 	if err != nil {
 		return 0
@@ -146,12 +146,12 @@ func (app *SideChain) GetEpochStatus() int64 {
 }
 
 // SetEpochStatus last epoch timestamp
-func (app *SideChain) SetEpochStatus(status int64) error {
+func (app *TeeChain) SetEpochStatus(status int64) error {
 	return model.SetKey(GLOABL_STATE, "epoch_status", util.Int64ToBytes(status))
 }
 
 // GetEpoch get last epoch
-func (app *SideChain) GetEpoch() uint32 {
+func (app *TeeChain) GetEpoch() uint32 {
 	bt, err := model.GetKey(GLOABL_STATE, "epoch")
 	if err != nil {
 		return 0
@@ -167,7 +167,7 @@ func (app *SideChain) GetEpoch() uint32 {
 }
 
 // SetEpoch set new epoch
-func (app *SideChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
+func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
 	// Save new epoch to DKG
 	if app.dkg != nil {
 		app.dkg.ToNewEpoch()
@@ -199,7 +199,7 @@ func (app *SideChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
 }
 
 // Get validators form local db
-func (app *SideChain) GetValidators() ([]*model.SideValidator, map[string]*model.PubKey, error) {
+func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*model.PubKey, error) {
 	var err error
 	list, _, err := model.GetProtoMessageList[model.SideValidator](GLOABL_STATE, "validator")
 	if err != nil {
@@ -216,7 +216,7 @@ func (app *SideChain) GetValidators() ([]*model.SideValidator, map[string]*model
 }
 
 // Init validator to db From init chain
-func (app *SideChain) initValidators(vs []abci.ValidatorUpdate) error {
+func (app *TeeChain) initValidators(vs []abci.ValidatorUpdate) error {
 	tx := model.DBINS.NewTransaction()
 
 	var err error
@@ -234,7 +234,7 @@ func (app *SideChain) initValidators(vs []abci.ValidatorUpdate) error {
 }
 
 // Calc validator updates
-func (app *SideChain) calcValidatorUpdates(epoch *model.EpochEnd) {
+func (app *TeeChain) calcValidatorUpdates(epoch *model.EpochEnd) {
 	oldValidators, _, _ := app.GetValidators()
 	newValidators := epoch.Validators
 

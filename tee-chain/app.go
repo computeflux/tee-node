@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"encoding/binary"

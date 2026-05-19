@@ -9,14 +9,14 @@ graph TB
     InitP2PKey --> InitValidatorKey[加载验证器密钥]
     InitValidatorKey --> InitNodeKey[初始化主链节点密钥]
     InitNodeKey --> ConnectMainChain[连接主链]
-    ConnectMainChain --> InitSideChain[初始化侧链节点]
-    InitSideChain --> InitBFT[初始化BFT共识节点]
+    ConnectMainChain --> InitTeeChain[初始化侧链节点]
+    InitTeeChain --> InitBFT[初始化BFT共识节点]
     InitBFT --> InitDKG[初始化DKG分布式密钥生成]
     InitDKG --> StartDKG[启动DKG服务]
     StartDKG --> StartGraphQL[启动GraphQL服务器]
     StartGraphQL --> Running[系统运行中]
     
-    InitSideChain --> GetBootPeers[获取启动节点]
+    InitTeeChain --> GetBootPeers[获取启动节点]
     GetBootPeers --> ConfigP2P[配置P2P网络]
     ConfigP2P --> ConfigBFT[配置BFT共识]
     ConfigBFT --> CreateNode[创建BFT节点]
@@ -32,27 +32,27 @@ graph TB
 sequenceDiagram
     participant User as 用户
     participant GraphQL as GraphQL API
-    participant SideChain as 侧链
+    participant TeeChain as 侧链
     participant DKG as DKG模块
     participant DB as 数据库
     
     User->>GraphQL: upload_secret(secret, hash, user, index)
     GraphQL->>GraphQL: RSA解密secret
     GraphQL->>GraphQL: 验证hash
-    GraphQL->>SideChain: Encrypt(msg)
-    SideChain->>DKG: GetDkgPubkey()
-    DKG-->>SideChain: DKG公钥
-    SideChain->>SideChain: proxy_reenc.EncryptSecret()
-    Note over SideChain: 生成encCmt和encScrt
-    SideChain-->>GraphQL: 加密数据
+    GraphQL->>TeeChain: Encrypt(msg)
+    TeeChain->>DKG: GetDkgPubkey()
+    DKG-->>TeeChain: DKG公钥
+    TeeChain->>TeeChain: proxy_reenc.EncryptSecret()
+    Note over TeeChain: 生成encCmt和encScrt
+    TeeChain-->>GraphQL: 加密数据
     GraphQL->>GraphQL: 构建TeeCall
     GraphQL->>GraphQL: IssueReport(TEE报告)
-    GraphQL->>SideChain: SubmitTx(上传交易)
-    SideChain->>SideChain: ProcessTx(处理交易)
-    SideChain->>SideChain: FinalizeTx(最终化交易)
-    SideChain->>DB: SaveSecret(user, index, data)
-    DB-->>SideChain: 保存成功
-    SideChain-->>GraphQL: 交易成功
+    GraphQL->>TeeChain: SubmitTx(上传交易)
+    TeeChain->>TeeChain: ProcessTx(处理交易)
+    TeeChain->>TeeChain: FinalizeTx(最终化交易)
+    TeeChain->>DB: SaveSecret(user, index, data)
+    DB-->>TeeChain: 保存成功
+    TeeChain-->>GraphQL: 交易成功
     GraphQL-->>User: 返回true
 ```
 
@@ -61,15 +61,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant Pod as Pod/TEE Worker
-    participant SideChain as 侧链节点
+    participant TeeChain as 侧链节点
     participant Validators as 验证节点群
     participant DKG as DKG模块
     participant DB as 数据库
     
-    Pod->>SideChain: BroadcastReencryptReq(PodStart)
+    Pod->>TeeChain: BroadcastReencryptReq(PodStart)
     Note over Pod: 包含Pod公钥、Secret IDs、Disk IDs
     
-    SideChain->>Validators: 广播重加密请求
+    TeeChain->>Validators: 广播重加密请求
     Note over Validators: 发送到所有验证节点
     
     loop 每个验证节点
@@ -80,25 +80,25 @@ sequenceDiagram
         Validators->>Validators: proxy_reenc.Reencrypt()
         Note over Validators: 使用DKG份额和Pod公钥<br/>生成重加密份额
         Validators->>Validators: EncodeDecryptShare()
-        Validators->>SideChain: 发送重加密响应
+        Validators->>TeeChain: 发送重加密响应
     end
     
-    SideChain->>SideChain: 收集阈值数量的响应
-    Note over SideChain: threshold = 2/3 + 1
+    TeeChain->>TeeChain: 收集阈值数量的响应
+    Note over TeeChain: threshold = 2/3 + 1
     
-    SideChain->>SideChain: VerifyReencryptResp()
-    Note over SideChain: 验证每个节点的重加密响应
+    TeeChain->>TeeChain: VerifyReencryptResp()
+    Note over TeeChain: 验证每个节点的重加密响应
     
-    SideChain->>SideChain: Recover重加密承诺
-    Note over SideChain: 使用Lagrange插值恢复xncCmt
+    TeeChain->>TeeChain: Recover重加密承诺
+    Note over TeeChain: 使用Lagrange插值恢复xncCmt
     
-    SideChain->>DB: GetSecrets()
-    SideChain->>DB: GetDiskKeys()
+    TeeChain->>DB: GetSecrets()
+    TeeChain->>DB: GetDiskKeys()
     
-    SideChain->>SideChain: 构建DecryptResp
-    Note over SideChain: 包含DKG公钥、<br/>加密的Secrets和DiskKeys、<br/>重加密承诺xncCmt
+    TeeChain->>TeeChain: 构建DecryptResp
+    Note over TeeChain: 包含DKG公钥、<br/>加密的Secrets和DiskKeys、<br/>重加密承诺xncCmt
     
-    SideChain-->>Pod: DecryptResp
+    TeeChain-->>Pod: DecryptResp
     Pod->>Pod: DecryptSecret()
     Note over Pod: 使用Pod私钥解密<br/>encScrt - xncCmt + rdrSk * dkgPk = K
 ```
@@ -230,15 +230,15 @@ graph TB
     end
     
     subgraph 侧链节点
-        SideChain[侧链应用]
+        TeeChain[侧链应用]
         BFTNode[BFT共识节点]
         P2PNetwork[P2P网络]
         
-        SideChain --> BFTNode
+        TeeChain --> BFTNode
         BFTNode --> P2PNetwork
-        SideChain --> SecretStore[秘密存储]
-        SideChain --> SecretAPI[秘密API]
-        SideChain --> TxProcess[交易处理]
+        TeeChain --> SecretStore[秘密存储]
+        TeeChain --> SecretAPI[秘密API]
+        TeeChain --> TxProcess[交易处理]
     end
     
     subgraph DKG模块
@@ -287,11 +287,11 @@ graph TB
         ProxyReenc --> Decrypt
     end
     
-    MainChain --> SideChain
-    SideChain --> DKG
-    GraphQL --> SideChain
-    SideChain --> DB
-    SideChain --> ProxyReenc
+    MainChain --> TeeChain
+    TeeChain --> DKG
+    GraphQL --> TeeChain
+    TeeChain --> DB
+    TeeChain --> ProxyReenc
     DKG --> ProxyReenc
 ```
 
@@ -310,8 +310,8 @@ flowchart TD
     HashVerify --> DKGEnc[DKG公钥加密]
     DKGEnc --> BuildTx[构建交易]
     BuildTx --> TEEReport[生成TEE报告]
-    TEEReport --> SubmitSideChain[提交到侧链]
-    SubmitSideChain --> BFTConsensus[BFT共识]
+    TEEReport --> SubmitTeeChain[提交到侧链]
+    SubmitTeeChain --> BFTConsensus[BFT共识]
     BFTConsensus --> SaveDB[(保存到数据库)]
     
     DecryptFlow --> PodRequest[Pod请求解密]
@@ -339,7 +339,7 @@ flowchart TD
 - **特点**: 验证节点不需要知道原始秘密，只需要使用自己的DKG份额进行重加密
 - **安全性**: 使用NIZK（零知识证明）确保重加密的正确性
 
-### 侧链 (Side Chain)
+### 侧链 (Tee Chain)
 - **共识**: 使用CometBFT (Tendermint) BFT共识
 - **存储**: 使用PebbleDB存储加密的秘密数据
 - **功能**: 处理秘密的上传、存储和重加密请求
@@ -356,5 +356,3 @@ flowchart TD
 3. **零知识证明**: 重加密过程使用NIZK证明，确保正确性
 4. **TEE验证**: 使用TEE报告确保代码在可信环境中运行
 5. **端到端加密**: 从用户上传到Pod解密全程加密
-
-

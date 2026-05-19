@@ -7,9 +7,9 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/side-chain/contracts/auth"
-	"github.com/computeflux/tee-provider/side-chain/contracts/gateway"
-	"github.com/computeflux/tee-provider/side-chain/contracts/gov"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/auth"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/gov"
 )
 
 // Query 执行合约的查询操作（只读操作）。

@@ -201,7 +201,7 @@ func (*BTFReactor) InitPeer(peer p2p.Peer) p2p.Peer {
 
 func (r *BTFReactor) GetPubkeyFromPeerID(peer p2p.ID) (*model.PubKey, error) {
 	for _, node := range r.nodekeys {
-		if node.SideChainNodeID() == peer {
+		if node.TeeChainNodeID() == peer {
 			return node, nil
 		}
 	}
@@ -222,7 +222,7 @@ func (r *BTFReactor) PrintPeers(event string) {
 
 	// save self nodekey
 	for _, v := range pubkeys {
-		if v.SideChainNodeID() == r.Switch.NodeInfo().ID() {
+		if v.TeeChainNodeID() == r.Switch.NodeInfo().ID() {
 			r.id = v
 		}
 	}

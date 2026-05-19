@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"bytes"
@@ -11,13 +11,13 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 )
 
-// Submit tx to sidechain
+// Submit tx to teechain
 func SubmitTx(tx *model.Tx) error {
-	if SideChainNode == nil {
+	if TeeChainNode == nil {
 		return fmt.Errorf("side chain node is not initialized")
 	}
-	return SideChainNode.Mempool().CheckTx(GetTxBytes(tx), func(r *abci.ResponseCheckTx) {}, mempool.TxInfo{
-		SenderP2PID: SideChainNode.NodeInfo().ID(),
+	return TeeChainNode.Mempool().CheckTx(GetTxBytes(tx), func(r *abci.ResponseCheckTx) {}, mempool.TxInfo{
+		SenderP2PID: TeeChainNode.NodeInfo().ID(),
 	})
 }
 
@@ -29,7 +29,7 @@ func GetTxBytes(tx *model.Tx) []byte {
 	return buf.Bytes()
 }
 
-func (s *SideChain) SubmitCallFromNode(call *model.SysCall) error {
+func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
 	sigbt, err := call.BytesForSig()
 	if err != nil {
 		return errors.Errorf("BytesForSig: %v", err)
@@ -53,7 +53,7 @@ func (s *SideChain) SubmitCallFromNode(call *model.SysCall) error {
 	return SubmitTx(tx)
 }
 
-func (s *SideChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
+func (s *TeeChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 	sigbt, err := call.BytesForSig()
 	if err != nil {
 		return nil, errors.Errorf("BytesForSig: %v", err)
@@ -80,7 +80,7 @@ func (s *SideChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 	return GetTxBytes(tx), nil
 }
 
-// func (s *SideChain) SignTxWithNode(tx *model.Tx) error {
+// func (s *TeeChain) SignTxWithNode(tx *model.Tx) error {
 // 	// 获取 DKG Signer
 // 	dkg := s.GetDKG()
 // 	if dkg == nil || dkg.Signer == nil {

@@ -1,4 +1,4 @@
-package sidechain
+package teechain
 
 import (
 	"errors"
@@ -21,16 +21,16 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
-var SideChainNode *nm.Node
+var TeeChainNode *nm.Node
 var P2PKey *model.PubKey
 
 // init side chain
-func InitSideChain(
+func InitTeeChain(
 	nodePriv *model.PrivKey,
 	chainPort int,
 	light bool,
 	callback func(),
-) (func() (*nm.Node, error), *SideChain, *bftbrigde.BTFReactor, error) {
+) (func() (*nm.Node, error), *TeeChain, *bftbrigde.BTFReactor, error) {
 	if chains.MainChain == nil {
 		return nil, nil, nil, errors.New("MainChain is nil")
 	}
@@ -42,9 +42,9 @@ func InitSideChain(
 	}
 
 	// 创建侧链实例
-	sideChain, err := NewSideChain(light)
+	teeChain, err := NewTeeChain(light)
 	if err != nil {
-		return nil, nil, nil, errors.New("NewSideChain error: " + err.Error())
+		return nil, nil, nil, errors.New("NewTeeChain error: " + err.Error())
 	}
 
 	addr := util.GetEnv("SIDE_CHAIN_ADDR", "0.0.0.0")
@@ -92,7 +92,7 @@ func InitSideChain(
 	}
 	config.SetRoot("./token_chain_data")
 
-	// init sidechain node key
+	// init teechain node key
 	nodeKey, err := p2p.LoadNodeKey(config.NodeKeyFile())
 	if err != nil {
 		return nil, nil, nil, errors.New("failed to load node key: " + err.Error())
@@ -104,10 +104,10 @@ func InitSideChain(
 	// add boot nodes
 	seeds := []string{}
 	for _, boot := range boots {
-		if util.ToSideChainNodeID(boot.Id[:]) == nodeKey.ID() {
+		if util.ToTeeChainNodeID(boot.Id[:]) == nodeKey.ID() {
 			continue
 		}
-		seeds = append(seeds, boot.SideChainUrl())
+		seeds = append(seeds, boot.TeeChainUrl())
 	}
 	config.P2P.Seeds = strings.Join(seeds, ",")
 
@@ -135,13 +135,13 @@ func InitSideChain(
 		p2pReactor.SetID(P2PKey)
 	}
 
-	var StartSideChain = func() (*nm.Node, error) {
+	var StartTeeChain = func() (*nm.Node, error) {
 		// init BFT node
-		SideChainNode, err = nm.NewNode(
+		TeeChainNode, err = nm.NewNode(
 			config,
 			validatorKey,
 			nodeKey,
-			proxy.NewLocalClientCreator(sideChain),
+			proxy.NewLocalClientCreator(teeChain),
 			nm.DefaultGenesisDocProviderFunc(config),
 			cfg.DefaultDBProvider,
 			nm.DefaultMetricsProvider(config.Instrumentation),
@@ -155,28 +155,28 @@ func InitSideChain(
 			return nil, errors.New("init BFT node error: " + err.Error())
 		}
 
-		return SideChainNode, nil
+		return TeeChainNode, nil
 	}
 
 	// call callback function
 	callback()
 
-	sideChain.p2p = p2pReactor
-	sideChain.NodePriv = nodePriv
+	teeChain.p2p = p2pReactor
+	teeChain.NodePriv = nodePriv
 	if !light {
 		// add hook for partial sign
-		p2pReactor.Sub("block-partial-sign", sideChain.revPartialSign)
-		go sideChain.txCh.Start(sideChain.handlePartialSign)
+		p2pReactor.Sub("block-partial-sign", teeChain.revPartialSign)
+		go teeChain.txCh.Start(teeChain.handlePartialSign)
 	}
-	p2pReactor.Sub("secret", sideChain.revSecret)
+	p2pReactor.Sub("secret", teeChain.revSecret)
 
-	return StartSideChain, sideChain, p2pReactor, err
+	return StartTeeChain, teeChain, p2pReactor, err
 }
 
-func (s *SideChain) SetDKG(dkg *dkg.DKG) {
+func (s *TeeChain) SetDKG(dkg *dkg.DKG) {
 	s.dkg = dkg
 }
 
-func (s *SideChain) GetDKG() *dkg.DKG {
+func (s *TeeChain) GetDKG() *dkg.DKG {
 	return s.dkg
 }

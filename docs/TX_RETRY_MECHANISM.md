@@ -64,7 +64,7 @@ if err != nil {
 // side-chain/side_chain.go:148-153
 if !light {
     // 创建重试管理器（不再使用定时器，改为在区块处理时触发）
-    sideChain.retryManager = NewRetryManager(sideChain)
+    teeChain.retryManager = NewRetryManager(teeChain)
 }
 ```
 
@@ -79,7 +79,7 @@ if !light {
 
 ```go
 // side-chain/consensus.go:PrepareProposal()
-func (app *SideChain) PrepareProposal(...) {
+func (app *TeeChain) PrepareProposal(...) {
     // 在每个区块准备时，检查并重试失败的交易
     if app.retryManager != nil {
         app.retryManager.CheckAndRetryFailedTxs()
@@ -166,12 +166,12 @@ func (rm *RetryManager) calculateRetryDelay(retryCount int) time.Duration {
 func (rm *RetryManager) retrySubmitTx(txIndex int64, sigs [][]byte) error {
     // 如果没有签名，重新获取
     if len(sigs) == 0 {
-        sigList, err := rm.sideChain.SigListOfTx(txIndex)
+        sigList, err := rm.teeChain.SigListOfTx(txIndex)
         // ... 获取签名
     }
     
     // 重新调用 SyncToHub
-    return rm.sideChain.SyncToHub(txIndex, sigs)
+    return rm.teeChain.SyncToHub(txIndex, sigs)
 }
 ```
 
@@ -314,4 +314,3 @@ status, err := LoadTxStatus(txIndex)
 3. **需要签名**: 重试需要重新获取部分签名
 4. **延迟控制**: 使用时间延迟（指数退避），确保不会过于频繁重试
 5. **主链状态**: 重试前不会检查主链是否已有该交易（可以后续优化）
-

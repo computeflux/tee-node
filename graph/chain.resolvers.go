@@ -25,7 +25,7 @@ func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
 	}
 
 	// 提交交易
-	if err := sideChain.SubmitCallFromNode(call); err != nil {
+	if err := teeChain.SubmitCallFromNode(call); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)
 	}
 
@@ -53,7 +53,7 @@ func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, erro
 
 // Validators is the resolver for the validators field.
 func (r *queryResolver) Validators(ctx context.Context) ([]string, error) {
-	validators, _, err := sideChain.GetValidators()
+	validators, _, err := teeChain.GetValidators()
 	if err != nil {
 		return nil, gqlerror.Errorf("%s", "GetValidators:"+err.Error())
 	}

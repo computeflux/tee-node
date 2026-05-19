@@ -18,7 +18,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 	authsvc "github.com/computeflux/tee-provider/services/auth"
 	"github.com/computeflux/tee-provider/services/wallet"
-	sidechain "github.com/computeflux/tee-provider/side-chain"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 var DefaultChainUrl string = "ws://wetee-node.worker-addon.svc.cluster.local:9944"
@@ -37,7 +37,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// init sidechain node key
+	// init teechain node key
 	_, p2pKey, err := model.GetP2PKey()
 	if err != nil {
 		fmt.Println("failed to load node key:", err)
@@ -77,7 +77,7 @@ func main() {
 	}
 
 	// Init node
-	nodeFunc, sideChain, dkgReactor, err := sidechain.InitSideChain(nodePriv, chainPort, false, func() {
+	nodeFunc, teeChain, dkgReactor, err := teechain.InitTeeChain(nodePriv, chainPort, false, func() {
 		util.LogWithYellow("Main Chain", chainConfig.Urls)
 	})
 	if err != nil {
@@ -95,11 +95,11 @@ func main() {
 	go dkgIns.Start()
 	defer dkgIns.Stop()
 
-	// Set DKG to sideChain
-	sideChain.SetDKG(dkgIns)
+	// Set DKG to teeChain
+	teeChain.SetDKG(dkgIns)
 
 	// load chains
-	err = sideChain.LoadChains()
+	err = teeChain.LoadChains()
 	if err != nil {
 		log.Fatalf("loadChains error: %v", err)
 		os.Exit(1)
@@ -131,7 +131,7 @@ func main() {
 
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{
-		SideChain: sideChain,
+		TeeChain:  teeChain,
 		AuthCfg:   authCfg,
 		WalletSvc: walletSvc,
 		JWTSvc:    jwtSvc,
@@ -141,7 +141,7 @@ func main() {
 	}
 
 	// Start GraphQL server
-	go graph.StartServerWithResolver(sideChain, gqlPort, resolver)
+	go graph.StartServerWithResolver(teeChain, gqlPort, resolver)
 
 	// wait for stop signal
 	sigCh := make(chan os.Signal, 1)
