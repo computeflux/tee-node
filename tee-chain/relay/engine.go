@@ -139,14 +139,14 @@ func FromRelaySysCall(rs *model.RelaySync) SyncEvent {
 }
 
 // BuildSyncEvent 从 ChainApi 返回的原始数据构建 SyncEvent (Worker 用) | Build SyncEvent from raw ChainApi data (for Worker)
-func BuildSyncEvent(chainID uint32, nonce, blockNum uint64, target, typ, data []byte) SyncEvent {
+func BuildSyncEvent(chainID uint32, nonce, blockNum uint64, target []byte, typ []byte, data [][]byte) SyncEvent {
 	return SyncEvent{
 		ChainID:        chainID,
 		Nonce:          nonce,
 		BlockNum:       blockNum,
 		TargetContract: target,
 		EventType:      typ,
-		EventData:      [][]byte{data}, // 原始 blob 作为单个参数 | raw blob as single arg
+		EventData:      data, // 原始 blob 作为单个参数 | raw blob as single arg
 	}
 }
 
@@ -157,17 +157,18 @@ func dispatch(ev SyncEvent, api model.ContractApi) error {
 		util.LogWithGray("RELAY", fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
 	}
 
-	_, err := api.Call(api.GetSystemAccount(), model.ContractCall{
-		Name:   ev.TargetContract,
-		Method: model.MethodToSelectorBytes(string(ev.EventType)),
-		Args:   ev.EventData,
-	})
-	if err != nil {
-		util.LogWithRed("RELAY", fmt.Sprintf("dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
-	} else {
-		util.LogOk("RELAY", fmt.Sprintf("dispatch ok: %s.%s args=%d", string(ev.TargetContract), string(ev.EventType), len(ev.EventData)))
-	}
-	return err
+	return nil
+	// _, err := api.Call(api.GetSystemAccount(), model.ContractCall{
+	// 	Name:   ev.TargetContract,
+	// 	Method: model.MethodToSelectorBytes(string(ev.EventType)),
+	// 	Args:   ev.EventData,
+	// })
+	// if err != nil {
+	// 	util.LogWithRed("RELAY", fmt.Sprintf("dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
+	// } else {
+	// 	util.LogOk("RELAY", fmt.Sprintf("dispatch ok: %s.%s args=%d", string(ev.TargetContract), string(ev.EventType), len(ev.EventData)))
+	// }
+	// return err
 }
 
 // ── nonce 存储 | nonce storage ──────────────────────────

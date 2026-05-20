@@ -47,7 +47,7 @@ type EvmCall struct {
 type RelayEvent struct {
 	TargetContract []byte
 	EventType      []byte
-	EventData      []byte
+	EventData      [][]byte
 }
 
 type RechargeEvent struct {

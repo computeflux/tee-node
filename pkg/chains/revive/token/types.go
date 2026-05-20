@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 )
 
 type Error struct { // Enum
@@ -130,5 +131,11 @@ func (ty *Error) Error() string {
 type EventRecord struct { // Composite
 	TargetContract []byte
 	EventType      []byte
-	EventData      []byte
+	EventData      [][]byte
+}
+type Tuple_22 struct { // Tuple
+	F0 types.U256
+	F1 types.U256
+	F2 types.U256
+	F3 types.U256
 }

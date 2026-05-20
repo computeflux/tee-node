@@ -59,7 +59,7 @@ func TestMakeRelaySysCall_EmptyEvent(t *testing.T) {
 // ── BuildSyncEvent ────────────────────────────────────
 
 func TestBuildSyncEvent(t *testing.T) {
-	ev := BuildSyncEvent(1, 42, 0, []byte("gateway"), []byte("Withdraw"), []byte("data"))
+	ev := BuildSyncEvent(1, 42, 0, []byte("gateway"), []byte("Withdraw"), [][]byte{[]byte("data")})
 	require.Equal(t, uint32(1), ev.ChainID)
 	require.Equal(t, uint64(42), ev.Nonce)
 	require.Equal(t, []byte("gateway"), ev.TargetContract)
