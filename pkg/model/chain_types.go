@@ -43,6 +43,13 @@ type EvmCall struct {
 
 // ── Cross-chain Points Events ─────────────────────────────
 
+// RelayEvent 从主链合约拉取的 relay 事件 | Relay event fetched from main chain contract
+type RelayEvent struct {
+	TargetContract []byte
+	EventType      []byte
+	EventData      []byte
+}
+
 type RechargeEvent struct {
 	User   UniAddr `json:"user"`
 	Amount uint64  `json:"amount"`

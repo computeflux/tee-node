@@ -7,7 +7,7 @@ import (
 )
 
 func (d Gov) ensureGov() error {
-	sudo := d.api.GetSudoAccount()
+	sudo := d.api.GetSystemAccount()
 	caller := d.api.GetCaller()
 
 	if sudo.V == nil || !bytes.Equal(sudo.V, caller.V) {

@@ -210,7 +210,7 @@ func (c *Subnet) QueryTeeChainKey(
 ) (*types.H160, *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "side_chain_key")
+		util.LogWithPurple("[ DryRun   method ]", "tee_chain_key")
 	}
 	v, gas, err := chain.DryRunInk[types.H160](
 		c,
@@ -219,7 +219,7 @@ func (c *Subnet) QueryTeeChainKey(
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0x3405e510",
+			Selector: "0x91ad6934",
 			Args:     []any{},
 		},
 	)
@@ -521,98 +521,6 @@ func (c *Subnet) QueryAsset(
 		util.InkContractInput{
 			Selector: "0x0bd40606",
 			Args:     []any{id},
-		},
-	)
-	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
-		return nil, nil, err
-	}
-	return v, gas, nil
-}
-
-func (c *Subnet) DryRunSetCloudContract(
-	addr types.H160, __ink_params chain.DryRunParams,
-) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
-	if c.ChainClient.Debug {
-		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "set_cloud_contract")
-	}
-	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
-		c,
-		__ink_params.Origin,
-		__ink_params.PayAmount,
-		__ink_params.GasLimit,
-		__ink_params.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0xf42fd05e",
-			Args:     []any{addr},
-		},
-	)
-	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
-		return nil, nil, err
-	}
-	if v != nil && v.IsErr {
-		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
-	}
-
-	return v, gas, nil
-}
-
-func (c *Subnet) ExecSetCloudContract(
-	addr types.H160, __ink_params chain.ExecParams,
-) error {
-	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
-	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunSetCloudContract(addr, _param)
-	if err != nil {
-		return err
-	}
-	return chain.CallInk(
-		c,
-		gas.GasRequired,
-		gas.StorageDeposit,
-		util.InkContractInput{
-			Selector: "0xf42fd05e",
-			Args:     []any{addr},
-		},
-		__ink_params,
-	)
-}
-
-func (c *Subnet) CallOfSetCloudContract(
-	addr types.H160, __ink_params chain.DryRunParams,
-) (*types.Call, error) {
-	_, gas, err := c.DryRunSetCloudContract(addr, __ink_params)
-	if err != nil {
-		return nil, err
-	}
-	return chain.CallOfTransaction(
-		c,
-		__ink_params.PayAmount,
-		gas.GasRequired,
-		gas.StorageDeposit,
-		util.InkContractInput{
-			Selector: "0xf42fd05e",
-			Args:     []any{addr},
-		},
-	)
-}
-
-func (c *Subnet) QueryCloudContract(
-	__ink_params chain.DryRunParams,
-) (*types.H160, *chain.DryRunReturnGas, error) {
-	if c.ChainClient.Debug {
-		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "cloud_contract")
-	}
-	v, gas, err := chain.DryRunInk[types.H160](
-		c,
-		__ink_params.Origin,
-		__ink_params.PayAmount,
-		__ink_params.GasLimit,
-		__ink_params.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0x6ad59a25",
-			Args:     []any{},
 		},
 	)
 	if err != nil && !errors.Is(err, chain.ErrContractReverted) {

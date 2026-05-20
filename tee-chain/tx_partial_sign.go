@@ -35,7 +35,7 @@ func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model
 		return errors.New("hubs is empty")
 	}
 
-	chain, err := s.getChain(chainId)
+	chain, err := chains.GetChainByID(chainId)
 	if err != nil {
 		return errors.Wrap(err, "getChain error")
 	}

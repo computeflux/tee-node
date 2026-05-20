@@ -13,19 +13,21 @@ import (
 )
 
 var MainChain MainChainApi
+var Chains []ChainApi
 
 // ── ChainApi ──────────────────────────────────────────────
 
 // ChainApi is the minimal interface for any side-chain (Substrate, EVM, …).
 type ChainApi interface {
 	ChainType() string
+	ChainId() uint32
 	GetCipher() model.SuiteType
 	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error)
 
 	// Relay 同步 (替代旧的 SyncRecharge/SyncWithdraw/Events)
 	// 主链合约 emit 事件 → relayer 拉取 → 侧链 relay engine 验证执行
 	GetLatestNonce() (uint64, error)
-	GetRelayEvent(nonce uint64) (targetContract, eventType, eventData []byte, err error)
+	GetRelayEvents(from, to uint64) ([]model.RelayEvent, error)
 
 	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
 	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
@@ -61,7 +63,7 @@ type MainChainApi interface {
 
 // ConnectMainChain creates or reuses the singleton main-chain connection.
 func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
-	config := config.GetChainConfig(env)
+	config := config.GetMainChainConfig(env)
 	if config == nil {
 		return nil, fmt.Errorf("invalid environment: %s", env)
 	}
@@ -72,8 +74,18 @@ func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
 }
 
 // ConnectChain creates a side-chain connection.
-func ConnectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, error) {
-	return connectChain(config, pk)
+func ConnectChain(env string, pk *model.PrivKey) {
+	var chains []ChainApi = []ChainApi{MainChain}
+	chainConfigs := config.GetChainConfigs(env)
+	for _, chainConfig := range chainConfigs {
+		chain, err := connectChain(&chainConfig, pk)
+		if err != nil {
+			util.LogError("CHAIN", "failed to connect chain", chainConfig.NetworkLabel, err)
+			continue
+		}
+		chains = append(chains, chain)
+	}
+	Chains = chains
 }
 
 // connectMainChain creates a MainChainApi for the given config.
@@ -88,6 +100,15 @@ func connectMainChain(config *model.ChainConfigType, pk *model.PrivKey) (MainCha
 		os.Exit(1)
 	}
 	return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
+}
+
+func GetChainByID(chainId uint32) (ChainApi, error) {
+	for _, chain := range Chains {
+		if chain.ChainId() == chainId {
+			return chain, nil
+		}
+	}
+	return nil, fmt.Errorf("chain not found: %d", chainId)
 }
 
 // connectChain creates a ChainApi for the given config.

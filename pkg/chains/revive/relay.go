@@ -1,59 +1,37 @@
 package revive
 
 import (
-	"math/big"
-
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
+	"github.com/computeflux/tee-provider/pkg/model"
 	chain "github.com/wetee-dao/ink.go"
-	"github.com/wetee-dao/ink.go/util"
 )
 
+// GetLatestNonce 查询主链合约最新事件 nonce | Query latest event nonce on main chain contract
 func (c *Contract) GetLatestNonce() (uint64, error) {
 	param := chain.DefaultParamWithOrigin(c.signer.AccountID())
-	v, _, err := chain.DryRunInk[types.U64](
-		c.token, param.Origin, param.PayAmount,
-		param.GasLimit, param.StorageDepositLimit,
-		util.InkContractInput{Selector: "0xbbb975bf"},
-	)
+	v, _, err := c.token.QueryGetLatestNonce(param)
 	if err != nil || v == nil {
 		return 0, err
 	}
 	return uint64(*v), nil
 }
 
-func (c *Contract) GetRelayEvent(nonce uint64) (target, typ, data []byte, err error) {
+// GetRelayEvents 批量查询 events (from..=to) | Batch query events from..=to
+func (c *Contract) GetRelayEvents(from, to uint64) ([]model.RelayEvent, error) {
 	param := chain.DefaultParamWithOrigin(c.signer.AccountID())
-	raw, _, err := chain.DryRunInk[types.Bytes](
-		c.token, param.Origin, param.PayAmount,
-		param.GasLimit, param.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0xcd2308da",
-			Args:     []any{types.U64(nonce)},
-		},
-	)
-	if err != nil || raw == nil || len(*raw) == 0 || (*raw)[0] == 0 {
-		return nil, nil, nil, err
-	}
-	rec, err := decodeEventRecord((*raw)[1:])
+	records, _, err := c.token.QueryGetEvents(from, to, param)
 	if err != nil {
-		return nil, nil, nil, err
-	}
-	return rec.TargetContract, rec.EventType, rec.EventData, nil
-}
-
-func decodeEventRecord(b []byte) (*eventRecord, error) {
-	var rec eventRecord
-	if err := codec.Decode(b, &rec); err != nil {
 		return nil, err
 	}
-	return &rec, nil
+	if records == nil || len(*records) == 0 {
+		return nil, nil
+	}
+	events := make([]model.RelayEvent, 0, len(*records))
+	for _, rec := range *records {
+		events = append(events, model.RelayEvent{
+			TargetContract: rec.TargetContract,
+			EventType:      rec.EventType,
+			EventData:      rec.EventData,
+		})
+	}
+	return events, nil
 }
-
-type eventRecord struct {
-	TargetContract types.Bytes
-	EventType      types.Bytes
-	EventData      types.Bytes
-}
-
-var _ = big.NewInt

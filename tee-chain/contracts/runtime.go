@@ -3,6 +3,7 @@
 package contracts
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -58,9 +59,20 @@ func (r *Runtime) GetCaller() model.UniAddr {
 // GetSudoAccount 获取超级管理员账户地址。
 // 超级管理员拥有执行特权操作的权限，如设置公共加入开关等。
 // 返回:
-//   - UniAddr: 超级管理员账户地址
-func (r *Runtime) GetSudoAccount() model.UniAddr {
+//   - UniAddr: 系统账户地址
+func (r *Runtime) GetSystemAccount() model.UniAddr {
 	return r.sudo
+}
+
+// CallbySystem 模拟系统调用，使用系统账户地址作为调用者。
+// 该方法用于执行需要系统权限的操作，如合约初始化等。
+// 返回:
+//   - bool: true 表示调用者是系统账户，false 表示不是系统账户
+func (r *Runtime) CallbySystem() bool {
+	if r.sudo.T != r.caller.T {
+		return false
+	}
+	return bytes.Equal(r.sudo.V, r.caller.V)
 }
 
 // IsContractIsInited 检查合约是否已初始化。

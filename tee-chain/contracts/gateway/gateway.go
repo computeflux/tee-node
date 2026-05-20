@@ -181,6 +181,10 @@ func (g GatewayMutation) UpdateProvider(
 // ── Points ───────────────────────────────────────────────
 
 func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
+	if !g.api.CallbySystem() {
+		return fmt.Errorf("Recharge: caller is not sudo account")
+	}
+
 	key := string(user.V)
 	bal, _ := g.balances.Get(g.api.GetTxn(), key)
 	if bal == nil {
@@ -253,10 +257,15 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 }
 
 func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
+	if !g.api.CallbySystem() {
+		return fmt.Errorf("Withdraw: caller is not sudo account")
+	}
+
 	pb, err := g.providerBalances.Get(g.api.GetTxn(), providerID)
 	if err != nil || pb == nil {
 		return ErrProviderNotFound
 	}
+
 	if *pb < amount {
 		return ErrLowBalance
 	}

@@ -22,9 +22,10 @@ var MainChainConfig *model.ChainConfigType
 // Contract
 type Contract struct {
 	*chain.ChainClient
-	signer chain.SignerType
-	subnet *subnet.Subnet
-	token  *token.Token
+	chainId uint32
+	signer  chain.SignerType
+	subnet  *subnet.Subnet
+	token   *token.Token
 }
 
 func GetCloudAddress() string {
@@ -107,6 +108,10 @@ func (c *Contract) GetSignerAddress() string {
 // ChainType returns the chain type string.
 func (c *Contract) ChainType() string {
 	return "substrate"
+}
+
+func (c *Contract) ChainId() uint32 {
+	return c.chainId
 }
 
 // GetCipher returns the signing suite used by this chain.

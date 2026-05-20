@@ -13,7 +13,6 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/cosmos/gogoproto/proto"
 
-	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -36,7 +35,6 @@ type TeeChain struct {
 	onGoingValidators   []abci.ValidatorUpdate
 	currProposerAddress []byte
 
-	chains     map[uint32]*chains.ChainApi
 	relay      *relay.Engine
 	relayCache *relayCache
 }
@@ -142,8 +140,10 @@ func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcess
 
 	// ── Relay: 验证出块节点预置的 relay tx ──────────────
 	if app.relay != nil {
+		// 跟踪区块内每个链的预期 nonce (一个区块可能有多个 relay tx)
+		chainExpected := make(map[uint32]uint64)
 		for _, txbt := range req.Txs {
-			if !app.verifyRelayTx(txbt) {
+			if !app.verifyRelayTx(txbt, chainExpected) {
 				LogWithTime("🌈 ProcessProposal: invalid relay tx, REJECT")
 				return &abci.ResponseProcessProposal{Status: abci.ResponseProcessProposal_REJECT}, nil
 			}
@@ -154,8 +154,8 @@ func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcess
 	return &abci.ResponseProcessProposal{Status: status}, nil
 }
 
-// verifyRelayTx 验证单笔 relay tx (ProcessProposal 调用)
-func (app *TeeChain) verifyRelayTx(txbt []byte) bool {
+// verifyRelayTx 验证单笔 relay tx (ProcessProposal 调用, chainExpected 跟踪区块内 nonce)
+func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64) bool {
 	txbox := new(model.Tx)
 	if err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox); err != nil {
 		return true
@@ -172,10 +172,22 @@ func (app *TeeChain) verifyRelayTx(txbt []byte) bool {
 	}
 
 	ev := relay.FromRelaySysCall(rs.RelaySync)
-	if err := app.relay.CheckRelayEvent(ev); err != nil {
-		LogWithTime("Relay reject:", err)
+	// 获取已提交 DB 的 last + 区块内预期值取最大
+	dbLast, dbErr := app.relay.LastNonce(ev.ChainID)
+	if dbErr != nil {
+		LogWithTime("Relay reject:", dbErr)
 		return false
 	}
+	expected := dbLast + 1
+	if blkExpected, exists := chainExpected[ev.ChainID]; exists && blkExpected > expected {
+		expected = blkExpected
+	}
+	if ev.Nonce != expected {
+		LogWithTime("Relay reject:", fmt.Sprintf("chain=%d nonce=%d expected=%d (db=%d)", ev.ChainID, ev.Nonce, expected, dbLast))
+		return false
+	}
+	// 更新区块内预期值 (下一个 relay tx 的 nonce 必须 +1)
+	chainExpected[ev.ChainID] = expected + 1
 	return true
 }
 

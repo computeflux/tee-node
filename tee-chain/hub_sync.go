@@ -29,7 +29,7 @@ func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	}
 
 	chainId := stored.HubCalls[0].ChainId
-	chain, err := s.getChain(chainId)
+	chain, err := chains.GetChainByID(chainId)
 	if err != nil {
 		return errors.Wrap(err, "getChain error")
 	}
@@ -40,7 +40,7 @@ func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	signer.SetSigs(sigs)
 
 	// submit sync tx to polkadot hub
-	err = chains.MainChain.SignAndSubmit(signer, *call, false, 0)
+	err = chain.SignAndSubmit(signer, *call, false, 0)
 	if err != nil {
 		util.LogWithRed("Sync to polkadot hub", "error => ", err.Error())
 		fmt.Println("                    ", " SS58 => ", s.dkg.DkgPubKeys[chain.GetCipher()])

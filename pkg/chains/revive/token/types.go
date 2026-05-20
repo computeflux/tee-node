@@ -126,3 +126,9 @@ func (ty *Error) Error() string {
 	}
 	return "Unknown"
 }
+
+type EventRecord struct { // Composite
+	TargetContract []byte
+	EventType      []byte
+	EventData      []byte
+}

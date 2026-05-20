@@ -108,9 +108,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, prop
 			if app.relay != nil {
 				rt := app.runtimeForContract(height, txn, tx.GetCaller())
 				app.relay.SetRuntime(rt)
-				if err := app.relay.CheckRelayEvent(ev); err != nil {
-					return nil, errors.Wrap(err, "check relay event")
-				}
+				// ApplyRelayEvent 内部有 txn 级别 nonce 校验 (ProcessProposal 已做 DB 级别校验)
 				if err := app.relay.ApplyRelayEvent(ev); err != nil {
 					return nil, errors.Wrap(err, "apply relay event")
 				}

@@ -18,6 +18,7 @@ import (
 
 // EvmChain implements ChainApi + MainChainApi for EVM chains.
 type EvmChain struct {
+	chainId    uint32
 	cipher     model.SuiteType
 	urls       []string
 	mu         sync.RWMutex
@@ -98,6 +99,7 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*EvmChain, e
 		chainName:  config.NetworkLabel,
 		privateKey: ecdsaKey,
 		cipher:     config.Cipher,
+		chainId:    config.ChainID,
 		auth:       auth,
 		signerAddr: crypto.PubkeyToAddress(ecdsaKey.PublicKey).Hex(),
 	}, nil
@@ -167,6 +169,9 @@ func (e *EvmChain) ChainType() string          { return "evm" }
 func (e *EvmChain) GetCipher() model.SuiteType { return e.cipher }
 func (e *EvmChain) GetChainUrls() []string     { return e.urls }
 func (e *EvmChain) GetSignerAddress() string   { return e.signerAddr }
+func (c *EvmChain) ChainId() uint32 {
+	return c.chainId
+}
 
 func (e *EvmChain) GetClient() *model.ChainClient {
 	e.mu.RLock()

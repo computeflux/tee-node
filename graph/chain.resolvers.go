@@ -35,7 +35,7 @@ func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
 // ChainInfo is the resolver for the chain_info field.
 func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, error) {
 	chainEnv := util.GetEnv("CHAIN_ENV", "local")
-	chainConfig := config.GetChainConfig(chainEnv)
+	chainConfig := config.GetMainChainConfig(chainEnv)
 	if chainConfig == nil {
 		return nil, gqlerror.Errorf("%s", "ChainInfo is nil")
 	}

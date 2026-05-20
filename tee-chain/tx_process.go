@@ -33,6 +33,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte) abci.ResponseProcessProposal_Propos
 		case *model.SysCall_Empty:
 		case *model.SysCall_HubCall:
 		case *model.SysCall_Contract:
+		case *model.SysCall_RelaySync:
 		default:
 			fmt.Println("Payload is not set or unknown")
 			return abci.ResponseProcessProposal_REJECT

@@ -521,6 +521,78 @@ func (c *Token) CallOfWithdrawSol(
 	)
 }
 
+func (c *Token) QueryGetLatestNonce(
+	__ink_params chain.DryRunParams,
+) (*uint64, *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "get_latest_nonce")
+	}
+	v, gas, err := chain.DryRunInk[uint64](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0xa487a9e6",
+			Args:     []any{},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
+func (c *Token) QueryGetEvents(
+	from uint64, to uint64, __ink_params chain.DryRunParams,
+) (*[]EventRecord, *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "get_events")
+	}
+	v, gas, err := chain.DryRunInk[[]EventRecord](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x7a4d3129",
+			Args:     []any{from, to},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
+func (c *Token) QueryGetEvent(
+	nonce uint64, __ink_params chain.DryRunParams,
+) (*util.Option[EventRecord], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "get_event")
+	}
+	v, gas, err := chain.DryRunInk[util.Option[EventRecord]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0xd0774d04",
+			Args:     []any{nonce},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
 func (c *Token) QueryGetBalance(
 	user types.H160, __ink_params chain.DryRunParams,
 ) (*types.U256, *chain.DryRunReturnGas, error) {

@@ -63,7 +63,8 @@ type ContractApi interface {
 	GetHeight() int64
 	GetTxn() *Txn
 	GetCaller() UniAddr
-	GetSudoAccount() UniAddr
+	GetSystemAccount() UniAddr
+	CallbySystem() bool
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
 }

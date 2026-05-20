@@ -1,6 +1,7 @@
 package gov
 
 import (
+	"bytes"
 	"math/big"
 	"os"
 	"testing"
@@ -23,8 +24,11 @@ type testRuntime struct {
 func (r *testRuntime) GetHeight() int64         { return r.height }
 func (r *testRuntime) GetTxn() *model.Txn       { return r.txn }
 func (r *testRuntime) GetCaller() model.UniAddr { return r.caller }
-func (r *testRuntime) GetSudoAccount() model.UniAddr {
+func (r *testRuntime) GetSystemAccount() model.UniAddr {
 	return r.sudoAccount
+}
+func (r *testRuntime) CallbySystem() bool {
+	return r.sudoAccount.T != r.caller.T || !bytes.Equal(r.sudoAccount.V, r.caller.V)
 }
 
 // Query 实现跨合约查询（测试环境暂不支持）
