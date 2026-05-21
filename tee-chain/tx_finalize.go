@@ -106,10 +106,19 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, prop
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				rt := app.runtimeForContract(height, txn, tx.GetCaller())
-				app.relay.SetRuntime(rt)
+				pub, err := app.GetDkgPubkey()
+				if err != nil {
+					return nil, errors.Wrap(err, "dkg not init")
+				}
+
+				runtime := contracts.NewRuntime(height, txn, model.UniAddr{
+					V: pub.ToBytes(),
+				}, model.UniAddr{
+					V: pub.ToBytes(),
+				})
+
 				// ApplyRelayEvent 内部有 txn 级别 nonce 校验 (ProcessProposal 已做 DB 级别校验)
-				if err := app.relay.ApplyRelayEvent(ev); err != nil {
+				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					return nil, errors.Wrap(err, "apply relay event")
 				}
 			}
@@ -132,16 +141,6 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, prop
 		}
 	}
 	return res, nil
-}
-
-// runtimeForContract 为 relay 事件创建 runtime
-func (app *TeeChain) runtimeForContract(height int64, txn *model.Txn, caller []byte) model.ContractApi {
-	pub, err := app.GetDkgPubkey()
-	sudoAddr := model.UniAddr{}
-	if err == nil && pub != nil {
-		sudoAddr.V = pub.ToBytes()
-	}
-	return contracts.NewRuntime(height, txn, model.UniAddr{V: caller}, sudoAddr)
 }
 
 func (app *TeeChain) finalizeHubCall(hub *model.HubCall, txn *model.Txn) error {

@@ -86,15 +86,24 @@ func jsonDecode(data []byte, v interface{}) error {
 func DetectProvider(baseURL string) string {
 	lower := strings.ToLower(baseURL)
 	switch {
-	case strings.Contains(lower, "openai.com"): return "openai"
-	case strings.Contains(lower, "anthropic.com"): return "anthropic"
-	case strings.Contains(lower, "googleapis.com"): return "gemini"
-	case strings.Contains(lower, "deepseek.com"): return "deepseek"
-	case strings.Contains(lower, "groq.com"): return "groq"
-	case strings.Contains(lower, "mistral.ai"): return "mistral"
-	case strings.Contains(lower, "cohere.ai"): return "cohere"
-	case strings.Contains(lower, "x.ai"): return "xai"
-	default: return "openai" // default to OpenAI-compatible
+	case strings.Contains(lower, "openai.com"):
+		return "openai"
+	case strings.Contains(lower, "anthropic.com"):
+		return "anthropic"
+	case strings.Contains(lower, "googleapis.com"):
+		return "gemini"
+	case strings.Contains(lower, "deepseek.com"):
+		return "deepseek"
+	case strings.Contains(lower, "groq.com"):
+		return "groq"
+	case strings.Contains(lower, "mistral.ai"):
+		return "mistral"
+	case strings.Contains(lower, "cohere.ai"):
+		return "cohere"
+	case strings.Contains(lower, "x.ai"):
+		return "xai"
+	default:
+		return "openai" // default to OpenAI-compatible
 	}
 }
 
@@ -103,6 +112,8 @@ func GetAdaptorForProvider(provider string) Adaptor {
 	switch provider {
 	case "anthropic":
 		return &AnthropicAdaptor{}
+	case "gemini":
+		return &GeminiAdaptor{}
 	default:
 		return &OpenAIAdaptor{}
 	}

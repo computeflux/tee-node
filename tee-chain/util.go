@@ -56,6 +56,7 @@ func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
 		}
 		return nil, errors.New("get G-dkg_pub_key error")
 	}
+
 	account, err := types.NewAccountID(key)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_key error")

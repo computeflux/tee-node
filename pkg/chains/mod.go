@@ -17,7 +17,7 @@ var Chains []ChainApi
 
 // ── ChainApi ──────────────────────────────────────────────
 
-// ChainApi is the minimal interface for any side-chain (Substrate, EVM, …).
+// ChainApi is the minimal interface for any tee-chain (Substrate, EVM, …).
 type ChainApi interface {
 	ChainType() string
 	ChainId() uint32
@@ -73,7 +73,7 @@ func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
 	return MainChain, err
 }
 
-// ConnectChain creates a side-chain connection.
+// ConnectChain creates a tee-chain connection.
 func ConnectChain(env string, pk *model.PrivKey) {
 	var chains []ChainApi = []ChainApi{MainChain}
 	chainConfigs := config.GetChainConfigs(env)

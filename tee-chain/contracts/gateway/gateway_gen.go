@@ -243,15 +243,15 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 	args := call.Args
 	methodSel := [4]byte(call.Method[:4])
 	switch methodSel {
-	case [4]byte{0x37, 0x44, 0xe4, 0xb0}:
-		if err := model.RequireArgLen(args, 1, "get_balance"); err != nil {
+	case [4]byte{0x04, 0x60, 0x1f, 0xca}:
+		if err := model.RequireArgLen(args, 1, "get_credit"); err != nil {
 			return nil, err
 		}
 		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
 		if err != nil {
-			return nil, fmt.Errorf("get_balance: user: %w", err)
+			return nil, fmt.Errorf("get_credit: user: %w", err)
 		}
-		out, err := q.GetBalance(user)
+		out, err := q.GetCredit(user)
 		if err != nil {
 			return nil, err
 		}
@@ -288,19 +288,6 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xd3, 0xaf, 0x56, 0xaa}:
-		if err := model.RequireArgLen(args, 1, "get_provider_balance"); err != nil {
-			return nil, err
-		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("get_provider_balance: providerID: %w", err)
-		}
-		out, err := q.GetProviderBalance(providerID)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
 	case [4]byte{0x55, 0xc0, 0x48, 0x47}:
 		out, err := q.GetProviderByOwner()
 		if err != nil {
@@ -309,6 +296,19 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		return codec.Encode(out)
 	case [4]byte{0x46, 0x7c, 0x95, 0xd9}:
 		out, err := q.GetProviderCount()
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xad, 0x4c, 0x38, 0xcd}:
+		if err := model.RequireArgLen(args, 1, "get_provider_credit"); err != nil {
+			return nil, err
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_provider_credit: providerID: %w", err)
+		}
+		out, err := q.GetProviderCredit(providerID)
 		if err != nil {
 			return nil, err
 		}
@@ -434,25 +434,25 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 
 func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
-		api:              api,
-		balances:         &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "balance_"},
-		models:           model.NewIndexedList[uint64, ModelInfo]("gateway", "model_next_id", "model_"),
-		providers:        model.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_v3_next_id", "providers_v3_"),
-		providerByOwner:  &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "provider_by_owner_"},
-		providerBalances: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_balance_"},
-		apiKeys:          &model.StoreMapping[string, APIKeyInfo]{Namespace: "gateway", KeyPrefix: "api_key_"},
-		usages:           &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
+		api:             api,
+		credits:         &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
+		models:          model.NewIndexedList[uint64, ModelInfo]("gateway", "model_next_id", "model_"),
+		providers:       model.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_v3_next_id", "providers_v3_"),
+		providerByOwner: &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "provider_by_owner_"},
+		providerCredits: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
+		apiKeys:         &model.StoreMapping[string, APIKeyInfo]{Namespace: "gateway", KeyPrefix: "api_key_"},
+		usages:          &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
 	}
 }
 
 var MethodMap = map[[4]byte]string{
-	[4]byte{0x37, 0x44, 0xe4, 0xb0}: "get_balance",
+	[4]byte{0x04, 0x60, 0x1f, 0xca}: "get_credit",
 	[4]byte{0xd3, 0xff, 0x81, 0xe9}: "get_model",
 	[4]byte{0x05, 0xed, 0xba, 0xf5}: "get_model_count",
 	[4]byte{0xb3, 0x4c, 0x16, 0xd8}: "get_provider",
-	[4]byte{0xd3, 0xaf, 0x56, 0xaa}: "get_provider_balance",
 	[4]byte{0x55, 0xc0, 0x48, 0x47}: "get_provider_by_owner",
 	[4]byte{0x46, 0x7c, 0x95, 0xd9}: "get_provider_count",
+	[4]byte{0xad, 0x4c, 0x38, 0xcd}: "get_provider_credit",
 	[4]byte{0xda, 0xa1, 0xc2, 0xd5}: "list_active_models",
 	[4]byte{0xbd, 0x24, 0x20, 0x9b}: "list_active_providers",
 	[4]byte{0xc1, 0x51, 0x1f, 0xbf}: "list_models",

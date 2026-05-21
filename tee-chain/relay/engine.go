@@ -18,6 +18,8 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
+const RELAY_KEY = "RELAY"
+
 // SyncEvent 从主链同步的事件 | Event synced from main chain
 type SyncEvent struct {
 	ChainID        uint32     // 主链 ID | main chain identifier
@@ -32,18 +34,12 @@ type SyncEvent struct {
 
 // Engine 同步引擎 — 每个侧链节点一个实例 | Sync engine — one per sidechain node
 type Engine struct {
-	api model.ContractApi // 区块运行时 | block runtime (injected per block)
 }
 
 // NewEngine 创建引擎 | Create engine
-func NewEngine(api model.ContractApi) *Engine {
-	util.LogWithGreen("RELAY", "engine created")
-	return &Engine{api: api}
-}
-
-// SetRuntime 注入当前区块的运行时 (出块时调用) | Inject block runtime (called during FinalizeTx)
-func (e *Engine) SetRuntime(api model.ContractApi) {
-	e.api = api
+func NewEngine() *Engine {
+	util.LogWithGreen(RELAY_KEY, "engine created")
+	return &Engine{}
 }
 
 // CheckRelayEvent 验证 relay 事件 (ProcessProposal 阶段) | Validate relay event (ProcessProposal phase)
@@ -54,40 +50,40 @@ func (e *Engine) CheckRelayEvent(ev SyncEvent) error {
 	// 读已提交状态的最新 nonce | read latest nonce from committed state
 	last, err := getLastNonceBg(ev.ChainID)
 	if err != nil {
-		util.LogWithRed("RELAY", "CheckRelayEvent: getLastNonceBg failed, chain", ev.ChainID, "err:", err)
+		util.LogWithRed(RELAY_KEY, "CheckRelayEvent: getLastNonceBg failed, chain", ev.ChainID, "err:", err)
 		return err
 	}
 
 	// nonce 必须严格递增 (防重放 + 防乱序) | nonce must be strictly increasing (anti-replay + anti-out-of-order)
 	if ev.Nonce != last+1 {
-		util.LogWithRed("RELAY", fmt.Sprintf("CheckRelayEvent: bad nonce, chain=%d expected=%d got=%d", ev.ChainID, last+1, ev.Nonce))
+		util.LogWithRed(RELAY_KEY, fmt.Sprintf("CheckRelayEvent: bad nonce, chain=%d expected=%d got=%d", ev.ChainID, last+1, ev.Nonce))
 		return fmt.Errorf("relay: expected nonce %d, got %d", last+1, ev.Nonce)
 	}
 
-	util.LogOk("RELAY", fmt.Sprintf("CheckRelayEvent: ok, chain=%d nonce=%d block=%d", ev.ChainID, ev.Nonce, ev.BlockNum))
+	util.LogOk(RELAY_KEY, fmt.Sprintf("CheckRelayEvent: ok, chain=%d nonce=%d block=%d", ev.ChainID, ev.Nonce, ev.BlockNum))
 	return nil
 }
 
 // ApplyRelayEvent 执行 relay 事件并更新 nonce (FinalizeTx 阶段) | Execute relay event and update nonce (FinalizeTx phase)
-func (e *Engine) ApplyRelayEvent(ev SyncEvent) error {
-	txn := e.api.GetTxn()
+func (e *Engine) ApplyRelayEvent(ev SyncEvent, api model.ContractApi) error {
+	txn := api.GetTxn()
 	// 二次校验 (区块内可能有多个 relay tx) | double-check (block may contain multiple relay txs)
 	last, err := getLastNonce(txn, ev.ChainID)
 	if err != nil {
-		util.LogWithRed("RELAY", "ApplyRelayEvent: getLastNonce failed, chain", ev.ChainID, "err:", err)
+		util.LogWithRed(RELAY_KEY, "ApplyRelayEvent: getLastNonce failed, chain", ev.ChainID, "err:", err)
 		return err
 	}
 	if ev.Nonce != last+1 {
-		util.LogWithRed("RELAY", fmt.Sprintf("ApplyRelayEvent: bad nonce, chain=%d expected=%d got=%d", ev.ChainID, last+1, ev.Nonce))
+		util.LogWithRed(RELAY_KEY, fmt.Sprintf("ApplyRelayEvent: bad nonce, chain=%d expected=%d got=%d", ev.ChainID, last+1, ev.Nonce))
 		return fmt.Errorf("relay: expected nonce %d, got %d", last+1, ev.Nonce)
 	}
 
 	// 先写 nonce 再执行, 防止同一事件重复打包 | write nonce first to prevent re-packaging
 	setLastNonce(txn, ev.ChainID, ev.Nonce)
-	util.LogWithCyan("RELAY", fmt.Sprintf("ApplyRelayEvent: chain=%d nonce=%d block=%d -> %s.%s", ev.ChainID, ev.Nonce, ev.BlockNum, string(ev.TargetContract), string(ev.EventType)))
+	util.LogWithCyan(RELAY_KEY, fmt.Sprintf("ApplyRelayEvent: chain=%d nonce=%d block=%d -> %s.%s", ev.ChainID, ev.Nonce, ev.BlockNum, string(ev.TargetContract), string(ev.EventType)))
 
 	// 分发到目标合约 | dispatch to target contract
-	return dispatch(ev, e.api)
+	return dispatch(ev, api)
 }
 
 // LastNonce 查询已处理的最新 nonce | Query last processed nonce
@@ -154,31 +150,33 @@ func BuildSyncEvent(chainID uint32, nonce, blockNum uint64, target []byte, typ [
 func dispatch(ev SyncEvent, api model.ContractApi) error {
 	target := string(ev.TargetContract) + "." + string(ev.EventType)
 	if target != "gateway.Recharge" && target != "gateway.Withdraw" {
-		util.LogWithGray("RELAY", fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
+		util.LogWithGray(RELAY_KEY, fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
 	}
 
-	return nil
-	// _, err := api.Call(api.GetSystemAccount(), model.ContractCall{
-	// 	Name:   ev.TargetContract,
-	// 	Method: model.MethodToSelectorBytes(string(ev.EventType)),
-	// 	Args:   ev.EventData,
-	// })
-	// if err != nil {
-	// 	util.LogWithRed("RELAY", fmt.Sprintf("dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
-	// } else {
-	// 	util.LogOk("RELAY", fmt.Sprintf("dispatch ok: %s.%s args=%d", string(ev.TargetContract), string(ev.EventType), len(ev.EventData)))
-	// }
-	// return err
+	// return nil
+	_, err := api.Call(api.GetSystemAccount(), model.ContractCall{
+		Name:   ev.TargetContract,
+		Method: model.MethodToSelectorBytes(string(ev.EventType)),
+		Args:   ev.EventData,
+	})
+
+	if err != nil {
+		util.LogWithRed(RELAY_KEY, fmt.Sprintf("dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
+	} else {
+		util.LogOk(RELAY_KEY, fmt.Sprintf("dispatch ok: %s.%s args=%d", string(ev.TargetContract), string(ev.EventType), len(ev.EventData)))
+	}
+	return err
 }
 
 // ── nonce 存储 | nonce storage ──────────────────────────
 
 // getLastNonce 读取 nonce (txn 内, FinalizeTx 用) | Read nonce (within txn, for FinalizeTx)
 func getLastNonce(txn *model.Txn, chainID uint32) (uint64, error) {
-	n, err := model.TxnGetCodec[uint64](txn, "RELAY", fmt.Sprintf("nonce_%d", chainID))
+	n, err := model.TxnGetCodec[uint64](txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
 	}
+
 	if n == nil {
 		return 0, nil // 首次事件, 无历史 nonce | first event, no prior nonce
 	}
@@ -187,12 +185,12 @@ func getLastNonce(txn *model.Txn, chainID uint32) (uint64, error) {
 
 // setLastNonce 写入 nonce (txn 内, 原子提交) | Write nonce (within txn, atomic commit)
 func setLastNonce(txn *model.Txn, chainID uint32, v uint64) error {
-	return model.TxnSetCodec(txn, "RELAY", fmt.Sprintf("nonce_%d", chainID), v)
+	return model.TxnSetCodec(txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID), v)
 }
 
 // getLastNonceBg 读取 nonce (直接读 DB, CheckTx/ProcessProposal 用) | Read nonce (direct DB read, for CheckTx/ProcessProposal)
 func getLastNonceBg(chainID uint32) (uint64, error) {
-	n, err := model.GetCodec[uint64]("RELAY", fmt.Sprintf("nonce_%d", chainID))
+	n, err := model.GetCodec[uint64](RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
 	}

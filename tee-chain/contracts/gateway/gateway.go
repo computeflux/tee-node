@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrLowBalance       = errors.New("low balance")
+	ErrLowCredit        = errors.New("low Credit")
 	ErrModelNotFound    = errors.New("model not found")
 	ErrProviderNotFound = errors.New("provider not found")
 	ErrAPIKeyNotFound   = errors.New("api key not found")
@@ -21,13 +21,13 @@ var (
 type Gateway struct {
 	api model.ContractApi
 
-	balances         *model.StoreMapping[string, uint64]
-	models           *model.IndexedList[uint64, ModelInfo]    // tag 索引 + 自增 id + 分页
-	providers        *model.IndexedList[uint64, ProviderInfo] `store:"keyPfx:providers_v3"`
-	providerByOwner  *model.StoreMapping[string, uint64]      // owner → providerID（一人一 provider）
-	providerBalances *model.StoreMapping[uint64, uint64]
-	apiKeys          *model.StoreMapping[string, APIKeyInfo] // hex(keyHash) → APIKeyInfo
-	usages           *model.StoreMapping[string, DailyUsage]
+	credits         *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:credits"`
+	models          *model.IndexedList[uint64, ModelInfo]      // tag 索引 + 自增 id + 分页
+	providers       *model.IndexedList[uint64, ProviderInfo]   `store:"keyPfx:providers_v3"`
+	providerByOwner *model.StoreMapping[string, uint64]        // owner → providerID（一人一 provider）
+	providerCredits *model.StoreMapping[uint64, uint64]
+	apiKeys         *model.StoreMapping[string, APIKeyInfo] // hex(keyHash) → APIKeyInfo
+	usages          *model.StoreMapping[string, DailyUsage]
 }
 
 type GatewayQuery struct{ Gateway }
@@ -185,13 +185,12 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 		return fmt.Errorf("Recharge: caller is not sudo account")
 	}
 
-	key := string(user.V)
-	bal, _ := g.balances.Get(g.api.GetTxn(), key)
+	bal, _ := g.credits.Get(g.api.GetTxn(), user)
 	if bal == nil {
 		bal = new(uint64)
 	}
 	*bal += amount
-	return g.balances.Set(g.api.GetTxn(), key, *bal)
+	return g.credits.Set(g.api.GetTxn(), user, *bal)
 }
 
 // ── Billing ──────────────────────────────────────────────
@@ -226,21 +225,20 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		}
 
 		// 扣用户余额
-		userKey := string(r.User.V)
-		bal, _ := g.balances.Get(g.api.GetTxn(), userKey)
+		bal, _ := g.credits.Get(g.api.GetTxn(), r.User)
 		if bal == nil || *bal < cost {
-			return fmt.Errorf("settle user %x: %w", r.User.V, ErrLowBalance)
+			return fmt.Errorf("settle user %x: %w", r.User.V, ErrLowCredit)
 		}
 		*bal -= cost
-		g.balances.Set(g.api.GetTxn(), userKey, *bal)
+		g.credits.Set(g.api.GetTxn(), r.User, *bal)
 
 		// 加 provider 余额
-		pb, _ := g.providerBalances.Get(g.api.GetTxn(), r.ProviderID)
+		pb, _ := g.providerCredits.Get(g.api.GetTxn(), r.ProviderID)
 		if pb == nil {
 			pb = new(uint64)
 		}
 		*pb += cost
-		g.providerBalances.Set(g.api.GetTxn(), r.ProviderID, *pb)
+		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
 
 		// 记录每日用量
 		dayKey := fmt.Sprintf("%x_%d_%d_%s", r.User.V, r.ProviderID, r.ModelID, "today")
@@ -261,16 +259,16 @@ func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
 		return fmt.Errorf("Withdraw: caller is not sudo account")
 	}
 
-	pb, err := g.providerBalances.Get(g.api.GetTxn(), providerID)
+	pb, err := g.providerCredits.Get(g.api.GetTxn(), providerID)
 	if err != nil || pb == nil {
 		return ErrProviderNotFound
 	}
 
 	if *pb < amount {
-		return ErrLowBalance
+		return ErrLowCredit
 	}
 	*pb -= amount
-	return g.providerBalances.Set(g.api.GetTxn(), providerID, *pb)
+	return g.providerCredits.Set(g.api.GetTxn(), providerID, *pb)
 }
 
 // ── API Key ──────────────────────────────────────────────
@@ -317,8 +315,8 @@ func (g GatewayMutation) RevokeAPIKey(keyHash []byte) error {
 
 // ── Query: Single ────────────────────────────────────────
 
-func (g GatewayQuery) GetBalance(user model.UniAddr) (uint64, error) {
-	bal, err := g.balances.Get(g.api.GetTxn(), string(user.V))
+func (g GatewayQuery) GetCredit(user model.UniAddr) (uint64, error) {
+	bal, err := g.credits.Get(g.api.GetTxn(), user)
 	if err != nil || bal == nil {
 		return 0, nil
 	}
@@ -352,8 +350,8 @@ func (g GatewayQuery) LookupAPIKey(keyHash []byte) (*APIKeyInfo, error) {
 	return g.apiKeys.Get(g.api.GetTxn(), hexKey)
 }
 
-func (g GatewayQuery) GetProviderBalance(providerID uint64) (uint64, error) {
-	bal, err := g.providerBalances.Get(g.api.GetTxn(), providerID)
+func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {
+	bal, err := g.providerCredits.Get(g.api.GetTxn(), providerID)
 	if err != nil || bal == nil {
 		return 0, nil
 	}

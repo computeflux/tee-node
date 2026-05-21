@@ -12,17 +12,17 @@ import (
 // 批量写入 Pebble，避免每个请求都同步写磁盘
 
 type usageRecord struct {
-	tokenID   uint64
-	day       string
+	tokenID    uint64
+	day        string
 	providerID uint64
-	modelID   uint64
-	tokens    uint64
+	modelID    uint64
+	tokens     uint64
 }
 
 var (
-	usageCh     = make(chan usageRecord, 4096)
-	usageWg     sync.WaitGroup
-	usageOnce   sync.Once
+	usageCh   = make(chan usageRecord, 4096)
+	usageWg   sync.WaitGroup
+	usageOnce sync.Once
 )
 
 func initUsageWriter() {
@@ -68,7 +68,8 @@ func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint
 	select {
 	case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens}:
 	default:
-		// Provider full, drop (degraded mode)
+		// Channel full, drop (degraded mode) — log for monitoring.
+		log.Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)", tokenID, providerID, tokens)
 	}
 }
 

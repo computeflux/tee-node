@@ -3,14 +3,15 @@ package gateway
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"runtime/debug"
-	"sync"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -37,7 +38,9 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-Id")
 		if id == "" {
-			id = fmt.Sprintf("%d-%x", time.Now().UnixNano(), make([]byte, 4))
+			b := make([]byte, 4)
+			rand.Read(b)
+			id = fmt.Sprintf("%d-%x", time.Now().UnixNano(), b)
 		}
 		w.Header().Set("X-Request-Id", id)
 		next.ServeHTTP(w, r)
@@ -153,9 +156,15 @@ type channelMetric struct {
 	recent []bool // true=success, false=fail
 }
 
-var channelMetrics = make(map[uint64]*channelMetric)
+var (
+	channelMetrics   = make(map[uint64]*channelMetric)
+	channelMetricsMu sync.Mutex
+)
 
 func EmitChannelMetric(providerID uint64, success bool) {
+	channelMetricsMu.Lock()
+	defer channelMetricsMu.Unlock()
+
 	m, ok := channelMetrics[providerID]
 	if !ok {
 		m = &channelMetric{}

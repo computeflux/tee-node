@@ -12,14 +12,14 @@ import (
 // ── Gemini types ─────────────────────────────────────────
 
 type GeminiRequest struct {
-	Contents         []GeminiContent   `json:"contents"`
-	GenerationConfig *GeminiGenConfig  `json:"generationConfig,omitempty"`
-	SafetySettings   []GeminiSafety    `json:"safetySettings,omitempty"`
+	Contents         []GeminiContent  `json:"contents"`
+	GenerationConfig *GeminiGenConfig `json:"generationConfig,omitempty"`
+	SafetySettings   []GeminiSafety   `json:"safetySettings,omitempty"`
 }
 
 type GeminiContent struct {
-	Role  string        `json:"role,omitempty"`
-	Parts []GeminiPart  `json:"parts"`
+	Role  string       `json:"role,omitempty"`
+	Parts []GeminiPart `json:"parts"`
 }
 
 type GeminiPart struct {
@@ -111,7 +111,7 @@ func (a *GeminiAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 		return nil, err
 	}
 	a.SetupRequestHeader(ctx, req, meta)
-	return http.DefaultClient.Do(req)
+	return DoHTTP(req)
 }
 
 func (a *GeminiAdaptor) DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (*Usage, *ErrorWithStatusCode) {
@@ -148,8 +148,8 @@ func (a *GeminiAdaptor) handleGeminiNormal(ctx *RelayContext, resp *http.Respons
 	oaiResp := map[string]interface{}{
 		"object": "chat.completion",
 		"choices": []map[string]interface{}{{
-			"index": 0,
-			"message": map[string]string{"role": "assistant", "content": content},
+			"index":         0,
+			"message":       map[string]string{"role": "assistant", "content": content},
 			"finish_reason": "stop",
 		}},
 		"usage": map[string]int{

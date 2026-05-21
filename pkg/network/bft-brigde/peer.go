@@ -58,7 +58,7 @@ func (p *BTFReactor) doSend(msg *model.PeerMsg) error {
 		p.Receive(sendData)
 	}
 
-	p.Switch.Broadcast(sendData)
+	p.Switch.BroadcastAsync(sendData)
 	return nil
 }
 
@@ -191,7 +191,7 @@ func (p *BTFReactor) AvailableNodes() []*model.PubKey {
 	peers := p.Switch.Peers()
 	nodes := make([]*model.PubKey, 0, peers.Size())
 	for _, n := range p.nodekeys {
-		for _, peer := range peers.List() {
+		for _, peer := range peers.Copy() {
 			if peer.ID() == n.TeeChainNodeID() {
 				nodes = append(nodes, n)
 			}

@@ -123,6 +123,11 @@ func InvalidateCache() {
 }
 
 func findTokenCached(key string) *model.GatewayTokenInfo {
+	return FindTokenByKey(key)
+}
+
+// FindTokenByKey finds an active API key in the token cache.
+func FindTokenByKey(key string) *model.GatewayTokenInfo {
 	for _, tk := range GetCachedTokens() {
 		if tk.Key == key && tk.IsActive {
 			return tk

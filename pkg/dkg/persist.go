@@ -53,6 +53,8 @@ func (dkg *DKG) reState() error {
 }
 
 func (dkg *DKG) saveState() error {
+	dkg.mu.RLock()
+	defer dkg.mu.RUnlock()
 	raw := dkgStoreJSON{
 		Nodes:           dkg.Nodes,
 		Threshold:       dkg.Threshold,

@@ -20,19 +20,20 @@ import (
 type EndpointRateLimiter struct {
 	mu       sync.Mutex
 	window   []time.Time
-	maxConc  int64       // 最大并发
-	inflight int64       // 当前并发
+	maxConc  int64 // 最大并发
+	inflight int64 // 当前并发
 }
 
 var (
-	endpointLimiters   = make(map[uint64]*EndpointRateLimiter)
-	endpointLimiterMu  sync.RWMutex
+	endpointLimiters  = make(map[uint64]*EndpointRateLimiter)
+	endpointLimiterMu sync.RWMutex
 )
 
 func getEndpointLimiter(endpointID uint64, _ int) *EndpointRateLimiter {
-	endpointLimiterMu.RLock()
+	endpointLimiterMu.Lock()
+	defer endpointLimiterMu.Unlock()
+
 	lim, ok := endpointLimiters[endpointID]
-	endpointLimiterMu.RUnlock()
 	if ok {
 		return lim
 	}
@@ -40,9 +41,7 @@ func getEndpointLimiter(endpointID uint64, _ int) *EndpointRateLimiter {
 	lim = &EndpointRateLimiter{
 		maxConc: 50, // 单 key 50 并发
 	}
-	endpointLimiterMu.Lock()
 	endpointLimiters[endpointID] = lim
-	endpointLimiterMu.Unlock()
 	return lim
 }
 
@@ -51,7 +50,7 @@ func (l *EndpointRateLimiter) Allow() bool {
 	if l == nil {
 		return true
 	}
-	return atomic.AddInt64(&l.inflight, 1) <= l.maxConc
+	return atomic.AddInt64(&l.inflight, 1) <= atomic.LoadInt64(&l.maxConc)
 }
 
 // Done decrements inflight
@@ -63,9 +62,7 @@ func (l *EndpointRateLimiter) Done() {
 
 // SetLimits updates max concurrency
 func (l *EndpointRateLimiter) SetLimits(_ int, maxConc int64) {
-	l.mu.Lock()
-	l.maxConc = maxConc
-	l.mu.Unlock()
+	atomic.StoreInt64(&l.maxConc, maxConc)
 }
 
 // Stats returns current state
@@ -78,9 +75,9 @@ func (l *EndpointRateLimiter) Stats() (rpm int, inflight int64) {
 var ProviderRateDefaults = map[string]struct {
 	MaxConc int64
 }{
-	"openai":    {MaxConc: 50},   // 10 keys × 50 = 500 打满连接池
-	"anthropic": {MaxConc: 20},   // 25 keys × 20 = 500
-	"gemini":    {MaxConc: 100},  // 5 keys × 100 = 500
+	"openai":    {MaxConc: 50},  // 10 keys × 50 = 500 打满连接池
+	"anthropic": {MaxConc: 20},  // 25 keys × 20 = 500
+	"gemini":    {MaxConc: 100}, // 5 keys × 100 = 500
 	"default":   {MaxConc: 50},
 }
 

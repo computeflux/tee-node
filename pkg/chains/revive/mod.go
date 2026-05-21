@@ -6,7 +6,6 @@ package revive
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/token"
@@ -83,7 +82,7 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 	if err != nil {
 		return nil, errors.New("CheckBlock error: " + err.Error())
 	}
-	fmt.Println("block number", blockNumber)
+	util.LogWithYellow("Main Chain", "block number", blockNumber)
 
 	return &Contract{
 		ChainClient: client,

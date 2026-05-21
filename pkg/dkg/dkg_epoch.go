@@ -16,6 +16,15 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	dkg.mu.RLock()
 	sponsor := dkg.NewEpochSponsor
 	successBack := dkg.consensusSuccessBack
+	newEpochTime := dkg.NewEpochTime
+	newDkgPubKeysCopy := make(map[model.SuiteType]*model.PubKey)
+	for k, v := range dkg.NewDkgPubKeys {
+		if v != nil {
+			cpy := *v
+			newDkgPubKeysCopy[k] = &cpy
+		}
+	}
+	newDkgPubKeysEd := newDkgPubKeysCopy[model.SuiteEd25519]
 	dkg.mu.RUnlock()
 
 	// No sponsor (e.g., test mode): trigger callback directly.
@@ -50,21 +59,21 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	}
 
 	cipher := chains.MainChain.GetCipher()
-	if dkg.NewDkgPubKeys[cipher] == nil {
+	if newDkgPubKeysCopy[cipher] == nil {
 		util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "NewDkgPubKey is nil")
 		return
 	}
 
 	// TODO
 	if cipher == model.SuiteEd25519 {
-		isSome, sig, err := dkg.CheckMapAccount(dkg.NewDkgPubKeys[model.SuiteEd25519])
+		isSome, sig, err := dkg.CheckMapAccount(newDkgPubKeysEd)
 		if err != nil {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "CheckMapAccount error:"+err.Error())
 			return
 		}
 		if !isSome {
 			msg := model.NewEpochMsg{
-				Time:       dkg.NewEpochTime,
+				Time:       newEpochTime,
 				PartialSig: sig,
 			}
 			bt, err := json.Marshal(msg)
@@ -95,7 +104,7 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		return
 	}
 	msg := model.NewEpochMsg{
-		Time:       dkg.NewEpochTime,
+		Time:       newEpochTime,
 		PartialSig: sig,
 	}
 
@@ -123,17 +132,27 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	msg := new(model.NewEpochMsg)
 	err := json.Unmarshal(data, msg)
 	if err != nil {
-		dkg.consensusFailBack(errors.New("RevPartialSig client.PartialSign error:" + err.Error()))
+		dkg.mu.RLock()
+		failBack := dkg.consensusFailBack
+		dkg.mu.RUnlock()
+		if failBack != nil {
+			failBack(errors.New("RevPartialSig client.PartialSign error:" + err.Error()))
+		}
 		return err
 	}
 
+	dkg.mu.Lock()
 	if dkg.NewEpochPartialSigs == nil || dkg.NewEpochPartialSigTime != dkg.NewEpochTime {
 		dkg.NewEpochPartialSigs = make(map[string]*model.NewEpochMsg)
 		dkg.NewEpochPartialSigTime = dkg.NewEpochTime
 	}
-
 	dkg.NewEpochPartialSigs[OrgId] = msg
 	enough := len(dkg.NewEpochPartialSigs) >= dkg.Threshold
+	sponsorNodeID := dkg.NewEpochSponsor.NodeID
+	successBack := dkg.consensusSuccessBack
+	failBack2 := dkg.consensusFailBack
+	newDkgPubKeysEd := dkg.NewDkgPubKeys[model.SuiteEd25519]
+	dkg.mu.Unlock()
 
 	if !enough {
 		return nil
@@ -142,7 +161,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	// Test-only: skip actual chain signing.
 	if skipPartialSign {
-		dkg.consensusSuccessBack(&DssSigner{suite: model.SuiteEd25519}, dkg.NewEpochSponsor.NodeID)
+		successBack(&DssSigner{suite: model.SuiteEd25519}, sponsorNodeID)
 		return nil
 	}
 
@@ -155,10 +174,10 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	// TODO
 	if cipher == model.SuiteEd25519 {
-		pub := dkg.NewDkgPubKeys[model.SuiteEd25519]
+		pub := newDkgPubKeysEd
 		isSome, err := chains.MainChain.CheckMapAccount(*pub)
 		if err != nil {
-			dkg.consensusFailBack(errors.New("RevPartialSig CheckMapAccount error:" + err.Error()))
+			failBack2(errors.New("RevPartialSig CheckMapAccount error:" + err.Error()))
 			return errors.New("RevPartialSig CheckMapAccount error:" + err.Error())
 		}
 
@@ -172,17 +191,17 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 			runtimeCall := revive.MakeMapAccountCall()
 			call, err := (runtimeCall).AsCall()
 			if err != nil {
-				dkg.consensusFailBack(errors.New("RevPartialSig AsCall error:" + err.Error()))
+				failBack2(errors.New("RevPartialSig AsCall error:" + err.Error()))
 				return errors.New("AsCall error:" + err.Error())
 			}
 
 			err = chains.MainChain.SignAndSubmit(&signer, model.ChainCall{Substrate: call}, false, 0)
 			if err != nil {
-				dkg.consensusFailBack(errors.New("RevPartialSig side chain key MapAccount error:" + err.Error()))
+				failBack2(errors.New("RevPartialSig side chain key MapAccount error:" + err.Error()))
 				return errors.New("side chain key MapAccount error:" + err.Error())
 			}
 
-			dkg.consensusFailBack(errors.New("RevPartialSig run makeaccount, next time submit tx"))
+			failBack2(errors.New("RevPartialSig run makeaccount, next time submit tx"))
 			return nil
 		}
 	}
@@ -195,7 +214,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	util.LogWithPurple("DKG SubmitToNepoch", "signer", signer.Pubkey().String(), "newEpochPartialSigs", len(dkg.NewEpochPartialSigs))
 
-	dkg.consensusSuccessBack(&signer, dkg.NewEpochSponsor.NodeID)
+	successBack(&signer, sponsorNodeID)
 	return nil
 }
 

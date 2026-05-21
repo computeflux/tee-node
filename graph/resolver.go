@@ -8,8 +8,8 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
-	authsvc "github.com/computeflux/tee-provider/services/auth"
-	"github.com/computeflux/tee-provider/services/wallet"
+	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
+	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -27,7 +27,7 @@ type Resolver struct {
 }
 
 // ResolveSignerEmail 从 token 解析出用户邮箱
-// 支持登录 JWT 和短期签名 token
+// 支持 API Key 和短期签名 token
 func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
 	// 先尝试作为签名 token 解析
 	if len(token) > 4 && token[:4] == "sig_" {
@@ -42,10 +42,11 @@ func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
 		return session.Email, nil
 	}
 
-	// 尝试作为 JWT 解析
-	claims, err := r.JWTSvc.ParseToken(token)
-	if err != nil {
-		return "", fmt.Errorf("unauthorized")
+	// 尝试作为 API Key 解析
+	tk := model.FindGatewayTokenByKey(token)
+	if tk != nil && tk.IsActive {
+		return tk.Owner, nil
 	}
-	return claims.Email, nil
+
+	return "", fmt.Errorf("unauthorized")
 }

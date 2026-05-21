@@ -75,7 +75,7 @@ tee-provider 子网可以作为**任意公链的子网**运行，将链下安全
 
 ## 项目模块
 
-### 1. 侧链 / 共识 (`side-chain/`)
+### 1. 侧链 / 共识 (`tee-chain/`)
 
 子网核心，基于 CometBFT 实现：
 
@@ -174,13 +174,13 @@ query { contractDryRun(caller, callerType, contract, mut, method, args) }
 
 ## 合约层设计 — Auth + Gateway 上链
 
-tee-provider 内建智能合约系统（`side-chain/contracts/`），遵循统一的路由模式：
+tee-provider 内建智能合约系统（`tee-chain/contracts/`），遵循统一的路由模式：
 `contracts/contract.go` 按合约名 `call.Name` 分发 → 各合约包实现 `Mutation(call)` / `Query(call)`。
 
 现有入口（扩展后）：
 
 ```go
-// side-chain/contracts/contract.go
+// tee-chain/contracts/contract.go
 func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
     switch string(call.Name) {
     case "gov":     // 已有：治理/代币/提案
@@ -199,7 +199,7 @@ func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
 ### 合约目录结构（规划）
 
 ```
-side-chain/contracts/
+tee-chain/contracts/
 ├── contract.go              # 合约路由入口
 ├── runtime.go               # 合约运行时上下文
 ├── gov/                     # 已有：治理合约
@@ -541,7 +541,7 @@ tee-provider/
 ├── go.mod / go.sum
 ├── Dockerfile
 │
-├── side-chain/                      # 侧链核心 (CometBFT ABCI)
+├── tee-chain/                      # 侧链核心 (CometBFT ABCI)
 │   ├── mod.go                       # 初始化
 │   ├── consensus.go                 # 共识状态机
 │   ├── chains.go                    # 多链管理

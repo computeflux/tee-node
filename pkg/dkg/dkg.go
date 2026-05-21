@@ -213,6 +213,8 @@ func (d *DKG) GetDkgPubKey(st model.SuiteType) *model.PubKey {
 
 // P2PId returns the p2p id of self node.
 func (dkg *DKG) P2PId() *model.PubKey {
+	dkg.mu.RLock()
+	defer dkg.mu.RUnlock()
 	pub := dkg.Signer.GetPublicForSuite(model.SuiteEd25519)
 	for _, p := range dkg.Nodes {
 		if p.ValidatorId.String() == pub.String() {

@@ -16,9 +16,10 @@ import (
 	chain "github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
+	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
+	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/util"
-	authsvc "github.com/computeflux/tee-provider/services/auth"
-	"github.com/computeflux/tee-provider/services/wallet"
+	_ "github.com/computeflux/tee-provider/pkg/util/cgostubs"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 

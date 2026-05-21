@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/services/gateway/relay"
+	"github.com/computeflux/tee-provider/pkg/services/gateway/relay"
 )
 
 func RegisterGatewayRoutes(r chi.Router) {
@@ -40,6 +40,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	channel := GetChannelFromContext(r)
 	endpoint := GetEndpointFromContext(r)
 	modelName := GetModelFromContext(r)
+	token := GetTokenFromContext(r)
 	if channel == nil || endpoint == nil {
 		writeError(w, http.StatusServiceUnavailable, "no route", "server_error")
 		return
@@ -60,7 +61,18 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	defer lim.Done()
 
-	bodyBytes, _ := readRequestBody(r)
+	// Use cached body from DistributeMiddleware if available, otherwise read.
+	bodyBytes := GetBodyFromContext(r)
+	if bodyBytes == nil {
+		var err error
+		bodyBytes, err = readRequestBody(r)
+		if err != nil {
+			releaseEndpoint(channel.ID, endpoint.ID)
+			writeError(w, http.StatusBadRequest, "failed to read request body", "invalid_request")
+			return
+		}
+	}
+
 	var reqBody struct {
 		Model  string `json:"model"`
 		Stream bool   `json:"stream"`
@@ -70,8 +82,16 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		modelName = reqBody.Model
 	}
 
-	usage, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
+	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
 	releaseEndpoint(channel.ID, endpoint.ID)
+
+	// Business error (e.g. upstream 4xx): already contains status code and message.
+	if bizErr != nil {
+		EmitChannelMetric(channel.ID, false)
+		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
+		return
+	}
+	// Transport error (e.g. connection refused).
 	if err != nil {
 		EmitChannelMetric(channel.ID, false)
 		writeError(w, http.StatusBadGateway, err.Error(), "server_error")
@@ -79,7 +99,12 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	EmitChannelMetric(channel.ID, true)
-	recordUsageAsync(0, time.Now().Format("2006-01-02"), channel.ID, uint64(func() int {
+
+	var tokenID uint64
+	if token != nil {
+		tokenID = token.ID
+	}
+	recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), channel.ID, uint64(func() int {
 		if usage != nil {
 			return usage.TotalTokens
 		}
@@ -94,7 +119,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[GATEWAY] %s %s -> %s (%d tokens, %v)", r.Method, modelName, endpoint.URL, tkns, elapsed)
 }
 
-func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, error) {
+func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
 	ctx.Set("request_model", modelName)
 
@@ -108,7 +133,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("upstream: %w", err)
+		return nil, nil, fmt.Errorf("upstream: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -120,16 +145,14 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 			disableEndpoint(endpoint.ProviderID, endpoint.ID)
 			log.Printf("[MONITOR] disabled endpoint %d: %s", endpoint.ID, bizErr.Error.Message)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(bizErr.StatusCode)
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": bizErr.Error})
-		return nil, fmt.Errorf("%d: %s", bizErr.StatusCode, bizErr.Error.Message)
+		// Return the bizErr so the caller writes the error response once.
+		return nil, bizErr, nil
 	}
-	return usage, nil
+	return usage, nil, nil
 }
 
 func HandleListModels(w http.ResponseWriter, r *http.Request) {
-	models := []map[string]interface{}{}
+	models := make([]map[string]interface{}, 0)
 	var id uint64
 	for {
 		m, err := model.GetGatewayModel(id)
@@ -145,9 +168,6 @@ func HandleListModels(w http.ResponseWriter, r *http.Request) {
 		if id > 1000 {
 			break
 		}
-	}
-	if models == nil {
-		models = []map[string]interface{}{}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"object": "list", "data": models})

@@ -56,6 +56,32 @@
     },
     "messages": [
       {
+        "args": [
+          {
+            "docs": [],
+            "label": "user",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "get_credit",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 20
+        },
+        "selector": "0x04601fca"
+      },
+      {
         "args": [],
         "default": false,
         "docs": [],
@@ -492,32 +518,6 @@
         "selector": "0x36e09037"
       },
       {
-        "args": [
-          {
-            "docs": [],
-            "label": "user",
-            "type": {
-              "displayName": [
-                "UniAddr"
-              ],
-              "type": 13
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "get_balance",
-        "mutates": false,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "Result"
-          ],
-          "type": 20
-        },
-        "selector": "0x3744e4b0"
-      },
-      {
         "args": [],
         "default": false,
         "docs": [],
@@ -812,6 +812,32 @@
         ],
         "default": false,
         "docs": [],
+        "label": "get_provider_credit",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 20
+        },
+        "selector": "0xad4c38cd"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "provider_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
         "label": "get_provider",
         "mutates": false,
         "payable": false,
@@ -920,32 +946,6 @@
           "type": 30
         },
         "selector": "0xc533a84f"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
-            "label": "provider_i_d",
-            "type": {
-              "displayName": [
-                "u64"
-              ],
-              "type": 3
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "get_provider_balance",
-        "mutates": false,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "Result"
-          ],
-          "type": 20
-        },
-        "selector": "0xd3af56aa"
       },
       {
         "args": [
@@ -1168,7 +1168,7 @@
               {
                 "fields": [],
                 "index": 1,
-                "name": "LowBalance"
+                "name": "LowCredit"
               },
               {
                 "fields": [],

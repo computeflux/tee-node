@@ -1,6 +1,6 @@
 package channeltype
 
-import "github.com/computeflux/tee-provider/services/gateway/relay/apitype"
+import "github.com/computeflux/tee-provider/pkg/services/gateway/relay/apitype"
 
 func ToAPIType(channelType int) int {
 	apiType := apitype.OpenAI

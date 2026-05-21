@@ -11,7 +11,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/services/wallet"
+	"github.com/computeflux/tee-provider/pkg/services/wallet"
 )
 
 // RequestOtp is the resolver for the requestOTP field.

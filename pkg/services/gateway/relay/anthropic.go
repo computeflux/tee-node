@@ -20,7 +20,7 @@ type AnthropicRequest struct {
 }
 
 type AnthropicMessage struct {
-	Role    string            `json:"role"`
+	Role    string             `json:"role"`
 	Content []AnthropicContent `json:"content"`
 }
 
@@ -30,8 +30,8 @@ type AnthropicContent struct {
 }
 
 type AnthropicResponse struct {
-	Id      string            `json:"id"`
-	Model   string            `json:"model"`
+	Id      string             `json:"id"`
+	Model   string             `json:"model"`
 	Content []AnthropicContent `json:"content"`
 	Usage   struct {
 		InputTokens  int `json:"input_tokens"`
@@ -83,7 +83,7 @@ func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Read
 			continue
 		}
 		antReq.Messages = append(antReq.Messages, AnthropicMessage{
-			Role: msg.Role,
+			Role:    msg.Role,
 			Content: []AnthropicContent{{Type: "text", Text: msg.Content}},
 		})
 	}
@@ -95,7 +95,7 @@ func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Read
 		return nil, err
 	}
 	a.SetupRequestHeader(ctx, req, meta)
-	return http.DefaultClient.Do(req)
+	return DoHTTP(req)
 }
 
 func (a *AnthropicAdaptor) DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (*Usage, *ErrorWithStatusCode) {
@@ -164,7 +164,7 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 		data := strings.TrimPrefix(line, "data: ")
 
 		var evt struct {
-			Type string `json:"type"`
+			Type  string `json:"type"`
 			Delta *struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
@@ -179,7 +179,7 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 
 		// Convert to OpenAI SSE format
 		chunk := map[string]interface{}{
-			"object": "chat.completion.chunk",
+			"object":  "chat.completion.chunk",
 			"choices": []map[string]interface{}{{"index": 0, "delta": map[string]string{}}},
 		}
 		if evt.Delta != nil && evt.Delta.Text != "" {

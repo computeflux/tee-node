@@ -44,7 +44,7 @@ var topics = map[string]p2p.ChannelDescriptor{
 
 type BTFReactor struct {
 	service.BaseService
-	Switch *p2p.Switch
+	Switch p2p.Switcher
 
 	id                      *model.PubKey
 	validators              []*model.PubKey
@@ -101,7 +101,7 @@ func (r *BTFReactor) OnReset() error {
 	return nil
 }
 
-func (dr *BTFReactor) SetSwitch(sw *p2p.Switch) {
+func (dr *BTFReactor) SetSwitch(sw p2p.Switcher) {
 	dr.Switch = sw
 
 	// 发送启动期间暂存的所有消息

@@ -72,6 +72,7 @@ func (r *Runtime) CallbySystem() bool {
 	if r.sudo.T != r.caller.T {
 		return false
 	}
+
 	return bytes.Equal(r.sudo.V, r.caller.V)
 }
 

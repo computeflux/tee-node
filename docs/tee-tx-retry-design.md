@@ -33,7 +33,7 @@
 在 `SyncToHub` 函数中，当交易提交到主链失败时：
 
 ```go
-// side-chain/tx_sync.go:64-84
+// tee-chain/tx_sync.go:64-84
 err = client.SignAndSubmit(signer, *call, false, 0)
 if err != nil {
     // 更新状态为 FAILED
@@ -61,7 +61,7 @@ if err != nil {
 在侧链初始化时，重试管理器被创建（**不再启动后台goroutine**）：
 
 ```go
-// side-chain/side_chain.go:148-153
+// tee-chain/side_chain.go:148-153
 if !light {
     // 创建重试管理器（不再使用定时器，改为在区块处理时触发）
     teeChain.retryManager = NewRetryManager(teeChain)
@@ -78,7 +78,7 @@ if !light {
 在每个区块的 `PrepareProposal` 时触发重试检查：
 
 ```go
-// side-chain/consensus.go:PrepareProposal()
+// tee-chain/consensus.go:PrepareProposal()
 func (app *TeeChain) PrepareProposal(...) {
     // 在每个区块准备时，检查并重试失败的交易
     if app.retryManager != nil {
@@ -100,7 +100,7 @@ func (app *TeeChain) PrepareProposal(...) {
 对每个失败的交易，检查是否满足重试条件：
 
 ```go
-// side-chain/tx_retry.go:shouldRetry()
+// tee-chain/tx_retry.go:shouldRetry()
 func (rm *RetryManager) shouldRetry(status *TxSubmissionStatus) bool {
     // 1. 状态必须是 FAILED
     if status.Status != TxStatusFailed {
@@ -131,7 +131,7 @@ func (rm *RetryManager) shouldRetry(status *TxSubmissionStatus) bool {
 使用指数退避策略计算重试延迟：
 
 ```go
-// side-chain/tx_retry.go:calculateRetryDelay()
+// tee-chain/tx_retry.go:calculateRetryDelay()
 func (rm *RetryManager) calculateRetryDelay(retryCount int) time.Duration {
     // 指数退避: delay = initialDelay * (backoffFactor ^ retryCount)
     delay := float64(InitialRetryDelay) * math.Pow(RetryBackoffFactor, float64(retryCount))
@@ -162,7 +162,7 @@ func (rm *RetryManager) calculateRetryDelay(retryCount int) time.Duration {
 如果满足重试条件且已到重试时间，执行重试：
 
 ```go
-// side-chain/tx_retry.go:retrySubmitTx()
+// tee-chain/tx_retry.go:retrySubmitTx()
 func (rm *RetryManager) retrySubmitTx(txIndex int64, sigs [][]byte) error {
     // 如果没有签名，重新获取
     if len(sigs) == 0 {
@@ -187,7 +187,7 @@ func (rm *RetryManager) retrySubmitTx(txIndex int64, sigs [][]byte) error {
 ### 2.1 错误判断
 
 ```go
-// side-chain/tx_status.go:IsRetryableError()
+// tee-chain/tx_status.go:IsRetryableError()
 func IsRetryableError(err error) bool {
     errStr := err.Error()
     

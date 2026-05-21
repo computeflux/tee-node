@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/computeflux/tee-provider/services/gateway/relay"
+	"github.com/computeflux/tee-provider/pkg/services/gateway/relay"
 )
 
 // ── Auto Scaler ───────────────────────────────────────────
@@ -18,21 +18,21 @@ import (
 //   防抖：扩后冷却 2 分钟，避免抖动
 
 type AutoScaler struct {
-	mu              sync.Mutex
-	lastScaleTime   time.Time
-	scaleDownCount  int
-	enabled         bool
-	minConns        int
-	maxConns        int
-	cooldownPeriod  time.Duration
+	mu                sync.Mutex
+	lastScaleTime     time.Time
+	scaleDownCount    int
+	enabled           bool
+	minConns          int
+	maxConns          int
+	cooldownPeriod    time.Duration
 	shrinkQuietPeriod time.Duration // 低负载需持续多久才缩容
 }
 
 var scaler = &AutoScaler{
-	enabled:          true,
-	minConns:         500,   // 最小 500，保证基本体验
-	maxConns:         10000,
-	cooldownPeriod:   2 * time.Minute,   // 扩后冷却
+	enabled:           true,
+	minConns:          500, // 最小 500，保证基本体验
+	maxConns:          10000,
+	cooldownPeriod:    2 * time.Minute,  // 扩后冷却
 	shrinkQuietPeriod: 10 * time.Minute, // 持续 10 分钟低负载才缩
 }
 
@@ -142,11 +142,11 @@ func GetScalerStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"state":            state,
-		"poolSize":         cfg.MaxConnsPerHost,
-		"totalInflight":    total,
-		"utilization":      util,
-		"cooldown":         cooldown.String(),
+		"state":         state,
+		"poolSize":      cfg.MaxConnsPerHost,
+		"totalInflight": total,
+		"utilization":   util,
+		"cooldown":      cooldown.String(),
 	}
 }
 
@@ -177,4 +177,3 @@ func InitAutoScaler() {
 	}()
 	log.Printf("[SCALER] started: %d-%d conns, fast-up + slow-down", scaler.minConns, scaler.maxConns)
 }
-

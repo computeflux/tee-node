@@ -18,7 +18,7 @@ func (s *TeeChain) LoadChains() error {
 	}
 
 	// 初始化 relay engine
-	s.relay = relay.NewEngine(nil)
+	s.relay = relay.NewEngine()
 
 	// 启动 relay 后台拉取 worker
 	s.startRelayWorker()
