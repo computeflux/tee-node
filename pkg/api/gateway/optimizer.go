@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -69,7 +68,7 @@ func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint
 	case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens}:
 	default:
 		// Channel full, drop (degraded mode) — log for monitoring.
-		log.Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)", tokenID, providerID, tokens)
+		GATEWAYLOG().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)", tokenID, providerID, tokens)
 	}
 }
 
@@ -158,5 +157,5 @@ func InitOptimizations() {
 	initUsageWriter()
 	initCacheRefresh()
 	initRateLimiterCleanup()
-	log.Printf("[OPT] async usage writer + cache refresh + rate limiter cleanup started")
+	GATEWAYLOG().Printf("[OPT] async usage writer + cache refresh + rate limiter cleanup started")
 }

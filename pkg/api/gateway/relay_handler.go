@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -62,23 +61,11 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 
 	// Use cached body from DistributeMiddleware if available, otherwise read.
 	bodyBytes := GetBodyFromContext(r)
-	if bodyBytes == nil {
-		var err error
-		bodyBytes, err = readRequestBody(r)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "failed to read request body", "invalid_request")
-			return
-		}
-	}
-
 	var reqBody struct {
 		Model  string `json:"model"`
 		Stream bool   `json:"stream"`
 	}
 	json.Unmarshal(bodyBytes, &reqBody)
-	if reqBody.Model != "" {
-		modelName = reqBody.Model
-	}
 
 	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
 
@@ -88,6 +75,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
 		return
 	}
+
 	// Transport error (e.g. connection refused).
 	if err != nil {
 		EmitChannelMetric(channel.ID, false)
@@ -113,7 +101,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if usage != nil {
 		tkns = usage.TotalTokens
 	}
-	log.Printf("[GATEWAY] %s %s -> %s (%d tokens, %v)", r.Method, modelName, endpoint.URL, tkns, elapsed)
+	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, modelName, endpoint.URL, tkns, elapsed)
 }
 
 func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
@@ -128,7 +116,6 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 	adaptor := relay.GetAdaptorForProvider(relay.DetectProvider(endpoint.URL))
 	adaptor.Init(meta)
 
-	fmt.Printf("Relaying to upstream %s with model %s\n", endpoint.URL, modelName)
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("upstream: %w", err)
@@ -137,7 +124,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 
 	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
 	if bizErr != nil {
-		log.Printf("[MONITOR] upstream error: %s (status=%d)", bizErr.Error.Message, bizErr.StatusCode)
+		GATEWAYLOG().Printf("[MONITOR] upstream error: %s (status=%d)", bizErr.Error.Message, bizErr.StatusCode)
 		// Return the bizErr so the caller writes the error response once.
 		return nil, bizErr, nil
 	}

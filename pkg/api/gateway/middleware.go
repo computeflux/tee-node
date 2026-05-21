@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -21,7 +20,7 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Printf("[PANIC] %v\n%s", err, debug.Stack())
+				GATEWAYLOG().Printf("[PANIC] %v\n%s", err, debug.Stack())
 				writeError(w, http.StatusInternalServerError,
 					fmt.Sprintf("panic: %v", err), "server_error")
 			}
@@ -53,7 +52,7 @@ func LoggerMiddleware(next http.Handler) http.Handler {
 		ww := &responseWriter{ResponseWriter: w, statusCode: 200}
 		next.ServeHTTP(ww, r)
 		elapsed := time.Since(start)
-		log.Printf("[HTTP] %s %s | %d | %v | %s",
+		GATEWAYLOG().Printf("[HTTP] %s %s | %d | %v | %s",
 			r.Method, r.URL.Path, ww.statusCode, elapsed, r.RemoteAddr)
 	})
 }
@@ -186,7 +185,7 @@ func EmitChannelMetric(providerID uint64, success bool) {
 		}
 		rate := float64(successCount) / float64(len(m.recent))
 		if rate < threshold {
-			log.Printf("[MONITOR] channel %d success rate %.2f < %.2f, alerting",
+			GATEWAYLOG().Printf("[MONITOR] channel %d success rate %.2f < %.2f, alerting",
 				providerID, rate, threshold)
 			m.recent = nil
 		}

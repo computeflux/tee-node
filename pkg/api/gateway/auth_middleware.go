@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -31,12 +30,12 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 		}
 		token := findTokenCached(key)
 		if token == nil {
-			log.Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
+			GATEWAYLOG().Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
 		if !token.IsActive {
-			log.Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
+			GATEWAYLOG().Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
@@ -52,20 +51,18 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		// Read body early to extract model name for correct routing.
 		// Body is reset so downstream handler can re-read it.
 		bodyBytes, err := readRequestBody(r)
-		if err != nil {
+		if err != nil || bodyBytes == nil {
 			writeError(w, http.StatusBadRequest, "failed to read request body", "invalid_request")
 			return
 		}
 
 		// Parse model from JSON body first, fall back to query string.
-		var reqBody struct {
-			Model string `json:"model"`
-		}
-		json.Unmarshal(bodyBytes, &reqBody)
-
-		modelName := reqBody.Model
-		if modelName == "" {
-			modelName = r.URL.Query().Get("model")
+		var bodyMap map[string]interface{}
+		modelName := r.URL.Query().Get("model")
+		if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
+			if bodyMap["model"] != nil {
+				modelName = bodyMap["model"].(string)
+			}
 		}
 		if modelName == "" {
 			writeError(w, http.StatusNotFound, "model is null", "not_found")
@@ -74,6 +71,13 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// Parse "channel/model" format
 		providerName, actualModel := parseProviderModel(modelName)
+		if modelName != actualModel {
+			bodyMap["model"] = actualModel
+			if newBody, err := json.Marshal(bodyMap); err == nil {
+				bodyBytes = newBody
+			}
+		}
+
 		token := GetTokenFromContext(r)
 
 		// 1. 从合约查询模型（必须存在且活跃）
@@ -83,20 +87,15 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		fmt.Println("ProviderName", providerName)
-		fmt.Println("model")
-		fmt.Println(m)
-		fmt.Println("ProviderType", m.ProviderType)
-		fmt.Println("Model", actualModel)
-
 		// 2. 验证请求的 Provider 与模型所属 Provider 一致
 		expectedProvider := providerTypeName(m.ProviderType)
-		// if !strings.EqualFold(expectedProvider, providerName) {
-		// 	writeError(w, http.StatusBadRequest,
-		// 		fmt.Sprintf("model %s belongs to provider %s, not %s", actualModel, expectedProvider, providerName),
-		// 		"invalid_request")
-		// 	return
-		// }
+		if !strings.EqualFold(expectedProvider, providerName) {
+			fmt.Printf("[AUTH] TODO provider mismatch: expected %s, got %s for model %s\n", expectedProvider, providerName, actualModel)
+			// writeError(w, http.StatusBadRequest,
+			// 	fmt.Sprintf("model %s belongs to provider %s, not %s", actualModel, expectedProvider, providerName),
+			// 	"invalid_request")
+			// return
+		}
 
 		// 3. 从合约构建 endpoints（URI + APIKeys）
 		endpoints := buildEndpointsFromModel(m)

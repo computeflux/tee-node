@@ -41,7 +41,6 @@ func GetByContext(ctx *RelayContext) *Meta {
 	}
 
 	if meta.BaseURL == "" {
-		// 从 channel 获取
 		v, ok := ctx.Get("channel")
 		if ok {
 			if ch, ok2 := v.(*model.GatewayProviderInfo); ok2 {

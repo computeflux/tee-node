@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,7 +18,21 @@ type OpenAIAdaptor struct{}
 func (a *OpenAIAdaptor) Init(meta *Meta) {}
 
 func (a *OpenAIAdaptor) GetRequestURL(meta *Meta) (string, error) {
-	return meta.BaseURL + meta.RequestURLPath, nil
+	base := strings.TrimRight(meta.BaseURL, "/")
+	path := meta.RequestURLPath
+
+	// 去重：如果 base 末尾路径组件与 path 开头重复，去掉 base 中的重复部分
+	// 例如 https://api.minimaxi.com/v1 + /v1/chat/completions
+	//      → https://api.minimaxi.com/v1/chat/completions
+	if path != "" {
+		lastSeg := filepath.Base(base)
+		firstSeg := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)[0]
+		if lastSeg == firstSeg && lastSeg != "" {
+			base = strings.TrimSuffix(base, "/"+lastSeg)
+		}
+	}
+
+	return base + path, nil
 }
 
 func (a *OpenAIAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error {

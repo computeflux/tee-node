@@ -3,7 +3,6 @@ package gateway
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -52,7 +51,7 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 		return nil
 	}
 	if info == nil {
-		log.Printf("[GATEWAY] contract lookup returned nil for hexHash=%s", hexHash)
+		GATEWAYLOG().Printf("[GATEWAY] contract lookup returned nil for hexHash=%s", hexHash)
 		return nil
 	}
 	return &model.GatewayTokenInfo{
@@ -114,7 +113,7 @@ func fetchGatewayModelsFromContract() []cgateway.ModelInfo {
 	}
 	models, err := bridge.GatewayListActiveModels(0, 1000)
 	if err != nil {
-		log.Printf("[GATEWAY] contract list models error: %v", err)
+		GATEWAYLOG().Printf("[GATEWAY] contract list models error: %v", err)
 		return nil
 	}
 	out := make([]cgateway.ModelInfo, len(models))

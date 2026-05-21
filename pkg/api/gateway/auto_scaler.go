@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -88,7 +87,7 @@ func (s *AutoScaler) tick() {
 		s.lastScaleTime = time.Now()
 		s.scaleDownCount = 0
 
-		log.Printf("[SCALER] ▲▲ scale up: %d → %d (util %.0f%%, inflight %d)",
+		GATEWAYLOG().Printf("[SCALER] ▲▲ scale up: %d → %d (util %.0f%%, inflight %d)",
 			current, target, utilization, total)
 		return
 	}
@@ -109,7 +108,7 @@ func (s *AutoScaler) tick() {
 			s.lastScaleTime = time.Now()
 			s.scaleDownCount = 0
 
-			log.Printf("[SCALER] ▼▼ scale down: %d → %d (util %.0f%%, inflight %d, quiet %d min)",
+			GATEWAYLOG().Printf("[SCALER] ▼▼ scale down: %d → %d (util %.0f%%, inflight %d, quiet %d min)",
 				current, target, utilization, total, s.shrinkQuietPeriod/time.Minute)
 		}
 		return
@@ -175,5 +174,5 @@ func InitAutoScaler() {
 			scaler.tick()
 		}
 	}()
-	log.Printf("[SCALER] started: %d-%d conns, fast-up + slow-down", scaler.minConns, scaler.maxConns)
+	GATEWAYLOG().Printf("[SCALER] started: %d-%d conns, fast-up + slow-down", scaler.minConns, scaler.maxConns)
 }
