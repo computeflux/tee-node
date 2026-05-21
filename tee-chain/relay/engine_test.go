@@ -92,20 +92,20 @@ func TestGetLastNonce_NotRegistered(t *testing.T) {
 	txn := model.DBINS.NewTransaction()
 	defer txn.Rollback()
 
-	_, err := getLastNonce(txn, 999)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not registered")
+	n, err := getLastNonce(txn, 999)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), n)
 }
 
 // ── Nonce 后台读 ──────────────────────────────────────
 
 func TestGetLastNonceBg_NotRegistered(t *testing.T) {
-	_, err := getLastNonceBg(999)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "not registered")
+	n, err := getLastNonceBg(999)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), n)
 }
 
-// ── Mock Engine ───────────────────────────────────────
+// ── Mock API ──────────────────────────────────────────
 
 type mockAPI struct {
 	txn *model.Txn
@@ -126,15 +126,13 @@ func (m *mockAPI) Query(_ model.UniAddr, _ model.ContractCall) ([]byte, error) {
 
 func newMockEngine() (*Engine, *model.Txn) {
 	txn := model.DBINS.NewTransaction()
-	return &Engine{api: &mockAPI{txn: txn}}, txn
+	return NewEngine(), txn
 }
 
-// commitAndRefresh 提交 txn 并创建新 txn 给 engine
-func commitAndRefresh(eng *Engine, oldTxn *model.Txn) *model.Txn {
+// commitAndRefresh 提交 txn 并创建新 txn
+func commitAndRefresh(_ *Engine, oldTxn *model.Txn) *model.Txn {
 	oldTxn.Commit()
-	newTxn := model.DBINS.NewTransaction()
-	eng.api = &mockAPI{txn: newTxn}
-	return newTxn
+	return model.DBINS.NewTransaction()
 }
 
 // ── CheckRelayEvent ───────────────────────────────────
@@ -200,8 +198,9 @@ func TestApplyRelayEvent_FirstEvent(t *testing.T) {
 
 	setLastNonce(txn, 1, 0)
 
+	api := &mockAPI{txn: txn}
 	ev := SyncEvent{ChainID: 1, Nonce: 1, TargetContract: []byte("test"), EventType: []byte("test")}
-	err := eng.ApplyRelayEvent(ev)
+	err := eng.ApplyRelayEvent(ev, api)
 	require.NoError(t, err)
 
 	n, _ := getLastNonce(txn, 1)
@@ -214,8 +213,9 @@ func TestApplyRelayEvent_WrongNonce(t *testing.T) {
 
 	setLastNonce(txn, 1, 5)
 
+	api := &mockAPI{txn: txn}
 	ev := SyncEvent{ChainID: 1, Nonce: 3} // 小于当前
-	err := eng.ApplyRelayEvent(ev)
+	err := eng.ApplyRelayEvent(ev, api)
 	require.Error(t, err)
 }
 
@@ -226,6 +226,9 @@ func TestEngine_LastNonce(t *testing.T) {
 	defer txn.Rollback()
 
 	setLastNonce(txn, 3, 7)
+	err := txn.Commit()
+	require.NoError(t, err)
+
 	n, err := eng.LastNonce(3)
 	require.NoError(t, err)
 	require.Equal(t, uint64(7), n)

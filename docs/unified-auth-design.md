@@ -157,6 +157,8 @@ curl -X POST https://node/gql \
 
 ## 6. 影响范围
 
+### 后端
+
 | 文件 | 动作 |
 |------|------|
 | `graph/auth.go` | 重写：废弃 JWT/Legacy，统一为 API Key |
@@ -167,13 +169,120 @@ curl -X POST https://node/gql \
 | `pkg/model/user.go` | 可选：移除 `PublicUser`（如确认无其他引用） |
 | `pkg/api/gateway/*` | 无改动（已兼容） |
 
+### 前端 SDK (`web3auth`)
+
+| 文件 | 动作 |
+|------|------|
+| `src/core/auth.ts` | 注释更新：token 字段说明改为 API Key；mock token 格式改为 `tee_` 前缀 |
+| `src/core/wallet.ts` | 注释更新：JWT → API Key；请求已带 `Authorization: Bearer <token>` header，无需改动 |
+
+> 前端 SDK 的调用逻辑无需结构性修改，因为：
+> - 登录 mutation 返回的 `token` 字段后端已自动改为 API Key，前端直接透传即可。
+> - `wallet.ts` 中的 GraphQL 请求已统一通过 `Authorization: Bearer ${this.token}` 发送，与新的 API Key 鉴权完全兼容。
+> - `verifyPassword` 等 mutation 仍通过 `token` 参数传递凭证，后端 `resolveEmailFromToken` 已支持 API Key 解析。
+
 ---
 
-## 7. 回滚与兼容
+## 7. 接口鉴权权限矩阵
+
+### 7.1 REST 接口
+
+| 接口 | 方法 | 鉴权中间件 | 说明 |
+|------|------|-----------|------|
+| `/v1/chat/completions` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/completions` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/embeddings` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/images/generations` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/audio/speech` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/audio/transcriptions` | POST | `TokenAuthMiddleware` | AI 模型调用 |
+| `/v1/models` | GET | `TokenAuthMiddleware` | 模型列表 |
+
+> REST 侧所有 `/v1/*` 路由已统一通过 `TokenAuthMiddleware` 校验 API Key。
+
+### 7.2 GraphQL 接口
+
+当前 `@AuthCheck` directive 已在 `graph/secret.graphqls` 定义，但**尚未应用到任何字段**。以下矩阵列出所有 GraphQL 操作，并标注**建议**的鉴权状态：
+
+#### 公开接口（无需 `@AuthCheck`）
+
+| 操作 | 类型 | 说明 |
+|------|------|------|
+| `requestOTP` | Mutation | 请求 OTP，登录前调用 |
+| `verifyOTP` | Mutation | 验证 OTP 并返回 API Key |
+| `socialLogin` | Mutation | 社交登录并返回 API Key |
+| `oauthURL` | Query | 获取 OAuth 授权 URL |
+| `authHealth` | Query | 认证服务健康检查 |
+| `chain_info` | Query | 链信息查询 |
+| `validators` | Query | 验证器列表 |
+| `contractDryRun` | Query | 合约只读查询（链上签名验证） |
+| `tee_report` | Query | 获取 TEE report |
+| `secret_rsa` | Query | 获取 RSA 公钥 |
+
+#### 需要鉴权的接口（建议加 `@AuthCheck`）
+
+| 操作 | 类型 | 说明 | 当前状态 |
+|------|------|------|---------|
+| `upload_secret` | Mutation | 上传秘密 | ❌ 未加 `@AuthCheck`（参数里传了 user，但 HTTP 层未校验） |
+| `init_disk_key` | Mutation | 初始化磁盘密钥 | ❌ 未加 `@AuthCheck` |
+| `setPassword` | Mutation | 设置交易密码 | ⚠️ 通过 `token` 参数自校验（建议也加 `@AuthCheck` 做二次校验） |
+| `verifyPassword` | Mutation | 验证交易密码 | ⚠️ 同上 |
+| `signTransaction` | Mutation | 签名交易 | ⚠️ 通过 `token` 参数自校验 |
+| `signMessage` | Mutation | 签名消息 | ⚠️ 通过 `token` 参数自校验 |
+| `requestRecovery` | Mutation | 发起社交恢复 | ⚠️ 通过 recoveryEmail 查库 |
+| `verifyRecovery` | Mutation | 验证恢复 OTP | ⚠️ 通过 OTP 校验 |
+| `completeRecovery` | Mutation | 完成恢复 | ⚠️ 通过 recoveryToken 校验 |
+| `systemContractInit` | Mutation | 系统合约初始化 | ❌ 未加 `@AuthCheck`（管理员操作，建议加） |
+| `faucet` | Mutation | 水龙头领币 | ❌ 未加 `@AuthCheck`（local 环境开放，但 main 环境建议限制） |
+| `contractCall` | Mutation | 执行合约调用（链上签名验证） | ❌ 链上签名已验证 caller，HTTP 层可不强制 |
+| `start_epoch` | Mutation | 触发新区块 | ❌ 未加 `@AuthCheck`（节点操作，建议加） |
+| `claimOrderToken` | Mutation | 领取订单 API Token | ❌ 未实现 |
+
+#### 建议的 Schema 改动示例
+
+```graphql
+# graph/secret.graphqls
+extend type Mutation {
+  upload_secret(index: String!, secret: String!, hash: String!, user: String!): Boolean! @AuthCheck
+  init_disk_key(index: String!, user: String!): Boolean! @AuthCheck
+}
+
+# graph/chain.graphqls
+extend type Mutation {
+  start_epoch: Boolean! @AuthCheck
+}
+
+# graph/contract.graphqls
+extend type Mutation {
+  systemContractInit(contract: String!): Boolean! @AuthCheck
+}
+```
+
+> 注意：`contractCall` 的鉴权由链上 `caller + signature` 完成，HTTP 层 `@AuthCheck` 可作为补充但不强制。`faucet` 在 `main` 环境已禁用，可保持现状。
+
+---
+
+## 8. 回滚与兼容
 
 - API Key 的验证逻辑与原 `TokenAuthMiddleware` 完全一致，不存在行为差异。
 - 若前端已缓存 JWT，登录 mutation 会返回新的 API Key，前端只需替换存储的 token 即可。
 - Legacy Polkadot 签名格式彻底废弃；需要旧格式的客户端需先走 Web3Auth 登录获取 API Key。
+
+---
+
+## 附录 A：相关测试修复
+
+### A.1 `tee-chain/relay/engine_test.go`
+
+该测试文件因 `Engine` 结构体重构（移除 `api` 字段、`ApplyRelayEvent` 新增 `model.ContractApi` 参数、`getLastNonce` 行为变更）导致编译和运行时失败，已修复：
+
+| 测试 | 原问题 | 修复 |
+|------|--------|------|
+| `newMockEngine` | `Engine{api: ...}` 字段已不存在 | 改为 `NewEngine()`，mockAPI 由调用方传入 |
+| `commitAndRefresh` | 直接修改 `eng.api` | 改为只提交事务并返回新 txn |
+| `TestApplyRelayEvent_*` | `ApplyRelayEvent(ev)` 缺少参数 | 改为 `ApplyRelayEvent(ev, api)` |
+| `TestGetLastNonce_NotRegistered` | 期望返回 "not registered" 错误 | 实际返回 `(0, nil)`，调整断言 |
+| `TestGetLastNonceBg_NotRegistered` | 同上 | 同上 |
+| `TestEngine_LastNonce` | 未提交 txn，读不到写入的 nonce | 在调用 `LastNonce` 前执行 `txn.Commit()` |
 
 ---
 

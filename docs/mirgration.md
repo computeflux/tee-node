@@ -432,7 +432,7 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
         Directives: NewDirectiveRoot(),
     }))
 
-    router.Handle("/", playground.Handler("WeTEE", "/gql"))
+    router.Handle("/", playground.Handler("TEE", "/gql"))
     router.Handle("/gql", srv)
 
     http.ListenAndServe(":"+fmt.Sprint(port), router)
@@ -734,7 +734,7 @@ SMTP_PORT=587
 SMTP_FROM=auth@example.com
 SMTP_USER=auth@example.com
 SMTP_PASSWORD=<password>
-SMTP_FROM_NAME="WeTEE Auth"
+SMTP_FROM_NAME="TEE Auth"
 GOOGLE_CLIENT_ID=<id>
 GOOGLE_CLIENT_SECRET=<secret>
 GOOGLE_REDIRECT_URL=https://tee.example.com/auth/callback/google

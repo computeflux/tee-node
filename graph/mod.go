@@ -51,7 +51,7 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 	}))
 
 	// GraphQL playground
-	router.Handle("/", playground.Handler("WeTEE-DSECRET", "/gql"))
+	router.Handle("/", playground.Handler("TEE-CHAIN", "/gql"))
 
 	srv := handler.NewDefaultServer(NewExecutableSchema(Config{
 		Resolvers:  resolver,

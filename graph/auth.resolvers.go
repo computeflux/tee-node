@@ -33,17 +33,14 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	}
 	provider := "email_passwordless"
 	address := r.WalletSvc.DeriveAddress(email)
-	token, err := r.JWTSvc.IssueToken(email, address, provider)
-	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: "failed to issue token"}, nil
-	}
+	apiKey := createUserAPIKey(email)
 	model.PutAuthUser(&model.AuthUser{
 		Email: email, Name: email, Address: address,
 		AuthProvider: provider, LastLogin: time.Now().Unix(),
 	})
 	return &auth.AuthResponse{
 		Success:  true,
-		Token:    token,
+		Token:    apiKey,
 		Address:  address,
 		UserInfo: &auth.UserInfo{Email: email, Name: email, TypeOfLogin: provider},
 	}, nil
@@ -84,7 +81,7 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	}
 
 	address := r.WalletSvc.DeriveAddress(oauthUser.Email)
-	token, _ := r.JWTSvc.IssueToken(oauthUser.Email, address, provider)
+	apiKey := createUserAPIKey(oauthUser.Email)
 	userInfo := &auth.UserInfo{
 		Email:        oauthUser.Email,
 		Name:         oauthUser.Name,
@@ -101,22 +98,22 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	})
 
 	return &auth.AuthResponse{
-		Success: true, UserInfo: userInfo, Token: token, Address: address,
+		Success: true, UserInfo: userInfo, Token: apiKey, Address: address,
 	}, nil
 }
 
 // SetPassword is the resolver for the setPassword field.
 func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string) (*auth.WalletResult, error) {
-	claims, err := r.JWTSvc.ParseToken(token)
+	email, err := resolveEmailFromToken(token)
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
 	}
 	// 加密私钥
-	if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
+	if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 	// 存储密码 hash 到用户记录
-	user, _ := model.GetAuthUser(claims.Email)
+	user, _ := model.GetAuthUser(email)
 	if user != nil {
 		user.PasswordHash = passwordHash
 		model.PutAuthUser(user)
@@ -126,14 +123,14 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 
 // VerifyPassword is the resolver for the verifyPassword field.
 func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error) {
-	claims, err := r.JWTSvc.ParseToken(token)
+	email, err := resolveEmailFromToken(token)
 	if err != nil {
 		e := "unauthorized"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
 	}
 
 	// 验证密码 hash
-	user, err := model.GetAuthUser(claims.Email)
+	user, err := model.GetAuthUser(email)
 	if err != nil || user == nil {
 		e := "user not found"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
@@ -142,7 +139,7 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 	// 如果用户没有设置过密码，先尝试用传入的密码初始化
 	if user.PasswordHash == "" {
 		// 首次设置密码：加密私钥并存储
-		if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
+		if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
 			e := err.Error()
 			return &model.SignSessionResult{Status: "error", Error: &e}, nil
 		}
@@ -154,11 +151,11 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 	}
 
 	// 生成短期签名 token（5 分钟有效）
-	signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), claims.Email)
+	signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), email)
 	expiresAt := time.Now().Add(5 * time.Minute).Unix()
 	if err := model.PutSignSession(&model.SignSession{
 		Token:     signToken,
-		Email:     claims.Email,
+		Email:     email,
 		ExpiresAt: expiresAt,
 	}); err != nil {
 		e := "failed to create session"
@@ -242,28 +239,34 @@ func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail str
 	}
 	model.DeleteRecoveryOTP(rec.UserEmail)
 
-	token, err := r.JWTSvc.IssueRecoveryToken(rec.UserEmail)
-	if err != nil {
+	// 生成恢复用的短期签名 token（10 分钟有效）
+	recoveryToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), rec.UserEmail)
+	expiresAt := time.Now().Add(10 * time.Minute).Unix()
+	if err := model.PutSignSession(&model.SignSession{
+		Token:     recoveryToken,
+		Email:     rec.UserEmail,
+		ExpiresAt: expiresAt,
+	}); err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: "token issue failed"}, nil
 	}
-	return &auth.RecoveryResult{Status: "ok", RecoveryToken: token}, nil
+	return &auth.RecoveryResult{Status: "ok", RecoveryToken: recoveryToken}, nil
 }
 
 // CompleteRecovery is the resolver for the completeRecovery field.
 func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error) {
-	claims, err := r.JWTSvc.ParseToken(recoveryToken)
+	email, err := resolveEmailFromToken(recoveryToken)
 	if err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: "invalid token"}, nil
 	}
 
-	if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
+	if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
 
-	address := r.WalletSvc.DeriveAddress(claims.Email)
-	token, _ := r.JWTSvc.IssueToken(claims.Email, address, "recovery")
+	address := r.WalletSvc.DeriveAddress(email)
+	apiKey := createUserAPIKey(email)
 	return &auth.RecoveryResult{
-		Status: "ok", Token: token, Address: address, Email: claims.Email,
+		Status: "ok", Token: apiKey, Address: address, Email: email,
 	}, nil
 }
 

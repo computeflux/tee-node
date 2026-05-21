@@ -71,7 +71,7 @@ func InitTeeChain(
 			PrivValidatorKey:   "config/priv_validator_key.json",
 			PrivValidatorState: "data/priv_validator_state.json",
 			NodeKey:            "config/node_key.json",
-			Moniker:            "WeTEE Chain",
+			Moniker:            "TEE Chain",
 			ProxyApp:           "tcp://127.0.0.1:" + fmt.Sprint(chainPort+1),
 			ABCI:               "socket",
 			LogLevel:           "error",

@@ -44,7 +44,7 @@ func LoadConfig() *AuthConfig {
 		SMTPUser:     util.GetEnv("SMTP_USER", ""),
 		SMTPPassword: util.GetEnv("SMTP_PASSWORD", ""),
 		SMTPFrom:     util.GetEnv("SMTP_FROM", ""),
-		SMTPFromName: util.GetEnv("SMTP_FROM_NAME", "WeTEE Auth"),
+		SMTPFromName: util.GetEnv("SMTP_FROM_NAME", "TEE Auth"),
 
 		GoogleClientID:      util.GetEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret:  util.GetEnv("GOOGLE_CLIENT_SECRET", ""),

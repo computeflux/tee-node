@@ -5,7 +5,7 @@ import "github.com/computeflux/tee-provider/pkg/model"
 func InitSeedData() {
 	if m, _ := model.GetGatewayModel(0); m != nil {
 		InitOptimizations()
-	InitAutoScaler()
+		InitAutoScaler()
 		return
 	}
 
@@ -34,9 +34,6 @@ func InitSeedData() {
 		ID: 2, Name: "gemini", ModelIds: []uint64{3}, Priority: 10, IsActive: true, Owner: "admin",
 	})
 	model.SetGatewayEndpoint(3, &model.GatewayEndpoint{ID: 3, ProviderID: 2, URL: "https://generativelanguage.googleapis.com", APIKey: "google-key1", Weight: 1, IsActive: true})
-
-	// Token
-	model.SetGatewayToken(0, &model.GatewayTokenInfo{ID: 0, Owner: "admin", Key: "demo-token", RateLimit: 60, IsActive: true})
 
 	model.SetNextID("gateway_model", 4)
 	model.SetNextID("gateway_provider", 3)

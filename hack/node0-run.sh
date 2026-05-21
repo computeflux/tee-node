@@ -169,7 +169,7 @@ export SMTP_PORT="${SMTP_PORT:-587}"
 export SMTP_USER="${SMTP_USER:-}"
 export SMTP_PASSWORD="${SMTP_PASSWORD:-}"
 export SMTP_FROM="${SMTP_FROM:-}"
-export SMTP_FROM_NAME="${SMTP_FROM_NAME:-WeTEE Auth}"
+export SMTP_FROM_NAME="${SMTP_FROM_NAME:-TEE Auth}"
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
