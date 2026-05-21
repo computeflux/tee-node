@@ -3614,30 +3614,8 @@ func (ec *executionContext) _Mutation_start_epoch(ctx context.Context, field gra
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		directive0 := func(rctx context.Context) (any, error) {
-			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Mutation().StartEpoch(rctx)
-		}
-
-		directive1 := func(ctx context.Context) (any, error) {
-			if ec.directives.AuthCheck == nil {
-				var zeroVal bool
-				return zeroVal, errors.New("directive AuthCheck is not implemented")
-			}
-			return ec.directives.AuthCheck(ctx, nil, directive0)
-		}
-
-		tmp, err := directive1(rctx)
-		if err != nil {
-			return nil, graphql.ErrorOnPath(ctx, err)
-		}
-		if tmp == nil {
-			return nil, nil
-		}
-		if data, ok := tmp.(bool); ok {
-			return data, nil
-		}
-		return nil, fmt.Errorf(`unexpected type %T from directive, should be bool`, tmp)
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().StartEpoch(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)

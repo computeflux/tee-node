@@ -436,9 +436,9 @@ func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
 		api:             api,
 		credits:         &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
-		models:          model.NewIndexedList[uint64, ModelInfo]("gateway", "model_next_id", "model_"),
-		providers:       model.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_v3_next_id", "providers_v3_"),
-		providerByOwner: &model.StoreMapping[string, uint64]{Namespace: "gateway", KeyPrefix: "provider_by_owner_"},
+		models:          model.NewIndexedList[uint64, ModelInfo]("gateway", "v0_models_next_id", "v0_models_"),
+		providers:       model.NewIndexedList[uint64, ProviderInfo]("gateway", "v0_providers_next_id", "v0_providers_"),
+		providerByOwner: &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v0_provider_by_owner_"},
 		providerCredits: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
 		apiKeys:         &model.StoreMapping[string, APIKeyInfo]{Namespace: "gateway", KeyPrefix: "api_key_"},
 		usages:          &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},

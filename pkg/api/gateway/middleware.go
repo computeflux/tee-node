@@ -13,8 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 // ── Panic Recovery ───────────────────────────────────────
@@ -177,7 +175,7 @@ func EmitChannelMetric(providerID uint64, success bool) {
 	}
 	m.recent = append(m.recent, success)
 
-	// 自动禁用低成功率 channel
+	// 监控低成功率 channel（只记录日志，不修改本地 DB；Provider 状态由合约管理）
 	threshold := 0.3
 	if len(m.recent) >= queueSize {
 		successCount := 0
@@ -188,13 +186,8 @@ func EmitChannelMetric(providerID uint64, success bool) {
 		}
 		rate := float64(successCount) / float64(len(m.recent))
 		if rate < threshold {
-			log.Printf("[MONITOR] channel %d success rate %.2f < %.2f, disabling",
+			log.Printf("[MONITOR] channel %d success rate %.2f < %.2f, alerting",
 				providerID, rate, threshold)
-			ch, _ := model.GetGatewayProvider(providerID)
-			if ch != nil && ch.IsActive {
-				ch.IsActive = false
-				model.SetGatewayProvider(providerID, ch)
-			}
 			m.recent = nil
 		}
 	}

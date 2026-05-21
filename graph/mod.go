@@ -36,8 +36,11 @@ func StartServer(s *teechain.TeeChain, port int) {
 func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver) {
 	teeChain = s
 
+	// 注入合约查询桥接（Gateway 数据从合约读取）
+	gateway.SetContractBridge(s)
+
 	// Phase 2: seed data
-	gateway.InitSeedData()
+	// gateway.InitSeedData()
 
 	router := chi.NewRouter()
 	router.Use(AuthMiddleware())

@@ -47,6 +47,12 @@ func resolveEmailFromToken(token string) (string, error) {
 		return session.Email, nil
 	}
 
+	// 优先从合约查询 API Key
+	if tk := gateway.LookupAPIKeyViaContract(token); tk != nil && tk.IsActive {
+		return tk.Owner, nil
+	}
+
+	// Fallback: PebbleDB（Web3Auth 登录生成的临时 key）
 	tk := model.FindGatewayTokenByKey(token)
 	if tk != nil && tk.IsActive {
 		return tk.Owner, nil

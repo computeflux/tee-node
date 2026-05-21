@@ -3,10 +3,10 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
 )
@@ -30,7 +30,13 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		token := findTokenCached(key)
-		if token == nil || !token.IsActive {
+		if token == nil {
+			log.Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
+			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
+			return
+		}
+		if !token.IsActive {
+			log.Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
@@ -40,7 +46,7 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 }
 
 // DistributeMiddleware routes based on "channel/model" format
-// e.g. "openai/gpt-4" → find "openai" channel → pick endpoint by user hash → route
+// e.g. "openai/gpt-4" → query contract → verify model exists → pick endpoint by user hash → route
 func DistributeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Read body early to extract model name for correct routing.
@@ -62,30 +68,67 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			modelName = r.URL.Query().Get("model")
 		}
 		if modelName == "" {
-			modelName = "openai/gpt-3.5-turbo" // default
+			writeError(w, http.StatusNotFound, "model is null", "not_found")
+			return
 		}
 
 		// Parse "channel/model" format
 		providerName, actualModel := parseProviderModel(modelName)
 		token := GetTokenFromContext(r)
 
-		channel := findProviderCached(providerName)
-		if channel == nil {
-			writeError(w, http.StatusServiceUnavailable,
-				"channel not found: "+providerName, "server_error")
+		// 1. 从合约查询模型（必须存在且活跃）
+		m := findGatewayModelByName(actualModel)
+		if m == nil {
+			writeError(w, http.StatusNotFound, "model not found: "+actualModel, "not_found")
 			return
 		}
 
-		// Pick endpoint with consistent hash (sticky by user + channel)
+		fmt.Println("ProviderName", providerName)
+		fmt.Println("model")
+		fmt.Println(m)
+		fmt.Println("ProviderType", m.ProviderType)
+		fmt.Println("Model", actualModel)
+
+		// 2. 验证请求的 Provider 与模型所属 Provider 一致
+		expectedProvider := providerTypeName(m.ProviderType)
+		// if !strings.EqualFold(expectedProvider, providerName) {
+		// 	writeError(w, http.StatusBadRequest,
+		// 		fmt.Sprintf("model %s belongs to provider %s, not %s", actualModel, expectedProvider, providerName),
+		// 		"invalid_request")
+		// 	return
+		// }
+
+		// 3. 从合约构建 endpoints（URI + APIKeys）
+		endpoints := buildEndpointsFromModel(m)
+		if len(endpoints) == 0 {
+			writeError(w, http.StatusServiceUnavailable,
+				"no available endpoints for model "+actualModel, "server_error")
+			return
+		}
+
+		// 4. 按用户 hash 选 endpoint（sticky）
 		userKey := token.Owner
 		if userKey == "" {
 			userKey = r.RemoteAddr
 		}
-		endpoint := pickEndpoint(channel.ID, userKey+":"+providerName)
+		b := model.NewEndpointBalancerFromEndpoints(endpoints)
+		if b == nil {
+			writeError(w, http.StatusServiceUnavailable,
+				"no available endpoint for model "+actualModel, "server_error")
+			return
+		}
+		endpoint := b.Pick(userKey + ":" + actualModel)
 		if endpoint == nil {
 			writeError(w, http.StatusServiceUnavailable,
-				"no available endpoint for "+providerName, "server_error")
+				"no available endpoint for model "+actualModel, "server_error")
 			return
+		}
+
+		// 5. 构建虚拟 channel（供下游 metrics / usage 使用）
+		channel := &model.GatewayProviderInfo{
+			ID:       m.ProviderID,
+			Name:     expectedProvider,
+			IsActive: true,
 		}
 
 		ctx := context.WithValue(r.Context(), ctxProvider, channel)
@@ -105,74 +148,6 @@ func parseProviderModel(input string) (channel, model string) {
 		return parts[0], parts[1]
 	}
 	return "openai", input
-}
-
-// ── Cached channel lookup ────────────────────────────────
-
-func findProviderCached(name string) *model.GatewayProviderInfo {
-	for _, ch := range GetCachedChannels() {
-		if strings.EqualFold(ch.Name, name) && ch.IsActive {
-			return ch
-		}
-	}
-	return nil
-}
-
-// ── Endpoint balancer cache ──────────────────────────────
-
-var (
-	balancerMu  sync.RWMutex
-	balancers   = make(map[uint64]*model.EndpointBalancer)
-	balancerTTL = 10 * time.Second
-	lastRefresh = make(map[uint64]time.Time)
-)
-
-func pickEndpoint(providerID uint64, userKey string) *model.GatewayEndpoint {
-	// Fast path: use cached balancer.
-	balancerMu.RLock()
-	b, ok := balancers[providerID]
-	last := lastRefresh[providerID]
-	balancerMu.RUnlock()
-
-	if ok && time.Since(last) <= balancerTTL && b != nil {
-		return b.Pick(userKey)
-	}
-
-	// Slow path: refresh under exclusive lock to avoid races.
-	balancerMu.Lock()
-	defer balancerMu.Unlock()
-
-	// Double-check: another goroutine may have refreshed while we waited.
-	if b2, ok2 := balancers[providerID]; ok2 && time.Since(lastRefresh[providerID]) <= balancerTTL && b2 != nil {
-		return b2.Pick(userKey)
-	}
-
-	b = model.NewEndpointBalancer(providerID)
-	balancers[providerID] = b
-	lastRefresh[providerID] = time.Now()
-
-	if b == nil {
-		return nil
-	}
-	return b.Pick(userKey)
-}
-
-func disableEndpoint(providerID uint64, endpointID uint64) {
-	balancerMu.RLock()
-	b := balancers[providerID]
-	balancerMu.RUnlock()
-	if b != nil {
-		b.OnEndpointDisabled(endpointID)
-	}
-}
-
-func releaseEndpoint(providerID uint64, endpointID uint64) {
-	balancerMu.RLock()
-	b := balancers[providerID]
-	balancerMu.RUnlock()
-	if b != nil {
-		b.Release(endpointID)
-	}
 }
 
 // GetBodyFromContext returns cached body bytes set by DistributeMiddleware.

@@ -15,5 +15,5 @@ extend type Query {
 }
 
 extend type Mutation {
-  start_epoch: Boolean! @AuthCheck
+  start_epoch: Boolean!
 }

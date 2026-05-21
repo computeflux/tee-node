@@ -128,7 +128,6 @@ func main() {
 	// ── 初始化 Web3Auth 服务 ──────────────────────────────
 	authCfg := auth.LoadConfig()
 	walletSvc := wallet.NewWalletService(authCfg)
-	jwtSvc := authsvc.NewJWTService(authCfg)
 	emailSvc := authsvc.NewEmailService(authCfg)
 	oauthSvc := authsvc.NewOAuthService(authCfg)
 	otpSvc := authsvc.NewOTPService(authCfg.OTPTTLMins)
@@ -138,7 +137,6 @@ func main() {
 		TeeChain:  teeChain,
 		AuthCfg:   authCfg,
 		WalletSvc: walletSvc,
-		JWTSvc:    jwtSvc,
 		EmailSvc:  emailSvc,
 		OAuthSvc:  oauthSvc,
 		OTPSvc:    otpSvc,

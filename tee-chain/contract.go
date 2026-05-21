@@ -5,7 +5,80 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 )
+
+// ── Gateway 非 codec 查询接口（供 HTTP 层直接调用）──────
+
+func (app *TeeChain) gatewayRuntime() (*contracts.Runtime, error) {
+	if model.DBINS == nil {
+		return nil, fmt.Errorf("DBINS is nil")
+	}
+	txn := model.DBINS.NewTransaction()
+	// NOTE: caller does NOT call txn.Commit() for read-only queries.
+	// The caller must defer txn.Rollback().
+
+	var sudo model.UniAddr
+	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
+		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
+	}
+	return contracts.NewRuntime(app.state.Height, txn, model.UniAddr{}, sudo), nil
+}
+
+// GatewayLookupAPIKey 根据 keyHash 查询链上 API Key 信息。
+func (app *TeeChain) GatewayLookupAPIKey(keyHash []byte) (*gateway.APIKeyInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.LookupAPIKey(keyHash)
+}
+
+// GatewayListActiveModels 查询链上活跃模型列表。
+func (app *TeeChain) GatewayListActiveModels(offset uint64, limit uint32) ([]gateway.ModelInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
+}
+
+// GatewayListActiveProviders 查询链上活跃 Provider 列表。
+func (app *TeeChain) GatewayListActiveProviders(offset uint64, limit uint32) ([]gateway.ProviderInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.ListActiveProviders(offset, limit)
+}
+
+// GatewayGetProvider 查询单个 Provider。
+func (app *TeeChain) GatewayGetProvider(id uint64) (*gateway.ProviderInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetProvider(id)
+}
+
+// GatewayGetModel 查询单个 Model。
+func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetModel(id)
+}
 
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
 	var err error

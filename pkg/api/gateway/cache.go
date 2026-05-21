@@ -7,12 +7,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
-// ── In-memory cache to avoid Pebble scan per request ─────
-
-type channelCacheEntry struct {
-	channels  []*model.GatewayProviderInfo
-	expiresAt time.Time
-}
+// ── Token cache (fallback for legacy local keys) ─────────
 
 type tokenCacheEntry struct {
 	tokens    []*model.GatewayTokenInfo
@@ -21,38 +16,12 @@ type tokenCacheEntry struct {
 
 var (
 	cacheMu    sync.RWMutex
-	chanCache  *channelCacheEntry
 	tokenCache *tokenCacheEntry
 	cacheTTL   = 5 * time.Second
 )
 
-// RefreshChannelCache reloads channels from Pebble
-func RefreshChannelCache() {
-	channels := make([]*model.GatewayProviderInfo, 0)
-	var id uint64
-	for {
-		ch, err := model.GetGatewayProvider(id)
-		if err != nil || ch == nil {
-			break
-		}
-		if ch.IsActive {
-			channels = append(channels, ch)
-		}
-		id++
-		if id > 10000 {
-			break
-		}
-	}
-
-	cacheMu.Lock()
-	chanCache = &channelCacheEntry{
-		channels:  channels,
-		expiresAt: time.Now().Add(cacheTTL),
-	}
-	cacheMu.Unlock()
-}
-
-// RefreshTokenCache reloads tokens from Pebble
+// RefreshTokenCache reloads tokens from Pebble (local cache for legacy keys).
+// Contract-based API keys are verified on-demand via lookupAPIKeyViaContract.
 func RefreshTokenCache() {
 	tokens := make([]*model.GatewayTokenInfo, 0)
 	var id uint64
@@ -78,24 +47,6 @@ func RefreshTokenCache() {
 	cacheMu.Unlock()
 }
 
-// GetCachedChannels returns channels from cache, refreshing if needed
-func GetCachedChannels() []*model.GatewayProviderInfo {
-	cacheMu.RLock()
-	if chanCache != nil && time.Now().Before(chanCache.expiresAt) {
-		ch := chanCache.channels
-		cacheMu.RUnlock()
-		return ch
-	}
-	cacheMu.RUnlock()
-
-	RefreshChannelCache()
-
-	cacheMu.RLock()
-	ch := chanCache.channels
-	cacheMu.RUnlock()
-	return ch
-}
-
 // GetCachedTokens returns tokens from cache
 func GetCachedTokens() []*model.GatewayTokenInfo {
 	cacheMu.RLock()
@@ -117,7 +68,6 @@ func GetCachedTokens() []*model.GatewayTokenInfo {
 // InvalidateCache forces a refresh on next access
 func InvalidateCache() {
 	cacheMu.Lock()
-	chanCache = nil
 	tokenCache = nil
 	cacheMu.Unlock()
 }
@@ -126,8 +76,16 @@ func findTokenCached(key string) *model.GatewayTokenInfo {
 	return FindTokenByKey(key)
 }
 
-// FindTokenByKey finds an active API key in the token cache.
+// FindTokenByKey finds an active API key.
+// 1. 优先查询合约（链上注册的 API Key）
+// 2. 回退到本地 PebbleDB 缓存（legacy 本地 key）
 func FindTokenByKey(key string) *model.GatewayTokenInfo {
+	// 优先走合约查询
+	if tk := lookupAPIKeyViaContract(key); tk != nil {
+		return tk
+	}
+
+	// Fallback: local PebbleDB cache
 	for _, tk := range GetCachedTokens() {
 		if tk.Key == key && tk.IsActive {
 			return tk

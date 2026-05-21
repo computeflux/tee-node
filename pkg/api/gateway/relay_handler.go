@@ -52,7 +52,6 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	lim := getEndpointLimiter(endpoint.ID, rpmLimit)
 	lim.SetLimits(rpmLimit, maxConc)
 	if !lim.Allow() {
-		releaseEndpoint(channel.ID, endpoint.ID)
 		rpm, inf := lim.Stats()
 		writeError(w, http.StatusTooManyRequests,
 			fmt.Sprintf("rate limited: %d/%d RPM, %d/%d inflight", rpm, rpmLimit, inf, maxConc),
@@ -67,7 +66,6 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		var err error
 		bodyBytes, err = readRequestBody(r)
 		if err != nil {
-			releaseEndpoint(channel.ID, endpoint.ID)
 			writeError(w, http.StatusBadRequest, "failed to read request body", "invalid_request")
 			return
 		}
@@ -83,7 +81,6 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
-	releaseEndpoint(channel.ID, endpoint.ID)
 
 	// Business error (e.g. upstream 4xx): already contains status code and message.
 	if bizErr != nil {
@@ -131,6 +128,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 	adaptor := relay.GetAdaptorForProvider(relay.DetectProvider(endpoint.URL))
 	adaptor.Init(meta)
 
+	fmt.Printf("Relaying to upstream %s with model %s\n", endpoint.URL, modelName)
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("upstream: %w", err)
@@ -139,12 +137,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 
 	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
 	if bizErr != nil {
-		if ShouldDisableChannel(bizErr.Error.Message, bizErr.StatusCode) {
-			endpoint.IsActive = false
-			model.SetGatewayEndpoint(endpoint.ID, endpoint)
-			disableEndpoint(endpoint.ProviderID, endpoint.ID)
-			log.Printf("[MONITOR] disabled endpoint %d: %s", endpoint.ID, bizErr.Error.Message)
-		}
+		log.Printf("[MONITOR] upstream error: %s (status=%d)", bizErr.Error.Message, bizErr.StatusCode)
 		// Return the bizErr so the caller writes the error response once.
 		return nil, bizErr, nil
 	}
@@ -153,22 +146,14 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.Gat
 
 func HandleListModels(w http.ResponseWriter, r *http.Request) {
 	models := make([]map[string]interface{}, 0)
-	var id uint64
-	for {
-		m, err := model.GetGatewayModel(id)
-		if err != nil || m == nil {
-			break
-		}
-		if m.IsActive {
-			models = append(models, map[string]interface{}{
-				"id": m.Name, "object": "model", "owned_by": m.Owner,
-			})
-		}
-		id++
-		if id > 1000 {
-			break
-		}
+
+	// 从合约读取模型列表
+	for _, m := range getCachedGatewayModels() {
+		models = append(models, map[string]interface{}{
+			"id": m.Name, "object": "model", "owned_by": fmt.Sprintf("%x", m.Owner.V),
+		})
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"object": "list", "data": models})
 }

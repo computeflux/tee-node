@@ -20,7 +20,6 @@ type Resolver struct {
 	// Web3Auth 服务
 	AuthCfg   *auth.AuthConfig
 	WalletSvc *wallet.WalletService
-	JWTSvc    *authsvc.JWTService
 	EmailSvc  authsvc.EmailService
 	OAuthSvc  *authsvc.OAuthService
 	OTPSvc    *authsvc.OTPService

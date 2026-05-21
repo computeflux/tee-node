@@ -1,14 +1,9 @@
 package model
 
 import (
-	"encoding/json"
-	"fmt"
 	"hash/fnv"
 	"sync"
 	"sync/atomic"
-
-	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // ── Endpoint ─────────────────────────────────────────────
@@ -23,48 +18,6 @@ type GatewayEndpoint struct {
 }
 
 // ── CRUD ─────────────────────────────────────────────────
-
-func SetGatewayEndpoint(id uint64, ep *GatewayEndpoint) error {
-	ep.ID = id
-	return SetJson("GATEWAY", fmt.Sprintf("ep:%d", id), ep)
-}
-
-func GetGatewayEndpoint(id uint64) (*GatewayEndpoint, error) {
-	return GetJson[GatewayEndpoint]("GATEWAY", fmt.Sprintf("ep:%d", id))
-}
-
-// ListChannelEndpoints returns all active gateway endpoints for a provider.
-func ListChannelEndpoints(providerID uint64) []*GatewayEndpoint {
-	if DBINS == nil {
-		return nil
-	}
-	prefix := []byte(comboKey("GATEWAY", "ep:"))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
-		LowerBound: prefix,
-		UpperBound: keyUpperBound(prefix),
-	})
-	if err != nil {
-		return nil
-	}
-	defer iter.Close()
-
-	var eps []*GatewayEndpoint
-	for iter.First(); iter.Valid(); iter.Next() {
-		v := iter.Value()
-		decrypted, err := util.Unseal(v, nil)
-		if err != nil {
-			continue
-		}
-		var ep GatewayEndpoint
-		if json.Unmarshal(decrypted, &ep) != nil {
-			continue
-		}
-		if ep.ProviderID == providerID && ep.IsActive {
-			eps = append(eps, &ep)
-		}
-	}
-	return eps
-}
 
 // ── Sticky Balancer ──────────────────────────────────────
 //
@@ -91,12 +44,10 @@ type EndpointBalancer struct {
 	inflight  []int64 // 当前并发（监控用）
 }
 
-func NewEndpointBalancer(providerID uint64) *EndpointBalancer {
-	eps := ListChannelEndpoints(providerID)
+func NewEndpointBalancerFromEndpoints(eps []*GatewayEndpoint) *EndpointBalancer {
 	if len(eps) == 0 {
 		return nil
 	}
-
 	b := &EndpointBalancer{
 		endpoints: eps,
 		userMap:   make(map[string]uint64),
@@ -216,8 +167,4 @@ func (b *EndpointBalancer) Stats() map[uint64]struct {
 		}{userCounts[ep.ID], atomic.LoadInt64(&b.inflight[i])}
 	}
 	return s
-}
-
-func (b *EndpointBalancer) Refresh(providerID uint64) *EndpointBalancer {
-	return NewEndpointBalancer(providerID)
 }
