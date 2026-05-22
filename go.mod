@@ -16,8 +16,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/go-sev-guest v0.13.0
 	github.com/hashicorp/vault v1.19.0
-	github.com/ipfs/go-cid v0.5.0
-	github.com/multiformats/go-multihash v0.2.3
 	github.com/stretchr/testify v1.11.1
 	github.com/vedhavyas/go-subkey/v2 v2.0.0
 	github.com/vektah/gqlparser/v2 v2.5.27
@@ -36,6 +34,7 @@ require (
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
+	github.com/ipfs/go-cid v0.5.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/koron/go-ssdp v0.0.6 // indirect
@@ -55,6 +54,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.4.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.1 // indirect
+	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.6.1 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect
