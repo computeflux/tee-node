@@ -106,6 +106,10 @@
         {
             "name": "SMTP_FROM_NAME",
             "fromHost": true
+        },
+        {
+            "name": "TEE_GENESIS_NODE",
+            "fromHost": true
         }
     ],
     "files": [

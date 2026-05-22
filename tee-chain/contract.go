@@ -80,6 +80,17 @@ func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetModel(id)
 }
 
+// GatewayGetEncryptedAPIKey 查询加密 API Key。
+func (app *TeeChain) GatewayGetEncryptedAPIKey(ref string) (*gateway.EncryptedAPIKey, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetEncryptedAPIKey(ref)
+}
+
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
 	var err error
 	defer func() {

@@ -35,8 +35,8 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	address := r.WalletSvc.DeriveAddress(email)
 	apiKey := createUserAPIKey(email)
 	model.PutAuthUser(&model.AuthUser{
-		Email: email, Name: email, Address: address,
-		AuthProvider: provider, LastLogin: time.Now().Unix(),
+		Email:   email,
+		Address: address,
 	})
 	return &auth.AuthResponse{
 		Success:  true,
@@ -91,10 +91,9 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		VerifierID:   oauthUser.ProviderID,
 	}
 
-	// 持久化
+	// 持久化（只存最小信息）
 	model.PutAuthUser(&model.AuthUser{
-		Email: oauthUser.Email, Name: oauthUser.Name, Address: address,
-		AuthProvider: provider, LastLogin: time.Now().Unix(),
+		Email: oauthUser.Email, Address: address,
 	})
 
 	return &auth.AuthResponse{

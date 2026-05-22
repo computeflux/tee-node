@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cockroachdb/pebble"
@@ -26,7 +27,8 @@ func (dkg *DKG) reState() error {
 
 	var raw dkgStoreJSON
 	if err := json.Unmarshal(v, &raw); err != nil {
-		return fmt.Errorf("unmarshal dkg state: %w", err)
+		util.LogWithYellow("DKG", "skip restoring old state (format mismatch), reinitializing DKG")
+		os.Exit(1)
 	}
 
 	dkg.Threshold = raw.Threshold

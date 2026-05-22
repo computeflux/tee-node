@@ -19,7 +19,7 @@ func (e *Contract) PartialSign(signer chain.PartialSignerType, call model.ChainC
 // SignAndSubmit signs and submits a chain call.
 func (c *Contract) SignAndSubmit(signer chain.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error {
 	util.LogWithPurple("Revive SignAndSubmit", "signer", subkey.SS58Encode(signer.Public(), 42))
-	return c.ChainClient.SignAndSubmit(signer, call.Substrate, true, 0)
+	return c.ChainClient.SignAndSubmit(signer, call.Substrate, false, 0)
 }
 
 var batchMethods = []string{"batch", "batch_all", "force_batch"}

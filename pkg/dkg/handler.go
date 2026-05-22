@@ -59,6 +59,8 @@ func (dkg *DKG) handleDkg(msg *model.DkgMessage) error {
 			util.LogError("RandomDKG", "handleRandomDealRespBatch error:", err)
 		}
 		return err
+	case kmsSyncReq, kmsSyncResp:
+		return dkg.handleKmsSync(msg)
 	default:
 		// 如果消息类型未知，返回错误
 		return fmt.Errorf("unknown message type: %s", msg.Type)

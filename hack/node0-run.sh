@@ -142,6 +142,7 @@ export SIDE_CHAIN_PORT=30116
 export SIDE_CHAIN_RPC_PORT=30117
 export GQL_PORT=30118
 export CHAIN_ENV=test
+export TEE_GENESIS_NODE=true
 
 export JWT_SECRET="${JWT_SECRET:-dev-jwt-secret-change-in-production}"
 export SEED_SECRET="${SEED_SECRET:-dev-seed-secret-change-in-production}"

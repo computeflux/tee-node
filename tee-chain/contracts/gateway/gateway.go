@@ -28,6 +28,7 @@ type Gateway struct {
 	providerCredits *model.StoreMapping[uint64, uint64]        // providerID → accumulated credits
 	apiKeys         *model.StoreMapping[string, APIKeyInfo]    // hex(keyHash) → APIKeyInfo
 	usages          *model.StoreMapping[string, DailyUsage]
+	encryptedKeys   *model.StoreMapping[string, EncryptedAPIKey] // ref → EncryptedAPIKey
 }
 
 type GatewayQuery struct{ Gateway }

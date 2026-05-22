@@ -11,25 +11,19 @@ import (
 
 // ── Auth 持久化类型 ───────────────────────────────────────
 
-// AuthUser 认证用户
+// AuthUser 认证用户（最小化存储）
 type AuthUser struct {
 	Email        string `json:"email"`
-	Name         string `json:"name"`
 	Address      string `json:"address"`
-	AuthProvider string `json:"authProvider"`
-	LastLogin    int64  `json:"lastLogin"`
 	PasswordHash string `json:"passwordHash,omitempty"`
 }
 
-
-
 // AuthSession 认证会话
 type AuthSession struct {
-	Token        string `json:"token"`
-	Email        string `json:"email"`
-	Address      string `json:"address"`
-	AuthProvider string `json:"authProvider"`
-	CreatedAt    int64  `json:"createdAt"`
+	Token     string `json:"token"`
+	Email     string `json:"email"`
+	Address   string `json:"address"`
+	CreatedAt int64  `json:"createdAt"`
 }
 
 // EncryptedKey 加密私钥

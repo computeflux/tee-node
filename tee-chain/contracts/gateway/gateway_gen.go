@@ -115,11 +115,11 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeyRefs, err := model.DecodeScaleArgBytes[[]string](args[8])
 		if err != nil {
-			return fmt.Errorf("register_model: apiKeys: %w", err)
+			return fmt.Errorf("register_model: apiKeyRefs: %w", err)
 		}
-		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing, modelID, providerType, uri, apiKeys)
+		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing, modelID, providerType, uri, apiKeyRefs)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
 		if err := model.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
@@ -174,11 +174,11 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeyRefs, err := model.DecodeScaleArgBytes[[]string](args[8])
 		if err != nil {
-			return fmt.Errorf("update_model: apiKeys: %w", err)
+			return fmt.Errorf("update_model: apiKeyRefs: %w", err)
 		}
-		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing, modelIDStr, providerType, uri, apiKeys)
+		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing, modelIDStr, providerType, uri, apiKeyRefs)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -442,6 +442,7 @@ func NewGateway(api model.ContractApi) *Gateway {
 		providerCredits: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
 		apiKeys:         &model.StoreMapping[string, APIKeyInfo]{Namespace: "gateway", KeyPrefix: "api_key_"},
 		usages:          &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
+		encryptedKeys:   &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "enc_key_"},
 	}
 }
 

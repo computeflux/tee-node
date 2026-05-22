@@ -152,21 +152,53 @@ func findGatewayModelByName(name string) *cgateway.ModelInfo {
 }
 
 // buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表。
+// 使用 TEE KMS 解密链上存储的加密 API Key（明文永不上链）。
 func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
 	url := m.URI
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
 	}
-	if len(m.APIKeys) == 0 {
+	if len(m.APIKeyRefs) == 0 {
 		return nil
 	}
-	eps := make([]*model.GatewayEndpoint, 0, len(m.APIKeys))
-	for i, key := range m.APIKeys {
+
+	// 获取全局密钥（内存缓存，~0 开销）
+	gk, err := model.GetGlobalKey()
+	if err != nil {
+		GATEWAYLOG().Printf("[GATEWAY] GetGlobalKey failed: %v", err)
+		return nil
+	}
+
+	bridge := getBridge()
+
+	eps := make([]*model.GatewayEndpoint, 0, len(m.APIKeyRefs))
+	for i, ref := range m.APIKeyRefs {
+		var apiKey string
+		if bridge != nil {
+			encKey, err := bridge.GatewayGetEncryptedAPIKey(ref)
+			if err != nil || encKey == nil {
+				GATEWAYLOG().Printf("[GATEWAY] get encrypted key ref=%s err=%v", ref, err)
+				continue
+			}
+			kmsKey := &model.KMSKey{
+				Ref:        encKey.Ref,
+				Ciphertext: encKey.Ciphertext,
+				Nonce:      encKey.Nonce,
+			}
+			apiKey, err = model.DecryptWithGK(gk, kmsKey)
+			if err != nil {
+				GATEWAYLOG().Printf("[GATEWAY] decrypt ref=%s err=%v", ref, err)
+				continue
+			}
+		}
+		if apiKey == "" {
+			continue
+		}
 		eps = append(eps, &model.GatewayEndpoint{
 			ID:         uint64(i) + 1,
 			ProviderID: m.ProviderID,
 			URL:        url,
-			APIKey:     key,
+			APIKey:     apiKey,
 			Weight:     1,
 			IsActive:   true,
 		})
