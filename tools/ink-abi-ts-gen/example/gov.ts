@@ -1,8 +1,15 @@
 // Auto-generated from ink! ABI
 // DO NOT EDIT MANUALLY
 
+export interface CallContent {
+  Contract: string;
+  Selector: string;
+  Args: string[];
+  Amount: U256;
+}
+
 export interface Curve {
-  Type: number[];
+  Type: string;
   LinearBegin: number;
   LinearEnd: number;
   LinearLength: number;
@@ -21,10 +28,8 @@ export interface Member {
   Balance: U256;
 }
 
-export interface Option { None: null } | { Some: Vote }
-
 export interface Proposal {
-  Call: Option;
+  Call: CallContent | null;
   TrackID: number;
   Caller: UniAddr;
   Status: ProposalStatus;
@@ -43,13 +48,20 @@ export interface ProposalStatus {
   Block: number;
 }
 
+export interface ProposalStatusQuery {
+  State: number;
+  BlockHeight: number;
+  ConfirmedNumber: number;
+  LastConfirmedBlock: number;
+}
+
 export interface ProposalWithID {
   ID: number;
   Proposal: Proposal;
 }
 
 export interface TrackData {
-  Name: number[];
+  Name: string;
   PreparePeriod: number;
   MaxDeciding: number;
   ConfirmPeriod: number;
@@ -72,7 +84,7 @@ export interface U256 {
 
 export interface UniAddr {
   T: number;
-  V: number[];
+  V: string;
 }
 
 export interface Vote {
@@ -96,25 +108,25 @@ export type DefaultTrackResponse = number;
 export type TracksResponse = TrackWithID[];
 export type ExecProposalResponse = void;
 export type CancelProposalResponse = void;
-export type VoteResponse = Option;
+export type VoteResponse = Vote | null;
 export type MembersResponse = Member[];
 export type InitResponse = void;
 export type PublicJoinResponse = void;
 export type GetPublicJoinResponse = boolean;
 export type TotalSupplyResponse = U256;
-export type ProposalResponse = Option;
+export type ProposalResponse = ProposalWithID | null;
 export type SpendResponse = void;
 export type BalanceOfResponse = U256;
 export type LeaveWithBurnResponse = void;
 export type MintResponse = void;
 export type PayoutResponse = void;
 export type TransferResponse = void;
-export type TrackResponse = Option;
+export type TrackResponse = TrackData | null;
 export type SubmitVoteResponse = void;
 export type JoinResponse = void;
 export type AddTrackResponse = void;
 export type DepositProposalResponse = void;
 export type TransferFromResponse = void;
-export type ProposalStatusResponse = Option;
+export type ProposalStatusResponse = ProposalStatusQuery | null;
 export type ProposalsResponse = ProposalWithID[];
 export type VotesOfUserResponse = Vote[];

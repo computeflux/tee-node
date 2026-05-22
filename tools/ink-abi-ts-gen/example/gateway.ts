@@ -3,14 +3,14 @@
 
 export interface APIKeyInfo {
   Owner: UniAddr;
-  KeyHash: number[];
+  KeyHash: string;
   RateLimit: number;
   IsActive: boolean;
   CreatedAt: number;
 }
 
 export interface ModelInfo {
-  Name: number[];
+  Name: string;
   Owner: UniAddr;
   ProviderID: number;
   PointsPer1K: number;
@@ -20,18 +20,16 @@ export interface ModelInfo {
   ContextLength: number;
   PromptPricing: number;
   ProviderType: number;
-  ModelID: number[];
-  URI: number[];
-  APIKeys: number[][];
+  ModelID: string;
+  URI: string;
+  APIKeys: string[];
 }
-
-export interface Option { None: null } | { Some: number }
 
 export interface ProviderInfo {
   Owner: UniAddr;
-  Name: number[];
-  LogoURL: number[];
-  Description: number[];
+  Name: string;
+  LogoURL: string;
+  Description: string;
   ModelIds: number[];
   Region: number;
   Deposit: number;
@@ -47,7 +45,7 @@ export interface ProviderInfo {
 
 export interface UniAddr {
   T: number;
-  V: number[];
+  V: string;
 }
 
 export type GetCreditResponse = number;
@@ -60,7 +58,7 @@ export type RegisterModelResponse = void;
 export type ListProvidersResponse = ProviderInfo[];
 export type GetProviderCountResponse = number;
 export type InitResponse = void;
-export type GetProviderByOwnerResponse = Option;
+export type GetProviderByOwnerResponse = number | null;
 export type DeactivateModelResponse = void;
 export type QueryModelsResponse = ModelInfo[];
 export type RevokeAPIKeyResponse = void;

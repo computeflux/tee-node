@@ -166,16 +166,33 @@ func primitiveToTS(p string) string {
 	case "str":
 		return "string"
 	}
-	return "any /* " + p + " */"
+	return "unknown /* " + p + " */"
+}
+
+// findVariant 按名称查找 variant，不依赖顺序
+func findVariant(variants []Variant, name string) *Variant {
+	for i := range variants {
+		if variants[i].Name == name {
+			return &variants[i]
+		}
+	}
+	return nil
+}
+
+// isPrimitiveU8 判断指定 type id 是否为 primitive u8
+func (g *TSGen) isPrimitiveU8(ty int) bool {
+	entry, ok := g.typeMap[ty]
+	if !ok {
+		return false
+	}
+	return entry.Type.Def.Primitive == "u8"
 }
 
 // ── Recursive type resolver (returns TS type expression) ─────
 
-// RecursionTypes resolves an ABI type id to a TypeScript type string.
-// It caches results in typeResult to avoid cycles and duplicates.
 func (g *TSGen) RecursionTypes(ty int, hintName string, depth int) string {
 	if depth > 50 {
-		return "any /* depth exceeded */"
+		return "unknown /* depth exceeded */"
 	}
 	if cached, ok := g.typeResult[ty]; ok {
 		return cached
@@ -183,7 +200,7 @@ func (g *TSGen) RecursionTypes(ty int, hintName string, depth int) string {
 
 	entry, ok := g.typeMap[ty]
 	if !ok {
-		return "any /* unknown type id */"
+		return "unknown /* unknown type id */"
 	}
 
 	d := entry.Type.Def
@@ -215,6 +232,10 @@ func (g *TSGen) RecursionTypes(ty int, hintName string, depth int) string {
 
 	// Sequence (Vec<T>)
 	if d.Sequence != nil {
+		if g.isPrimitiveU8(d.Sequence.Type) {
+			g.typeResult[ty] = "string"
+			return "string"
+		}
 		inner := g.RecursionTypes(d.Sequence.Type, "", depth+1)
 		result := inner + "[]"
 		g.typeResult[ty] = result
@@ -223,6 +244,10 @@ func (g *TSGen) RecursionTypes(ty int, hintName string, depth int) string {
 
 	// Array ([T; n])
 	if d.Array != nil {
+		if g.isPrimitiveU8(d.Array.Type) {
+			g.typeResult[ty] = "string"
+			return "string"
+		}
 		inner := g.RecursionTypes(d.Array.Type, "", depth+1)
 		result := inner + "[]"
 		g.typeResult[ty] = result
@@ -240,7 +265,7 @@ func (g *TSGen) RecursionTypes(ty int, hintName string, depth int) string {
 		return result
 	}
 
-	result := "any /* unsupported */"
+	result := "unknown /* unsupported */"
 	g.typeResult[ty] = result
 	return result
 }
@@ -264,20 +289,31 @@ func (g *TSGen) structBody(fields []Field, depth int) string {
 func (g *TSGen) variantToTS(ty int, entry TypeEntry, v *VariantDef, depth int) string {
 	variants := v.Variants
 
-	// Result<T, E>
-	if len(variants) == 2 && variants[0].Name == "Ok" && variants[1].Name == "Err" {
-		okType := "void"
-		if len(variants[0].Fields) > 0 {
-			okType = g.RecursionTypes(variants[0].Fields[0].Type, "", depth+1)
+	// Result<T, E> —— 不依赖 variants 顺序
+	var okVariant, errVariant *Variant
+	if len(variants) == 2 {
+		switch variants[0].Name {
+		case "Ok":
+			if variants[1].Name == "Err" {
+				okVariant, errVariant = &variants[0], &variants[1]
+			}
+		case "Err":
+			if variants[1].Name == "Ok" {
+				okVariant, errVariant = &variants[1], &variants[0]
+			}
 		}
-		// For return types we usually only need the Ok payload.
-		// Cache a raw Result name if the type has a named path.
+	}
+	if okVariant != nil {
+		okType := "void"
+		if len(okVariant.Fields) > 0 {
+			okType = g.RecursionTypes(okVariant.Fields[0].Type, "", depth+1)
+		}
 		name := typeNameFromPath(entry.Type.Path)
 		if name != "" && name != "Result" {
 			if _, exists := g.definitions[name]; !exists {
-				errType := "any"
-				if len(variants[1].Fields) > 0 {
-					errType = g.RecursionTypes(variants[1].Fields[0].Type, "", depth+1)
+				errType := "unknown"
+				if len(errVariant.Fields) > 0 {
+					errType = g.RecursionTypes(errVariant.Fields[0].Type, "", depth+1)
 				}
 				g.typeResult[ty] = name
 				g.definitions[name] = fmt.Sprintf("{ Ok: %s } | { Err: %s }", okType, errType)
@@ -288,11 +324,24 @@ func (g *TSGen) variantToTS(ty int, entry TypeEntry, v *VariantDef, depth int) s
 		return okType
 	}
 
-	// Option<T>
-	if len(variants) == 2 && variants[0].Name == "Some" && variants[1].Name == "None" {
-		someType := "any"
-		if len(variants[0].Fields) > 0 {
-			someType = g.RecursionTypes(variants[0].Fields[0].Type, "", depth+1)
+	// Option<T> —— 不依赖 variants 顺序，返回内联 T | null（不生成 named definition）
+	var someVariant *Variant
+	if len(variants) == 2 {
+		switch variants[0].Name {
+		case "Some":
+			if variants[1].Name == "None" {
+				someVariant = &variants[0]
+			}
+		case "None":
+			if variants[1].Name == "Some" {
+				someVariant = &variants[1]
+			}
+		}
+	}
+	if someVariant != nil {
+		someType := "unknown"
+		if len(someVariant.Fields) > 0 {
+			someType = g.RecursionTypes(someVariant.Fields[0].Type, "", depth+1)
 		}
 		result := someType + " | null"
 		g.typeResult[ty] = result
@@ -329,19 +378,16 @@ func (g *TSGen) variantToTS(ty int, entry TypeEntry, v *VariantDef, depth int) s
 
 // ── Return value extraction ──────────────────────────────────
 
-// GetReturnValue unwraps the Result.Ok branch for a message return type.
 func (g *TSGen) GetReturnValue(msg Message) string {
 	rt := msg.ReturnType.Type
 	entry, ok := g.typeMap[rt]
 	if !ok {
-		return "any"
+		return "unknown"
 	}
 	v := entry.Type.Def.Variant
 	if v == nil {
-		// not a Result, resolve directly
 		return g.RecursionTypes(rt, "", 0)
 	}
-	// Find Ok variant
 	for _, vr := range v.Variants {
 		if vr.Name == "Ok" && len(vr.Fields) > 0 {
 			return g.RecursionTypes(vr.Fields[0].Type, "", 0)
@@ -357,14 +403,12 @@ func (g *TSGen) Generate() string {
 	out.WriteString("// Auto-generated from ink! ABI\n")
 	out.WriteString("// DO NOT EDIT MANUALLY\n\n")
 
-	// Resolve all message return types first (populates definitions)
 	msgReturns := make(map[string]string)
 	for _, msg := range g.abi.Spec.Messages {
 		ret := g.GetReturnValue(msg)
 		msgReturns[msg.Label] = ret
 	}
 
-	// Emit definitions in deterministic order
 	var names []string
 	for n := range g.definitions {
 		names = append(names, n)
@@ -372,7 +416,6 @@ func (g *TSGen) Generate() string {
 	sort.Strings(names)
 	for _, name := range names {
 		body := g.definitions[name]
-		// Inline tuple / simple unions use type alias; structs use interface
 		if strings.HasPrefix(body, "{") && strings.HasSuffix(body, "}") {
 			out.WriteString(fmt.Sprintf("export interface %s %s\n\n", name, body))
 		} else {
@@ -380,7 +423,6 @@ func (g *TSGen) Generate() string {
 		}
 	}
 
-	// Emit per-message response types
 	for _, msg := range g.abi.Spec.Messages {
 		funcName := pascal(msg.Label)
 		ret := msgReturns[msg.Label]

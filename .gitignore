@@ -41,3 +41,5 @@ hack/node2/
 hack/contract_cache
 k8s.yaml
 ext/experimental/dss
+
+ink-abi-ts-gen
