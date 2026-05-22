@@ -177,11 +177,11 @@ func (g GatewayMutation) RevokeAPIKey(keyHash []byte) error {
 // ── Query: Single ────────────────────────────────────────
 
 func (g GatewayQuery) GetCredit(user model.UniAddr) (uint64, error) {
-	bal, err := g.credits.Get(g.api.GetTxn(), user)
-	if err != nil || bal == nil {
+	c, err := g.credits.Get(g.api.GetTxn(), user)
+	if err != nil || c == nil {
 		return 0, nil
 	}
-	return *bal, nil
+	return *c, nil
 }
 
 // LookupAPIKey TEE 提供方根据 hash 查找 API Key 对应的用户

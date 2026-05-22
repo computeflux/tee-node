@@ -1,5 +1,8 @@
 # API Key 设计文档
 
+> 最后更新：2026-05-21
+> 重要变更：统一为单一 API Key 鉴权，JWT 和 Legacy Polkadot 已移除
+
 ## 一、泳道图
 
 ```
@@ -18,7 +21,7 @@
     ═══════════════════════════ 日常调用 ═══════════════════════════
     │                              │                              │
     │  4. POST /v1/chat            │                              │
-    │     Header: X-API-Key ──────>│                              │
+    │     Header: Authorization: Bearer tee_xxx...               │
     │     Body: {model, messages}  │                              │
     │                              │  5. hash = blake2b(apiKey)   │
     │                              │     LookupAPIKey(hash) ─────>│
@@ -79,7 +82,48 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-## 三、合约接口
+## 三、统一鉴权原则
+
+### 3.1 唯一鉴权方式
+
+**所有接口统一使用 `Authorization: Bearer <apiKey>`**：
+
+| 接口类型 | 鉴权头 | 说明 |
+|---------|--------|------|
+| REST Gateway | `Authorization: Bearer tee_xxx...` | AI 模型请求转发 |
+| GraphQL | `Authorization: Bearer tee_xxx...` | Web3Auth / 秘密管理 |
+
+### 3.2 鉴权流程
+
+```
+Authorization: Bearer <apiKey>
+    │
+    v
+ 提取 apiKey（去掉 "Bearer " 前缀）
+    │
+    v
+ blake2b.Sum256(apiKey) → keyHash
+    │
+    v
+ GatewayLookupAPIKey(keyHash) [链上合约查询]
+    │
+    v
+ 验证 isActive == true
+ 验证 rateLimit 未超限
+    │
+    v
+ 鉴权通过，继续处理请求
+```
+
+### 3.3 已移除的鉴权方式
+
+| 鉴权方式 | 状态 | 说明 |
+|---------|:---:|:---|
+| JWT (GraphQL) | ❌ 已移除 | 原 `X-Token` header，现统一为 Bearer |
+| Legacy Polkadot | ❌ 已移除 | 原 `X-Signature` header，现统一为 Bearer |
+| API Key (REST) | ✅ 保留并统一 | 现为唯一鉴权方式 |
+
+## 四、合约接口
 
 ### 类型定义
 
@@ -117,7 +161,7 @@ type DailyUsage struct {
 ### Mutation（写操作）
 
 | 方法 | Selector | 参数 | 权限 | 说明 |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | `RegisterAPIKey` | `0x8edf9e30` | `keyHash [32]byte, rateLimit uint32` | 任意用户 | 注册 API Key 哈希 |
 | `RevokeAPIKey` | `0x97288469` | `keyHash [32]byte` | key 拥有者 | 吊销 API Key |
 | `SettleUsage` | `0x1b8ec9bd` | `records []Settlement` | Provider | 批量结算用户用量 |
@@ -139,69 +183,86 @@ cost = (tokensUsed + 999) / 1000 * model.PointsPer1K + model.PromptPricing
 if cost < 1 { cost = 1 }
 ```
 
-## 四、TEE 侧伪代码
+## 五、TEE 侧实现
+
+### 5.1 合约查询桥接
 
 ```go
-type TEEService struct {
-    chain    GatewayContract
-    usage    map[string]uint64  // owner.V → total tokens
+// pkg/api/gateway/contract.go
+
+// hashAPIKey 对明文 API Key 做 blake2b-256 哈希
+func hashAPIKey(key string) []byte {
+    h := blake2b.Sum256([]byte(key))
+    return h[:]
 }
 
-func (s *TEEService) HandleChat(w http.ResponseWriter, r *http.Request) {
-    apiKey := r.Header.Get("X-API-Key")
-
-    // 1. 查链上 key 信息
-    keyHash := blake2b.Sum256([]byte(apiKey))
-    info, err := s.chain.LookupAPIKey(keyHash)
-    if err != nil || info == nil || !info.IsActive {
-        http.Error(w, "unauthorized", 401)
-        return
+// LookupAPIKeyViaContract 通过合约查询 API Key 信息
+func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
+    bridge := getBridge()
+    hash := hashAPIKey(key)
+    
+    info, err := bridge.GatewayLookupAPIKey(hash)
+    if err != nil || info == nil {
+        return nil
     }
-
-    // 2. 限流检查
-    if !s.rateLimiter.Allow(info.Owner, info.RateLimit) {
-        http.Error(w, "rate limited", 429)
-        return
-    }
-
-    // 3. 转发到 AI 模型
-    model := resolveModel(r.Body)
-    resp := s.callAIModel(model, r.Body)
-
-    // 4. 记录用量（累加到内存）
-    s.mu.Lock()
-    s.usage[string(info.Owner.V)] += resp.TokensUsed
-    s.mu.Unlock()
-
-    // 5. 返回响应
-    writeResponse(w, resp)
-}
-
-// 每 5 分钟执行
-func (s *TEEService) SettleWorker() {
-    ticker := time.NewTicker(5 * time.Minute)
-    for range ticker.C {
-        s.mu.Lock()
-        usage := s.usage
-        s.usage = make(map[string]uint64)
-        s.mu.Unlock()
-
-        var records []Settlement
-        for ownerHex, tokens := range usage {
-            records = append(records, Settlement{
-                User:       decodeOwner(ownerHex),
-                ProviderID: s.providerID,
-                ModelID:    s.modelID,
-                TokensUsed: tokens,
-                Cost:       0, // 合约自动计算
-            })
-        }
-        s.chain.SettleUsage(records)
+    
+    return &model.GatewayTokenInfo{
+        Owner:     fmt.Sprintf("%x", info.Owner.V),
+        Key:       key,
+        RateLimit: info.RateLimit,
+        IsActive:  info.IsActive,
     }
 }
 ```
 
-## 五、安全待办
+### 5.2 鉴权中间件
+
+```go
+// pkg/api/gateway/auth_middleware.go
+
+func TokenAuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+        if key == "" {
+            writeError(w, 401, "missing api key", "auth_error")
+            return
+        }
+        
+        // 优先查合约
+        token := LookupAPIKeyViaContract(key)
+        if token == nil {
+            // Fallback: 本地 PebbleDB（legacy token）
+            token = FindTokenByKeyFallback(key)
+        }
+        
+        if token == nil || !token.IsActive {
+            writeError(w, 401, "invalid api key", "auth_error")
+            return
+        }
+        
+        ctx := context.WithValue(r.Context(), ctxToken, token)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+### 5.3 异步用量记录
+
+```go
+// pkg/api/gateway/optimizer.go
+
+func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint64) {
+    initUsageWriter()
+    select {
+    case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens}:
+    default:
+        GatewayLog().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)",
+            tokenID, providerID, tokens)
+    }
+}
+```
+
+## 六、安全待办
 
 | 项目 | 状态 | 说明 |
 |---|---|---|
@@ -211,7 +272,7 @@ func (s *TEEService) SettleWorker() {
 | 用量伪造 | 🔲 TODO | 需 TEE enclave 签名校验 |
 | apiKey 熵 | ⚠️ | 用户必须用 `"tee_" + rand(32B)`，禁止弱 key |
 
-## 六、API Key 格式规范
+## 七、API Key 格式规范
 
 ```
 格式:  tee_<64 hex chars>
@@ -220,6 +281,17 @@ func (s *TEEService) SettleWorker() {
 哈希:  blake2b.Sum256(apiKey) → [32]byte 上链
 ```
 
+## 八、日志记录
 
-perceptron/perceptron-mk1
-xiaobai/deepseek v4 pro
+所有 Gateway 相关日志（含鉴权）统一写入 `./logs/gateway.log`：
+
+```
+2026/05/21 15:00:00 [AUTH] token not found for key prefix: tee_a1b2c3...
+2026/05/21 15:00:01 [GATEWAY] contract lookup success: owner=0x... active=true
+2026/05/21 15:00:02 [HTTP] POST /v1/chat/completions | 200 | 1.234s | 192.168.1.1
+```
+
+---
+
+*文档生成/更新：2026-05-21*
+*基于代码版本：`tee-node` 项目当前仓库状态*
