@@ -1121,16 +1121,6 @@
         "args": [
           {
             "docs": [],
-            "label": "provider_i_d",
-            "type": {
-              "displayName": [
-                "u64"
-              ],
-              "type": 3
-            }
-          },
-          {
-            "docs": [],
             "label": "offset",
             "type": {
               "displayName": [
@@ -1234,6 +1224,32 @@
           "type": 41
         },
         "selector": "0xc89f2f8f"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "provider_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "list_provider_models",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 32
+        },
+        "selector": "0xcd2ef88d"
       },
       {
         "args": [

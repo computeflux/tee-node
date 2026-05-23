@@ -140,14 +140,48 @@ func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, erro
 	return vals, err
 }
 
-func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
-	return g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool { return m.IsActive })
+func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32) ([]ModelInfo, error) {
+	if uint64(len(ids)) <= offset {
+		return nil, nil
+	}
+	end := offset + uint64(limit)
+	if end > uint64(len(ids)) {
+		end = uint64(len(ids))
+	}
+	txn := g.api.GetTxn()
+	out := make([]ModelInfo, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		m, err := g.models.Get(txn, id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
 }
 
-func (g GatewayQuery) ListActiveModelsWithinProvider(providerID uint64, offset uint64, limit uint32) ([]ModelInfoWithProvider, error) {
-	models, err := g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool {
-		return m.IsActive && m.ProviderID == providerID
-	})
+func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+	if err != nil {
+		return nil, err
+	}
+	return g.listModelsByIDs(ids, offset, limit)
+}
+
+func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": providerID})
+	if err != nil {
+		return nil, err
+	}
+	return g.listModelsByIDs(ids, 0, 10000)
+}
+
+func (g GatewayQuery) ListActiveModelsWithinProvider(offset uint64, limit uint32) ([]ModelInfoWithProvider, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+	if err != nil {
+		return nil, err
+	}
+	models, err := g.listModelsByIDs(ids, offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -165,31 +199,6 @@ func (g GatewayQuery) ListActiveModelsWithinProvider(providerID uint64, offset u
 	return out, nil
 }
 
-func (g GatewayQuery) listModelsFiltered(
-	offset uint64, limit uint32, fn func(*ModelInfo) bool,
-) ([]ModelInfo, error) {
-	txn := g.api.GetTxn()
-	total, _ := g.models.Len(txn)
-	out := make([]ModelInfo, 0, limit)
-	var skipped, collected uint64
-	for i := uint64(0); i < uint64(total) && collected < uint64(limit); i++ {
-		m, err := g.models.Get(txn, i)
-		if err != nil || m == nil {
-			continue
-		}
-		if fn != nil && !fn(m) {
-			continue
-		}
-		if skipped < offset {
-			skipped++
-			continue
-		}
-		out = append(out, *m)
-		collected++
-	}
-	return out, nil
-}
-
 func (g GatewayQuery) GetModelCount() (uint64, error) {
 	return g.models.Len(g.api.GetTxn())
 }
@@ -199,24 +208,45 @@ func (g GatewayQuery) QueryModels(
 	minContext, maxContext, maxPrice uint64,
 	offset uint64, limit uint32,
 ) ([]ModelInfo, error) {
-	return g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool {
-		if !m.IsActive {
-			return false
+	txn := g.api.GetTxn()
+
+	filter := map[string]any{"IsActive": uint64(1)}
+	if minContext != 0 || maxContext != 0 {
+		filter["ContextLength"] = model.Range{Min: minContext, Max: maxContext}
+	}
+	if maxPrice != 0 {
+		filter["PromptPricing"] = model.Range{Min: 0, Max: maxPrice}
+	}
+
+	ids, err := g.models.Query(txn, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := g.listModelsByIDs(ids, 0, uint32(len(ids)))
+	if err != nil {
+		return nil, err
+	}
+
+	// 按位查询无法用 exact 索引，需二次过滤
+	if modalities != 0 {
+		filtered := make([]ModelInfo, 0, len(models))
+		for _, m := range models {
+			if m.InputModalities&modalities != 0 {
+				filtered = append(filtered, m)
+			}
 		}
-		if modalities != 0 && m.InputModalities&modalities == 0 {
-			return false
-		}
-		if minContext != 0 && m.ContextLength < minContext {
-			return false
-		}
-		if maxContext != 0 && m.ContextLength > maxContext {
-			return false
-		}
-		if maxPrice != 0 && m.PromptPricing > maxPrice {
-			return false
-		}
-		return true
-	})
+		models = filtered
+	}
+
+	if uint64(len(models)) <= offset {
+		return nil, nil
+	}
+	end := offset + uint64(limit)
+	if end > uint64(len(models)) {
+		end = uint64(len(models))
+	}
+	return models[offset:end], nil
 }
 
 // GetModelsByProvider 返回某个 Provider 注册的所有模型（使用 ProviderID exact 索引）

@@ -55,7 +55,7 @@ type ModelInfo struct {
 	Owner           model.UniAddr `json:"owner"`
 	ProviderID      uint64        `json:"providerId" idx:"exact"` // 所属 Provider
 	PointsPer1K     uint64        `json:"pointsPer1K"`
-	IsActive        bool          `json:"isActive"`
+	IsActive        bool          `json:"isActive" idx:"exact"`
 	CreatedAt       uint64        `json:"createdAt"`
 	InputModalities uint8         `json:"inputModalities" idx:"exact"`
 	ContextLength   uint64        `json:"contextLength"   idx:"bucket:4000,8000,16000,32000,64000,128000,256000,512000,1000000"`
@@ -103,7 +103,7 @@ type ProviderInfo struct {
 	UptimeSLA     uint32 `json:"uptimeSLA"`     // 承诺可用率（基点，9990=99.9%）
 
 	// ── 状态 ──
-	IsActive  bool   `json:"isActive"`
+	IsActive  bool   `json:"isActive" idx:"exact"`
 	CreatedAt uint64 `json:"createdAt"`
 }
 

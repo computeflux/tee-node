@@ -505,22 +505,18 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc3, 0xef, 0x49, 0x0c}:
-		if err := model.RequireArgLen(args, 3, "list_active_models_within_provider"); err != nil {
+		if err := model.RequireArgLen(args, 2, "list_active_models_within_provider"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("list_active_models_within_provider: providerID: %w", err)
-		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: limit: %w", err)
 		}
-		out, err := q.ListActiveModelsWithinProvider(providerID, offset, limit)
+		out, err := q.ListActiveModelsWithinProvider(offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -555,6 +551,19 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("list_models: limit: %w", err)
 		}
 		out, err := q.ListModels(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xcd, 0x2e, 0xf8, 0x8d}:
+		if err := model.RequireArgLen(args, 1, "list_provider_models"); err != nil {
+			return nil, err
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_provider_models: providerID: %w", err)
+		}
+		out, err := q.ListProviderModels(providerID)
 		if err != nil {
 			return nil, err
 		}
@@ -664,6 +673,7 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0xc3, 0xef, 0x49, 0x0c}: "list_active_models_within_provider",
 	[4]byte{0xbd, 0x24, 0x20, 0x9b}: "list_active_providers",
 	[4]byte{0xc1, 0x51, 0x1f, 0xbf}: "list_models",
+	[4]byte{0xcd, 0x2e, 0xf8, 0x8d}: "list_provider_models",
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",

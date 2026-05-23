@@ -74,6 +74,8 @@ func newIdxRegistry[ID IdxID, V any](namespace, prefix string) *idxRegistry[ID, 
 			switch f.Type.Kind() {
 			case reflect.String:
 				r.strIndexes[f.Name] = NewStoreIndex[string, ID](namespace, idxPrefix)
+			case reflect.Bool:
+				fallthrough
 			case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 				r.exactIndexes[f.Name] = NewStoreIndex[uint64, ID](namespace, idxPrefix)
 			default:
@@ -329,6 +331,11 @@ func fieldUint64(rv reflect.Value, name string) uint64 {
 	switch f.Kind() {
 	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return f.Uint()
+	case reflect.Bool:
+		if f.Bool() {
+			return 1
+		}
+		return 0
 	default:
 		panic(fmt.Sprintf("idx tag: field %q is not a uint type", name))
 	}

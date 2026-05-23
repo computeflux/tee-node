@@ -104,38 +104,37 @@ func (g GatewayQuery) GetProviderCount() (uint64, error) {
 	return g.providers.Len(g.api.GetTxn())
 }
 
+func (g GatewayQuery) listProvidersByIDs(ids []uint64, offset uint64, limit uint32) ([]ProviderInfo, error) {
+	if uint64(len(ids)) <= offset {
+		return nil, nil
+	}
+	end := offset + uint64(limit)
+	if end > uint64(len(ids)) {
+		end = uint64(len(ids))
+	}
+	txn := g.api.GetTxn()
+	out := make([]ProviderInfo, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		p, err := g.providers.Get(txn, id)
+		if err != nil || p == nil {
+			continue
+		}
+		out = append(out, *p)
+	}
+	return out, nil
+}
+
 func (g GatewayQuery) ListProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
 	_, vals, err := g.providers.List(g.api.GetTxn(), offset, limit)
 	return vals, err
 }
 
 func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
-	return g.listProvidersFiltered(offset, limit, func(ch *ProviderInfo) bool { return ch.IsActive })
-}
-
-func (g GatewayQuery) listProvidersFiltered(
-	offset uint64, limit uint32, fn func(*ProviderInfo) bool,
-) ([]ProviderInfo, error) {
-	txn := g.api.GetTxn()
-	total, _ := g.providers.Len(txn)
-	out := make([]ProviderInfo, 0, limit)
-	var skipped, collected uint64
-	for i := uint64(0); i < total && collected < uint64(limit); i++ {
-		ch, err := g.providers.Get(txn, i)
-		if err != nil || ch == nil {
-			continue
-		}
-		if fn != nil && !fn(ch) {
-			continue
-		}
-		if skipped < offset {
-			skipped++
-			continue
-		}
-		out = append(out, *ch)
-		collected++
+	ids, err := g.providers.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return g.listProvidersByIDs(ids, offset, limit)
 }
 
 // GetProviderByName 返回指定名称的所有 Provider（使用 Name exact 索引）
