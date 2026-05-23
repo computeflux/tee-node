@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -33,14 +34,16 @@ var (
 type Gateway struct {
 	api model.ContractApi
 
-	credits         *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:credits"`
-	models          *model.IndexedList[uint64, ModelInfo]      `store:"keyPfx:v0_models"`
-	providers       *model.IndexedList[uint64, ProviderInfo]   `store:"keyPfx:v0_providers"`
-	providerByOwner *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:v0_provider_by_owner"` // owner → providerID（一人一 provider）
-	providerCredits *model.StoreMapping[uint64, uint64]        // providerID → accumulated credits
-	apiKeys         *model.IndexedStore[string, APIKeyInfo]    // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
-	usages          *model.StoreMapping[string, DailyUsage]
-	encryptedKeys   *model.StoreMapping[string, EncryptedAPIKey] // ref → EncryptedAPIKey
+	credits           *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:credits"`
+	models            *model.IndexedList[uint64, ModelInfo]      `store:"keyPfx:v0_models"`
+	providers         *model.IndexedList[uint64, ProviderInfo]   `store:"keyPfx:v0_providers"`
+	providerByOwner   *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:v0_provider_by_owner"` // owner → providerID（一人一 provider）
+	providerCredits   *model.StoreMapping[uint64, uint64]        // providerID → accumulated credits
+	apiKeys           *model.IndexedStore[string, APIKeyInfo]    // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
+	usages            *model.StoreMapping[string, DailyUsage]
+	encryptedKeys     *model.StoreMapping[string, EncryptedAPIKey]              // ref → EncryptedAPIKey
+	rechargeHistory   *model.StoreList2D[model.UniAddr, uint32, RechargeRecord] // user → []RechargeRecord
+	settlementHistory *model.StoreList2D[uint64, uint32, SettlementRecord]      // providerID → []SettlementRecord
 }
 
 type GatewayQuery struct{ Gateway }
@@ -64,7 +67,19 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 		bal = new(uint64)
 	}
 	*bal += amount
-	return g.credits.Set(g.api.GetTxn(), user, *bal)
+	if err := g.credits.Set(g.api.GetTxn(), user, *bal); err != nil {
+		return err
+	}
+
+	// 记录充值历史
+	day := fmt.Sprintf("%d", g.api.GetHeight()/7200) // 约每日一个区块高度周期
+	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
+		User:   user,
+		Amount: amount,
+		Day:    day,
+		Block:  g.api.GetHeight(),
+	})
+	return nil
 }
 
 // ── Billing ──────────────────────────────────────────────
@@ -124,6 +139,18 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		usage.TokensUsed += r.TokensUsed
 		usage.PointsUsed += cost
 		g.usages.Set(g.api.GetTxn(), dayKey, *usage)
+
+		// 记录结算历史
+		day := fmt.Sprintf("%d", g.api.GetHeight()/7200)
+		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, SettlementRecord{
+			ProviderID: r.ProviderID,
+			User:       r.User,
+			ModelID:    r.ModelID,
+			TokensUsed: r.TokensUsed,
+			Cost:       cost,
+			Day:        day,
+			Block:      g.api.GetHeight(),
+		})
 	}
 	return nil
 }
@@ -231,4 +258,62 @@ func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {
 		return 0, nil
 	}
 	return *bal, nil
+}
+
+// ── Query: History ───────────────────────────────────────
+
+// GetRechargeHistory 查询用户充值历史（按时间倒序）
+func (g GatewayQuery) GetRechargeHistory(user model.UniAddr, offset uint64, limit uint32) ([]RechargeRecord, error) {
+	_, records, err := g.rechargeHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
+	if err != nil {
+		return nil, err
+	}
+	// DescList 从最新开始返回，若 offset > 0 需要跳过前面条目
+	if int(offset) >= len(records) {
+		return []RechargeRecord{}, nil
+	}
+	return records[offset:], nil
+}
+
+// GetSettlementHistory 查询 Provider 结算历史（按时间倒序）
+func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]SettlementRecord, error) {
+	_, records, err := g.settlementHistory.DescList(g.api.GetTxn(), providerID, (*uint32)(nil), limit)
+	if err != nil {
+		return nil, err
+	}
+	if int(offset) >= len(records) {
+		return []SettlementRecord{}, nil
+	}
+	return records[offset:], nil
+}
+
+// GetUsageHistory 查询用户在某 Provider+Model 上的用量历史（按日聚合）
+// providerID=0 且 modelID=0 时查询该用户所有 Provider+Model 的用量。
+func (g GatewayQuery) GetUsageHistory(user model.UniAddr, providerID uint64, modelID uint64, startDay string, endDay string) ([]DailyUsage, error) {
+	var prefix string
+	if providerID == 0 && modelID == 0 {
+		prefix = fmt.Sprintf("gateway:usage_%x_", user.V)
+	} else {
+		prefix = fmt.Sprintf("gateway:usage_%x_%d_%d_", user.V, providerID, modelID)
+	}
+	_, vals, err := g.api.GetTxn().ListByPrefix([]byte(prefix))
+	if err != nil {
+		return nil, err
+	}
+	var out []DailyUsage
+	for _, v := range vals {
+		var u DailyUsage
+		if err := json.Unmarshal(v, &u); err != nil {
+			continue
+		}
+		if u.Day >= startDay && u.Day <= endDay {
+			out = append(out, u)
+		}
+	}
+	return out, nil
+}
+
+// GetAllUsageByUser 查询用户的全部用量历史（不区分 Provider/Model，按日聚合）
+func (g GatewayQuery) GetAllUsageByUser(user model.UniAddr, startDay string, endDay string) ([]DailyUsage, error) {
+	return g.GetUsageHistory(user, 0, 0, startDay, endDay)
 }

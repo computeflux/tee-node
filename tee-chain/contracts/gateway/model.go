@@ -144,6 +144,27 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 	return g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool { return m.IsActive })
 }
 
+func (g GatewayQuery) ListActiveModelsWithinProvider(providerID uint64, offset uint64, limit uint32) ([]ModelInfoWithProvider, error) {
+	models, err := g.listModelsFiltered(offset, limit, func(m *ModelInfo) bool {
+		return m.IsActive && m.ProviderID == providerID
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ModelInfoWithProvider, 0, len(models))
+	for i := range models {
+		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].ProviderID)
+		if prov == nil {
+			continue
+		}
+		out = append(out, ModelInfoWithProvider{
+			Model:    models[i],
+			Provider: *prov,
+		})
+	}
+	return out, nil
+}
+
 func (g GatewayQuery) listModelsFiltered(
 	offset uint64, limit uint32, fn func(*ModelInfo) bool,
 ) ([]ModelInfo, error) {

@@ -273,6 +273,27 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
+	case [4]byte{0x19, 0x9f, 0xb9, 0xbe}:
+		if err := model.RequireArgLen(args, 3, "get_all_usage_by_user"); err != nil {
+			return nil, err
+		}
+		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_all_usage_by_user: user: %w", err)
+		}
+		startDay, err := model.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_all_usage_by_user: startDay: %w", err)
+		}
+		endDay, err := model.DecodeScaleArgBytes[string](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_all_usage_by_user: endDay: %w", err)
+		}
+		out, err := q.GetAllUsageByUser(user, startDay, endDay)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
 	case [4]byte{0x04, 0x60, 0x1f, 0xca}:
 		if err := model.RequireArgLen(args, 1, "get_credit"); err != nil {
 			return nil, err
@@ -395,6 +416,77 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
+	case [4]byte{0xc8, 0x9f, 0x2f, 0x8f}:
+		if err := model.RequireArgLen(args, 3, "get_recharge_history"); err != nil {
+			return nil, err
+		}
+		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_recharge_history: user: %w", err)
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_recharge_history: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_recharge_history: limit: %w", err)
+		}
+		out, err := q.GetRechargeHistory(user, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0x74, 0xd5, 0x99, 0xfb}:
+		if err := model.RequireArgLen(args, 3, "get_settlement_history"); err != nil {
+			return nil, err
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_settlement_history: providerID: %w", err)
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_settlement_history: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_settlement_history: limit: %w", err)
+		}
+		out, err := q.GetSettlementHistory(providerID, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xed, 0x59, 0xef, 0x8b}:
+		if err := model.RequireArgLen(args, 5, "get_usage_history"); err != nil {
+			return nil, err
+		}
+		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_usage_history: user: %w", err)
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_usage_history: providerID: %w", err)
+		}
+		modelID, err := model.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_usage_history: modelID: %w", err)
+		}
+		startDay, err := model.DecodeScaleArgBytes[string](args[3])
+		if err != nil {
+			return nil, fmt.Errorf("get_usage_history: startDay: %w", err)
+		}
+		endDay, err := model.DecodeScaleArgBytes[string](args[4])
+		if err != nil {
+			return nil, fmt.Errorf("get_usage_history: endDay: %w", err)
+		}
+		out, err := q.GetUsageHistory(user, providerID, modelID, startDay, endDay)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
 	case [4]byte{0xda, 0xa1, 0xc2, 0xd5}:
 		if err := model.RequireArgLen(args, 2, "list_active_models"); err != nil {
 			return nil, err
@@ -408,6 +500,27 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("list_active_models: limit: %w", err)
 		}
 		out, err := q.ListActiveModels(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xc3, 0xef, 0x49, 0x0c}:
+		if err := model.RequireArgLen(args, 3, "list_active_models_within_provider"); err != nil {
+			return nil, err
+		}
+		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: providerID: %w", err)
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: offset: %w", err)
+		}
+		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: limit: %w", err)
+		}
+		out, err := q.ListActiveModelsWithinProvider(providerID, offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -516,20 +629,23 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 
 func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
-		api:             api,
-		credits:         &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
-		models:          model.NewIndexedList[uint64, ModelInfo]("gateway", "v0_models_next_id", "v0_models_"),
-		providers:       model.NewIndexedList[uint64, ProviderInfo]("gateway", "v0_providers_next_id", "v0_providers_"),
-		providerByOwner: &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v0_provider_by_owner_"},
-		providerCredits: &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
-		apiKeys:         model.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
-		usages:          &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
-		encryptedKeys:   &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "encrypted_key_"},
+		api:               api,
+		credits:           &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
+		models:            model.NewIndexedList[uint64, ModelInfo]("gateway", "v0_models_next_id", "v0_models_"),
+		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "v0_providers_next_id", "v0_providers_"),
+		providerByOwner:   &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v0_provider_by_owner_"},
+		providerCredits:   &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
+		apiKeys:           model.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
+		usages:            &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
+		encryptedKeys:     &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "encrypted_key_"},
+		rechargeHistory:   model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "recharge_history_k1_to_id_", "recharge_history_k1_length_", "recharge_history_k2_next_", "recharge_history_store_"),
+		settlementHistory: model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "settlement_history_k1_to_id_", "settlement_history_k1_length_", "settlement_history_k2_next_", "settlement_history_store_"),
 	}
 }
 
 var MethodMap = map[[4]byte]string{
 	[4]byte{0x42, 0xcc, 0x03, 0xe6}: "get_a_p_i_keys_by_owner",
+	[4]byte{0x19, 0x9f, 0xb9, 0xbe}: "get_all_usage_by_user",
 	[4]byte{0x04, 0x60, 0x1f, 0xca}: "get_credit",
 	[4]byte{0x08, 0xfd, 0x68, 0x35}: "get_encrypted_a_p_i_key",
 	[4]byte{0xd3, 0xff, 0x81, 0xe9}: "get_model",
@@ -541,7 +657,11 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x55, 0xc0, 0x48, 0x47}: "get_provider_by_owner",
 	[4]byte{0x46, 0x7c, 0x95, 0xd9}: "get_provider_count",
 	[4]byte{0xad, 0x4c, 0x38, 0xcd}: "get_provider_credit",
+	[4]byte{0xc8, 0x9f, 0x2f, 0x8f}: "get_recharge_history",
+	[4]byte{0x74, 0xd5, 0x99, 0xfb}: "get_settlement_history",
+	[4]byte{0xed, 0x59, 0xef, 0x8b}: "get_usage_history",
 	[4]byte{0xda, 0xa1, 0xc2, 0xd5}: "list_active_models",
+	[4]byte{0xc3, 0xef, 0x49, 0x0c}: "list_active_models_within_provider",
 	[4]byte{0xbd, 0x24, 0x20, 0x9b}: "list_active_providers",
 	[4]byte{0xc1, 0x51, 0x1f, 0xbf}: "list_models",
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",

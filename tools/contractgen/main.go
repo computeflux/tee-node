@@ -736,14 +736,23 @@ type storeValueField struct {
 
 // storeField 表示一个存储字段（StoreMapping 或 StoreValue）
 type storeField struct {
-	isMapping bool              // 是否为 StoreMapping
-	isValue   bool              // 是否为 StoreValue
-	isList    bool              // 是否为 StoreList
-	isList2D  bool              // 是否为 StoreList2D
-	mapping   storeMappingField // StoreMapping 字段
-	value     storeValueField   // StoreValue 字段
-	list      storeListField    // StoreList 字段
-	list2D    storeList2DField  // StoreList2D 字段
+	isMapping      bool                   // 是否为 StoreMapping
+	isValue        bool                   // 是否为 StoreValue
+	isList         bool                   // 是否为 StoreList
+	isList2D       bool                   // 是否为 StoreList2D
+	isIndexedStore bool                   // 是否为 IndexedStore
+	mapping        storeMappingField      // StoreMapping 字段
+	value          storeValueField        // StoreValue 字段
+	list           storeListField         // StoreList 字段
+	list2D         storeList2DField       // StoreList2D 字段
+	indexedStore   storeIndexedStoreField // IndexedStore 字段
+}
+
+type storeIndexedStoreField struct {
+	name    string // 字段名
+	idType  string // ID 类型
+	valType string // V 类型
+	prefix  string // prefix
 }
 
 type storeListField struct {
@@ -863,6 +872,24 @@ func parseStructFields(st *ast.StructType, fset *token.FileSet) []storeField {
 					keyPfx:    keyPfx,
 				},
 			})
+			continue
+		}
+
+		// 尝试解析 IndexedStore 类型
+		if idType, valType, ok := parseIndexedStoreType(typStr); ok {
+			keyPfx := extractKeyPrefix(field, "keyPfx")
+			if keyPfx == "" {
+				keyPfx = storeKeyPrefix(fieldName)
+			}
+			fields = append(fields, storeField{
+				isIndexedStore: true,
+				indexedStore: storeIndexedStoreField{
+					name:    fieldName,
+					idType:  idType,
+					valType: valType,
+					prefix:  keyPfx,
+				},
+			})
 		}
 	}
 	return fields
@@ -953,6 +980,17 @@ func parseIndexedListType(typ string) (key, val string, ok bool) {
 		return "", "", false
 	}
 	return k, v, true
+}
+
+// parseIndexedStoreType 解析 *model.IndexedStore[ID, V] 或 model.IndexedStore[ID, V] 类型
+func parseIndexedStoreType(typ string) (idType, valType string, ok bool) {
+	typ = strings.TrimSpace(typ)
+	typ = strings.TrimPrefix(typ, "*")
+	if !strings.HasPrefix(typ, "model.IndexedStore[") || !strings.HasSuffix(typ, "]") {
+		return "", "", false
+	}
+	inner := typ[len("model.IndexedStore[") : len(typ)-1]
+	return parseTypePair(inner)
 }
 
 // parseStoreList2DType 解析 *model.StoreList2D[K1, Ix, V] 类型，返回 K1, Ix, V 类型字符串
@@ -1139,6 +1177,11 @@ func writeConstructor(buf *bytes.Buffer, structName, ctorName, pkgName string, f
 			fmt.Fprintf(buf, "\t\t%s: model.NewStoreList2D[%s, %s, %s](%q, %q, %q, %q, %q),\n",
 				f.list2D.name, f.list2D.key1Type, f.list2D.indexType, f.list2D.valType,
 				pkgName, prefixK1ToID, prefixK1Length, prefixK2NextID, prefixStore)
+		} else if f.isIndexedStore {
+			// IndexedStore 使用 NewIndexedStore 构造函数
+			fmt.Fprintf(buf, "\t\t%s: model.NewIndexedStore[%s, %s](%q, %q),\n",
+				f.indexedStore.name, f.indexedStore.idType, f.indexedStore.valType,
+				pkgName, f.indexedStore.prefix)
 		}
 	}
 	fmt.Fprintf(buf, "\t}\n")

@@ -21,16 +21,29 @@ func RegisterGatewayRoutes(r chi.Router) {
 		r.Use(GzipDecodeMiddleware)
 		r.Use(RateLimitMiddleware(60, time.Minute))
 		r.Use(CacheMiddleware)
-		r.Use(TokenAuthMiddleware)
-		r.Use(DistributeMiddleware)
 
-		r.Post("/chat/completions", HandleRelay)
-		r.Post("/completions", HandleRelay)
-		r.Post("/embeddings", HandleRelay)
-		r.Post("/images/generations", HandleRelay)
-		r.Post("/audio/speech", HandleRelay)
-		r.Post("/audio/transcriptions", HandleRelay)
+		// 公开端点（模型列表）
 		r.Get("/models", HandleListModels)
+
+		// 需要 Token 认证的端点
+		r.Group(func(r chi.Router) {
+			r.Use(TokenAuthMiddleware)
+
+			// AI 调用（需要 DistributeMiddleware 做模型路由）
+			r.Group(func(r chi.Router) {
+				r.Use(DistributeMiddleware)
+				r.Post("/chat/completions", HandleRelay)
+				r.Post("/completions", HandleRelay)
+				r.Post("/embeddings", HandleRelay)
+				r.Post("/images/generations", HandleRelay)
+				r.Post("/audio/speech", HandleRelay)
+				r.Post("/audio/transcriptions", HandleRelay)
+			})
+
+			// 历史查询（不需要 DistributeMiddleware）
+			r.Get("/logs", HandleLogs)
+			r.Post("/data/export", HandleDataExport)
+		})
 	})
 }
 

@@ -68,6 +68,11 @@ type ModelInfo struct {
 	APIKeyRefs   []string `json:"apiKeyRefs,omitempty"` // 引用标识列表，指向 EncryptedAPIKey
 }
 
+type ModelInfoWithProvider struct {
+	Model    ModelInfo
+	Provider ProviderInfo
+}
+
 // ── Provider / Channel ──────────────────────────────────
 
 // ProviderInfo 去中心化 AI 服务提供者
@@ -135,4 +140,27 @@ type DailyUsage struct {
 	Count      uint64        `json:"count"`
 	TokensUsed uint64        `json:"tokensUsed"`
 	PointsUsed uint64        `json:"pointsUsed"`
+}
+
+// ── RechargeHistory ──────────────────────────────────────
+
+// RechargeRecord 单笔充值记录
+type RechargeRecord struct {
+	User   model.UniAddr `json:"user"`
+	Amount uint64        `json:"amount"`
+	Day    string        `json:"day"`
+	Block  int64         `json:"block"`
+}
+
+// ── SettlementHistory ────────────────────────────────────
+
+// SettlementRecord 单笔结算记录（Provider 视角）
+type SettlementRecord struct {
+	ProviderID uint64        `json:"providerId"`
+	User       model.UniAddr `json:"user"`
+	ModelID    uint64        `json:"modelId"`
+	TokensUsed uint64        `json:"tokensUsed"`
+	Cost       uint64        `json:"cost"`
+	Day        string        `json:"day"`
+	Block      int64         `json:"block"`
 }
