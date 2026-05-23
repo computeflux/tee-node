@@ -427,10 +427,9 @@ func (dkg *DKG) ToNewEpoch() {
 	dkg.mu.Lock()
 	edShare := dkg.NewDkgKeyShares[model.SuiteEd25519]
 	if edShare == nil {
-		dkg.mu.Unlock()
-		util.LogWithRed("DKG consensus ToNewEpoch", "failed <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< New Epoch", dkg.NewEpoch)
 		failBack := dkg.consensusFailBack
 		dkg.mu.Unlock()
+		util.LogWithRed("DKG consensus ToNewEpoch", "failed <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< New Epoch", dkg.NewEpoch)
 		if failBack != nil {
 			failBack(errors.New("DKG consensus failed"))
 		}

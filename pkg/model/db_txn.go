@@ -79,6 +79,46 @@ func (txn *Txn) ListByPrefix(prefix []byte) ([][]byte, [][]byte, error) {
 	return keys, list, nil
 }
 
+// ListByPrefixLimit 带 offset/limit 的 prefix 扫描，返回 key 和 value 列表。
+// offset 为跳过的条目数，limit 为最大返回数（0 表示无限制）。
+func (txn *Txn) ListByPrefixLimit(prefix []byte, offset, limit uint64) ([][]byte, [][]byte, error) {
+	iter, err := txn.in.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: keyUpperBound(prefix),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer iter.Close()
+
+	var keys [][]byte
+	var list [][]byte
+	var skipped uint64
+	for iter.First(); iter.Valid(); iter.Next() {
+		if offset > 0 {
+			if skipped < offset {
+				skipped++
+				continue
+			}
+		}
+		if limit > 0 && uint64(len(keys)) >= limit {
+			break
+		}
+		key := iter.Key()
+		keyCopy := make([]byte, len(key))
+		copy(keyCopy, key)
+
+		v := iter.Value()
+		decrypted, err := util.Unseal(v, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		list = append(list, decrypted)
+		keys = append(keys, keyCopy)
+	}
+	return keys, list, nil
+}
+
 func (txn *Txn) Delete(key []byte) error {
 	return txn.in.Delete(key, pebble.Sync)
 }

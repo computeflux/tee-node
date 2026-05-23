@@ -58,8 +58,8 @@ type ModelInfo struct {
 	IsActive        bool          `json:"isActive" idx:"exact"`
 	CreatedAt       uint64        `json:"createdAt"`
 	InputModalities uint8         `json:"inputModalities" idx:"exact"`
-	ContextLength   uint64        `json:"contextLength"   idx:"bucket:4000,8000,16000,32000,64000,128000,256000,512000,1000000"`
-	PromptPricing   uint64        `json:"promptPricing"   idx:"bucket:1,5,10,50,100,500,1000,5000,10000"`
+	ContextLength   uint64        `json:"contextLength"   idx:"range"`
+	PromptPricing   uint64        `json:"promptPricing"   idx:"range"`
 
 	// 供应商配置
 	ProviderType uint16   `json:"providerType"`         // 供应商类型 (openai, claude, ...)

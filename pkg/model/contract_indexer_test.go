@@ -13,10 +13,10 @@ import (
 
 type testProduct struct {
 	Name     string `json:"name"`
-	Category uint8  `idx:"exact"`                     // 精确索引
-	Price    uint64 `idx:"bucket:10,50,100,500,1000"` // 分桶索引
-	Stock    uint64 `idx:"bucket:5,20,100,500"`       // 分桶索引
-	IsActive bool   `json:"isActive"`
+	Category uint8  `idx:"exact"`                 // 精确索引
+	Price    uint64 `idx:"range"`                 // 范围索引
+	Stock    uint64 `idx:"range"`                 // 范围索引
+	IsActive bool   `json:"isActive" idx:"exact"` // bool 精确索引
 }
 
 // =============================================================================
@@ -263,7 +263,7 @@ func TestIndexedStore_QueryBadField(t *testing.T) {
 
 	_, err := store.Query(txn, map[string]any{"NoSuchField": uint64(1)})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no exact index")
+	require.Contains(t, err.Error(), "no exact/range index")
 }
 
 func TestIndexedStore_QueryBadFilterType(t *testing.T) {
@@ -274,7 +274,7 @@ func TestIndexedStore_QueryBadFilterType(t *testing.T) {
 
 	_, err := store.Query(txn, map[string]any{"Category": "not_a_number"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported filter type")
+	require.Contains(t, err.Error(), "no string index")
 }
 
 // =============================================================================
@@ -545,6 +545,382 @@ func TestIndexedList_StoreListMethods(t *testing.T) {
 	v, err := list.GetOrDefault(txn, 99, def)
 	require.NoError(t, err)
 	require.Equal(t, "default", v.Name)
+}
+
+// =============================================================================
+// 复杂索引测试
+// =============================================================================
+
+// ── Bool exact 索引 ──────────────────────────────────────
+
+func TestIndexedList_QueryBool(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	list := NewIndexedList[uint64, testProduct]("test", "next_id", "item_")
+
+	_, _ = list.Insert(txn, testProduct{Name: "A", Category: 1, IsActive: true})
+	_, _ = list.Insert(txn, testProduct{Name: "B", Category: 2, IsActive: false})
+	_, _ = list.Insert(txn, testProduct{Name: "C", Category: 1, IsActive: true})
+	_, _ = list.Insert(txn, testProduct{Name: "D", Category: 2, IsActive: false})
+
+	// IsActive=true (1)
+	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0, 2}, ids)
+
+	// IsActive=false (0)
+	ids, err = list.Query(txn, map[string]any{"IsActive": uint64(0)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 3}, ids)
+
+	// bool + exact 组合: Category=1 AND IsActive=true
+	ids, err = list.Query(txn, map[string]any{
+		"Category": uint64(1),
+		"IsActive": uint64(1),
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0, 2}, ids)
+
+	// bool + bucket 组合: IsActive=true AND Price≤50
+	err = list.UpdateFn(txn, 0, func(cur *testProduct) { cur.Price = 25 })
+	require.NoError(t, err)
+	err = list.UpdateFn(txn, 2, func(cur *testProduct) { cur.Price = 200 })
+	require.NoError(t, err)
+	ids, err = list.Query(txn, map[string]any{
+		"IsActive": uint64(1),
+		"Price":    Range{Min: 0, Max: 50},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0}, ids)
+}
+
+// ── 大规模数据索引一致性 ─────────────────────────────────
+
+func TestIndexedList_LargeScaleConsistency(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	list := NewIndexedList[uint64, testProduct]("test", "next_id", "item_")
+
+	const n = 500
+	for i := 0; i < n; i++ {
+		_, err := list.Insert(txn, testProduct{
+			Name:     "Item",
+			Category: uint8(i % 10),
+			Price:    uint64(i * 10),
+			Stock:    uint64(i % 100),
+			IsActive: i%3 == 0,
+		})
+		require.NoError(t, err)
+	}
+
+	// 验证每个 Category 的计数
+	for cat := 0; cat < 10; cat++ {
+		ids, err := list.Query(txn, map[string]any{"Category": uint64(cat)})
+		require.NoError(t, err)
+		require.Len(t, ids, n/10, "Category %d count mismatch", cat)
+	}
+
+	// 验证 IsActive=true 的计数 (i%3==0 → 约 1/3)
+	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.Len(t, ids, 167) // 500/3 ≈ 166.67
+
+	// 验证组合查询: Category=5 AND IsActive=true
+	ids, err = list.Query(txn, map[string]any{
+		"Category": uint64(5),
+		"IsActive": uint64(1),
+	})
+	require.NoError(t, err)
+	// i%10==5 的有 50 个，其中 i%3==0 的有 i=15,45,75... 共约 17 个
+	require.Len(t, ids, 17)
+}
+
+// ── RebuildIndex 历史数据补偿 ────────────────────────────
+
+func TestIndexedList_RebuildIndex(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	list := NewIndexedList[uint64, testProduct]("test", "next_id", "item_")
+
+	// 先插入数据（此时 IsActive 有 idx tag，会正常建索引）
+	_, _ = list.Insert(txn, testProduct{Name: "A", Category: 1, IsActive: true})
+	_, _ = list.Insert(txn, testProduct{Name: "B", Category: 2, IsActive: false})
+
+	// 确认索引正常
+	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0}, ids)
+
+	// 模拟"新增 idx tag"：删除索引后重建
+	// 先通过 Clear + Insert 模拟无索引状态
+	// 实际场景: 给已有字段新增 idx tag 后调用 RebuildIndex
+	list2 := NewIndexedList[uint64, testProduct]("test", "next_id2", "item2_")
+	_, _ = list2.Insert(txn, testProduct{Name: "X", Category: 3, IsActive: true})
+	_, _ = list2.Insert(txn, testProduct{Name: "Y", Category: 3, IsActive: true})
+	_, _ = list2.Insert(txn, testProduct{Name: "Z", Category: 3, IsActive: false})
+
+	// RebuildIndex 后应能正常查询
+	err = list2.RebuildIndex(txn)
+	require.NoError(t, err)
+
+	ids, err = list2.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0, 1}, ids)
+
+	ids, err = list2.Query(txn, map[string]any{"Category": uint64(3)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0, 1, 2}, ids)
+}
+
+// ── 范围边界值查询 ─────────────────────────────────────────
+//
+// range 索引使用固定宽度字典序 key，零假阳性：
+//   - 精确匹配范围边界
+//   - 无漏报、无假阳性
+
+func TestIndexedStore_QueryRangeEdgeCases(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
+
+	require.NoError(t, store.Put(txn, 1, testProduct{Price: 10}))
+	require.NoError(t, store.Put(txn, 2, testProduct{Price: 11}))
+	require.NoError(t, store.Put(txn, 3, testProduct{Price: 50}))
+	require.NoError(t, store.Put(txn, 4, testProduct{Price: 51}))
+	require.NoError(t, store.Put(txn, 5, testProduct{Price: 0}))
+	require.NoError(t, store.Put(txn, 6, testProduct{Price: 1000}))
+	require.NoError(t, store.Put(txn, 7, testProduct{Price: 1001}))
+
+	// Price ≤ 50 → 精确包含 0,10,11,50
+	ids, err := store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 50}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 2, 3, 5}, ids)
+
+	// 精确点查：Price=50
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 50, Max: 50}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{3}, ids)
+
+	// 下界查询：Price > 500 (Min=501, Max=0)
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 501, Max: 0}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{6, 7}, ids)
+
+	// 超大数据查询：Price > 1000 → 包含 Price=1001
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 1001, Max: 0}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{7}, ids)
+}
+
+// ── 多字段交集正确性 ─────────────────────────────────────
+
+func TestIndexedStore_QueryMultiFieldIntersection(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
+
+	// 构造数据矩阵: Category(1,2) × IsActive(T,F) × Price(低,高)
+	data := []struct {
+		id     uint64
+		cat    uint8
+		active bool
+		price  uint64
+	}{
+		{1, 1, true, 25},
+		{2, 1, true, 200},
+		{3, 1, false, 25},
+		{4, 1, false, 200},
+		{5, 2, true, 25},
+		{6, 2, true, 200},
+		{7, 2, false, 25},
+		{8, 2, false, 200},
+	}
+	for _, d := range data {
+		require.NoError(t, store.Put(txn, d.id, testProduct{
+			Category: d.cat,
+			IsActive: d.active,
+			Price:    d.price,
+		}))
+	}
+
+	// Category=1 AND IsActive=true → {1,2}
+	ids, err := store.Query(txn, map[string]any{
+		"Category": uint64(1),
+		"IsActive": uint64(1),
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 2}, ids)
+
+	// Category=1 AND IsActive=true AND Price≤50 → {1}
+	ids, err = store.Query(txn, map[string]any{
+		"Category": uint64(1),
+		"IsActive": uint64(1),
+		"Price":    Range{Min: 0, Max: 50},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1}, ids)
+
+	// Category=2 AND IsActive=false AND Price>50 → {8}
+	ids, err = store.Query(txn, map[string]any{
+		"Category": uint64(2),
+		"IsActive": uint64(0),
+		"Price":    Range{Min: 51, Max: 0},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{8}, ids)
+
+	// range 索引零假阳性：Price>500 无匹配，整个交集应为空
+	ids, err = store.Query(txn, map[string]any{
+		"Category": uint64(1),
+		"IsActive": uint64(1),
+		"Price":    Range{Min: 501, Max: 0},
+	})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+}
+
+// ── Update 跨桶迁移 ──────────────────────────────────────
+
+func TestIndexedStore_UpdateBucketMigration(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
+
+	// Price buckets: 10,50,100,500,1000
+	require.NoError(t, store.Put(txn, 1, testProduct{Price: 25}))  // bucket 50
+	require.NoError(t, store.Put(txn, 2, testProduct{Price: 300})) // bucket 500
+
+	// 更新 id=1 从 bucket 50 → bucket 500
+	err := store.Update(txn, 1, func(cur *testProduct) {
+		cur.Price = 300
+	})
+	require.NoError(t, err)
+
+	// 原 bucket 50 中不应再有 id=1
+	ids, err := store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 50}})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+
+	// 新 bucket 500 中应有 id=1 和 id=2
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 51, Max: 500}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 2}, ids)
+
+	// 再次更新 id=1 从 bucket 500 → bucket 1000
+	err = store.Update(txn, 1, func(cur *testProduct) {
+		cur.Price = 800
+	})
+	require.NoError(t, err)
+
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 501, Max: 1000}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1}, ids)
+
+	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 101, Max: 500}})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{2}, ids)
+}
+
+// ── 空结果与全匹配 ───────────────────────────────────────
+
+func TestIndexedStore_QueryEmptyAndFullMatch(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
+
+	// 空 filter → nil
+	ids, err := store.Query(txn, map[string]any{})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+
+	// 写入数据后全匹配
+	for i := 1; i <= 5; i++ {
+		require.NoError(t, store.Put(txn, uint64(i), testProduct{Category: 1, IsActive: true}))
+	}
+
+	// 所有数据的共同特征
+	ids, err = store.Query(txn, map[string]any{"Category": uint64(1)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 2, 3, 4, 5}, ids)
+
+	ids, err = store.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1, 2, 3, 4, 5}, ids)
+
+	// 不存在的值
+	ids, err = store.Query(txn, map[string]any{"Category": uint64(99)})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+}
+
+// ── 前缀隔离防碰撞 ───────────────────────────────────────
+
+func TestStoreIndex_PrefixCollision(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	// 两个不同 namespace 的索引，使用相同 prefix
+	idxA := NewStoreIndex[uint64]("nsA", "idx_cat_")
+	idxB := NewStoreIndex[uint64]("nsB", "idx_cat_")
+
+	require.NoError(t, idxA.Add(txn, "1", 100))
+	require.NoError(t, idxB.Add(txn, "1", 200))
+
+	// 各自独立查询
+	idsA, err := idxA.GetIDs(txn, "1")
+	require.NoError(t, err)
+	require.Equal(t, []uint64{100}, idsA)
+
+	idsB, err := idxB.GetIDs(txn, "1")
+	require.NoError(t, err)
+	require.Equal(t, []uint64{200}, idsB)
+
+	// GetAllIDs 也不互相影响
+	allA, err := idxA.GetAllIDs(txn)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{100}, allA)
+
+	allB, err := idxB.GetAllIDs(txn)
+	require.NoError(t, err)
+	require.Equal(t, []uint64{200}, allB)
+}
+
+// ── IndexedList.Update 直接更新 ──────────────────────────
+
+func TestIndexedList_UpdateDirect(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	list := NewIndexedList[uint64, testProduct]("test", "next_id", "item_")
+
+	_, _ = list.Insert(txn, testProduct{Name: "A", Category: 1, IsActive: true})
+	_, _ = list.Insert(txn, testProduct{Name: "B", Category: 2, IsActive: false})
+
+	// 直接 Update（非 UpdateFn）
+	err := list.Update(txn, 0, testProduct{Name: "A2", Category: 3, IsActive: false})
+	require.NoError(t, err)
+
+	// 旧索引已清理
+	ids, err := list.Query(txn, map[string]any{"Category": uint64(1)})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+
+	// IsActive=true 的查询应无结果（A 更新为 false，B 初始为 false）
+	ids, err = list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	require.NoError(t, err)
+	require.Nil(t, ids)
+
+	// 新索引已建立
+	ids, err = list.Query(txn, map[string]any{"Category": uint64(3)})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{0}, ids)
 }
 
 // =============================================================================

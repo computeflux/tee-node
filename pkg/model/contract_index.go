@@ -1,38 +1,26 @@
 // Package model: StoreIndex 提供通用二级倒排索引。
 //
 // 设计目标：
-//   1. 零额外依赖 — 基于 StoreMapping[K, []ID] 实现
+//   1. 零额外依赖 — 基于 Txn prefix 扫描实现
 //   2. 任何合约可复用 — 只需声明索引字段即可
-//   3. 支持三种查询模式：精确匹配、分桶范围、前缀匹配
+//   3. 支持精确匹配、范围查询
 //
-// 使用示例（Gateway 合约）：
+// 索引 key 格式：{namespace}_{prefix}{fieldValue}_{id}
+// 例如：gateway_idx_IsActive_1_42 表示 IsActive=1 的 model_id=42
 //
-//   type Gateway struct {
-//       models    *StoreMapping[uint64, ModelInfo]
-//       idxModal  *StoreIndex[uint8, uint64]   // modality → modelIDs
-//       idxCtx    *StoreIndex[uint64, uint64]   // context bucket → modelIDs
-//   }
-//
-//   // 写入时维护索引
-//   func (g *Gateway) RegisterModel(...) {
-//       g.models.Set(txn, id, info)
-//       g.idxModal.Add(txn, info.Modalities, id)
-//       g.idxCtx.Add(txn, Bucketize(info.ContextLen, ContextBuckets), id)
-//   }
-//
-//   // 查询时使用索引
-//   func (g *Gateway) QueryModels(filter) {
-//       candidates := g.idxModal.GetIDs(txn, filter.Modality)
-//       candidates = intersect(candidates, g.idxCtx.GetIDsByKeys(txn, buckets))
-//       // paginate & fetch
-//   }
+// 查询时通过 prefix 扫描直接获取所有匹配的 id，无需反序列化 ID 列表。
 
 package model
 
-// ── Index key & ID type constraints ──────────────────────
+import (
+	"fmt"
+	"strconv"
+	"strings"
 
-// IdxKey 索引键类型：与 MappingKey 一致。
-type IdxKey = MappingKey
+	"github.com/cockroachdb/pebble"
+)
+
+// ── Index key & ID type constraints ──────────────────────
 
 // IdxID 索引引用的主键类型（通常是自增 ID）。
 type IdxID interface {
@@ -41,106 +29,220 @@ type IdxID interface {
 
 // ── StoreIndex ───────────────────────────────────────────
 
-// StoreIndex[K, ID] 是一个倒排索引：将字段值 K 映射到一组主键 ID。
+// StoreIndex[ID] 是一个基于 prefix 扫描的倒排索引。
 //
-//	K  — 被索引的字段值（如 modality bitmask、context bucket）
-//	ID — 主键类型（如 modelID uint64）
-type StoreIndex[K IdxKey, ID IdxID] struct {
-	inner *StoreMapping[K, []ID]
+//	namespace — 命名空间（如 "gateway"）
+//	prefix    — 键前缀（如 "idx_IsActive_"）
+type StoreIndex[ID IdxID] struct {
+	namespace string
+	prefix    string
 }
 
 // NewStoreIndex 创建一个新的索引。
-// namespace: 命名空间（如 "gateway"）
-// prefix: 键前缀（如 "idx_mod_"、"idx_ctx_"）
-func NewStoreIndex[K IdxKey, ID IdxID](namespace, prefix string) *StoreIndex[K, ID] {
-	return &StoreIndex[K, ID]{
-		inner: &StoreMapping[K, []ID]{
-			Namespace: namespace,
-			KeyPrefix: prefix,
-		},
-	}
+func NewStoreIndex[ID IdxID](namespace, prefix string) *StoreIndex[ID] {
+	return &StoreIndex[ID]{namespace: namespace, prefix: prefix}
 }
 
-// Add 向索引中添加一条 (key → id) 记录。
-func (idx *StoreIndex[K, ID]) Add(txn *Txn, key K, id ID) error {
-	ids, err := idx.inner.Get(txn, key)
-	if err != nil {
-		return err
-	}
-	if ids == nil {
-		ids = &[]ID{}
-	}
-	*ids = append(*ids, id)
-	return idx.inner.Set(txn, key, *ids)
+// Add 向索引中添加一条 (fieldValue → id) 记录。
+func (idx *StoreIndex[ID]) Add(txn *Txn, fieldValue string, id ID) error {
+	key := idx.makeKey(fieldValue, id)
+	return txn.Set([]byte(key), []byte{1})
 }
 
-// Remove 从索引中移除一条 (key → id) 记录。
-func (idx *StoreIndex[K, ID]) Remove(txn *Txn, key K, id ID) error {
-	ids, err := idx.inner.Get(txn, key)
-	if err != nil || ids == nil {
-		return err
-	}
-	filtered := make([]ID, 0, len(*ids))
-	for _, x := range *ids {
-		if !idxIDEqual(x, id) {
-			filtered = append(filtered, x)
-		}
-	}
-	if len(filtered) == 0 {
-		return idx.inner.Delete(txn, key)
-	}
-	return idx.inner.Set(txn, key, filtered)
+// Remove 从索引中移除一条 (fieldValue → id) 记录。
+func (idx *StoreIndex[ID]) Remove(txn *Txn, fieldValue string, id ID) error {
+	key := idx.makeKey(fieldValue, id)
+	return txn.Delete([]byte(key))
 }
 
-// GetIDs 查询单个键对应的所有 ID。
-func (idx *StoreIndex[K, ID]) GetIDs(txn *Txn, key K) ([]ID, error) {
-	ids, err := idx.inner.Get(txn, key)
-	if err != nil || ids == nil {
-		return nil, err
-	}
-	return *ids, nil
+// GetIDs 查询单个 fieldValue 对应的所有 ID。
+func (idx *StoreIndex[ID]) GetIDs(txn *Txn, fieldValue string) ([]ID, error) {
+	prefix := idx.namespace + "_" + idx.prefix + fieldValue + "_"
+	return idx.scanPrefix(txn, prefix)
 }
 
-// GetIDsByKeys 查询多个键对应的 ID 并集（用于范围查询的分桶合并）。
-func (idx *StoreIndex[K, ID]) GetIDsByKeys(txn *Txn, keys []K) ([]ID, error) {
-	seen := make(map[any]bool)
-	var out []ID
-	for _, k := range keys {
-		ids, err := idx.GetIDs(txn, k)
+// GetIDsByKeys 查询多个 fieldValue 的并集（去重）。
+func (idx *StoreIndex[ID]) GetIDsByKeys(txn *Txn, fieldValues []string) ([]ID, error) {
+	if len(fieldValues) == 0 {
+		return nil, nil
+	}
+	var all []ID
+	seen := make(map[string]bool)
+	for _, fv := range fieldValues {
+		ids, err := idx.GetIDs(txn, fv)
 		if err != nil {
 			return nil, err
 		}
 		for _, id := range ids {
-			if !seen[id] {
-				seen[id] = true
-				out = append(out, id)
+			sk := idxIDToString(id)
+			if !seen[sk] {
+				seen[sk] = true
+				all = append(all, id)
 			}
 		}
 	}
-	return out, nil
+	return all, nil
+}
+
+// GetIDsByRange 范围扫描查询：返回 [minStr, maxStr] 区间内所有 ID（包含边界）。
+// fieldValue 必须是固定宽度的字典序字符串（如左填充零的数值）。
+func (idx *StoreIndex[ID]) GetIDsByRange(txn *Txn, minStr, maxStr string) ([]ID, error) {
+	lower := idx.namespace + "_" + idx.prefix + minStr + "_"
+	upper := idx.namespace + "_" + idx.prefix + maxStr + "_"
+	// upper 的 keyUpperBound 保证覆盖 maxStr 的所有后缀
+	ub := keyUpperBound([]byte(upper))
+	return idx.scanRange(txn, string(lower), string(ub))
 }
 
 // GetAllIDs 返回索引中所有 ID（遍历所有键）。
 // 注意：这会在内部做前缀扫描，数据量大时谨慎使用。
-func (idx *StoreIndex[K, ID]) GetAllIDs(txn *Txn) ([]ID, error) {
-	_, lists, err := idx.inner.List(txn)
+func (idx *StoreIndex[ID]) GetAllIDs(txn *Txn) ([]ID, error) {
+	prefix := idx.namespace + "_" + idx.prefix
+	return idx.scanPrefix(txn, prefix)
+}
+
+// scanPrefix 扫描指定 prefix 的所有 key，解析出 ID（自动去重）。
+// key 格式为 {namespace}_{prefix}{fieldValue}_{id}，suffix 可能是纯 id
+// 或 fieldValue_id；统一取最后一个 "_" 后的部分作为 ID。
+func (idx *StoreIndex[ID]) scanPrefix(txn *Txn, prefix string) ([]ID, error) {
+	keys, _, err := txn.ListByPrefix([]byte(prefix))
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[any]bool)
+	return idx.parseKeys(keys, len(prefix)), nil
+}
+
+// scanRange 扫描 [lower, upper) 范围内的所有 key，解析出 ID。
+func (idx *StoreIndex[ID]) scanRange(txn *Txn, lower, upper string) ([]ID, error) {
+	iter, err := txn.in.NewIter(&pebble.IterOptions{
+		LowerBound: []byte(lower),
+		UpperBound: []byte(upper),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	prefixLen := len(lower) // lower = namespace + "_" + prefix + minStr + "_"
 	var out []ID
-	for _, list := range lists {
-		for _, id := range list {
-			if !seen[id] {
-				seen[id] = true
-				out = append(out, id)
-			}
+	seen := make(map[string]bool)
+	for iter.First(); iter.Valid(); iter.Next() {
+		k := iter.Key()
+		if len(k) <= prefixLen {
+			continue
 		}
+		suffix := string(k[prefixLen:])
+		lastIdx := strings.LastIndex(suffix, "_")
+		var idStr string
+		if lastIdx < 0 {
+			idStr = suffix
+		} else {
+			idStr = suffix[lastIdx+1:]
+		}
+		id, err := idxParseIDFromKey[ID]([]byte(idStr))
+		if err != nil {
+			continue
+		}
+		sk := idxIDToString(id)
+		if seen[sk] {
+			continue
+		}
+		seen[sk] = true
+		out = append(out, id)
 	}
 	return out, nil
 }
 
-// ── ID equality helper ──────────────────────────────────
+// parseKeys 从 key 列表中解析 ID。
+func (idx *StoreIndex[ID]) parseKeys(keys [][]byte, prefixLen int) []ID {
+	var out []ID
+	seen := make(map[string]bool)
+	for _, k := range keys {
+		if len(k) <= prefixLen {
+			continue
+		}
+		suffix := string(k[prefixLen:])
+		lastIdx := strings.LastIndex(suffix, "_")
+		var idStr string
+		if lastIdx < 0 {
+			idStr = suffix
+		} else {
+			idStr = suffix[lastIdx+1:]
+		}
+		id, err := idxParseIDFromKey[ID]([]byte(idStr))
+		if err != nil {
+			continue
+		}
+		sk := idxIDToString(id)
+		if seen[sk] {
+			continue
+		}
+		seen[sk] = true
+		out = append(out, id)
+	}
+	return out
+}
+
+// makeKey 构造索引存储 key。
+func (idx *StoreIndex[ID]) makeKey(fieldValue string, id ID) string {
+	return idx.namespace + "_" + idx.prefix + fieldValue + "_" + idxIDToString(id)
+}
+
+// ── ID serialization helpers ─────────────────────────────
+
+func idxIDToString[ID IdxID](id ID) string {
+	switch v := any(id).(type) {
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(v), 10)
+	case string:
+		return v
+	case []byte:
+		return fmt.Sprintf("%x", v)
+	}
+	return ""
+}
+
+func idxParseIDFromKey[ID IdxID](suffix []byte) (ID, error) {
+	var zero ID
+	s := string(suffix)
+	switch any(zero).(type) {
+	case uint64:
+		v, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return zero, err
+		}
+		return any(v).(ID), nil
+	case uint32:
+		v, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			return zero, err
+		}
+		return any(uint32(v)).(ID), nil
+	case uint16:
+		v, err := strconv.ParseUint(s, 10, 16)
+		if err != nil {
+			return zero, err
+		}
+		return any(uint16(v)).(ID), nil
+	case uint8:
+		v, err := strconv.ParseUint(s, 10, 8)
+		if err != nil {
+			return zero, err
+		}
+		return any(uint8(v)).(ID), nil
+	case string:
+		return any(s).(ID), nil
+	case []byte:
+		return any([]byte(s)).(ID), nil
+	}
+	return zero, fmt.Errorf("unsupported ID type")
+}
 
 func idxIDEqual[ID IdxID](a, b ID) bool {
 	switch va := any(a).(type) {
@@ -160,87 +262,28 @@ func idxIDEqual[ID IdxID](a, b ID) bool {
 	return false
 }
 
-// ── Bucket helpers ──────────────────────────────────────
+// ── Range helpers ────────────────────────────────────────
 
-// Bucketize 将值归入最接近的桶上限。
-// buckets 必须升序排列，如 {4000, 8000, 16000, 32000, 64000, 128000, 256000}。
-func Bucketize(value uint64, buckets []uint64) uint64 {
-	for _, b := range buckets {
-		if value <= b {
-			return b
-		}
-	}
-	return buckets[len(buckets)-1]
-}
-
-// OverlappingBuckets 返回与 [min, max] 范围有重叠的所有桶。
-// 若 min==0 && max==0 表示不限制范围，返回 nil。
-func OverlappingBuckets(minVal, maxVal uint64, buckets []uint64) []uint64 {
-	if minVal == 0 && maxVal == 0 {
-		return nil
-	}
-	if maxVal == 0 {
-		maxVal = ^uint64(0)
-	}
-	var out []uint64
-	var prevB uint64 // 桶的下界，初始为 0
-	for _, b := range buckets {
-		// 桶的范围是 (prevB, b]
-		if b >= minVal && prevB < maxVal {
-			out = append(out, b)
-		}
-		prevB = b
-	}
-	return out
-}
-
-// ── Predefined bucket sets ───────────────────────────────
-
-// ContextBuckets 上下文长度分桶（单位：token）。
-var ContextBuckets = []uint64{
-	4_000,
-	8_000,
-	16_000,
-	32_000,
-	64_000,
-	128_000,
-	256_000,
-	512_000,
-	1_000_000,
-	^uint64(0), // 兜底：超过 1M 的都在这里
-}
-
-// PricingBuckets 每次提示定价分桶（单位：credit）。
-var PricingBuckets = []uint64{
-	1,
-	5,
-	10,
-	50,
-	100,
-	500,
-	1_000,
-	5_000,
-	10_000,
-	^uint64(0),
+// idxUint64Pad20 将 uint64 左填充零至 20 位，保证字典序 = 数值序。
+func idxUint64Pad20(v uint64) string {
+	return fmt.Sprintf("%020d", v)
 }
 
 // ── Set operations for query combining ───────────────────
 
 // IntersectIDs 取两个 ID 列表的交集。
+// 若 a 或 b 为空，返回 nil（空集与任何集的交集为空）。
 func IntersectIDs[ID IdxID](a, b []ID) []ID {
-	if len(a) == 0 {
-		return b
+	if len(a) == 0 || len(b) == 0 {
+		return nil
 	}
-	if len(b) == 0 {
-		return a
-	}
-	set := make(map[any]bool, len(a))
+	set := make(map[string]bool, len(a))
 	for _, id := range a {
-		set[id] = true
+		set[idxIDToString(id)] = true
 	}
 	var out []ID
 	for _, id := range b {
-		if set[id] {
+		if set[idxIDToString(id)] {
 			out = append(out, id)
 		}
 	}
