@@ -100,25 +100,33 @@ func providerDefaultURL(providerType uint16) string {
 var gatewayModelCache = struct {
 	mu          sync.RWMutex
 	models      []cgateway.ModelInfo
+	nameMap     map[string]cgateway.ModelInfo // Name → active model，O(1) 查询
 	lastRefresh time.Time
 }{}
 
 const gatewayModelCacheTTL = 5 * time.Second
 
-// fetchGatewayModelsFromContract 从合约拉取活跃模型列表。
-func fetchGatewayModelsFromContract() []cgateway.ModelInfo {
+// fetchGatewayModelsFromContract 从合约拉取活跃模型列表，同时构建 nameMap。
+func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway.ModelInfo) {
 	bridge := getBridge()
 	if bridge == nil {
-		return nil
+		return nil, nil
 	}
 	models, err := bridge.GatewayListActiveModels(0, 1000)
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] contract list models error: %v", err)
-		return nil
+		return nil, nil
 	}
 	out := make([]cgateway.ModelInfo, len(models))
 	copy(out, models)
-	return out
+
+	nameMap := make(map[string]cgateway.ModelInfo, len(models))
+	for _, m := range out {
+		if m.IsActive {
+			nameMap[m.Name] = m
+		}
+	}
+	return out, nameMap
 }
 
 // getCachedGatewayModels 返回缓存的合约模型列表。
@@ -131,24 +139,52 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 	}
 	gatewayModelCache.mu.RUnlock()
 
-	models := fetchGatewayModelsFromContract()
+	models, nameMap := fetchGatewayModelsFromContract()
 
 	gatewayModelCache.mu.Lock()
 	gatewayModelCache.models = models
+	gatewayModelCache.nameMap = nameMap
 	gatewayModelCache.lastRefresh = time.Now()
 	gatewayModelCache.mu.Unlock()
 	return models
 }
 
 // findGatewayModelByName 按模型名称从合约查询（必须活跃）。
+// 直接走链上 string exact 索引，O(1) 查询，避免本地缓存全量遍历。
 func findGatewayModelByName(name string) *cgateway.ModelInfo {
-	for _, m := range getCachedGatewayModels() {
-		if m.Name == name && m.IsActive {
-			cp := m
+	bridge := getBridge()
+	if bridge == nil {
+		return nil
+	}
+	models, err := bridge.GatewayGetModelByName(name)
+	if err != nil {
+		GATEWAYLOG().Printf("[GATEWAY] GetModelByName name=%s err=%v", name, err)
+		return nil
+	}
+	for i := range models {
+		if models[i].IsActive {
+			cp := models[i]
 			return &cp
 		}
 	}
 	return nil
+}
+
+// findGatewayProvider 按 ProviderID 从合约查询 Provider。
+func findGatewayProvider(providerID uint64) *cgateway.ProviderInfo {
+	bridge := getBridge()
+	if bridge == nil {
+		return nil
+	}
+	p, err := bridge.GatewayGetProvider(providerID)
+	if err != nil {
+		GATEWAYLOG().Printf("[GATEWAY] GetProvider id=%d err=%v", providerID, err)
+		return nil
+	}
+	if p == nil || !p.IsActive {
+		return nil
+	}
+	return p
 }
 
 // buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表。
@@ -158,7 +194,9 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
 	}
+
 	if len(m.APIKeyRefs) == 0 {
+		GATEWAYLOG().Printf("[GATEWAY] GetGlobalKey failed: APIKeyRefs is 【】")
 		return nil
 	}
 

@@ -80,6 +80,17 @@ func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetModel(id)
 }
 
+// GatewayGetModelByName 按名称查询活跃模型（走 string exact 索引，O(1) 查询）。
+func (app *TeeChain) GatewayGetModelByName(name string) ([]gateway.ModelInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetModelByName(name)
+}
+
 // GatewayGetEncryptedAPIKey 查询加密 API Key。
 func (app *TeeChain) GatewayGetEncryptedAPIKey(ref string) (*gateway.EncryptedAPIKey, error) {
 	runtime, err := app.gatewayRuntime()

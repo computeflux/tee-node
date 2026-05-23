@@ -36,6 +36,7 @@ import (
 // idxRegistry 是 IndexedStore 和 IndexedList 共用的索引管理核心。
 type idxRegistry[ID IdxID, V any] struct {
 	exactIndexes  map[string]*StoreIndex[uint64, ID]
+	strIndexes    map[string]*StoreIndex[string, ID]
 	bucketIndexes map[string]*bucketIdx[ID]
 	elemType      reflect.Type
 }
@@ -54,6 +55,7 @@ func newIdxRegistry[ID IdxID, V any](namespace, prefix string) *idxRegistry[ID, 
 
 	r := &idxRegistry[ID, V]{
 		exactIndexes:  make(map[string]*StoreIndex[uint64, ID]),
+		strIndexes:    make(map[string]*StoreIndex[string, ID]),
 		bucketIndexes: make(map[string]*bucketIdx[ID]),
 		elemType:      elemType,
 	}
@@ -69,7 +71,14 @@ func newIdxRegistry[ID IdxID, V any](namespace, prefix string) *idxRegistry[ID, 
 		parts := strings.SplitN(tag, ":", 2)
 		switch parts[0] {
 		case "exact":
-			r.exactIndexes[f.Name] = NewStoreIndex[uint64, ID](namespace, idxPrefix)
+			switch f.Type.Kind() {
+			case reflect.String:
+				r.strIndexes[f.Name] = NewStoreIndex[string, ID](namespace, idxPrefix)
+			case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				r.exactIndexes[f.Name] = NewStoreIndex[uint64, ID](namespace, idxPrefix)
+			default:
+				panic(fmt.Sprintf("idx tag exact: unsupported field type %s on %s", f.Type.Kind(), f.Name))
+			}
 		case "bucket":
 			buckets := parseBuckets(parts[1])
 			r.bucketIndexes[f.Name] = &bucketIdx[ID]{
@@ -89,6 +98,10 @@ func (r *idxRegistry[ID, V]) indexAdd(txn *Txn, id ID, val V) {
 		v := fieldUint64(rv, name)
 		_ = idx.Add(txn, v, id)
 	}
+	for name, idx := range r.strIndexes {
+		v := fieldString(rv, name)
+		_ = idx.Add(txn, v, id)
+	}
 	for name, bi := range r.bucketIndexes {
 		v := fieldUint64(rv, name)
 		b := Bucketize(v, bi.buckets)
@@ -100,6 +113,10 @@ func (r *idxRegistry[ID, V]) indexRemove(txn *Txn, id ID, val V) {
 	rv := reflect.ValueOf(val)
 	for name, idx := range r.exactIndexes {
 		v := fieldUint64(rv, name)
+		_ = idx.Remove(txn, v, id)
+	}
+	for name, idx := range r.strIndexes {
+		v := fieldString(rv, name)
 		_ = idx.Remove(txn, v, id)
 	}
 	for name, bi := range r.bucketIndexes {
@@ -115,6 +132,14 @@ func (r *idxRegistry[ID, V]) indexUpdate(txn *Txn, id ID, old, new V) {
 	for name, idx := range r.exactIndexes {
 		oldV := fieldUint64(oldRV, name)
 		newV := fieldUint64(newRV, name)
+		if oldV != newV {
+			_ = idx.Remove(txn, oldV, id)
+			_ = idx.Add(txn, newV, id)
+		}
+	}
+	for name, idx := range r.strIndexes {
+		oldV := fieldString(oldRV, name)
+		newV := fieldString(newRV, name)
 		if oldV != newV {
 			_ = idx.Remove(txn, oldV, id)
 			_ = idx.Add(txn, newV, id)
@@ -140,6 +165,20 @@ func (r *idxRegistry[ID, V]) query(txn *Txn, filter map[string]any) ([]ID, error
 			idx, ok := r.exactIndexes[field]
 			if !ok {
 				return nil, fmt.Errorf("query: no exact index for field %q", field)
+			}
+			ids, err := idx.GetIDs(txn, v)
+			if err != nil {
+				return nil, err
+			}
+			if candidates == nil {
+				candidates = ids
+			} else {
+				candidates = IntersectIDs(candidates, ids)
+			}
+		case string:
+			idx, ok := r.strIndexes[field]
+			if !ok {
+				return nil, fmt.Errorf("query: no string index for field %q", field)
 			}
 			ids, err := idx.GetIDs(txn, v)
 			if err != nil {
@@ -292,6 +331,16 @@ func fieldUint64(rv reflect.Value, name string) uint64 {
 		return f.Uint()
 	default:
 		panic(fmt.Sprintf("idx tag: field %q is not a uint type", name))
+	}
+}
+
+func fieldString(rv reflect.Value, name string) string {
+	f := rv.FieldByName(name)
+	switch f.Kind() {
+	case reflect.String:
+		return f.String()
+	default:
+		panic(fmt.Sprintf("idx tag: field %q is not a string type", name))
 	}
 }
 

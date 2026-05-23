@@ -137,3 +137,20 @@ func (g GatewayQuery) listProvidersFiltered(
 	}
 	return out, nil
 }
+
+// GetProviderByName 返回指定名称的所有 Provider（使用 Name exact 索引）
+func (g GatewayQuery) GetProviderByName(name string) ([]ProviderInfo, error) {
+	keys, err := g.providers.Query(g.api.GetTxn(), map[string]any{"Name": name})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ProviderInfo, 0, len(keys))
+	for _, k := range keys {
+		p, err := g.providers.Get(g.api.GetTxn(), k)
+		if err != nil || p == nil {
+			continue
+		}
+		out = append(out, *p)
+	}
+	return out, nil
+}

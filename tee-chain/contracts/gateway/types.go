@@ -51,9 +51,9 @@ type EncryptedAPIKey struct {
 
 // ModelInfo 独立注册的模型
 type ModelInfo struct {
-	Name            string        `json:"name"`
+	Name            string        `json:"name" idx:"exact"`
 	Owner           model.UniAddr `json:"owner"`
-	ProviderID      uint64        `json:"providerId"` // 所属 Provider
+	ProviderID      uint64        `json:"providerId" idx:"exact"` // 所属 Provider
 	PointsPer1K     uint64        `json:"pointsPer1K"`
 	IsActive        bool          `json:"isActive"`
 	CreatedAt       uint64        `json:"createdAt"`
@@ -76,9 +76,9 @@ type ProviderInfo struct {
 	Owner model.UniAddr `json:"owner"`
 
 	// ── 品牌 ──
-	Name        string `json:"name"`        // 提供者名称
-	LogoURL     string `json:"logoUrl"`     // logo 图片 URL (IPFS / HTTPS)
-	Description string `json:"description"` // 介绍
+	Name        string `json:"name" idx:"exact"` // 提供者名称
+	LogoURL     string `json:"logoUrl"`          // logo 图片 URL (IPFS / HTTPS)
+	Description string `json:"description"`      // 介绍
 
 	// ── 服务能力 ──
 	ModelIds []uint64 `json:"modelIds"` // 支持的模型列表
@@ -107,6 +107,7 @@ type ProviderInfo struct {
 // APIKeyInfo 用户 API Key（仅存哈希，原始 key 绝不上链）
 // TEE 提供方收到明文 key 后 blake2b 哈希，再以此查询链上记录
 type APIKeyInfo struct {
+	OwnerKey  uint64        `json:"ownerKey" idx:"exact"` // blake2b(owner.V)[:8] 转 uint64，用于索引
 	Owner     model.UniAddr `json:"owner"`
 	KeyHash   []byte        `json:"keyHash"`   // blake2b(apiKey), 32 bytes
 	RateLimit uint32        `json:"rateLimit"` // 每分钟最大请求数, 0=无限制

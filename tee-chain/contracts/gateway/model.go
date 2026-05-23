@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"fmt"
+
+	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 // ── Model ────────────────────────────────────────────────
@@ -9,7 +11,7 @@ import (
 func (g GatewayMutation) RegisterModel(
 	name string, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	modelID string, providerType uint16, uri string, apiKeyRefs []string,
+	modelID string, providerType uint16, uri string, apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
 
@@ -19,6 +21,32 @@ func (g GatewayMutation) RegisterModel(
 		return fmt.Errorf("must create a provider before registering models")
 	}
 
+	// 1. 注册每个 apiKey（明文 → TEE KMS 加密 → 链上存储 ref）
+	refs := make([]string, 0, len(apiKeys))
+	for i, key := range apiKeys {
+		if key == "" {
+			continue
+		}
+		ref := fmt.Sprintf("%s_%d_%d", modelID, g.api.GetHeight(), i)
+		gk, err := model.GetGlobalKey()
+		if err != nil {
+			return fmt.Errorf("kms not ready: %w", err)
+		}
+		ek, err := model.EncryptWithGK(gk, ref, key)
+		if err != nil {
+			return fmt.Errorf("encrypt api key failed: %w", err)
+		}
+		if err := g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
+			Ref:        ref,
+			Ciphertext: ek.Ciphertext,
+			Nonce:      ek.Nonce,
+		}); err != nil {
+			return fmt.Errorf("store encrypted key failed: %w", err)
+		}
+		refs = append(refs, ref)
+	}
+
+	// 2. 注册模型（只存 ref 列表，明文永不上链）
 	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
 		Name:            name,
 		Owner:           owner,
@@ -32,7 +60,7 @@ func (g GatewayMutation) RegisterModel(
 		ModelID:         modelID,
 		ProviderType:    providerType,
 		URI:             uri,
-		APIKeyRefs:      apiKeyRefs,
+		APIKeyRefs:      refs,
 	}); err != nil {
 		return err
 	}
@@ -42,9 +70,42 @@ func (g GatewayMutation) RegisterModel(
 func (g GatewayMutation) UpdateModel(
 	modelID uint64, pointsPer1K uint64,
 	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	modelIDStr string, providerType uint16, uri string, apiKeyRefs []string,
+	modelIDStr string, providerType uint16, uri string, apiKeys []string,
 ) error {
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	// 获取当前模型，保存旧 APIKeyRefs 用于清理
+	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || cur == nil {
+		return fmt.Errorf("model not found")
+	}
+	oldRefs := cur.APIKeyRefs
+
+	// 加密新的 apiKeys 并存储
+	refs := make([]string, 0, len(apiKeys))
+	for i, key := range apiKeys {
+		if key == "" {
+			continue
+		}
+		ref := fmt.Sprintf("%s_%d_%d", modelIDStr, g.api.GetHeight(), i)
+		gk, err := model.GetGlobalKey()
+		if err != nil {
+			return fmt.Errorf("kms not ready: %w", err)
+		}
+		ek, err := model.EncryptWithGK(gk, ref, key)
+		if err != nil {
+			return fmt.Errorf("encrypt api key failed: %w", err)
+		}
+		if err := g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
+			Ref:        ref,
+			Ciphertext: ek.Ciphertext,
+			Nonce:      ek.Nonce,
+		}); err != nil {
+			return fmt.Errorf("store encrypted key failed: %w", err)
+		}
+		refs = append(refs, ref)
+	}
+
+	// 更新模型字段
+	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
 		m.PointsPer1K = pointsPer1K
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
@@ -52,8 +113,16 @@ func (g GatewayMutation) UpdateModel(
 		m.ModelID = modelIDStr
 		m.ProviderType = providerType
 		m.URI = uri
-		m.APIKeyRefs = apiKeyRefs
-	})
+		m.APIKeyRefs = refs
+	}); err != nil {
+		return err
+	}
+
+	// 清理旧的 encryptedKeys
+	for _, ref := range oldRefs {
+		_ = g.encryptedKeys.Delete(g.api.GetTxn(), ref)
+	}
+	return nil
 }
 
 func (g GatewayMutation) DeactivateModel(modelID uint64) error {
@@ -127,6 +196,40 @@ func (g GatewayQuery) QueryModels(
 		}
 		return true
 	})
+}
+
+// GetModelsByProvider 返回某个 Provider 注册的所有模型（使用 ProviderID exact 索引）
+func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": providerID})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ModelInfo, 0, len(keys))
+	for _, k := range keys {
+		m, err := g.models.Get(g.api.GetTxn(), k)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
+}
+
+// GetModelByName 返回指定名称的所有模型（使用 Name exact 索引）
+func (g GatewayQuery) GetModelByName(name string) ([]ModelInfo, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"Name": name})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ModelInfo, 0, len(keys))
+	for _, k := range keys {
+		m, err := g.models.Get(g.api.GetTxn(), k)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
 }
 
 // ── Encrypted API Key ────────────────────────────────────

@@ -2,12 +2,24 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"golang.org/x/crypto/blake2b"
 )
+
+// uniAddrKey 将 UniAddr 转为确定性 uint64，用于 exact 索引。
+func uniAddrKey(a model.UniAddr) uint64 {
+	h, _ := blake2b.New256(nil)
+	h.Write(a.V)
+	var tBytes [4]byte
+	binary.BigEndian.PutUint32(tBytes[:], a.T)
+	h.Write(tBytes[:])
+	return binary.BigEndian.Uint64(h.Sum(nil)[:8])
+}
 
 var (
 	ErrLowCredit        = errors.New("low Credit")
@@ -26,7 +38,7 @@ type Gateway struct {
 	providers       *model.IndexedList[uint64, ProviderInfo]   `store:"keyPfx:v0_providers"`
 	providerByOwner *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:v0_provider_by_owner"` // owner → providerID（一人一 provider）
 	providerCredits *model.StoreMapping[uint64, uint64]        // providerID → accumulated credits
-	apiKeys         *model.StoreMapping[string, APIKeyInfo]    // hex(keyHash) → APIKeyInfo
+	apiKeys         *model.IndexedStore[string, APIKeyInfo]    // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
 	usages          *model.StoreMapping[string, DailyUsage]
 	encryptedKeys   *model.StoreMapping[string, EncryptedAPIKey] // ref → EncryptedAPIKey
 }
@@ -143,11 +155,12 @@ func (g GatewayMutation) RegisterAPIKey(keyHash []byte, rateLimit uint32) error 
 	owner := g.api.GetCaller()
 	hexKey := hex.EncodeToString(keyHash)
 
-	if existing, _ := g.apiKeys.Get(g.api.GetTxn(), hexKey); existing != nil {
+	if existing, _ := g.apiKeys.Primary.Get(g.api.GetTxn(), hexKey); existing != nil {
 		return fmt.Errorf("api key already registered")
 	}
 
-	return g.apiKeys.Set(g.api.GetTxn(), hexKey, APIKeyInfo{
+	return g.apiKeys.Put(g.api.GetTxn(), hexKey, APIKeyInfo{
+		OwnerKey:  uniAddrKey(owner),
 		Owner:     owner,
 		KeyHash:   keyHash,
 		RateLimit: rateLimit,
@@ -164,15 +177,16 @@ func (g GatewayMutation) RevokeAPIKey(keyHash []byte) error {
 	owner := g.api.GetCaller()
 	hexKey := hex.EncodeToString(keyHash)
 
-	info, err := g.apiKeys.Get(g.api.GetTxn(), hexKey)
+	info, err := g.apiKeys.Primary.Get(g.api.GetTxn(), hexKey)
 	if err != nil || info == nil {
 		return ErrAPIKeyNotFound
 	}
 	if !bytes.Equal(info.Owner.V, owner.V) || info.Owner.T != owner.T {
 		return ErrNotOwner
 	}
-	info.IsActive = false
-	return g.apiKeys.Set(g.api.GetTxn(), hexKey, *info)
+	return g.apiKeys.Update(g.api.GetTxn(), hexKey, func(cur *APIKeyInfo) {
+		cur.IsActive = false
+	})
 }
 
 // ── Query: Single ────────────────────────────────────────
@@ -191,7 +205,24 @@ func (g GatewayQuery) LookupAPIKey(keyHash []byte) (*APIKeyInfo, error) {
 		return nil, ErrAPIKeyNotFound
 	}
 	hexKey := hex.EncodeToString(keyHash)
-	return g.apiKeys.Get(g.api.GetTxn(), hexKey)
+	return g.apiKeys.Primary.Get(g.api.GetTxn(), hexKey)
+}
+
+// GetAPIKeysByOwner 返回某个用户注册的所有 API Key（使用 OwnerKey exact 索引，O(1) 查询）
+func (g GatewayQuery) GetAPIKeysByOwner(owner model.UniAddr) ([]APIKeyInfo, error) {
+	keys, err := g.apiKeys.Query(g.api.GetTxn(), map[string]any{"OwnerKey": uniAddrKey(owner)})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]APIKeyInfo, 0, len(keys))
+	for _, k := range keys {
+		info, err := g.apiKeys.Primary.Get(g.api.GetTxn(), k)
+		if err != nil || info == nil {
+			continue
+		}
+		out = append(out, *info)
+	}
+	return out, nil
 }
 
 func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {

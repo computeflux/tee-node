@@ -11,7 +11,7 @@ import (
 // ── Gateway 持久化类型 ───────────────────────────────────
 
 type GatewayProviderInfo struct {
-	Name     string   `json:"name"`
+	Type     string   `json:"name"`
 	BaseURL  string   `json:"baseURL"`
 	ModelIds []uint64 `json:"modelIds"`
 	Priority uint32   `json:"priority"`

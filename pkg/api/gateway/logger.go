@@ -9,7 +9,7 @@ import (
 var gatewayLogger *log.Logger
 
 func init() {
-	logDir := "./logs"
+	logDir := "/token_chain_data"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		log.Printf("[GATEWAY-INIT] failed to create log dir %s: %v", logDir, err)
 		gatewayLogger = log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile)

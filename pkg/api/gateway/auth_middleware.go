@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -57,7 +56,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Parse model from JSON body first, fall back to query string.
-		var bodyMap map[string]interface{}
+		var bodyMap map[string]any
 		modelName := r.URL.Query().Get("model")
 		if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
 			if bodyMap["model"] != nil {
@@ -87,15 +86,19 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 2. 验证请求的 Provider 与模型所属 Provider 一致
-		expectedProvider := providerTypeName(m.ProviderType)
-		if !strings.EqualFold(expectedProvider, providerName) {
-			fmt.Printf("[AUTH] TODO provider mismatch: expected %s, got %s for model %s\n", expectedProvider, providerName, actualModel)
-			// writeError(w, http.StatusBadRequest,
-			// 	fmt.Sprintf("model %s belongs to provider %s, not %s", actualModel, expectedProvider, providerName),
-			// 	"invalid_request")
-			// return
+		// 2. 用 ProviderID 查询 Provider，验证名称与活跃状态
+		provider := findGatewayProvider(m.ProviderID)
+		if provider == nil || !provider.IsActive {
+			writeError(w, http.StatusServiceUnavailable,
+				"provider not available for model "+actualModel, "server_error")
+			return
 		}
+		if provider.Name != providerName {
+			writeError(w, http.StatusBadRequest,
+				"provider name \""+providerName+"\" mismatch for model "+actualModel+"\"provider.name"+provider.Name+"\"", "invalid_request")
+			return
+		}
+		providerType := providerTypeName(m.ProviderType)
 
 		// 3. 从合约构建 endpoints（URI + APIKeys）
 		endpoints := buildEndpointsFromModel(m)
@@ -126,7 +129,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		// 5. 构建虚拟 channel（供下游 metrics / usage 使用）
 		channel := &model.GatewayProviderInfo{
 			ID:       m.ProviderID,
-			Name:     expectedProvider,
+			Type:     providerType,
 			IsActive: true,
 		}
 
