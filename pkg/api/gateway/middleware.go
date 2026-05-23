@@ -67,6 +67,13 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+// Flush 实现 http.Flusher，支持 SSE 流式响应。
+func (rw *responseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // ── GZip Decode ──────────────────────────────────────────
 
 func GzipDecodeMiddleware(next http.Handler) http.Handler {
