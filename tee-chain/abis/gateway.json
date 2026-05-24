@@ -1121,6 +1121,46 @@
         "args": [
           {
             "docs": [],
+            "label": "min_context",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "max_context",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "min_price",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "max_price",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
             "label": "offset",
             "type": {
               "displayName": [

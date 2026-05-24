@@ -102,12 +102,12 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if token != nil {
 		tokenID = token.ID
 	}
-	recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), channel.ID, uint64(func() int {
-		if usage != nil {
-			return usage.TotalTokens
-		}
-		return 0
-	}()))
+	var totalTokens, cachedTokens int
+	if usage != nil {
+		totalTokens = usage.TotalTokens
+		cachedTokens = usage.PromptTokensDetails.CachedTokens
+	}
+	recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), channel.ID, uint64(totalTokens), uint64(cachedTokens))
 
 	elapsed := time.Since(start)
 	tkns := 0

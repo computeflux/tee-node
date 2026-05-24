@@ -29,9 +29,16 @@ type ImageRequest struct {
 }
 
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens        int                 `json:"prompt_tokens"`
+	CompletionTokens    int                 `json:"completion_tokens"`
+	TotalTokens         int                 `json:"total_tokens"`
+	PromptTokensDetails PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+}
+
+type PromptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens"`
+	AudioTokens  int `json:"audio_tokens"`
+	TextTokens   int `json:"text_tokens"`
 }
 
 type ErrorWithStatusCode struct {

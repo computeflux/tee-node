@@ -122,24 +122,26 @@ type APIKeyInfo struct {
 
 // Settlement 单笔结算记录
 type Settlement struct {
-	User       model.UniAddr `json:"user"`
-	ModelID    uint64        `json:"modelId"`
-	ProviderID uint64        `json:"providerId"`
-	TokensUsed uint64        `json:"tokensUsed"`
-	Cost       uint64        `json:"cost"`
+	User         model.UniAddr `json:"user"`
+	ModelID      uint64        `json:"modelId"`
+	ProviderID   uint64        `json:"providerId"`
+	TokensUsed   uint64        `json:"tokensUsed"`
+	CachedTokens uint64        `json:"cachedTokens"`
+	Cost         uint64        `json:"cost"`
 }
 
 // ── DailyUsage ───────────────────────────────────────────
 
 // DailyUsage 每日用量
 type DailyUsage struct {
-	User       model.UniAddr `json:"user"`
-	ProviderID uint64        `json:"providerId"`
-	ModelID    uint64        `json:"modelId"`
-	Day        string        `json:"day"`
-	Count      uint64        `json:"count"`
-	TokensUsed uint64        `json:"tokensUsed"`
-	PointsUsed uint64        `json:"pointsUsed"`
+	User         model.UniAddr `json:"user"`
+	ProviderID   uint64        `json:"providerId"`
+	ModelID      uint64        `json:"modelId"`
+	Day          string        `json:"day"`
+	Count        uint64        `json:"count"`
+	TokensUsed   uint64        `json:"tokensUsed"`
+	CachedTokens uint64        `json:"cachedTokens"`
+	PointsUsed   uint64        `json:"pointsUsed"`
 }
 
 // ── RechargeHistory ──────────────────────────────────────
@@ -156,11 +158,12 @@ type RechargeRecord struct {
 
 // SettlementRecord 单笔结算记录（Provider 视角）
 type SettlementRecord struct {
-	ProviderID uint64        `json:"providerId"`
-	User       model.UniAddr `json:"user"`
-	ModelID    uint64        `json:"modelId"`
-	TokensUsed uint64        `json:"tokensUsed"`
-	Cost       uint64        `json:"cost"`
-	Day        string        `json:"day"`
-	Block      int64         `json:"block"`
+	ProviderID   uint64        `json:"providerId"`
+	User         model.UniAddr `json:"user"`
+	ModelID      uint64        `json:"modelId"`
+	TokensUsed   uint64        `json:"tokensUsed"`
+	CachedTokens uint64        `json:"cachedTokens"`
+	Cost         uint64        `json:"cost"`
+	Day          string        `json:"day"`
+	Block        int64         `json:"block"`
 }

@@ -34,13 +34,35 @@ type AnthropicResponse struct {
 	Model   string             `json:"model"`
 	Content []AnthropicContent `json:"content"`
 	Usage   struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 	} `json:"usage"`
 	Error *struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+// anthropicStreamEvent 表示 Anthropic SSE 流中的各种事件
+type anthropicStreamEvent struct {
+	Type  string `json:"type"`
+	Delta *struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"delta"`
+	Message *struct {
+		Usage *struct {
+			InputTokens              int `json:"input_tokens"`
+			OutputTokens             int `json:"output_tokens"`
+			CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+			CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		} `json:"usage"`
+	} `json:"message"`
+	Usage *struct {
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
 }
 
 // ── AnthropicAdaptor ─────────────────────────────────────
@@ -125,15 +147,20 @@ func (a *AnthropicAdaptor) handleAnthropicNormal(ctx *RelayContext, resp *http.R
 		}
 	}
 
+	cachedTokens := antResp.Usage.CacheReadInputTokens
+
 	oaiResp := map[string]interface{}{
 		"id":      antResp.Id,
 		"object":  "chat.completion",
 		"model":   antResp.Model,
 		"choices": []map[string]interface{}{{"index": 0, "message": map[string]string{"role": "assistant", "content": content}, "finish_reason": "stop"}},
-		"usage": map[string]int{
+		"usage": map[string]interface{}{
 			"prompt_tokens":     antResp.Usage.InputTokens,
 			"completion_tokens": antResp.Usage.OutputTokens,
 			"total_tokens":      antResp.Usage.InputTokens + antResp.Usage.OutputTokens,
+			"prompt_tokens_details": map[string]int{
+				"cached_tokens": cachedTokens,
+			},
 		},
 	}
 
@@ -144,6 +171,9 @@ func (a *AnthropicAdaptor) handleAnthropicNormal(ctx *RelayContext, resp *http.R
 		PromptTokens:     antResp.Usage.InputTokens,
 		CompletionTokens: antResp.Usage.OutputTokens,
 		TotalTokens:      antResp.Usage.InputTokens + antResp.Usage.OutputTokens,
+		PromptTokensDetails: PromptTokensDetails{
+			CachedTokens: cachedTokens,
+		},
 	}, nil
 }
 
@@ -155,7 +185,10 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 
-	totalTokens := 0
+	promptTokens := 0
+	completionTokens := 0
+	cachedTokens := 0
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
@@ -163,16 +196,7 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 		}
 		data := strings.TrimPrefix(line, "data: ")
 
-		var evt struct {
-			Type  string `json:"type"`
-			Delta *struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"delta"`
-			Usage *struct {
-				OutputTokens int `json:"output_tokens"`
-			} `json:"usage"`
-		}
+		var evt anthropicStreamEvent
 		if json.Unmarshal([]byte(data), &evt) != nil {
 			continue
 		}
@@ -185,8 +209,14 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 		if evt.Delta != nil && evt.Delta.Text != "" {
 			chunk["choices"].([]map[string]interface{})[0]["delta"] = map[string]string{"content": evt.Delta.Text}
 		}
+
+		// Collect usage from stream events
+		if evt.Message != nil && evt.Message.Usage != nil {
+			promptTokens = evt.Message.Usage.InputTokens
+			cachedTokens = evt.Message.Usage.CacheReadInputTokens
+		}
 		if evt.Usage != nil {
-			totalTokens = evt.Usage.OutputTokens
+			completionTokens = evt.Usage.OutputTokens
 		}
 
 		b, _ := json.Marshal(chunk)
@@ -201,7 +231,15 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 		flusher.Flush()
 	}
 
-	return &Usage{TotalTokens: totalTokens}, nil
+	totalTokens := promptTokens + completionTokens
+	return &Usage{
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+		PromptTokensDetails: PromptTokensDetails{
+			CachedTokens: cachedTokens,
+		},
+	}, nil
 }
 
 func (a *AnthropicAdaptor) GetModelList() []string {

@@ -44,14 +44,30 @@ type GeminiResponse struct {
 		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
 	UsageMetadata *struct {
-		PromptTokenCount     int `json:"promptTokenCount"`
-		CandidatesTokenCount int `json:"candidatesTokenCount"`
-		TotalTokenCount      int `json:"totalTokenCount"`
+		PromptTokenCount        int `json:"promptTokenCount"`
+		CandidatesTokenCount    int `json:"candidatesTokenCount"`
+		TotalTokenCount         int `json:"totalTokenCount"`
+		CachedContentTokenCount int `json:"cachedContentTokenCount"`
 	} `json:"usageMetadata"`
 	Error *struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// geminiStreamEvent 解析 Gemini SSE 流中的事件
+type geminiStreamEvent struct {
+	Candidates []struct {
+		Content struct {
+			Parts []GeminiPart `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+	UsageMetadata *struct {
+		PromptTokenCount        int `json:"promptTokenCount"`
+		CandidatesTokenCount    int `json:"candidatesTokenCount"`
+		TotalTokenCount         int `json:"totalTokenCount"`
+		CachedContentTokenCount int `json:"cachedContentTokenCount"`
+	} `json:"usageMetadata"`
 }
 
 // ── GeminiAdaptor ────────────────────────────────────────
@@ -139,10 +155,24 @@ func (a *GeminiAdaptor) handleGeminiNormal(ctx *RelayContext, resp *http.Respons
 		content = gemResp.Candidates[0].Content.Parts[0].Text
 	}
 	usage := &Usage{}
+	cachedTokens := 0
 	if gemResp.UsageMetadata != nil {
 		usage.PromptTokens = gemResp.UsageMetadata.PromptTokenCount
 		usage.CompletionTokens = gemResp.UsageMetadata.CandidatesTokenCount
 		usage.TotalTokens = gemResp.UsageMetadata.TotalTokenCount
+		cachedTokens = gemResp.UsageMetadata.CachedContentTokenCount
+		usage.PromptTokensDetails = PromptTokensDetails{CachedTokens: cachedTokens}
+	}
+
+	usageMap := map[string]interface{}{
+		"prompt_tokens":     usage.PromptTokens,
+		"completion_tokens": usage.CompletionTokens,
+		"total_tokens":      usage.TotalTokens,
+	}
+	if cachedTokens > 0 {
+		usageMap["prompt_tokens_details"] = map[string]int{
+			"cached_tokens": cachedTokens,
+		}
 	}
 
 	oaiResp := map[string]interface{}{
@@ -152,9 +182,7 @@ func (a *GeminiAdaptor) handleGeminiNormal(ctx *RelayContext, resp *http.Respons
 			"message":       map[string]string{"role": "assistant", "content": content},
 			"finish_reason": "stop",
 		}},
-		"usage": map[string]int{
-			"prompt_tokens": usage.PromptTokens, "completion_tokens": usage.CompletionTokens, "total_tokens": usage.TotalTokens,
-		},
+		"usage": usageMap,
 	}
 
 	ctx.W.Header().Set("Content-Type", "application/json")
@@ -170,7 +198,11 @@ func (a *GeminiAdaptor) handleGeminiStream(ctx *RelayContext, resp *http.Respons
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 
+	promptTokens := 0
+	completionTokens := 0
 	totalTokens := 0
+	cachedTokens := 0
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
@@ -178,18 +210,20 @@ func (a *GeminiAdaptor) handleGeminiStream(ctx *RelayContext, resp *http.Respons
 		}
 		data := strings.TrimPrefix(line, "data: ")
 
-		var evt struct {
-			Candidates []struct {
-				Content struct {
-					Parts []GeminiPart `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
+		var evt geminiStreamEvent
 		json.Unmarshal([]byte(data), &evt)
 
 		text := ""
 		if len(evt.Candidates) > 0 && len(evt.Candidates[0].Content.Parts) > 0 {
 			text = evt.Candidates[0].Content.Parts[0].Text
+		}
+
+		// Collect usage from stream events
+		if evt.UsageMetadata != nil {
+			promptTokens = evt.UsageMetadata.PromptTokenCount
+			completionTokens = evt.UsageMetadata.CandidatesTokenCount
+			totalTokens = evt.UsageMetadata.TotalTokenCount
+			cachedTokens = evt.UsageMetadata.CachedContentTokenCount
 		}
 
 		chunk := map[string]interface{}{
@@ -208,7 +242,15 @@ func (a *GeminiAdaptor) handleGeminiStream(ctx *RelayContext, resp *http.Respons
 	if flusher != nil {
 		flusher.Flush()
 	}
-	return &Usage{TotalTokens: totalTokens}, nil
+
+	return &Usage{
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		TotalTokens:      totalTokens,
+		PromptTokensDetails: PromptTokensDetails{
+			CachedTokens: cachedTokens,
+		},
+	}, nil
 }
 
 func (a *GeminiAdaptor) GetModelList() []string {

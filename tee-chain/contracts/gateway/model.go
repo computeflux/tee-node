@@ -177,8 +177,19 @@ func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error)
 	return g.listModelsByIDs(ids, 0, 10000)
 }
 
-func (g GatewayQuery) ListActiveModelsWithinProvider(offset uint64, limit uint32) ([]ModelInfoWithProvider, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+func (g GatewayQuery) ListActiveModelsWithinProvider(
+	minContext, maxContext, minPrice, maxPrice uint64,
+	offset uint64, limit uint32,
+) ([]ModelInfoWithProvider, error) {
+	filter := map[string]any{"IsActive": uint64(1)}
+	if minContext != 0 || maxContext != 0 {
+		filter["ContextLength"] = model.Range{Min: minContext, Max: maxContext}
+	}
+	if minPrice != 0 || maxPrice != 0 {
+		filter["PromptPricing"] = model.Range{Min: minPrice, Max: maxPrice}
+	}
+
+	ids, err := g.models.Query(g.api.GetTxn(), filter)
 	if err != nil {
 		return nil, err
 	}

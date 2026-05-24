@@ -505,18 +505,34 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc3, 0xef, 0x49, 0x0c}:
-		if err := model.RequireArgLen(args, 2, "list_active_models_within_provider"); err != nil {
+		if err := model.RequireArgLen(args, 6, "list_active_models_within_provider"); err != nil {
 			return nil, err
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		minContext, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: minContext: %w", err)
+		}
+		maxContext, err := model.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: maxContext: %w", err)
+		}
+		minPrice, err := model.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: minPrice: %w", err)
+		}
+		maxPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_models_within_provider: maxPrice: %w", err)
+		}
+		offset, err := model.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		limit, err := model.DecodeScaleArgBytes[uint32](args[5])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: limit: %w", err)
 		}
-		out, err := q.ListActiveModelsWithinProvider(offset, limit)
+		out, err := q.ListActiveModelsWithinProvider(minContext, maxContext, minPrice, maxPrice, offset, limit)
 		if err != nil {
 			return nil, err
 		}

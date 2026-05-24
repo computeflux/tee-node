@@ -30,13 +30,14 @@ type GatewayTokenInfo struct {
 }
 
 type GatewayDailyUsage struct {
-	TokenID    uint64 `json:"tokenId"`
-	ProviderID uint64 `json:"channelId"`
-	ModelID    uint64 `json:"modelId"`
-	Day        string `json:"day"`
-	Count      uint64 `json:"count"`
-	TokensUsed uint64 `json:"tokensUsed"`
-	PointsUsed uint64 `json:"pointsUsed"`
+	TokenID      uint64 `json:"tokenId"`
+	ProviderID   uint64 `json:"channelId"`
+	ModelID      uint64 `json:"modelId"`
+	Day          string `json:"day"`
+	Count        uint64 `json:"count"`
+	TokensUsed   uint64 `json:"tokensUsed"`
+	CachedTokens uint64 `json:"cachedTokens"`
+	PointsUsed   uint64 `json:"pointsUsed"`
 }
 
 // ── Token ────────────────────────────────────────────────

@@ -60,7 +60,9 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 
 		cost := r.Cost
 		if cost == 0 {
-			cost = (r.TokensUsed+999)/1000*m.PointsPer1K + m.PromptPricing
+			// 缓存命中 token 按 10% 计价（向上取整到千）
+			effectiveTokens := r.CachedTokens/10 + (r.TokensUsed - r.CachedTokens)
+			cost = (effectiveTokens+999)/1000*m.PointsPer1K + m.PromptPricing
 		}
 		if cost < 1 {
 			cost = 1
@@ -90,19 +92,21 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		}
 		usage.Count++
 		usage.TokensUsed += r.TokensUsed
+		usage.CachedTokens += r.CachedTokens
 		usage.PointsUsed += cost
 		g.usages.Set(g.api.GetTxn(), dayKey, *usage)
 
 		// 记录结算历史
 		day := fmt.Sprintf("%d", g.api.GetHeight()/7200)
 		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, SettlementRecord{
-			ProviderID: r.ProviderID,
-			User:       r.User,
-			ModelID:    r.ModelID,
-			TokensUsed: r.TokensUsed,
-			Cost:       cost,
-			Day:        day,
-			Block:      g.api.GetHeight(),
+			ProviderID:   r.ProviderID,
+			User:         r.User,
+			ModelID:      r.ModelID,
+			TokensUsed:   r.TokensUsed,
+			CachedTokens: r.CachedTokens,
+			Cost:         cost,
+			Day:          day,
+			Block:        g.api.GetHeight(),
 		})
 	}
 	return nil

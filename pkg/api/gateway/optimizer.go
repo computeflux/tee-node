@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,11 +12,12 @@ import (
 // 批量写入 Pebble，避免每个请求都同步写磁盘
 
 type usageRecord struct {
-	tokenID    uint64
-	day        string
-	providerID uint64
-	modelID    uint64
-	tokens     uint64
+	tokenID      uint64
+	day          string
+	providerID   uint64
+	modelID      uint64
+	tokens       uint64
+	cachedTokens uint64
 }
 
 var (
@@ -37,16 +39,25 @@ func initUsageWriter() {
 				select {
 				case r := <-usageCh:
 					key := r.day + "_" + uintToStr(r.tokenID)
+					var effectiveTokens uint64
+					if r.cachedTokens >= r.tokens {
+						effectiveTokens = r.tokens / 10
+					} else {
+						effectiveTokens = r.cachedTokens/10 + (r.tokens - r.cachedTokens)
+					}
+					points := (effectiveTokens + 999) / 1000
 					if u, ok := batch[key]; ok {
 						u.Count++
 						u.TokensUsed += r.tokens
-						u.PointsUsed += (r.tokens + 999) / 1000
+						u.CachedTokens += r.cachedTokens
+						u.PointsUsed += points
 					} else {
 						batch[key] = &model.GatewayDailyUsage{
 							TokenID: r.tokenID, ProviderID: r.providerID,
 							ModelID: r.modelID, Day: r.day,
 							Count: 1, TokensUsed: r.tokens,
-							PointsUsed: (r.tokens + 999) / 1000,
+							CachedTokens: r.cachedTokens,
+							PointsUsed:   points,
 						}
 					}
 				case <-ticker.C:
@@ -62,13 +73,14 @@ func initUsageWriter() {
 	})
 }
 
-func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint64) {
+func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint64, cachedTokens uint64) {
 	initUsageWriter()
 	select {
-	case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens}:
+	case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens, cachedTokens}:
+		fmt.Println("Usage", tokenID, day, providerID, 0, tokens, cachedTokens)
 	default:
 		// Channel full, drop (degraded mode) — log for monitoring.
-		GATEWAYLOG().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)", tokenID, providerID, tokens)
+		GATEWAYLOG().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d cached=%d (channel full)", tokenID, providerID, tokens, cachedTokens)
 	}
 }
 
