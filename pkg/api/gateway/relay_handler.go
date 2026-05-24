@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/services/gateway/relay"
+	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 )
 
 func RegisterGatewayRoutes(r chi.Router) {

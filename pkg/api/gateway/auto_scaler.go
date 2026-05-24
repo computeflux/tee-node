@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/services/gateway/relay"
+	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 )
 
 // ── Auto Scaler ───────────────────────────────────────────
