@@ -37,7 +37,7 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	}
 	provider := "email_passwordless"
 	address := r.WalletSvc.DeriveAddress(email)
-	apiKey := createUserAPIKey(email)
+	apiKey := createUserAPIKey(email, address)
 	model.PutAuthUser(&model.AuthUser{
 		Email:   email,
 		Address: address,
@@ -85,7 +85,7 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	}
 
 	address := r.WalletSvc.DeriveAddress(oauthUser.Email)
-	apiKey := createUserAPIKey(oauthUser.Email)
+	apiKey := createUserAPIKey(oauthUser.Email, address)
 	userInfo := &auth.UserInfo{
 		Email:        oauthUser.Email,
 		Name:         oauthUser.Name,
@@ -380,7 +380,7 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 	}
 
 	address := r.WalletSvc.DeriveAddress(email)
-	apiKey := createUserAPIKey(email)
+	apiKey := createUserAPIKey(email, address)
 	return &auth.RecoveryResult{
 		Status: "ok", Token: apiKey, Address: address, Email: email,
 	}, nil

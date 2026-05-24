@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
@@ -18,11 +19,23 @@ func generateAPIKey() string {
 }
 
 // createUserAPIKey creates and stores a new API Key for the given user.
-func createUserAPIKey(owner string) string {
+// addrHex 为 Ethereum 地址 hex 字符串（如 "0xabc..."），用于结算时构造 UniAddr。
+func createUserAPIKey(owner string, addrHex string) string {
 	apiKey := generateAPIKey()
 	nextID := model.GetNextID("gateway_token")
+
+	// 构造 UniAddr：以太坊地址 callerType=1（EVM），去掉 0x 前缀
+	addr := model.UniAddr{T: 1, V: []byte{}}
+	if addrHex != "" && addrHex != "0x" {
+		addrHex = strings.TrimPrefix(addrHex, "0x")
+		if b, err := hex.DecodeString(addrHex); err == nil && len(b) == 20 {
+			addr.V = b
+		}
+	}
+
 	model.SetGatewayToken(nextID, &model.GatewayTokenInfo{
 		Owner:     owner,
+		Addr:      addr,
 		Key:       apiKey,
 		RateLimit: 60,
 		IsActive:  true,

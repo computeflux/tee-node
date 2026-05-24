@@ -16,23 +16,25 @@ type GatewayProviderInfo struct {
 }
 
 type GatewayTokenInfo struct {
-	ID        uint64 `json:"id"`
-	Owner     string `json:"owner"`
-	Key       string `json:"key"` // bearer token value
-	RateLimit uint32 `json:"rateLimit"`
-	IsActive  bool   `json:"isActive"`
-	CreatedAt uint64 `json:"createdAt"`
+	ID        uint64  `json:"id"`
+	Owner     string  `json:"owner"`
+	Addr      UniAddr `json:"addr"` // 完整的链上地址（含 T+V），用于结算
+	Key       string  `json:"key"`  // bearer token value
+	RateLimit uint32  `json:"rateLimit"`
+	IsActive  bool    `json:"isActive"`
+	CreatedAt uint64  `json:"createdAt"`
 }
 
 type GatewayDailyUsage struct {
-	TokenID      uint64 `json:"tokenId"`
-	ProviderID   uint64 `json:"providerId"`
-	ModelID      uint64 `json:"modelId"`
-	Day          string `json:"day"`
-	Count        uint64 `json:"count"`
-	TokensUsed   uint64 `json:"tokensUsed"`
-	CachedTokens uint64 `json:"cachedTokens"`
-	PointsUsed   uint64 `json:"pointsUsed"`
+	User         UniAddr `json:"user"`
+	TokenID      uint64  `json:"tokenId"`
+	ProviderID   uint64  `json:"providerId"`
+	ModelID      uint64  `json:"modelId"`
+	Day          string  `json:"day"`
+	Count        uint64  `json:"count"`
+	TokensUsed   uint64  `json:"tokensUsed"`
+	CachedTokens uint64  `json:"cachedTokens"`
+	PointsUsed   uint64  `json:"pointsUsed"`
 }
 
 // ── Token ────────────────────────────────────────────────

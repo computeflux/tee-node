@@ -50,9 +50,9 @@ func RegisterGatewayRoutes(r chi.Router) {
 func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	endpoint := GetEndpointFromContext(r)
-	model := GetModelFromContext(r)
+	modelData := GetModelFromContext(r)
 	token := GetTokenFromContext(r)
-	if endpoint == nil {
+	if endpoint == nil || modelData == nil {
 		writeError(w, http.StatusServiceUnavailable, "no route", "server_error")
 		return
 	}
@@ -80,33 +80,35 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	// Business error (e.g. upstream 4xx): already contains status code and message.
-	usage, bizErr, err := relayToUpstream(w, r, endpoint, model.Data.Name, bodyBytes, reqBody.Stream)
+	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream)
 	if bizErr != nil {
-		EmitProviderMetric(model.Data.ProviderID, false)
+		EmitProviderMetric(modelData.Data.ProviderID, false)
 		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
 		return
 	}
 
 	// Transport error (e.g. connection refused).
 	if err != nil {
-		EmitProviderMetric(model.Data.ProviderID, false)
+		EmitProviderMetric(modelData.Data.ProviderID, false)
 		writeError(w, http.StatusBadGateway, err.Error(), "server_error")
 		return
 	}
 
 	// 统计调用成功率和使用量
-	EmitProviderMetric(model.Data.ProviderID, true)
+	EmitProviderMetric(modelData.Data.ProviderID, true)
 
 	// 统计用户 Token 使用
 	var tokenID uint64
+	var userAddr model.UniAddr
 	if token != nil {
 		tokenID = token.ID
+		userAddr = token.Addr
 	}
 	var totalTokens, cachedTokens int
 	if usage != nil {
 		totalTokens = usage.TotalTokens
 		cachedTokens = usage.PromptTokensDetails.CachedTokens
-		recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), model, uint64(totalTokens), uint64(cachedTokens))
+		recordUsageAsync(userAddr, tokenID, time.Now().Format("2006-01-02"), modelData, uint64(totalTokens), uint64(cachedTokens))
 	}
 
 	// 记录调用时间
@@ -115,7 +117,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if usage != nil {
 		tkns = usage.TotalTokens
 	}
-	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, model.Data.Name, endpoint.URL, tkns, elapsed)
+	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, modelData.Data.Name, endpoint.URL, tkns, elapsed)
 }
 
 func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {

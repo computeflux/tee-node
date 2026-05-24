@@ -37,19 +37,22 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 
 // ── Billing ──────────────────────────────────────────────
 
-// SettleUsage 批量结算（仅模型所属 Provider 可调用，每 5 分钟执行一次）
+// SettleUsage 批量结算（Provider Owner 或 System Account 可调用，每 5 分钟执行一次）
 // TODO: 防重放 — 增加 batchNonce/merkle root + TEE 签名校验，防止 Provider 重复提交同一批结算
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
 	caller := g.api.GetCaller()
+	isSystem := g.api.CallbySystem()
 
 	for _, r := range records {
-		// 校验 provider 归属
+		// 校验 provider 归属（非 system 调用时必须验证）
 		prov, err := g.providers.Get(g.api.GetTxn(), r.ProviderID)
 		if err != nil || prov == nil {
 			return fmt.Errorf("settle: %w", ErrProviderNotFound)
 		}
-		if !bytes.Equal(prov.Owner.V, caller.V) || prov.Owner.T != caller.T {
-			return fmt.Errorf("settle: provider %d not owned by caller", r.ProviderID)
+		if !isSystem {
+			if !bytes.Equal(prov.Owner.V, caller.V) || prov.Owner.T != caller.T {
+				return fmt.Errorf("settle: provider %d not owned by caller", r.ProviderID)
+			}
 		}
 
 		// 校验模型存在

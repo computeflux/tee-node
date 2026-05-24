@@ -56,6 +56,7 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 	}
 	return &model.GatewayTokenInfo{
 		Owner:     fmt.Sprintf("%x", info.Owner.V),
+		Addr:      info.Owner,
 		Key:       key,
 		RateLimit: info.RateLimit,
 		IsActive:  info.IsActive,
