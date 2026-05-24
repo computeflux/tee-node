@@ -10,9 +10,14 @@ import (
 // ── Model ────────────────────────────────────────────────
 
 func (g GatewayMutation) RegisterModel(
-	name string, pointsPer1K uint64,
-	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	modelID string, providerType uint16, uri string, apiKeys []string,
+	name string,
+	inputModalities uint8,
+	contextLength uint64,
+	inPrice, cachedPrice, outPrice uint64,
+	modelID string,
+	providerType uint16,
+	uri string,
+	apiKeys []string,
 ) error {
 	owner := g.api.GetCaller()
 
@@ -20,6 +25,19 @@ func (g GatewayMutation) RegisterModel(
 	provID, err := g.providerByOwner.Get(g.api.GetTxn(), owner)
 	if err != nil || provID == nil {
 		return fmt.Errorf("must create a provider before registering models")
+	}
+
+	// ProviderID + Name 唯一性检查
+	txn := g.api.GetTxn()
+	existing, err := g.models.Query(txn, model.QueryAND{
+		model.QueryCond{Field: "ProviderID", Val: *provID},
+		model.QueryCond{Field: "Name", Val: name},
+	})
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return errors.New("model name already exists for this provider")
 	}
 
 	// 1. 注册每个 apiKey（明文 → TEE KMS 加密 → 链上存储 ref）
@@ -37,7 +55,7 @@ func (g GatewayMutation) RegisterModel(
 		if err != nil {
 			return fmt.Errorf("encrypt api key failed: %w", err)
 		}
-		if err := g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
+		if err := g.encryptedKeys.Set(txn, ref, EncryptedAPIKey{
 			Ref:        ref,
 			Ciphertext: ek.Ciphertext,
 			Nonce:      ek.Nonce,
@@ -48,16 +66,17 @@ func (g GatewayMutation) RegisterModel(
 	}
 
 	// 2. 注册模型（只存 ref 列表，明文永不上链）
-	if _, err := g.models.Insert(g.api.GetTxn(), ModelInfo{
+	if _, err := g.models.Insert(txn, ModelInfo{
 		Name:            name,
 		Owner:           owner,
 		ProviderID:      *provID,
-		PointsPer1K:     pointsPer1K,
 		IsActive:        true,
 		CreatedAt:       uint64(g.api.GetBlockTime()),
 		InputModalities: inputModalities,
 		ContextLength:   contextLength,
-		PromptPricing:   promptPricing,
+		InPrice:         inPrice,
+		CachedPrice:     cachedPrice,
+		OutPrice:        outPrice,
 		ModelID:         modelID,
 		ProviderType:    providerType,
 		URI:             uri,
@@ -69,9 +88,14 @@ func (g GatewayMutation) RegisterModel(
 }
 
 func (g GatewayMutation) UpdateModel(
-	modelID uint64, pointsPer1K uint64,
-	inputModalities uint8, contextLength uint64, promptPricing uint64,
-	modelIDStr string, providerType uint16, uri string, apiKeys []string,
+	modelID uint64,
+	inputModalities uint8,
+	contextLength uint64,
+	inPrice, cachedPrice, outPrice uint64,
+	modelIDStr string,
+	providerType uint16,
+	uri string,
+	apiKeys []string,
 ) error {
 	// 获取当前模型，保存旧 APIKeyRefs 用于清理
 	cur, err := g.models.Get(g.api.GetTxn(), modelID)
@@ -79,6 +103,9 @@ func (g GatewayMutation) UpdateModel(
 		return fmt.Errorf("model not found")
 	}
 	oldRefs := cur.APIKeyRefs
+
+	// ProviderID + Name 唯一性检查（name 不允许修改，但防御性检查）
+	// 如果未来允许改 name，需要在此排除自身 ID 后做冲突检查
 
 	// 加密新的 apiKeys 并存储
 	refs := make([]string, 0, len(apiKeys))
@@ -107,10 +134,11 @@ func (g GatewayMutation) UpdateModel(
 
 	// 更新模型字段
 	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
-		m.PointsPer1K = pointsPer1K
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
-		m.PromptPricing = promptPricing
+		m.InPrice = inPrice
+		m.CachedPrice = cachedPrice
+		m.OutPrice = outPrice
 		m.ModelID = modelIDStr
 		m.ProviderType = providerType
 		m.URI = uri
@@ -163,7 +191,7 @@ func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32)
 }
 
 func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+	ids, err := g.models.Query(g.api.GetTxn(), model.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +199,7 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 }
 
 func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": providerID})
+	ids, err := g.models.Query(g.api.GetTxn(), model.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
 		return nil, err
 	}
@@ -182,15 +210,15 @@ func (g GatewayQuery) ListActiveModelsWithinProvider(
 	minContext, maxContext, minPrice, maxPrice uint64,
 	offset uint64, limit uint32,
 ) ([]ModelInfoWithProvider, error) {
-	filter := map[string]any{"IsActive": uint64(1)}
+	exprs := model.QueryAND{model.QueryCond{Field: "IsActive", Val: uint64(1)}}
 	if minContext != 0 || maxContext != 0 {
-		filter["ContextLength"] = model.Range{Min: minContext, Max: maxContext}
+		exprs = append(exprs, model.QueryCond{Field: "ContextLength", Val: model.Range{Min: minContext, Max: maxContext}})
 	}
 	if minPrice != 0 || maxPrice != 0 {
-		filter["PromptPricing"] = model.Range{Min: minPrice, Max: maxPrice}
+		exprs = append(exprs, model.QueryCond{Field: "InPrice", Val: model.Range{Min: minPrice, Max: maxPrice}})
 	}
 
-	ids, err := g.models.Query(g.api.GetTxn(), filter)
+	ids, err := g.models.Query(g.api.GetTxn(), exprs)
 	if err != nil {
 		return nil, err
 	}
@@ -223,15 +251,15 @@ func (g GatewayQuery) QueryModels(
 ) ([]ModelInfo, error) {
 	txn := g.api.GetTxn()
 
-	filter := map[string]any{"IsActive": uint64(1)}
+	exprs := model.QueryAND{model.QueryCond{Field: "IsActive", Val: uint64(1)}}
 	if minContext != 0 || maxContext != 0 {
-		filter["ContextLength"] = model.Range{Min: minContext, Max: maxContext}
+		exprs = append(exprs, model.QueryCond{Field: "ContextLength", Val: model.Range{Min: minContext, Max: maxContext}})
 	}
 	if maxPrice != 0 {
-		filter["PromptPricing"] = model.Range{Min: 0, Max: maxPrice}
+		exprs = append(exprs, model.QueryCond{Field: "InPrice", Val: model.Range{Min: 0, Max: maxPrice}})
 	}
 
-	ids, err := g.models.Query(txn, filter)
+	ids, err := g.models.Query(txn, exprs)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +292,7 @@ func (g GatewayQuery) QueryModels(
 
 // GetModelsByProvider 返回某个 Provider 注册的所有模型（使用 ProviderID exact 索引）
 func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error) {
-	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": providerID})
+	keys, err := g.models.Query(g.api.GetTxn(), model.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +309,10 @@ func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error
 
 // GetModelByName 返回指定名称的所有模型（使用 Name exact 索引）
 func (g GatewayQuery) GetModelByName(pid uint64, name string) (*DataWithID[ModelInfo], error) {
-	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": pid, "Name": name})
+	keys, err := g.models.Query(g.api.GetTxn(), model.QueryAND{
+		model.QueryCond{Field: "ProviderID", Val: pid},
+		model.QueryCond{Field: "Name", Val: name},
+	})
 	if err != nil {
 		return nil, err
 	}

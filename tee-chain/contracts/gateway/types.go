@@ -53,19 +53,21 @@ type EncryptedAPIKey struct {
 type ModelInfo struct {
 	Name            string        `json:"name" idx:"exact"`
 	Owner           model.UniAddr `json:"owner"`
-	ProviderID      uint64        `json:"providerId" idx:"exact"` // 所属 Provider
-	PointsPer1K     uint64        `json:"pointsPer1K"`
-	IsActive        bool          `json:"isActive" idx:"exact"`
-	CreatedAt       uint64        `json:"createdAt"`
+	ProviderID      uint64        `json:"providerId" idx:"exact"`
 	InputModalities uint8         `json:"inputModalities" idx:"exact"`
 	ContextLength   uint64        `json:"contextLength"   idx:"range"`
-	PromptPricing   uint64        `json:"promptPricing"   idx:"range"`
+	InPrice         uint64        `json:"inPrice"   idx:"range"`
+	CachedPrice     uint64        `json:"cachedPrice"`
+	OutPrice        uint64        `json:"outPrice"`
 
 	// 供应商配置
 	ProviderType uint16   `json:"providerType"`         // 供应商类型 (openai, claude, ...)
 	ModelID      string   `json:"modelId"`              // 模型 ID
 	URI          string   `json:"uri,omitempty"`        // 自定义端点，为空则用供应商官方地址
 	APIKeyRefs   []string `json:"apiKeyRefs,omitempty"` // 引用标识列表，指向 EncryptedAPIKey
+
+	IsActive  bool   `json:"isActive" idx:"exact"`
+	CreatedAt uint64 `json:"createdAt"`
 }
 
 type DataWithID[T any] struct {

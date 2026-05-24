@@ -180,7 +180,8 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 
 // VerifyResponse is the resolver for the verifyResponse field.
 // challenge-response 验证：前端用 PBKDF2(password, salt) 派生 dk，然后 HMAC-SHA256(dk, challenge)
-func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, response string) (*model.SignSessionResult, error) {
+// 参数 challenge 用于精确定位要验证的 challenge，避免多 challenge 错位
+func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, challenge string, response string) (*model.SignSessionResult, error) {
 	email, err := resolveEmailFromToken(token)
 	if err != nil {
 		e := "unauthorized"
@@ -205,10 +206,15 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, res
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
 	}
 
-	// 查找未使用的 challenge
-	challenge, err := model.FindPendingChallenge(email)
-	if err != nil || challenge == "" {
-		e := "no valid challenge"
+	// 获取指定的 challenge 记录
+	rec, err := model.GetChallenge(email, challenge)
+	if err != nil || rec == nil {
+		e := "invalid challenge"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	if rec.Used {
+		e := "challenge already used"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
 	}
 
@@ -216,7 +222,7 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, res
 	expected := computeHMAC(user.DKHash, challenge)
 	isValid := hmac.Equal([]byte(expected), []byte(response))
 
-	// 标记 challenge 已使用（无论成败）
+	// 标记该 challenge 已使用（无论成败）
 	model.MarkChallengeUsed(email, challenge)
 
 	if isValid {
@@ -427,6 +433,12 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 
 	if user.Salt == "" || user.DKHash == "" {
 		return &model.ChallengeResult{Status: "error", Error: strPtr("password not set")}, nil
+	}
+
+	// 生成 16 字节随机 challenge 前，清除该用户所有旧未使用的 challenge
+	if err := model.ClearAllChallenges(email); err != nil {
+		// 非致命错误，继续
+		fmt.Printf("[GetChallenge] clear old challenges warning: %v\n", err)
 	}
 
 	// 生成 16 字节随机 challenge

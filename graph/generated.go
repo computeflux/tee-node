@@ -96,7 +96,7 @@ type ComplexityRoot struct {
 		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
 		VerifyPassword     func(childComplexity int, token string, passwordHash string) int
 		VerifyRecovery     func(childComplexity int, recoveryEmail string, otp string) int
-		VerifyResponse     func(childComplexity int, token string, response string) int
+		VerifyResponse     func(childComplexity int, token string, challenge string, response string) int
 	}
 
 	OAuthURL struct {
@@ -165,7 +165,7 @@ type MutationResolver interface {
 	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string) (*auth.AuthResponse, error)
 	SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error)
 	VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error)
-	VerifyResponse(ctx context.Context, token string, response string) (*model.SignSessionResult, error)
+	VerifyResponse(ctx context.Context, token string, challenge string, response string) (*model.SignSessionResult, error)
 	SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error)
 	SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error)
 	RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error)
@@ -537,7 +537,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.VerifyResponse(childComplexity, args["token"].(string), args["response"].(string)), true
+		return e.complexity.Mutation.VerifyResponse(childComplexity, args["token"].(string), args["challenge"].(string), args["response"].(string)), true
 
 	case "OAuthURL.authUrl":
 		if e.complexity.OAuthURL.AuthUrl == nil {
@@ -2060,11 +2060,16 @@ func (ec *executionContext) field_Mutation_verifyResponse_args(ctx context.Conte
 		return nil, err
 	}
 	args["token"] = arg0
-	arg1, err := ec.field_Mutation_verifyResponse_argsResponse(ctx, rawArgs)
+	arg1, err := ec.field_Mutation_verifyResponse_argsChallenge(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["response"] = arg1
+	args["challenge"] = arg1
+	arg2, err := ec.field_Mutation_verifyResponse_argsResponse(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["response"] = arg2
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_verifyResponse_argsToken(
@@ -2096,6 +2101,24 @@ func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("response"))
 	if tmp, ok := rawArgs["response"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyResponse_argsChallenge(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["challenge"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("challenge"))
+	if tmp, ok := rawArgs["challenge"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -3619,7 +3642,7 @@ func (ec *executionContext) _Mutation_verifyResponse(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().VerifyResponse(rctx, fc.Args["token"].(string), fc.Args["response"].(string))
+		return ec.resolvers.Mutation().VerifyResponse(rctx, fc.Args["token"].(string), fc.Args["challenge"].(string), fc.Args["response"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

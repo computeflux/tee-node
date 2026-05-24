@@ -15,7 +15,6 @@ type contextKey string
 
 const (
 	ctxToken    contextKey = "gateway_token"
-	ctxProvider contextKey = "gateway_provider"
 	ctxModel    contextKey = "gateway_model"
 	ctxEndpoint contextKey = "gateway_endpoint"
 	ctxBody     contextKey = "gateway_body"
@@ -46,7 +45,6 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 }
 
 // DistributeMiddleware routes based on "provider/model" format
-// e.g. "openai/gpt-4" → query contract → verify model exists → pick endpoint by user hash → route
 func DistributeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Read body early to extract model name for correct routing.
@@ -59,21 +57,21 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// Parse model from JSON body first, fall back to query string.
 		var bodyMap map[string]any
-		modelName := r.URL.Query().Get("model")
+		modelNameArg := r.URL.Query().Get("model")
 		if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
 			if bodyMap["model"] != nil {
-				modelName = bodyMap["model"].(string)
+				modelNameArg = bodyMap["model"].(string)
 			}
 		}
-		if modelName == "" {
+		if modelNameArg == "" {
 			writeError(w, http.StatusNotFound, "model is null", "not_found")
 			return
 		}
 
 		// Parse "provider/model" format
-		providerName, pmodel := parseProviderModel(modelName)
-		if modelName != pmodel {
-			bodyMap["model"] = pmodel
+		providerName, modelName := parseProviderModel(modelNameArg)
+		if modelNameArg != modelName {
+			bodyMap["model"] = modelName
 			if newBody, err := json.Marshal(bodyMap); err == nil {
 				bodyBytes = newBody
 			}

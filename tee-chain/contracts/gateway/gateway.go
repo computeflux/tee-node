@@ -30,16 +30,16 @@ var (
 type Gateway struct {
 	api model.ContractApi
 
-	credits           *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v1_credits"`
-	models            *model.IndexedList[uint64, ModelInfo]                     `store:"keyPfx:v1_models"`
-	providers         *model.IndexedList[uint64, ProviderInfo]                  `store:"keyPfx:v1_providers"`
-	providerByOwner   *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v1_provider_by_owner"` // owner → providerID（一人一 provider）
-	providerCredits   *model.StoreMapping[uint64, uint64]                       `store:"keyPfx:v1_provider_credit"`   // providerID → accumulated credits
-	apiKeys           *model.IndexedStore[string, APIKeyInfo]                   `store:"keyPfx:v1_api_key"`           // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
-	usages            *model.StoreMapping[string, DailyUsage]                   `store:"keyPfx:v1_usage"`
-	encryptedKeys     *model.StoreMapping[string, EncryptedAPIKey]              `store:"keyPfx:v1_encrypted_key"`      // ref → EncryptedAPIKey
-	rechargeHistory   *model.StoreList2D[model.UniAddr, uint32, RechargeRecord] `store:"keyPfx:v1_recharge_history"`   // user → []RechargeRecord
-	settlementHistory *model.StoreList2D[uint64, uint32, SettlementRecord]      `store:"keyPfx:v1_settlement_history"` // providerID → []SettlementRecord
+	credits           *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v2_credits"`
+	models            *model.IndexedList[uint64, ModelInfo]                     `store:"keyPfx:v2_models"`
+	providers         *model.IndexedList[uint64, ProviderInfo]                  `store:"keyPfx:v2_providers"`
+	providerByOwner   *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v2_provider_by_owner"` // owner → providerID（一人一 provider）
+	providerCredits   *model.StoreMapping[uint64, uint64]                       `store:"keyPfx:v2_provider_credit"`   // providerID → accumulated credits
+	apiKeys           *model.IndexedStore[string, APIKeyInfo]                   `store:"keyPfx:v2_api_key"`           // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
+	usages            *model.StoreMapping[string, DailyUsage]                   `store:"keyPfx:v2_usage"`
+	encryptedKeys     *model.StoreMapping[string, EncryptedAPIKey]              `store:"keyPfx:v2_encrypted_key"`      // ref → EncryptedAPIKey
+	rechargeHistory   *model.StoreList2D[model.UniAddr, uint32, RechargeRecord] `store:"keyPfx:v2_recharge_history"`   // user → []RechargeRecord
+	settlementHistory *model.StoreList2D[uint64, uint32, SettlementRecord]      `store:"keyPfx:v2_settlement_history"` // providerID → []SettlementRecord
 }
 
 type GatewayQuery struct{ Gateway }

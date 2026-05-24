@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/wetee-dao/ink.go/util"
 )
 
@@ -19,6 +20,14 @@ func (g GatewayMutation) CreateProvider(
 	// 一人只能注册一个 provider
 	if existing, _ := g.providerByOwner.Get(txn, owner); existing != nil {
 		return fmt.Errorf("provider already exists for this account (id=%d)", *existing)
+	}
+
+	// provider name 唯一性检查
+	if name != "" {
+		dup, _ := g.providers.Query(txn, model.QueryCond{Field: "Name", Val: name})
+		if len(dup) > 0 {
+			return errors.New("provider name already exists")
+		}
 	}
 
 	// priority 由 deposit 自动计算
@@ -59,7 +68,20 @@ func (g GatewayMutation) UpdateProvider(
 	modelIds []uint64, region uint8, feeRate uint32,
 	priority uint32, uptimeSLA uint32,
 ) error {
-	return g.providers.UpdateFn(g.api.GetTxn(), providerID, func(ch *ProviderInfo) {
+	txn := g.api.GetTxn()
+
+	// 若修改 name，需检查唯一性
+	if name != "" {
+		cur, _ := g.providers.Get(txn, providerID)
+		if cur != nil && cur.Name != name {
+			dup, _ := g.providers.Query(txn, model.QueryCond{Field: "Name", Val: name})
+			if len(dup) > 0 {
+				return errors.New("provider name already exists")
+			}
+		}
+	}
+
+	return g.providers.UpdateFn(txn, providerID, func(ch *ProviderInfo) {
 		if name != "" {
 			ch.Name = name
 		}
@@ -131,7 +153,7 @@ func (g GatewayQuery) ListProviders(offset uint64, limit uint32) ([]ProviderInfo
 }
 
 func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
-	ids, err := g.providers.Query(g.api.GetTxn(), map[string]any{"IsActive": uint64(1)})
+	ids, err := g.providers.Query(g.api.GetTxn(), model.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +162,7 @@ func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]Provid
 
 // GetProviderByName 返回指定名称的所有 Provider（使用 Name exact 索引）
 func (g GatewayQuery) GetProviderByName(name string) (*DataWithID[ProviderInfo], error) {
-	keys, err := g.providers.Query(g.api.GetTxn(), map[string]any{"Name": name})
+	keys, err := g.providers.Query(g.api.GetTxn(), model.QueryCond{Field: "Name", Val: name})
 	if err != nil {
 		return nil, err
 	}

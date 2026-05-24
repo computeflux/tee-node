@@ -71,19 +71,19 @@ func TestIndexedStore_QueryExact(t *testing.T) {
 	require.NoError(t, store.Put(txn, 3, testProduct{Name: "C", Category: 1, Price: 80}))
 
 	// 查 Category=1
-	ids, err := store.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err := store.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 3}, ids)
 
 	// 查 Category=2
-	ids, err = store.Query(txn, map[string]any{"Category": uint64(2)})
+	ids, err = store.Query(txn, QueryCond{Field: "Category", Val: uint64(2)})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{2}, ids)
 
 	// 查不存在的 Category
-	ids, err = store.Query(txn, map[string]any{"Category": uint64(99)})
+	ids, err = store.Query(txn, QueryCond{Field: "Category", Val: uint64(99)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── Bucket range query ───────────────────────────────────
@@ -100,17 +100,17 @@ func TestIndexedStore_QueryBucketRange(t *testing.T) {
 	require.NoError(t, store.Put(txn, 4, testProduct{Name: "luxury", Price: 800}))
 
 	// Price ≤ 50 → buckets 10, 50
-	ids, err := store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 50}})
+	ids, err := store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2}, ids)
 
 	// Price ≤ 500 → buckets 10, 50, 100, 500
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 500}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 0, Max: 500}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2, 3}, ids)
 
 	// Price ≥ 100 → buckets 100, 500, 1000
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 100, Max: 0}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 100, Max: 0}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{3, 4}, ids)
 }
@@ -129,29 +129,29 @@ func TestIndexedStore_QueryCombined(t *testing.T) {
 	require.NoError(t, store.Put(txn, 4, testProduct{Name: "D", Category: 1, Price: 25, Stock: 300}))
 
 	// Category=1 AND Price≤50
-	ids, err := store.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"Price":    Range{Min: 0, Max: 50},
+	ids, err := store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 4}, ids)
 
 	// Category=1 AND Price≤50 AND Stock≤20
-	ids, err = store.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"Price":    Range{Min: 0, Max: 50},
-		"Stock":    Range{Min: 0, Max: 20},
+	ids, err = store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
+		QueryCond{Field: "Stock", Val: Range{Min: 0, Max: 20}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1}, ids)
 
 	// 无交集
-	ids, err = store.Query(txn, map[string]any{
-		"Category": uint64(2),
-		"Price":    Range{Min: 500, Max: 0},
+	ids, err = store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(2)},
+		QueryCond{Field: "Price", Val: Range{Min: 500, Max: 0}},
 	})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── Update ───────────────────────────────────────────────
@@ -172,17 +172,17 @@ func TestIndexedStore_Update(t *testing.T) {
 	require.NoError(t, err)
 
 	// 旧 Category=1 中不应再有 id=1
-	ids, err := store.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err := store.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	// 新 Category=2 中应有 id=1
-	ids, err = store.Query(txn, map[string]any{"Category": uint64(2)})
+	ids, err = store.Query(txn, QueryCond{Field: "Category", Val: uint64(2)})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{1}, ids)
 
 	// Price 应在高桶中
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 100, Max: 0}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 100, Max: 0}})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{1}, ids)
 
@@ -227,7 +227,7 @@ func TestIndexedStore_Delete(t *testing.T) {
 	require.Nil(t, val)
 
 	// 索引中不应再有 1
-	ids, err := store.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err := store.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{2}, ids)
 
@@ -248,9 +248,9 @@ func TestIndexedStore_QueryEmptyFilter(t *testing.T) {
 	require.NoError(t, store.Put(txn, 1, testProduct{Name: "A", Category: 1}))
 	require.NoError(t, store.Put(txn, 2, testProduct{Name: "B", Category: 2}))
 
-	ids, err := store.Query(txn, map[string]any{})
+	ids, err := store.Query(txn, QueryAND{})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── Bad filter ───────────────────────────────────────────
@@ -261,7 +261,7 @@ func TestIndexedStore_QueryBadField(t *testing.T) {
 
 	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
 
-	_, err := store.Query(txn, map[string]any{"NoSuchField": uint64(1)})
+	_, err := store.Query(txn, QueryCond{Field: "NoSuchField", Val: uint64(1)})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no exact/range index")
 }
@@ -272,7 +272,7 @@ func TestIndexedStore_QueryBadFilterType(t *testing.T) {
 
 	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
 
-	_, err := store.Query(txn, map[string]any{"Category": "not_a_number"})
+	_, err := store.Query(txn, QueryCond{Field: "Category", Val: "not_a_number"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no string index")
 }
@@ -431,13 +431,13 @@ func TestIndexedList_UpdateFn(t *testing.T) {
 	require.Equal(t, uint64(300), val.Price)
 
 	// 索引已更新
-	ids, err := list.Query(txn, map[string]any{"Category": uint64(2)})
+	ids, err := list.Query(txn, QueryCond{Field: "Category", Val: uint64(2)})
 	require.NoError(t, err)
 	require.Equal(t, []uint64{0}, ids)
 
-	ids, err = list.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err = list.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── UpdateFn non-existent ────────────────────────────────
@@ -472,9 +472,9 @@ func TestIndexedList_Clear(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, val)
 
-	ids, err := list.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err := list.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	n, err := list.Len(txn)
 	require.NoError(t, err)
@@ -513,9 +513,9 @@ func TestIndexedList_Query(t *testing.T) {
 	_, _ = list.Insert(txn, testProduct{Name: "B", Category: 2, Price: 25})
 	_, _ = list.Insert(txn, testProduct{Name: "C", Category: 1, Price: 300})
 
-	ids, err := list.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"Price":    Range{Min: 0, Max: 50},
+	ids, err := list.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0}, ids)
@@ -565,19 +565,19 @@ func TestIndexedList_QueryBool(t *testing.T) {
 	_, _ = list.Insert(txn, testProduct{Name: "D", Category: 2, IsActive: false})
 
 	// IsActive=true (1)
-	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err := list.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0, 2}, ids)
 
 	// IsActive=false (0)
-	ids, err = list.Query(txn, map[string]any{"IsActive": uint64(0)})
+	ids, err = list.Query(txn, QueryCond{Field: "IsActive", Val: uint64(0)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 3}, ids)
 
 	// bool + exact 组合: Category=1 AND IsActive=true
-	ids, err = list.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"IsActive": uint64(1),
+	ids, err = list.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "IsActive", Val: uint64(1)},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0, 2}, ids)
@@ -587,9 +587,9 @@ func TestIndexedList_QueryBool(t *testing.T) {
 	require.NoError(t, err)
 	err = list.UpdateFn(txn, 2, func(cur *testProduct) { cur.Price = 200 })
 	require.NoError(t, err)
-	ids, err = list.Query(txn, map[string]any{
-		"IsActive": uint64(1),
-		"Price":    Range{Min: 0, Max: 50},
+	ids, err = list.Query(txn, QueryAND{
+		QueryCond{Field: "IsActive", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0}, ids)
@@ -617,20 +617,20 @@ func TestIndexedList_LargeScaleConsistency(t *testing.T) {
 
 	// 验证每个 Category 的计数
 	for cat := 0; cat < 10; cat++ {
-		ids, err := list.Query(txn, map[string]any{"Category": uint64(cat)})
+		ids, err := list.Query(txn, QueryCond{Field: "Category", Val: uint64(cat)})
 		require.NoError(t, err)
 		require.Len(t, ids, n/10, "Category %d count mismatch", cat)
 	}
 
 	// 验证 IsActive=true 的计数 (i%3==0 → 约 1/3)
-	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err := list.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
 	require.Len(t, ids, 167) // 500/3 ≈ 166.67
 
 	// 验证组合查询: Category=5 AND IsActive=true
-	ids, err = list.Query(txn, map[string]any{
-		"Category": uint64(5),
-		"IsActive": uint64(1),
+	ids, err = list.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(5)},
+		QueryCond{Field: "IsActive", Val: uint64(1)},
 	})
 	require.NoError(t, err)
 	// i%10==5 的有 50 个，其中 i%3==0 的有 i=15,45,75... 共约 17 个
@@ -650,7 +650,7 @@ func TestIndexedList_RebuildIndex(t *testing.T) {
 	_, _ = list.Insert(txn, testProduct{Name: "B", Category: 2, IsActive: false})
 
 	// 确认索引正常
-	ids, err := list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err := list.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0}, ids)
 
@@ -666,11 +666,11 @@ func TestIndexedList_RebuildIndex(t *testing.T) {
 	err = list2.RebuildIndex(txn)
 	require.NoError(t, err)
 
-	ids, err = list2.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err = list2.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0, 1}, ids)
 
-	ids, err = list2.Query(txn, map[string]any{"Category": uint64(3)})
+	ids, err = list2.Query(txn, QueryCond{Field: "Category", Val: uint64(3)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0, 1, 2}, ids)
 }
@@ -696,22 +696,22 @@ func TestIndexedStore_QueryRangeEdgeCases(t *testing.T) {
 	require.NoError(t, store.Put(txn, 7, testProduct{Price: 1001}))
 
 	// Price ≤ 50 → 精确包含 0,10,11,50
-	ids, err := store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 50}})
+	ids, err := store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2, 3, 5}, ids)
 
 	// 精确点查：Price=50
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 50, Max: 50}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 50, Max: 50}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{3}, ids)
 
 	// 下界查询：Price > 500 (Min=501, Max=0)
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 501, Max: 0}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 501, Max: 0}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{6, 7}, ids)
 
 	// 超大数据查询：Price > 1000 → 包含 Price=1001
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 1001, Max: 0}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 1001, Max: 0}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{7}, ids)
 }
@@ -749,39 +749,39 @@ func TestIndexedStore_QueryMultiFieldIntersection(t *testing.T) {
 	}
 
 	// Category=1 AND IsActive=true → {1,2}
-	ids, err := store.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"IsActive": uint64(1),
+	ids, err := store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "IsActive", Val: uint64(1)},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2}, ids)
 
 	// Category=1 AND IsActive=true AND Price≤50 → {1}
-	ids, err = store.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"IsActive": uint64(1),
-		"Price":    Range{Min: 0, Max: 50},
+	ids, err = store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "IsActive", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1}, ids)
 
 	// Category=2 AND IsActive=false AND Price>50 → {8}
-	ids, err = store.Query(txn, map[string]any{
-		"Category": uint64(2),
-		"IsActive": uint64(0),
-		"Price":    Range{Min: 51, Max: 0},
+	ids, err = store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(2)},
+		QueryCond{Field: "IsActive", Val: uint64(0)},
+		QueryCond{Field: "Price", Val: Range{Min: 51, Max: 0}},
 	})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{8}, ids)
 
 	// range 索引零假阳性：Price>500 无匹配，整个交集应为空
-	ids, err = store.Query(txn, map[string]any{
-		"Category": uint64(1),
-		"IsActive": uint64(1),
-		"Price":    Range{Min: 501, Max: 0},
+	ids, err = store.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "IsActive", Val: uint64(1)},
+		QueryCond{Field: "Price", Val: Range{Min: 501, Max: 0}},
 	})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── Update 跨桶迁移 ──────────────────────────────────────
@@ -803,12 +803,12 @@ func TestIndexedStore_UpdateBucketMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// 原 bucket 50 中不应再有 id=1
-	ids, err := store.Query(txn, map[string]any{"Price": Range{Min: 0, Max: 50}})
+	ids, err := store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	// 新 bucket 500 中应有 id=1 和 id=2
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 51, Max: 500}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 51, Max: 500}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2}, ids)
 
@@ -818,11 +818,11 @@ func TestIndexedStore_UpdateBucketMigration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 501, Max: 1000}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 501, Max: 1000}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1}, ids)
 
-	ids, err = store.Query(txn, map[string]any{"Price": Range{Min: 101, Max: 500}})
+	ids, err = store.Query(txn, QueryCond{Field: "Price", Val: Range{Min: 101, Max: 500}})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{2}, ids)
 }
@@ -836,9 +836,9 @@ func TestIndexedStore_QueryEmptyAndFullMatch(t *testing.T) {
 	store := NewIndexedStore[uint64, testProduct]("test", "prod_")
 
 	// 空 filter → nil
-	ids, err := store.Query(txn, map[string]any{})
+	ids, err := store.Query(txn, QueryAND{})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	// 写入数据后全匹配
 	for i := 1; i <= 5; i++ {
@@ -846,18 +846,18 @@ func TestIndexedStore_QueryEmptyAndFullMatch(t *testing.T) {
 	}
 
 	// 所有数据的共同特征
-	ids, err = store.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err = store.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2, 3, 4, 5}, ids)
 
-	ids, err = store.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err = store.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{1, 2, 3, 4, 5}, ids)
 
 	// 不存在的值
-	ids, err = store.Query(txn, map[string]any{"Category": uint64(99)})
+	ids, err = store.Query(txn, QueryCond{Field: "Category", Val: uint64(99)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 }
 
 // ── 前缀隔离防碰撞 ───────────────────────────────────────
@@ -908,17 +908,17 @@ func TestIndexedList_UpdateDirect(t *testing.T) {
 	require.NoError(t, err)
 
 	// 旧索引已清理
-	ids, err := list.Query(txn, map[string]any{"Category": uint64(1)})
+	ids, err := list.Query(txn, QueryCond{Field: "Category", Val: uint64(1)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	// IsActive=true 的查询应无结果（A 更新为 false，B 初始为 false）
-	ids, err = list.Query(txn, map[string]any{"IsActive": uint64(1)})
+	ids, err = list.Query(txn, QueryCond{Field: "IsActive", Val: uint64(1)})
 	require.NoError(t, err)
-	require.Nil(t, ids)
+	require.Empty(t, ids)
 
 	// 新索引已建立
-	ids, err = list.Query(txn, map[string]any{"Category": uint64(3)})
+	ids, err = list.Query(txn, QueryCond{Field: "Category", Val: uint64(3)})
 	require.NoError(t, err)
 	require.ElementsMatch(t, []uint64{0}, ids)
 }
@@ -962,10 +962,10 @@ func BenchmarkIndexedStore_Query(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = store.Query(txn, map[string]any{
-			"Category": uint64(2),
-			"Price":    Range{Min: 0, Max: 100},
-		})
+		_, _ = store.Query(txn, QueryAND{
+			QueryCond{Field: "Category", Val: uint64(2)},
+			QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
+	})
 	}
 }
 

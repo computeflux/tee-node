@@ -147,6 +147,10 @@ func MarkChallengeUsed(email, challenge string) error {
 	if err != nil {
 		return err
 	}
+	if rec == nil {
+		// challenge 已被删除（如被 ClearAllChallenges 清理），忽略
+		return nil
+	}
 	rec.Used = true
 	b, _ := json.Marshal(rec)
 	return SetKey("WEB3AUTH", key, b)
@@ -180,6 +184,36 @@ func FindPendingChallenge(email string) (string, error) {
 	return "", nil
 }
 
+// ClearAllChallenges 清除用户所有未使用的 challenge（避免多 challenge 残留导致验证错位）
+func ClearAllChallenges(email string) error {
+	prefix := []byte(comboKey("WEB3AUTH", fmt.Sprintf("c:%s:", email)))
+	iter, err := DBINS.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+	})
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	// 收集所有需要删除的 key
+	var toDelete []string
+	for iter.First(); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
+		raw, err := util.Unseal(iter.Value(), nil)
+		if err != nil {
+			continue
+		}
+		var rec ChallengeRecord
+		if json.Unmarshal(raw, &rec) == nil && !rec.Used {
+			toDelete = append(toDelete, rec.Challenge)
+		}
+	}
+
+	for _, c := range toDelete {
+		DeleteChallenge(email, c)
+	}
+	return nil
+}
+
 // ── Rate Limit ────────────────────────────────────────────
 
 func IncrFailedChallenge(email string) (int, error) {
@@ -204,15 +238,16 @@ func ResetFailedChallenge(email string) error {
 }
 
 func IsLocked(email string) bool {
-	// 简化实现：检查失败次数 >= 5
-	key := fmt.Sprintf("fl:%s", email)
-	b, err := GetKey("WEB3AUTH", key)
-	if err != nil || len(b) == 0 {
-		return false
-	}
-	var count int
-	_ = json.Unmarshal(b, &count)
-	return count >= 5
+	// // 简化实现：检查失败次数 >= 5
+	// key := fmt.Sprintf("fl:%s", email)
+	// b, err := GetKey("WEB3AUTH", key)
+	// if err != nil || len(b) == 0 {
+	// 	return false
+	// }
+	// var count int
+	// _ = json.Unmarshal(b, &count)
+	// return count >= 5
+	return false // 目前不锁定账户，避免误伤
 }
 
 // ── EncryptedKey ──────────────────────────────────────────

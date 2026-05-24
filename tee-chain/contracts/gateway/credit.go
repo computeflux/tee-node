@@ -60,9 +60,9 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 
 		cost := r.Cost
 		if cost == 0 {
-			// 缓存命中 token 按 10% 计价（向上取整到千）
-			effectiveTokens := r.CachedTokens/10 + (r.TokensUsed - r.CachedTokens)
-			cost = (effectiveTokens+999)/1000*m.PointsPer1K + m.PromptPricing
+			// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
+			uncached := r.TokensUsed - r.CachedTokens
+			cost = (uncached*m.InPrice + r.CachedTokens*m.CachedPrice + 999) / 1000
 		}
 		if cost < 1 {
 			cost = 1

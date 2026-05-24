@@ -1,6 +1,6 @@
 package providertype
 
-import "github.com/computeflux/tee-provider/pkg/services/gateway/relay/apitype"
+import "github.com/computeflux/tee-provider/pkg/services/gateway_relay/apitype"
 
 func ToAPIType(providerType int) int {
 	apiType := apitype.OpenAI

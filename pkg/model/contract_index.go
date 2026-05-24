@@ -272,10 +272,10 @@ func idxUint64Pad20(v uint64) string {
 // ── Set operations for query combining ───────────────────
 
 // IntersectIDs 取两个 ID 列表的交集。
-// 若 a 或 b 为空，返回 nil（空集与任何集的交集为空）。
+// 若 a 或 b 为空，返回空切片（空集与任何集的交集为空）。
 func IntersectIDs[ID IdxID](a, b []ID) []ID {
 	if len(a) == 0 || len(b) == 0 {
-		return nil
+		return []ID{}
 	}
 	set := make(map[string]bool, len(a))
 	for _, id := range a {

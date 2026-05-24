@@ -92,7 +92,7 @@ extend type Mutation {
   verifyPassword(token: String!, passwordHash: String!): SignSessionResult!
 
   """验证挑战响应，返回短期签名 token"""
-  verifyResponse(token: String!, response: String!): SignSessionResult!
+  verifyResponse(token: String!, challenge: String!, response: String!): SignSessionResult!
 
   """签名交易"""
   signTransaction(token: String!, tx: TxInput!): WalletResult!

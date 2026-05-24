@@ -12,7 +12,7 @@
 //	models := model.NewIndexedStore[uint64, ModelInfo]("gateway", "model_")
 //	models.Put(txn, id, info)                                  // 写 + 自动索引
 //	models.Update(txn, id, func(cur *ModelInfo) { ... })       // 更新 + 自动比对索引
-//	ids, _ := models.Query(txn, map[string]any{"InputModalities": uint64(3)})
+//	ids, _ := models.Query(txn, QueryCond{Field: "InputModalities", Val: uint64(3)})
 //
 // 用法 — IndexedList（自增 id）：
 //
@@ -20,7 +20,7 @@
 //	id, _ := list.Insert(txn, info)                            // 插入 + 自动分配 id + 自动索引
 //	list.Update(txn, id, func(cur *ModelInfo) { ... })         // 更新 + 自动比对索引
 //	keys, vals, _ := list.List(txn, 0, 10)                     // 原生分页
-//	ids, _ := list.Query(txn, map[string]any{"InputModalities": uint64(3)})
+//	ids, _ := list.Query(txn, QueryCond{Field: "InputModalities", Val: uint64(3)})
 
 package model
 
@@ -151,64 +151,80 @@ func (r *idxRegistry[ID, V]) indexUpdate(txn *Txn, id ID, old, new V) {
 	}
 }
 
-func (r *idxRegistry[ID, V]) query(txn *Txn, filter map[string]any) ([]ID, error) {
-	var candidates []ID
-	for field, val := range filter {
-		switch v := val.(type) {
-		case uint64:
-			idx, ok := r.exactIndexes[field]
-			if ok {
-				ids, err := idx.GetIDs(txn, idxUint64Str(v))
-				if err != nil {
-					return nil, err
-				}
-				candidates = mergeIDs(candidates, ids)
-				continue
-			}
-			// 也可能是 range 索引上的 exact 查询（如 IsActive 实际是 bool）
-			idxRange, ok := r.rangeIndexes[field]
-			if ok {
-				ids, err := idxRange.GetIDs(txn, idxUint64Pad20(v))
-				if err != nil {
-					return nil, err
-				}
-				candidates = mergeIDs(candidates, ids)
-				continue
-			}
-			return nil, fmt.Errorf("query: no exact/range index for field %q", field)
-		case string:
-			idx, ok := r.strIndexes[field]
-			if !ok {
-				return nil, fmt.Errorf("query: no string index for field %q", field)
-			}
-			ids, err := idx.GetIDs(txn, v)
+func (r *idxRegistry[ID, V]) query(txn *Txn, expr QueryExpr) ([]ID, error) {
+	switch e := expr.(type) {
+	case QueryCond:
+		return r.queryCond(txn, e)
+	case QueryAND:
+		var candidates []ID
+		for _, child := range e {
+			ids, err := r.query(txn, child)
 			if err != nil {
 				return nil, err
 			}
 			candidates = mergeIDs(candidates, ids)
-		case Range:
-			idx, ok := r.rangeIndexes[field]
-			if !ok {
-				return nil, fmt.Errorf("query: no range index for field %q", field)
-			}
-			minVal := v.Min
-			maxVal := v.Max
-			// Max=0 且 Min>0 表示只有下界（无上限）
-			if minVal != 0 && maxVal == 0 {
-				maxVal = ^uint64(0)
-			}
-			minStr := idxUint64Pad20(minVal)
-			maxStr := idxUint64Pad20(maxVal)
-			ids, err := idx.GetIDsByRange(txn, minStr, maxStr)
-			if err != nil {
-				return nil, err
-			}
-			candidates = mergeIDs(candidates, ids)
-		default:
-			return nil, fmt.Errorf("query: unsupported filter type %T for field %q", val, field)
 		}
+		return candidates, nil
+	case QueryOR:
+		var all []ID
+		seen := make(map[string]bool)
+		for _, child := range e {
+			ids, err := r.query(txn, child)
+			if err != nil {
+				return nil, err
+			}
+			for _, id := range ids {
+				sk := idxIDToString(id)
+				if !seen[sk] {
+					seen[sk] = true
+					all = append(all, id)
+				}
+			}
+		}
+		return all, nil
+	default:
+		return nil, fmt.Errorf("query: unsupported expression type %T", expr)
 	}
-	return candidates, nil
+}
+
+func (r *idxRegistry[ID, V]) queryCond(txn *Txn, cond QueryCond) ([]ID, error) {
+	field := cond.Field
+	val := cond.Val
+	switch v := val.(type) {
+	case uint64:
+		idx, ok := r.exactIndexes[field]
+		if ok {
+			return idx.GetIDs(txn, idxUint64Str(v))
+		}
+		// 也可能是 range 索引上的 exact 查询（如 IsActive 实际是 bool）
+		idxRange, ok := r.rangeIndexes[field]
+		if ok {
+			return idxRange.GetIDs(txn, idxUint64Pad20(v))
+		}
+		return nil, fmt.Errorf("query: no exact/range index for field %q", field)
+	case string:
+		idx, ok := r.strIndexes[field]
+		if !ok {
+			return nil, fmt.Errorf("query: no string index for field %q", field)
+		}
+		return idx.GetIDs(txn, v)
+	case Range:
+		idx, ok := r.rangeIndexes[field]
+		if !ok {
+			return nil, fmt.Errorf("query: no range index for field %q", field)
+		}
+		minVal := v.Min
+		maxVal := v.Max
+		// Max=0 且 Min>0 表示只有下界（无上限）
+		if minVal != 0 && maxVal == 0 {
+			maxVal = ^uint64(0)
+		}
+		minStr := idxUint64Pad20(minVal)
+		maxStr := idxUint64Pad20(maxVal)
+		return idx.GetIDsByRange(txn, minStr, maxStr)
+	default:
+		return nil, fmt.Errorf("query: unsupported filter type %T for field %q", val, field)
+	}
 }
 
 // mergeIDs 将 ids 与 candidates 取交集（若 candidates 为 nil 则直接返回 ids）。
@@ -265,8 +281,8 @@ func (s *IndexedStore[ID, V]) Delete(txn *Txn, id ID) error {
 	return s.Primary.Delete(txn, id)
 }
 
-func (s *IndexedStore[ID, V]) Query(txn *Txn, filter map[string]any) ([]ID, error) {
-	return s.idx.query(txn, filter)
+func (s *IndexedStore[ID, V]) Query(txn *Txn, expr QueryExpr) ([]ID, error) {
+	return s.idx.query(txn, expr)
 }
 
 // ── IndexedList (auto-increment key) ─────────────────────
@@ -352,8 +368,8 @@ func (l *IndexedList[K, V]) RebuildIndex(txn *Txn) error {
 }
 
 // Query 组合索引查询，返回匹配的 key 列表。
-func (l *IndexedList[K, V]) Query(txn *Txn, filter map[string]any) ([]K, error) {
-	return l.idx.query(txn, filter)
+func (l *IndexedList[K, V]) Query(txn *Txn, expr QueryExpr) ([]K, error) {
+	return l.idx.query(txn, expr)
 }
 
 // ── helpers ──────────────────────────────────────────────
@@ -395,3 +411,26 @@ type Range struct {
 	Min uint64
 	Max uint64
 }
+
+// QueryExpr 是索引查询表达式接口。
+type QueryExpr interface {
+	isQueryExpr()
+}
+
+// QueryCond 单个字段条件。
+type QueryCond struct {
+	Field string
+	Val   any // uint64 | string | Range
+}
+
+func (QueryCond) isQueryExpr() {}
+
+// QueryAND 多个表达式的逻辑与（交集）。
+type QueryAND []QueryExpr
+
+func (QueryAND) isQueryExpr() {}
+
+// QueryOR 多个表达式的逻辑或（并集）。
+type QueryOR []QueryExpr
+
+func (QueryOR) isQueryExpr() {}

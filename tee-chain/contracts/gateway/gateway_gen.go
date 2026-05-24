@@ -97,46 +97,50 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.RegisterEncryptedAPIKey(ref, ciphertext, nonce)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := model.RequireArgLen(args, 9, "register_model"); err != nil {
+		if err := model.RequireArgLen(args, 10, "register_model"); err != nil {
 			return err
 		}
 		name, err := model.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("register_model: name: %w", err)
 		}
-		pointsPer1K, err := model.DecodeScaleArgBytes[uint64](args[1])
-		if err != nil {
-			return fmt.Errorf("register_model: pointsPer1K: %w", err)
-		}
-		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[2])
+		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[1])
 		if err != nil {
 			return fmt.Errorf("register_model: inputModalities: %w", err)
 		}
-		contextLength, err := model.DecodeScaleArgBytes[uint64](args[3])
+		contextLength, err := model.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return fmt.Errorf("register_model: contextLength: %w", err)
 		}
-		promptPricing, err := model.DecodeScaleArgBytes[uint64](args[4])
+		inPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
-			return fmt.Errorf("register_model: promptPricing: %w", err)
+			return fmt.Errorf("register_model: inPrice: %w", err)
 		}
-		modelID, err := model.DecodeScaleArgBytes[string](args[5])
+		cachedPrice, err := model.DecodeScaleArgBytes[uint64](args[4])
+		if err != nil {
+			return fmt.Errorf("register_model: cachedPrice: %w", err)
+		}
+		outPrice, err := model.DecodeScaleArgBytes[uint64](args[5])
+		if err != nil {
+			return fmt.Errorf("register_model: outPrice: %w", err)
+		}
+		modelID, err := model.DecodeScaleArgBytes[string](args[6])
 		if err != nil {
 			return fmt.Errorf("register_model: modelID: %w", err)
 		}
-		providerType, err := model.DecodeScaleArgBytes[uint16](args[6])
+		providerType, err := model.DecodeScaleArgBytes[uint16](args[7])
 		if err != nil {
 			return fmt.Errorf("register_model: providerType: %w", err)
 		}
-		uri, err := model.DecodeScaleArgBytes[string](args[7])
+		uri, err := model.DecodeScaleArgBytes[string](args[8])
 		if err != nil {
 			return fmt.Errorf("register_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[9])
 		if err != nil {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
-		return m.RegisterModel(name, pointsPer1K, inputModalities, contextLength, promptPricing, modelID, providerType, uri, apiKeys)
+		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, modelID, providerType, uri, apiKeys)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
 		if err := model.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
@@ -156,46 +160,50 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.SettleUsage(records)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := model.RequireArgLen(args, 9, "update_model"); err != nil {
+		if err := model.RequireArgLen(args, 10, "update_model"); err != nil {
 			return err
 		}
 		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("update_model: modelID: %w", err)
 		}
-		pointsPer1K, err := model.DecodeScaleArgBytes[uint64](args[1])
-		if err != nil {
-			return fmt.Errorf("update_model: pointsPer1K: %w", err)
-		}
-		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[2])
+		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[1])
 		if err != nil {
 			return fmt.Errorf("update_model: inputModalities: %w", err)
 		}
-		contextLength, err := model.DecodeScaleArgBytes[uint64](args[3])
+		contextLength, err := model.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return fmt.Errorf("update_model: contextLength: %w", err)
 		}
-		promptPricing, err := model.DecodeScaleArgBytes[uint64](args[4])
+		inPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
-			return fmt.Errorf("update_model: promptPricing: %w", err)
+			return fmt.Errorf("update_model: inPrice: %w", err)
 		}
-		modelIDStr, err := model.DecodeScaleArgBytes[string](args[5])
+		cachedPrice, err := model.DecodeScaleArgBytes[uint64](args[4])
+		if err != nil {
+			return fmt.Errorf("update_model: cachedPrice: %w", err)
+		}
+		outPrice, err := model.DecodeScaleArgBytes[uint64](args[5])
+		if err != nil {
+			return fmt.Errorf("update_model: outPrice: %w", err)
+		}
+		modelIDStr, err := model.DecodeScaleArgBytes[string](args[6])
 		if err != nil {
 			return fmt.Errorf("update_model: modelIDStr: %w", err)
 		}
-		providerType, err := model.DecodeScaleArgBytes[uint16](args[6])
+		providerType, err := model.DecodeScaleArgBytes[uint16](args[7])
 		if err != nil {
 			return fmt.Errorf("update_model: providerType: %w", err)
 		}
-		uri, err := model.DecodeScaleArgBytes[string](args[7])
+		uri, err := model.DecodeScaleArgBytes[string](args[8])
 		if err != nil {
 			return fmt.Errorf("update_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[9])
 		if err != nil {
 			return fmt.Errorf("update_model: apiKeys: %w", err)
 		}
-		return m.UpdateModel(modelID, pointsPer1K, inputModalities, contextLength, promptPricing, modelIDStr, providerType, uri, apiKeys)
+		return m.UpdateModel(modelID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, modelIDStr, providerType, uri, apiKeys)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -659,16 +667,16 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
 		api:               api,
-		credits:           &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v1_credits_"},
-		models:            model.NewIndexedList[uint64, ModelInfo]("gateway", "v1_models_next_id", "v1_models_"),
-		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "v1_providers_next_id", "v1_providers_"),
-		providerByOwner:   &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v1_provider_by_owner_"},
-		providerCredits:   &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v1_provider_credit_"},
-		apiKeys:           model.NewIndexedStore[string, APIKeyInfo]("gateway", "v1_api_key_"),
-		usages:            &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "v1_usage_"},
-		encryptedKeys:     &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "v1_encrypted_key_"},
-		rechargeHistory:   model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v1_recharge_history_k1_to_id_", "v1_recharge_history_k1_length_", "v1_recharge_history_k2_next_", "v1_recharge_history_store_"),
-		settlementHistory: model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "v1_settlement_history_k1_to_id_", "v1_settlement_history_k1_length_", "v1_settlement_history_k2_next_", "v1_settlement_history_store_"),
+		credits:           &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credits_"},
+		models:            model.NewIndexedList[uint64, ModelInfo]("gateway", "v2_models_next_id", "v2_models_"),
+		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "v2_providers_next_id", "v2_providers_"),
+		providerByOwner:   &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_by_owner_"},
+		providerCredits:   &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_credit_"},
+		apiKeys:           model.NewIndexedStore[string, APIKeyInfo]("gateway", "v2_api_key_"),
+		usages:            &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "v2_usage_"},
+		encryptedKeys:     &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "v2_encrypted_key_"},
+		rechargeHistory:   model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
+		settlementHistory: model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "v2_settlement_history_k1_to_id_", "v2_settlement_history_k1_length_", "v2_settlement_history_k2_next_", "v2_settlement_history_store_"),
 	}
 }
 
