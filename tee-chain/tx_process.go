@@ -3,6 +3,7 @@ package teechain
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -10,7 +11,7 @@ import (
 )
 
 // Process tx
-func (app *TeeChain) ProcessTx(txs [][]byte) abci.ResponseProcessProposal_ProposalStatus {
+func (app *TeeChain) ProcessTx(txs [][]byte, _time time.Time) abci.ResponseProcessProposal_ProposalStatus {
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
 		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)

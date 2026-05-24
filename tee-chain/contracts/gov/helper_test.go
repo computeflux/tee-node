@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ const testDBSubdir = "chain_data/wetee"
 
 // testRuntime implements model.ContractApi for tests.
 type testRuntime struct {
+	time        time.Time
 	height      int64
 	caller      model.UniAddr
 	txn         *model.Txn
@@ -22,6 +24,7 @@ type testRuntime struct {
 }
 
 func (r *testRuntime) GetHeight() int64         { return r.height }
+func (r *testRuntime) GetBlockTime() int64      { return r.time.Unix() }
 func (r *testRuntime) GetTxn() *model.Txn       { return r.txn }
 func (r *testRuntime) GetCaller() model.UniAddr { return r.caller }
 func (r *testRuntime) GetSystemAccount() model.UniAddr {

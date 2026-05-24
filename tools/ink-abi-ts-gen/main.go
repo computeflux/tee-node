@@ -157,8 +157,10 @@ func typeNameFromPath(path []string) string {
 
 func primitiveToTS(p string) string {
 	switch p {
-	case "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64":
+	case "u8", "u16", "u32", "i8", "i16", "i32":
 		return "number"
+	case "u64", "i64":
+		return "string"
 	case "u128", "i128", "u256", "i256":
 		return "string"
 	case "bool":

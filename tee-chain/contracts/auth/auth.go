@@ -48,7 +48,7 @@ func (a AuthMutation) RegisterUser(emailHash []byte, shareRoot []byte, address [
 		EmailHash:      emailHash,
 		ShareRoot:      shareRoot,
 		DerivedAddress: address,
-		RegisteredAt:   uint64(a.api.GetHeight()),
+		RegisteredAt:   uint64(a.api.GetBlockTime()),
 	})
 }
 
@@ -73,7 +73,7 @@ func (a AuthMutation) RequestRecovery(emailHash []byte, newRoot []byte) error {
 		EmailHash:    emailHash,
 		NewShareRoot: newRoot,
 		Approvals:    [][]byte{},
-		ExpiresAt:    uint64(a.api.GetHeight()) + 100,
+		ExpiresAt:    uint64(a.api.GetBlockTime()) + 100,
 	})
 }
 

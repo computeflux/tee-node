@@ -9,7 +9,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
-func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, addMainChainTx bool) {
+func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, blockTime time.Time, addMainChainTx bool) {
 	hubtx := make([][]byte, 0, 50)
 	hubCalls := make([]*model.HubCall, 0, 50)
 

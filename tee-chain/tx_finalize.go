@@ -3,6 +3,7 @@ package teechain
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -13,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, proposer []byte) ([]*abci.ExecTxResult, error) {
+func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
 	hubCalls := make([]*model.HubCall, 0, len(txs))
 	var txIndex int64 = 0
@@ -111,7 +112,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, prop
 					return nil, errors.Wrap(err, "dkg not init")
 				}
 
-				runtime := contracts.NewRuntime(height, txn, model.UniAddr{
+				runtime := contracts.NewRuntime(height, time, txn, model.UniAddr{
 					V: pub.ToBytes(),
 				}, model.UniAddr{
 					V: pub.ToBytes(),

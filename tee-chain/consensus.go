@@ -120,16 +120,16 @@ func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepare
 	// 如果有未提交到主链的交易（同步进行中），只打包 mempool 中的 SyncTxRetry 等非 HubCall 交易，不打包新 HubCall
 	if IsHubSyncRuning() {
 		util.LogWithYellow("PrepareProposal", "pending sync to main chain, only pack retry/non-hub txs")
-		app.PrepareTx(req.Txs, &finalProposal, req.Height, false)
+		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, false)
 		return &abci.ResponsePrepareProposal{Txs: finalProposal}, nil
 	}
 
 	epochStatus := app.GetEpochStatus()
 	// Check if it is in the epoch transition phase
 	if len(epochTx) == 0 && time.Now().Unix()-int64(epochStatus) > 120 {
-		app.PrepareTx(req.Txs, &finalProposal, req.Height, true)
+		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, true)
 	} else {
-		app.PrepareTx(req.Txs, &finalProposal, req.Height, false)
+		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, false)
 	}
 
 	return &abci.ResponsePrepareProposal{Txs: finalProposal}, nil
@@ -150,7 +150,7 @@ func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcess
 		}
 	}
 
-	status := app.ProcessTx(req.Txs)
+	status := app.ProcessTx(req.Txs, req.Time)
 	return &abci.ResponseProcessProposal{Status: status}, nil
 }
 
@@ -194,7 +194,7 @@ func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64)
 func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	// Iterate over Tx in current block
 	app.onGoingBlock = model.DBINS.NewTransaction()
-	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.ProposerAddress)
+	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.Time, req.ProposerAddress)
 	if err != nil {
 		app.onGoingBlock.Rollback()
 		app.onGoingBlock = nil

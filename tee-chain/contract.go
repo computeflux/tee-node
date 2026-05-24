@@ -2,6 +2,7 @@ package teechain
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
@@ -22,7 +23,7 @@ func (app *TeeChain) gatewayRuntime() (*contracts.Runtime, error) {
 	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
 		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
 	}
-	return contracts.NewRuntime(app.state.Height, txn, model.UniAddr{}, sudo), nil
+	return contracts.NewRuntime(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo), nil
 }
 
 // GatewayLookupAPIKey 根据 keyHash 查询链上 API Key 信息。
@@ -155,7 +156,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *mod
 	if pub == nil {
 		return fmt.Errorf("dkg pubkey is nil")
 	}
-	runtime := contracts.NewRuntime(height, txn, address, model.UniAddr{
+	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
 		V: pub.ToBytes(),
 	})
 
@@ -181,7 +182,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 		V: caller,
 	}
 
-	runtime := contracts.NewRuntime(height, txn, address, model.UniAddr{
+	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
 	})
 
@@ -211,7 +212,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call *mode
 		V: caller,
 	}
 
-	runtime := contracts.NewRuntime(height, txn, address, model.UniAddr{
+	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
 	})
 

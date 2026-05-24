@@ -53,7 +53,7 @@ func (g GatewayMutation) RegisterModel(
 		ProviderID:      *provID,
 		PointsPer1K:     pointsPer1K,
 		IsActive:        true,
-		CreatedAt:       uint64(g.api.GetHeight()),
+		CreatedAt:       uint64(g.api.GetBlockTime()),
 		InputModalities: inputModalities,
 		ContextLength:   contextLength,
 		PromptPricing:   promptPricing,
@@ -114,6 +114,7 @@ func (g GatewayMutation) UpdateModel(
 		m.ProviderType = providerType
 		m.URI = uri
 		m.APIKeyRefs = refs
+		m.CreatedAt = uint64(g.api.GetBlockTime())
 	}); err != nil {
 		return err
 	}

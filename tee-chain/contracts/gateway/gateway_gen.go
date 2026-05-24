@@ -639,16 +639,16 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 func NewGateway(api model.ContractApi) *Gateway {
 	return &Gateway{
 		api:               api,
-		credits:           &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
-		models:            model.NewIndexedList[uint64, ModelInfo]("gateway", "v0_models_next_id", "v0_models_"),
-		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "v0_providers_next_id", "v0_providers_"),
-		providerByOwner:   &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v0_provider_by_owner_"},
-		providerCredits:   &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
-		apiKeys:           model.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
-		usages:            &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "usage_"},
-		encryptedKeys:     &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "encrypted_key_"},
-		rechargeHistory:   model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "recharge_history_k1_to_id_", "recharge_history_k1_length_", "recharge_history_k2_next_", "recharge_history_store_"),
-		settlementHistory: model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "settlement_history_k1_to_id_", "settlement_history_k1_length_", "settlement_history_k2_next_", "settlement_history_store_"),
+		credits:           &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v1_credits_"},
+		models:            model.NewIndexedList[uint64, ModelInfo]("gateway", "v1_models_next_id", "v1_models_"),
+		providers:         model.NewIndexedList[uint64, ProviderInfo]("gateway", "v1_providers_next_id", "v1_providers_"),
+		providerByOwner:   &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v1_provider_by_owner_"},
+		providerCredits:   &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v1_provider_credit_"},
+		apiKeys:           model.NewIndexedStore[string, APIKeyInfo]("gateway", "v1_api_key_"),
+		usages:            &model.StoreMapping[string, DailyUsage]{Namespace: "gateway", KeyPrefix: "v1_usage_"},
+		encryptedKeys:     &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "v1_encrypted_key_"},
+		rechargeHistory:   model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v1_recharge_history_k1_to_id_", "v1_recharge_history_k1_length_", "v1_recharge_history_k2_next_", "v1_recharge_history_store_"),
+		settlementHistory: model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "v1_settlement_history_k1_to_id_", "v1_settlement_history_k1_length_", "v1_settlement_history_k2_next_", "v1_settlement_history_store_"),
 	}
 }
 
