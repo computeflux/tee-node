@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 )
 
 // ── Async usage writer ───────────────────────────────────
@@ -14,8 +15,7 @@ import (
 type usageRecord struct {
 	tokenID      uint64
 	day          string
-	providerID   uint64
-	modelID      uint64
+	model        *cgateway.DataWithID[cgateway.ModelInfo]
 	tokens       uint64
 	cachedTokens uint64
 }
@@ -53,8 +53,8 @@ func initUsageWriter() {
 						u.PointsUsed += points
 					} else {
 						batch[key] = &model.GatewayDailyUsage{
-							TokenID: r.tokenID, ProviderID: r.providerID,
-							ModelID: r.modelID, Day: r.day,
+							TokenID: r.tokenID, ProviderID: r.model.Data.ProviderID,
+							ModelID: r.model.ID, Day: r.day,
 							Count: 1, TokensUsed: r.tokens,
 							CachedTokens: r.cachedTokens,
 							PointsUsed:   points,
@@ -73,14 +73,14 @@ func initUsageWriter() {
 	})
 }
 
-func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint64, cachedTokens uint64) {
+func recordUsageAsync(tokenID uint64, day string, model *cgateway.DataWithID[cgateway.ModelInfo], tokens uint64, cachedTokens uint64) {
 	initUsageWriter()
+	fmt.Println("[OPTIMIZER:recordUsageAsync] args:", tokenID, day, model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
 	select {
-	case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens, cachedTokens}:
-		fmt.Println("Usage", tokenID, day, providerID, 0, tokens, cachedTokens)
+	case usageCh <- usageRecord{tokenID, day, model, tokens, cachedTokens}:
 	default:
-		// Channel full, drop (degraded mode) — log for monitoring.
-		GATEWAYLOG().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d cached=%d (channel full)", tokenID, providerID, tokens, cachedTokens)
+		// Provider full, drop (degraded mode) — log for monitoring.
+		GATEWAYLOG().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d cached=%d (provider full)", tokenID, model.Data.ProviderID, tokens, cachedTokens)
 	}
 }
 

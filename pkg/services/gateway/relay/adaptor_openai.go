@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,7 +48,24 @@ func (a *OpenAIAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx.Context(), "POST", url, body)
+	requestBody := body
+	if meta.IsStream {
+		raw, _ := io.ReadAll(body)
+		var reqMap map[string]interface{}
+		if json.Unmarshal(raw, &reqMap) == nil {
+			if _, ok := reqMap["stream_options"]; !ok {
+				reqMap["stream_options"] = map[string]interface{}{"include_usage": true}
+				newRaw, _ := json.Marshal(reqMap)
+				requestBody = bytes.NewReader(newRaw)
+			} else {
+				requestBody = bytes.NewReader(raw)
+			}
+		} else {
+			requestBody = bytes.NewReader(raw)
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx.Context(), "POST", url, requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +109,7 @@ func (a *OpenAIAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*U
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 
-	totalTokens := 0
+	usage := &Usage{}
 	for scanner.Scan() {
 		line := scanner.Text()
 		// 写入客户端
@@ -105,12 +123,12 @@ func (a *OpenAIAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*U
 				Usage *Usage `json:"usage,omitempty"`
 			}
 			if json.Unmarshal([]byte(data), &chunk) == nil && chunk.Usage != nil {
-				totalTokens = chunk.Usage.TotalTokens
+				usage = chunk.Usage
 			}
 		}
 	}
 
-	return &Usage{TotalTokens: totalTokens}, nil
+	return usage, nil
 }
 
 // handleNormal 处理普通（非流式）响应
@@ -148,7 +166,7 @@ func (a *OpenAIAdaptor) GetModelList() []string {
 	return []string{"gpt-4", "gpt-3.5-turbo"}
 }
 
-func (a *OpenAIAdaptor) GetChannelName() string {
+func (a *OpenAIAdaptor) GetProviderName() string {
 	return "openai"
 }
 

@@ -257,6 +257,6 @@ func (a *GeminiAdaptor) GetModelList() []string {
 	return []string{"gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"}
 }
 
-func (a *GeminiAdaptor) GetChannelName() string {
+func (a *GeminiAdaptor) GetProviderName() string {
 	return "gemini"
 }

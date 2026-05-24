@@ -3,7 +3,9 @@ package model
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -15,7 +17,9 @@ import (
 type AuthUser struct {
 	Email        string `json:"email"`
 	Address      string `json:"address"`
-	PasswordHash string `json:"passwordHash,omitempty"`
+	PasswordHash string `json:"passwordHash,omitempty"` // 用于解密私钥（不再作为网络凭证传输）
+	Salt         string `json:"salt,omitempty"`         // challenge salt（hex）
+	DKHash       string `json:"dkHash,omitempty"`       // PBKDF2 derived key hash（hex，用于 challenge-response 验证）
 }
 
 // AuthSession 认证会话
@@ -83,9 +87,10 @@ func DeleteAuthSession(token string) error {
 
 // SignSession 签名会话（密码验证后的短期授权）
 type SignSession struct {
-	Token     string `json:"token"`
-	Email     string `json:"email"`
-	ExpiresAt int64  `json:"expiresAt"`
+	Token        string `json:"token"`
+	Email        string `json:"email"`
+	ExpiresAt    int64  `json:"expiresAt"`
+	PasswordHash string `json:"passwordHash,omitempty"` // 关联的密码 hash，用于后续签名时解密私钥
 }
 
 // ── SignSession ───────────────────────────────────────────
@@ -104,6 +109,110 @@ func GetSignSession(token string) (*SignSession, error) {
 
 func DeleteSignSession(token string) error {
 	return DeleteKey("WEB3AUTH", "sig:"+token)
+}
+
+// ── Challenge ─────────────────────────────────────────────
+
+// ChallengeRecord 挑战记录（用于 challenge-response 验证）
+type ChallengeRecord struct {
+	Challenge string `json:"challenge"`
+	Email     string `json:"email"`
+	CreatedAt int64  `json:"createdAt"`
+	Used      bool   `json:"used"`
+}
+
+func PutChallenge(email, challenge string, ttlSeconds int) error {
+	rec := &ChallengeRecord{
+		Challenge: challenge,
+		Email:     email,
+		CreatedAt: time.Now().Unix(),
+		Used:      false,
+	}
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	return SetKey("WEB3AUTH", key, b)
+}
+
+func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
+	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	return GetJson[ChallengeRecord]("WEB3AUTH", key)
+}
+
+func MarkChallengeUsed(email, challenge string) error {
+	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	rec, err := GetChallenge(email, challenge)
+	if err != nil {
+		return err
+	}
+	rec.Used = true
+	b, _ := json.Marshal(rec)
+	return SetKey("WEB3AUTH", key, b)
+}
+
+func DeleteChallenge(email, challenge string) error {
+	return DeleteKey("WEB3AUTH", fmt.Sprintf("c:%s:%s", email, challenge))
+}
+
+// FindPendingChallenge 查找用户最新的未使用 challenge
+func FindPendingChallenge(email string) (string, error) {
+	prefix := []byte(comboKey("WEB3AUTH", fmt.Sprintf("c:%s:", email)))
+	iter, err := DBINS.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+	})
+	if err != nil {
+		return "", err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
+		raw, err := util.Unseal(iter.Value(), nil)
+		if err != nil {
+			continue
+		}
+		var rec ChallengeRecord
+		if json.Unmarshal(raw, &rec) == nil && !rec.Used {
+			return rec.Challenge, nil
+		}
+	}
+	return "", nil
+}
+
+// ── Rate Limit ────────────────────────────────────────────
+
+func IncrFailedChallenge(email string) (int, error) {
+	key := fmt.Sprintf("fl:%s", email)
+	b, err := GetKey("WEB3AUTH", key)
+	var count int
+	if err == nil && len(b) > 0 {
+		_ = json.Unmarshal(b, &count)
+	}
+	count++
+	nb, _ := json.Marshal(count)
+	if err := SetKey("WEB3AUTH", key, nb); err != nil {
+		return count, err
+	}
+	// TTL 1 hour: tee-node Pebble 无原生 TTL，需外部清理或接受长期存储
+	// 实际生产中可用定时任务清理，或存创建时间戳
+	return count, nil
+}
+
+func ResetFailedChallenge(email string) error {
+	return DeleteKey("WEB3AUTH", fmt.Sprintf("fl:%s", email))
+}
+
+func IsLocked(email string) bool {
+	// 简化实现：检查失败次数 >= 5
+	key := fmt.Sprintf("fl:%s", email)
+	b, err := GetKey("WEB3AUTH", key)
+	if err != nil || len(b) == 0 {
+		return false
+	}
+	var count int
+	_ = json.Unmarshal(b, &count)
+	return count >= 5
 }
 
 // ── EncryptedKey ──────────────────────────────────────────

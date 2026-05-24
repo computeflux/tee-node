@@ -256,7 +256,7 @@ func recordUsageAsync(tokenID uint64, day string, providerID uint64, tokens uint
     select {
     case usageCh <- usageRecord{tokenID, day, providerID, 0, tokens}:
     default:
-        GatewayLog().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (channel full)",
+        GatewayLog().Printf("[USAGE] dropped record: token=%d provider=%d tokens=%d (provider full)",
             tokenID, providerID, tokens)
     }
 }

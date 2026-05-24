@@ -151,40 +151,31 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 
 // findGatewayModelByName 按模型名称从合约查询（必须活跃）。
 // 直接走链上 string exact 索引，O(1) 查询，避免本地缓存全量遍历。
-func findGatewayModelByName(name string) *cgateway.ModelInfo {
+func findGatewayModelByName(pid uint64, name string) *cgateway.DataWithID[cgateway.ModelInfo] {
 	bridge := getBridge()
 	if bridge == nil {
 		return nil
 	}
-	models, err := bridge.GatewayGetModelByName(name)
+	model, err := bridge.GatewayGetModelByName(pid, name)
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] GetModelByName name=%s err=%v", name, err)
 		return nil
 	}
-	for i := range models {
-		if models[i].IsActive {
-			cp := models[i]
-			return &cp
-		}
-	}
-	return nil
+
+	return model
 }
 
-// findGatewayProvider 按 ProviderID 从合约查询 Provider。
-func findGatewayProvider(providerID uint64) *cgateway.ProviderInfo {
+func findProviderName(name string) *cgateway.DataWithID[cgateway.ProviderInfo] {
 	bridge := getBridge()
 	if bridge == nil {
 		return nil
 	}
-	p, err := bridge.GatewayGetProvider(providerID)
+	provider, err := bridge.GatewayGetProviderByName(name)
 	if err != nil {
-		GATEWAYLOG().Printf("[GATEWAY] GetProvider id=%d err=%v", providerID, err)
+		GATEWAYLOG().Printf("[GATEWAY] GetProviderByName name=%s err=%v", name, err)
 		return nil
 	}
-	if p == nil || !p.IsActive {
-		return nil
-	}
-	return p
+	return provider
 }
 
 // buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表。

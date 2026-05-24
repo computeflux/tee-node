@@ -1,4 +1,4 @@
-package channeltype
+package providertype
 
 const (
 	Unknown = iota

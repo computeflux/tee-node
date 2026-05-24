@@ -65,6 +65,14 @@ type ComplexityRoot struct {
 		Urls           func(childComplexity int) int
 	}
 
+	ChallengeResult struct {
+		Challenge func(childComplexity int) int
+		Error     func(childComplexity int) int
+		ExpiresAt func(childComplexity int) int
+		Salt      func(childComplexity int) int
+		Status    func(childComplexity int) int
+	}
+
 	LenValue struct {
 		K func(childComplexity int) int
 		V func(childComplexity int) int
@@ -78,7 +86,7 @@ type ComplexityRoot struct {
 		InitDiskKey        func(childComplexity int, index string, user string) int
 		RequestOtp         func(childComplexity int, email string, clientID string) int
 		RequestRecovery    func(childComplexity int, recoveryEmail string) int
-		SetPassword        func(childComplexity int, token string, passwordHash string) int
+		SetPassword        func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
 		SignMessage        func(childComplexity int, token string, message string, from string, passwordHash *string) int
 		SignTransaction    func(childComplexity int, token string, tx auth.TxInput) int
 		SocialLogin        func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string) int
@@ -88,6 +96,7 @@ type ComplexityRoot struct {
 		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
 		VerifyPassword     func(childComplexity int, token string, passwordHash string) int
 		VerifyRecovery     func(childComplexity int, recoveryEmail string, otp string) int
+		VerifyResponse     func(childComplexity int, token string, response string) int
 	}
 
 	OAuthURL struct {
@@ -98,6 +107,7 @@ type ComplexityRoot struct {
 		AuthHealth     func(childComplexity int) int
 		ChainInfo      func(childComplexity int) int
 		ContractDryRun func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
+		GetChallenge   func(childComplexity int, token string) int
 		OauthURL       func(childComplexity int, provider string) int
 		SecretRsa      func(childComplexity int) int
 		TeeReport      func(childComplexity int, hash string) int
@@ -153,8 +163,9 @@ type MutationResolver interface {
 	RequestOtp(ctx context.Context, email string, clientID string) (*auth.AuthResponse, error)
 	VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error)
 	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string) (*auth.AuthResponse, error)
-	SetPassword(ctx context.Context, token string, passwordHash string) (*auth.WalletResult, error)
+	SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error)
 	VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error)
+	VerifyResponse(ctx context.Context, token string, response string) (*model.SignSessionResult, error)
 	SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error)
 	SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error)
 	RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error)
@@ -171,6 +182,7 @@ type MutationResolver interface {
 type QueryResolver interface {
 	OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error)
 	AuthHealth(ctx context.Context) (string, error)
+	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
@@ -266,6 +278,41 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChainInfo.Urls(childComplexity), true
+
+	case "ChallengeResult.challenge":
+		if e.complexity.ChallengeResult.Challenge == nil {
+			break
+		}
+
+		return e.complexity.ChallengeResult.Challenge(childComplexity), true
+
+	case "ChallengeResult.error":
+		if e.complexity.ChallengeResult.Error == nil {
+			break
+		}
+
+		return e.complexity.ChallengeResult.Error(childComplexity), true
+
+	case "ChallengeResult.expiresAt":
+		if e.complexity.ChallengeResult.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.ChallengeResult.ExpiresAt(childComplexity), true
+
+	case "ChallengeResult.salt":
+		if e.complexity.ChallengeResult.Salt == nil {
+			break
+		}
+
+		return e.complexity.ChallengeResult.Salt(childComplexity), true
+
+	case "ChallengeResult.status":
+		if e.complexity.ChallengeResult.Status == nil {
+			break
+		}
+
+		return e.complexity.ChallengeResult.Status(childComplexity), true
 
 	case "LenValue.k":
 		if e.complexity.LenValue.K == nil {
@@ -375,7 +422,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SetPassword(childComplexity, args["token"].(string), args["passwordHash"].(string)), true
+		return e.complexity.Mutation.SetPassword(childComplexity, args["token"].(string), args["passwordHash"].(string), args["salt"].(string), args["dkHash"].(string)), true
 
 	case "Mutation.signMessage":
 		if e.complexity.Mutation.SignMessage == nil {
@@ -480,6 +527,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.VerifyRecovery(childComplexity, args["recoveryEmail"].(string), args["otp"].(string)), true
 
+	case "Mutation.verifyResponse":
+		if e.complexity.Mutation.VerifyResponse == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_verifyResponse_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.VerifyResponse(childComplexity, args["token"].(string), args["response"].(string)), true
+
 	case "OAuthURL.authUrl":
 		if e.complexity.OAuthURL.AuthUrl == nil {
 			break
@@ -512,6 +571,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ContractDryRun(childComplexity, args["caller"].(string), args["callerType"].(int), args["contract"].(string), args["mut"].(bool), args["method"].(string), args["args"].([]string)), true
+
+	case "Query.getChallenge":
+		if e.complexity.Query.GetChallenge == nil {
+			break
+		}
+
+		args, err := ec.field_Query_getChallenge_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.GetChallenge(childComplexity, args["token"].(string)), true
 
 	case "Query.oauthURL":
 		if e.complexity.Query.OauthURL == nil {
@@ -1351,6 +1422,16 @@ func (ec *executionContext) field_Mutation_setPassword_args(ctx context.Context,
 		return nil, err
 	}
 	args["passwordHash"] = arg1
+	arg2, err := ec.field_Mutation_setPassword_argsSalt(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["salt"] = arg2
+	arg3, err := ec.field_Mutation_setPassword_argsDkHash(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["dkHash"] = arg3
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_setPassword_argsToken(
@@ -1382,6 +1463,42 @@ func (ec *executionContext) field_Mutation_setPassword_argsPasswordHash(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("passwordHash"))
 	if tmp, ok := rawArgs["passwordHash"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_setPassword_argsSalt(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["salt"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("salt"))
+	if tmp, ok := rawArgs["salt"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_setPassword_argsDkHash(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["dkHash"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("dkHash"))
+	if tmp, ok := rawArgs["dkHash"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -1935,6 +2052,57 @@ func (ec *executionContext) field_Mutation_verifyRecovery_argsOtp(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_verifyResponse_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_verifyResponse_argsToken(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	arg1, err := ec.field_Mutation_verifyResponse_argsResponse(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["response"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_verifyResponse_argsToken(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["token"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+	if tmp, ok := rawArgs["token"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["response"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("response"))
+	if tmp, ok := rawArgs["response"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2103,6 +2271,34 @@ func (ec *executionContext) field_Query_contractDryRun_argsArgs(
 	}
 
 	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_getChallenge_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_getChallenge_argsToken(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_getChallenge_argsToken(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["token"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+	if tmp, ok := rawArgs["token"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
 	return zeroVal, nil
 }
 
@@ -2784,6 +2980,214 @@ func (ec *executionContext) fieldContext_ChainInfo_urls(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _ChallengeResult_status(ctx context.Context, field graphql.CollectedField, obj *model.ChallengeResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChallengeResult_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChallengeResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChallengeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChallengeResult_challenge(ctx context.Context, field graphql.CollectedField, obj *model.ChallengeResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChallengeResult_challenge(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Challenge, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChallengeResult_challenge(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChallengeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChallengeResult_salt(ctx context.Context, field graphql.CollectedField, obj *model.ChallengeResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChallengeResult_salt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Salt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChallengeResult_salt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChallengeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChallengeResult_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ChallengeResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChallengeResult_expiresAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpiresAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChallengeResult_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChallengeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChallengeResult_error(ctx context.Context, field graphql.CollectedField, obj *model.ChallengeResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChallengeResult_error(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Error, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChallengeResult_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChallengeResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _LenValue_k(ctx context.Context, field graphql.CollectedField, obj *model.LenValue) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_LenValue_k(ctx, field)
 	if err != nil {
@@ -3087,7 +3491,7 @@ func (ec *executionContext) _Mutation_setPassword(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SetPassword(rctx, fc.Args["token"].(string), fc.Args["passwordHash"].(string))
+		return ec.resolvers.Mutation().SetPassword(rctx, fc.Args["token"].(string), fc.Args["passwordHash"].(string), fc.Args["salt"].(string), fc.Args["dkHash"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3195,6 +3599,71 @@ func (ec *executionContext) fieldContext_Mutation_verifyPassword(ctx context.Con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_verifyPassword_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_verifyResponse(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_verifyResponse(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().VerifyResponse(rctx, fc.Args["token"].(string), fc.Args["response"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.SignSessionResult)
+	fc.Result = res
+	return ec.marshalNSignSessionResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐSignSessionResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_verifyResponse(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "status":
+				return ec.fieldContext_SignSessionResult_status(ctx, field)
+			case "signToken":
+				return ec.fieldContext_SignSessionResult_signToken(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_SignSessionResult_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_SignSessionResult_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SignSessionResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_verifyResponse_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4129,6 +4598,73 @@ func (ec *executionContext) fieldContext_Query_authHealth(_ context.Context, fie
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getChallenge(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_getChallenge(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().GetChallenge(rctx, fc.Args["token"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ChallengeResult)
+	fc.Result = res
+	return ec.marshalNChallengeResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChallengeResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_getChallenge(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "status":
+				return ec.fieldContext_ChallengeResult_status(ctx, field)
+			case "challenge":
+				return ec.fieldContext_ChallengeResult_challenge(ctx, field)
+			case "salt":
+				return ec.fieldContext_ChallengeResult_salt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_ChallengeResult_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_ChallengeResult_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChallengeResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_getChallenge_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -7808,6 +8344,53 @@ func (ec *executionContext) _ChainInfo(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var challengeResultImplementors = []string{"ChallengeResult"}
+
+func (ec *executionContext) _ChallengeResult(ctx context.Context, sel ast.SelectionSet, obj *model.ChallengeResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, challengeResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChallengeResult")
+		case "status":
+			out.Values[i] = ec._ChallengeResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "challenge":
+			out.Values[i] = ec._ChallengeResult_challenge(ctx, field, obj)
+		case "salt":
+			out.Values[i] = ec._ChallengeResult_salt(ctx, field, obj)
+		case "expiresAt":
+			out.Values[i] = ec._ChallengeResult_expiresAt(ctx, field, obj)
+		case "error":
+			out.Values[i] = ec._ChallengeResult_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var lenValueImplementors = []string{"LenValue"}
 
 func (ec *executionContext) _LenValue(ctx context.Context, sel ast.SelectionSet, obj *model.LenValue) graphql.Marshaler {
@@ -7902,6 +8485,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "verifyPassword":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_verifyPassword(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "verifyResponse":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_verifyResponse(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -8103,6 +8693,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_authHealth(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getChallenge":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getChallenge(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -8953,6 +9565,20 @@ func (ec *executionContext) marshalNChainInfo2ᚖgithubᚗcomᚋcomputefluxᚋte
 		return graphql.Null
 	}
 	return ec._ChainInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNChallengeResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChallengeResult(ctx context.Context, sel ast.SelectionSet, v model.ChallengeResult) graphql.Marshaler {
+	return ec._ChallengeResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNChallengeResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChallengeResult(ctx context.Context, sel ast.SelectionSet, v *model.ChallengeResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChallengeResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {

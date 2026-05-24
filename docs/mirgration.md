@@ -474,7 +474,7 @@ middleware/auth.go         → pkg/api/gateway/auth_mw.go      (gin → chi)
 middleware/rate-limit.go   → pkg/api/gateway/ratelimit.go    (gin → chi)
 
 # 以下由合约替代，不迁移
-model/token.go / channel.go / product.go    → contracts/gateway/
+model/token.go / provider.go / product.go    → contracts/gateway/
 controller/billing.go / token.go / user.go  → contracts/gateway/
 ```
 
@@ -510,12 +510,12 @@ func DistributeMiddleware(next http.Handler) http.Handler {
         var reqBody struct{ Model string `json:"model"` }
         json.Unmarshal(bodyBytes, &reqBody)
 
-        channel := selectBestChannel(reqBody.Model)
-        if channel == nil {
-            http.Error(w, `{"error":"no available channel"}`, 503)
+        provider := selectBestProvider(reqBody.Model)
+        if provider == nil {
+            http.Error(w, `{"error":"no available provider"}`, 503)
             return
         }
-        ctx := context.WithValue(r.Context(), ctxChannel, channel)
+        ctx := context.WithValue(r.Context(), ctxProvider, provider)
         next.ServeHTTP(w, r.WithContext(ctx))
     })
 }
@@ -526,13 +526,13 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 ```go
 // pkg/api/gateway/relay_handler.go
 func HandleRelay(w http.ResponseWriter, r *http.Request) {
-    channel := r.Context().Value(ctxChannel).(*ChannelInfo)
+    provider := r.Context().Value(ctxProvider).(*ProviderInfo)
 
     bodyBytes, _ := io.ReadAll(r.Body)
     r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-    adaptor := gateway.GetAdaptor(channel.ApiType)
-    resp, err := adaptor.DoRequest(r.Context(), channel.BaseURL, channel.Key, bodyBytes)
+    adaptor := gateway.GetAdaptor(provider.ApiType)
+    resp, err := adaptor.DoRequest(r.Context(), provider.BaseURL, provider.Key, bodyBytes)
     if err != nil {
         http.Error(w, `{"error":"`+err.Error()+`"}`, 502)
         return
@@ -540,7 +540,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 
     // Phase 3: 合约扣费
     // usage := adaptor.GetUsage(resp)
-    // teeChain.ContractGatewayConsume(tokenId, channelId, modelId, usage.TokensUsed)
+    // teeChain.ContractGatewayConsume(tokenId, providerId, modelId, usage.TokensUsed)
 
     w.Header().Set("Content-Type", "application/json")
     w.Write(resp.Body)
@@ -628,7 +628,7 @@ type Gateway struct {
     balances         *model.StoreMapping[UniAddr, Amount]       // 用户积分
     models           *model.StoreMapping[uint64, ModelInfo]     // 独立注册的模型
     providerBalances *model.StoreMapping[uint64, Amount]        // 模型收益
-    channels         *model.StoreMapping[uint64, ChannelInfo]   // Channel
+    providers         *model.StoreMapping[uint64, ProviderInfo]   // Provider
     tokens           *model.StoreMapping[uint64, TokenInfo]     // API token
     usages           *model.StoreMapping[string, DailyUsage]
 }
@@ -640,7 +640,7 @@ type ModelInfo struct {
     IsActive    bool
 }
 
-type ChannelInfo struct {
+type ProviderInfo struct {
     Name     string
     BaseURL  string
     ModelIds []uint64      // 关联已注册的模型
@@ -651,17 +651,17 @@ type ChannelInfo struct {
 
 // Mutation
 func (g GatewayMutation) RegisterModel(owner UniAddr, name string, pointsPer1K uint64) error { ... }
-func (g GatewayMutation) CreateChannel(owner UniAddr, name, baseUrl string, modelIds []uint64, prio uint32) error { ... }
+func (g GatewayMutation) CreateProvider(owner UniAddr, name, baseUrl string, modelIds []uint64, prio uint32) error { ... }
 func (g GatewayMutation) Recharge(user UniAddr, amount Amount) error { ... }
-func (g GatewayMutation) Consume(tokenId, channelId, modelId uint64, tokensUsed uint64) error { ... }
+func (g GatewayMutation) Consume(tokenId, providerId, modelId uint64, tokensUsed uint64) error { ... }
 func (g GatewayMutation) Withdraw(modelId uint64, amount Amount) error { ... }
 func (g GatewayMutation) CreateToken(owner UniAddr, rateLimit uint32) error { ... }
 
 // Query
 func (g GatewayQuery) GetBalance(user UniAddr) (*Amount, error) { ... }
 func (g GatewayQuery) GetModel(modelId uint64) (*ModelInfo, error) { ... }
-func (g GatewayQuery) GetChannel(channelId uint64) (*ChannelInfo, error) { ... }
-func (g GatewayQuery) ListActiveChannels(modelId uint64) ([]uint64, error) { ... }
+func (g GatewayQuery) GetProvider(providerId uint64) (*ProviderInfo, error) { ... }
+func (g GatewayQuery) ListActiveProviders(modelId uint64) ([]uint64, error) { ... }
 ```
 
 ### 4.3 合约注册
@@ -785,7 +785,7 @@ OE_MODE=SIM
 | `middleware/distributor.go` | `pkg/api/gateway/middleware.go` | gin → chi |
 | `middleware/auth.go` | `pkg/api/gateway/auth_mw.go` | gin → chi |
 | `controller/relay.go` | `pkg/api/gateway/relay_handler.go` | gin → chi |
-| `model/{token,channel,product}.go` | **合约替代** | Phase 3 |
+| `model/{token,provider,product}.go` | **合约替代** | Phase 3 |
 | `controller/{billing,token,user}.go` | **合约替代** | Phase 3 |
 
 ---

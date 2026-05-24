@@ -13,6 +13,14 @@ type ChainInfo struct {
 	Urls []string `json:"urls"`
 }
 
+type ChallengeResult struct {
+	Status    string  `json:"status"`
+	Challenge *string `json:"challenge,omitempty"`
+	Salt      *string `json:"salt,omitempty"`
+	ExpiresAt *int    `json:"expiresAt,omitempty"`
+	Error     *string `json:"error,omitempty"`
+}
+
 // 环境变量
 // Environments
 type Kvalue struct {

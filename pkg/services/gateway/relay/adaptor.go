@@ -37,8 +37,6 @@ type Usage struct {
 
 type PromptTokensDetails struct {
 	CachedTokens int `json:"cached_tokens"`
-	AudioTokens  int `json:"audio_tokens"`
-	TextTokens   int `json:"text_tokens"`
 }
 
 type ErrorWithStatusCode struct {
@@ -61,7 +59,7 @@ type Adaptor interface {
 	DoRequest(ctx *RelayContext, meta *Meta, requestBody io.Reader) (*http.Response, error)
 	DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (usage *Usage, err *ErrorWithStatusCode)
 	GetModelList() []string
-	GetChannelName() string
+	GetProviderName() string
 }
 
 // ── Adaptor factory ──────────────────────────────────────

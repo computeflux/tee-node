@@ -1,10 +1,10 @@
-package channeltype
+package providertype
 
 import "github.com/computeflux/tee-provider/pkg/services/gateway/relay/apitype"
 
-func ToAPIType(channelType int) int {
+func ToAPIType(providerType int) int {
 	apiType := apitype.OpenAI
-	switch channelType {
+	switch providerType {
 	case Anthropic:
 		apiType = apitype.Anthropic
 	case Baidu:

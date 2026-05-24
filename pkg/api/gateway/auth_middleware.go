@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	modelpkg "github.com/computeflux/tee-provider/pkg/model"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 )
 
 type contextKey string
@@ -43,7 +45,7 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// DistributeMiddleware routes based on "channel/model" format
+// DistributeMiddleware routes based on "provider/model" format
 // e.g. "openai/gpt-4" → query contract → verify model exists → pick endpoint by user hash → route
 func DistributeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,83 +70,73 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Parse "channel/model" format
-		providerName, actualModel := parseProviderModel(modelName)
-		if modelName != actualModel {
-			bodyMap["model"] = actualModel
+		// Parse "provider/model" format
+		providerName, pmodel := parseProviderModel(modelName)
+		if modelName != pmodel {
+			bodyMap["model"] = pmodel
 			if newBody, err := json.Marshal(bodyMap); err == nil {
 				bodyBytes = newBody
 			}
 		}
 
-		token := GetTokenFromContext(r)
+		// 用 ProviderID 查询 Provider，验证名称与活跃状态
+		provider := findProviderName(providerName)
+		if provider == nil || !provider.Data.IsActive {
+			writeError(w, http.StatusServiceUnavailable,
+				"provider not available for model "+modelName, "server_error")
+			return
+		}
+		if provider.Data.Name != providerName {
+			writeError(w, http.StatusBadRequest,
+				"provider name \""+providerName+"\" mismatch for model "+modelName+"\"provider.name"+provider.Data.Name+"\"", "invalid_request")
+			return
+		}
 
 		// 1. 从合约查询模型（必须存在且活跃）
-		m := findGatewayModelByName(actualModel)
-		if m == nil {
-			writeError(w, http.StatusNotFound, "model not found: "+actualModel, "not_found")
+		model := findGatewayModelByName(provider.ID, modelName)
+		if model == nil {
+			writeError(w, http.StatusNotFound, "model not found: "+modelName, "not_found")
 			return
 		}
-
-		// 2. 用 ProviderID 查询 Provider，验证名称与活跃状态
-		provider := findGatewayProvider(m.ProviderID)
-		if provider == nil || !provider.IsActive {
-			writeError(w, http.StatusServiceUnavailable,
-				"provider not available for model "+actualModel, "server_error")
-			return
-		}
-		if provider.Name != providerName {
-			writeError(w, http.StatusBadRequest,
-				"provider name \""+providerName+"\" mismatch for model "+actualModel+"\"provider.name"+provider.Name+"\"", "invalid_request")
-			return
-		}
-		providerType := providerTypeName(m.ProviderType)
 
 		// 3. 从合约构建 endpoints（URI + APIKeys）
-		endpoints := buildEndpointsFromModel(m)
+		endpoints := buildEndpointsFromModel(&model.Data)
 		if len(endpoints) == 0 {
 			writeError(w, http.StatusServiceUnavailable,
-				"no available endpoints for model "+actualModel, "server_error")
+				"no available endpoints for model "+modelName, "server_error")
 			return
 		}
 
 		// 4. 按用户 hash 选 endpoint（sticky）
+		token := GetTokenFromContext(r)
 		userKey := token.Owner
 		if userKey == "" {
 			userKey = r.RemoteAddr
 		}
-		b := model.NewEndpointBalancerFromEndpoints(endpoints)
+		b := modelpkg.NewEndpointBalancerFromEndpoints(endpoints)
 		if b == nil {
 			writeError(w, http.StatusServiceUnavailable,
-				"no available endpoint for model "+actualModel, "server_error")
+				"no available endpoint for model "+modelName, "server_error")
 			return
 		}
-		endpoint := b.Pick(userKey + ":" + actualModel)
+		endpoint := b.Pick(userKey + ":" + modelName)
 		if endpoint == nil {
 			writeError(w, http.StatusServiceUnavailable,
-				"no available endpoint for model "+actualModel, "server_error")
+				"no available endpoint for model "+modelName, "server_error")
 			return
 		}
 
-		// 5. 构建虚拟 channel（供下游 metrics / usage 使用）
-		channel := &model.GatewayProviderInfo{
-			ID:       m.ProviderID,
-			Type:     providerType,
-			IsActive: true,
-		}
-
-		ctx := context.WithValue(r.Context(), ctxProvider, channel)
-		ctx = context.WithValue(ctx, ctxModel, actualModel)
+		ctx := context.WithValue(r.Context(), ctxModel, model)
 		ctx = context.WithValue(ctx, ctxEndpoint, endpoint)
 		ctx = context.WithValue(ctx, ctxBody, bodyBytes)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// ── "channel/model" parser ───────────────────────────────
+// ── "provider/model" parser ───────────────────────────────
 // "openai/gpt-4" → ("openai", "gpt-4")
-// "gpt-4"        → ("openai", "gpt-4")  (default channel)
-func parseProviderModel(input string) (channel, model string) {
+// "gpt-4"        → ("openai", "gpt-4")  (default provider)
+func parseProviderModel(input string) (provider, model string) {
 	parts := strings.SplitN(input, "/", 2)
 	if len(parts) == 2 {
 		return parts[0], parts[1]
@@ -160,22 +152,17 @@ func GetBodyFromContext(r *http.Request) []byte {
 
 // ── Context accessors ────────────────────────────────────
 
-func GetTokenFromContext(r *http.Request) *model.GatewayTokenInfo {
-	t, _ := r.Context().Value(ctxToken).(*model.GatewayTokenInfo)
+func GetTokenFromContext(r *http.Request) *modelpkg.GatewayTokenInfo {
+	t, _ := r.Context().Value(ctxToken).(*modelpkg.GatewayTokenInfo)
 	return t
-}
-
-func GetChannelFromContext(r *http.Request) *model.GatewayProviderInfo {
-	c, _ := r.Context().Value(ctxProvider).(*model.GatewayProviderInfo)
-	return c
-}
-
-func GetModelFromContext(r *http.Request) string {
-	m, _ := r.Context().Value(ctxModel).(string)
-	return m
 }
 
 func GetEndpointFromContext(r *http.Request) *model.GatewayEndpoint {
 	e, _ := r.Context().Value(ctxEndpoint).(*model.GatewayEndpoint)
 	return e
+}
+
+func GetModelFromContext(r *http.Request) *cgateway.DataWithID[cgateway.ModelInfo] {
+	m, _ := r.Context().Value(ctxModel).(*cgateway.DataWithID[cgateway.ModelInfo])
+	return m
 }

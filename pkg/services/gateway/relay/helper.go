@@ -44,8 +44,8 @@ func WriteSSEDone(ctx *RelayContext) {
 
 // ── Model name helpers ───────────────────────────────────
 
-// ChannelBaseURLs maps channel type to default base URL
-var ChannelBaseURLs = map[string]string{
+// ProviderBaseURLs maps provider type to default base URL
+var ProviderBaseURLs = map[string]string{
 	"openai":    "https://api.openai.com",
 	"anthropic": "https://api.anthropic.com",
 	"gemini":    "https://generativelanguage.googleapis.com",
@@ -63,7 +63,7 @@ var ChannelBaseURLs = map[string]string{
 
 // GetBaseURL returns the default base URL for a provider
 func GetBaseURL(provider string) string {
-	if url, ok := ChannelBaseURLs[provider]; ok && url != "" {
+	if url, ok := ProviderBaseURLs[provider]; ok && url != "" {
 		return url
 	}
 	return ""
@@ -108,8 +108,8 @@ func DetectProvider(baseURL string) string {
 }
 
 // GetAdaptorForProvider returns the right adaptor for a provider
-func GetAdaptorForProvider(provider string) Adaptor {
-	switch provider {
+func GetAdaptorForProviderType(providerType string) Adaptor {
+	switch providerType {
 	case "anthropic":
 		return &AnthropicAdaptor{}
 	case "gemini":

@@ -1,6 +1,6 @@
-package channeltype
+package providertype
 
-var ChannelBaseURLs = []string{
+var ProviderBaseURLs = []string{
 	"",                              // 0
 	"https://api.openai.com",        // 1
 	"https://oa.api2d.net",          // 2
@@ -57,7 +57,7 @@ var ChannelBaseURLs = []string{
 }
 
 func init() {
-	if len(ChannelBaseURLs) != Dummy {
-		panic("channel base urls length not match")
+	if len(ProviderBaseURLs) != Dummy {
+		panic("provider base urls length not match")
 	}
 }

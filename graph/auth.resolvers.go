@@ -6,6 +6,10 @@ package graph
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -102,7 +106,8 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 }
 
 // SetPassword is the resolver for the setPassword field.
-func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string) (*auth.WalletResult, error) {
+// 同时保存 passwordHash（用于解密私钥）和 salt + dkHash（用于 challenge-response 验证）
+func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error) {
 	email, err := resolveEmailFromToken(token)
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
@@ -111,11 +116,15 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
-	// 存储密码 hash 到用户记录
+	// 存储密码信息到用户记录
 	user, _ := model.GetAuthUser(email)
 	if user != nil {
 		user.PasswordHash = passwordHash
-		model.PutAuthUser(user)
+		user.Salt = salt
+		user.DKHash = dkHash
+		if err := model.PutAuthUser(user); err != nil {
+			return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		}
 	}
 	return &auth.WalletResult{Status: "ok"}, nil
 }
@@ -169,6 +178,82 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 	}, nil
 }
 
+// VerifyResponse is the resolver for the verifyResponse field.
+// challenge-response 验证：前端用 PBKDF2(password, salt) 派生 dk，然后 HMAC-SHA256(dk, challenge)
+func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, response string) (*model.SignSessionResult, error) {
+	email, err := resolveEmailFromToken(token)
+	if err != nil {
+		e := "unauthorized"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	// 检查是否被锁定
+	if model.IsLocked(email) {
+		e := "Too many failed attempts"
+		return &model.SignSessionResult{Status: "locked", Error: &e}, nil
+	}
+
+	// 获取用户信息
+	user, err := model.GetAuthUser(email)
+	if err != nil || user == nil {
+		e := "user not found"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	if user.DKHash == "" {
+		e := "password not set"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	// 查找未使用的 challenge
+	challenge, err := model.FindPendingChallenge(email)
+	if err != nil || challenge == "" {
+		e := "no valid challenge"
+		return &model.SignSessionResult{Status: "error", Error: &e}, nil
+	}
+
+	// 验证 HMAC
+	expected := computeHMAC(user.DKHash, challenge)
+	isValid := hmac.Equal([]byte(expected), []byte(response))
+
+	// 标记 challenge 已使用（无论成败）
+	model.MarkChallengeUsed(email, challenge)
+
+	if isValid {
+		// 重置失败计数
+		model.ResetFailedChallenge(email)
+
+		// 生成短期签名 token（60 秒有效）
+		signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), email)
+		expiresAt := time.Now().Add(60 * time.Second).Unix()
+		if err := model.PutSignSession(&model.SignSession{
+			Token:        signToken,
+			Email:        email,
+			ExpiresAt:    expiresAt,
+			PasswordHash: user.PasswordHash, // 关联 passwordHash，签名时复用
+		}); err != nil {
+			e := "failed to create session"
+			return &model.SignSessionResult{Status: "error", Error: &e}, nil
+		}
+
+		et := int(expiresAt)
+		return &model.SignSessionResult{
+			Status:    "ok",
+			SignToken: &signToken,
+			ExpiresAt: &et,
+		}, nil
+	}
+
+	// 失败计数
+	fails, _ := model.IncrFailedChallenge(email)
+	if fails >= 5 {
+		// 锁定 30 分钟：实际由 IsLocked 检查失败次数 >= 5
+	}
+
+	e := "wrong password"
+	return &model.SignSessionResult{Status: "error", Error: &e}, nil
+}
+
 // SignTransaction is the resolver for the signTransaction field.
 // token 可以是登录 JWT 或短期签名 token
 func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error) {
@@ -176,6 +261,22 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
+
+	// 获取 passwordHash：如果是 signToken，从 session 中获取（一次性）
+	var passwordHash string
+	if len(token) > 4 && token[:4] == "sig_" {
+		session, err := model.GetSignSession(token)
+		if err != nil || session == nil {
+			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
+		}
+		passwordHash = session.PasswordHash
+		// 使用后删除 signToken（一次性）
+		model.DeleteSignSession(token)
+	} else {
+		// API Key 模式下需要传入 passwordHash
+		passwordHash = tx.PasswordHash
+	}
+
 	raw, err := r.WalletSvc.SignTx(email, &wallet.TxRequest{
 		From:         tx.From,
 		To:           tx.To,
@@ -185,7 +286,7 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 		GasPrice:     tx.GasPrice,
 		Nonce:        tx.Nonce,
 		ChainID:      tx.ChainID,
-		PasswordHash: tx.PasswordHash,
+		PasswordHash: passwordHash,
 	})
 	if err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
@@ -202,7 +303,16 @@ func (r *mutationResolver) SignMessage(ctx context.Context, token string, messag
 	}
 
 	var pwd string
-	if passwordHash != nil {
+	if len(token) > 4 && token[:4] == "sig_" {
+		// signToken 模式：从 session 获取 passwordHash（一次性）
+		session, err := model.GetSignSession(token)
+		if err != nil || session == nil {
+			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
+		}
+		pwd = session.PasswordHash
+		// 使用后删除 signToken
+		model.DeleteSignSession(token)
+	} else if passwordHash != nil {
 		pwd = *passwordHash
 	}
 
@@ -242,9 +352,10 @@ func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail str
 	recoveryToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), rec.UserEmail)
 	expiresAt := time.Now().Add(10 * time.Minute).Unix()
 	if err := model.PutSignSession(&model.SignSession{
-		Token:     recoveryToken,
-		Email:     rec.UserEmail,
-		ExpiresAt: expiresAt,
+		Token:        recoveryToken,
+		Email:        rec.UserEmail,
+		ExpiresAt:    expiresAt,
+		PasswordHash: "", // 恢复流程不关联 passwordHash
 	}); err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: "token issue failed"}, nil
 	}
@@ -295,6 +406,50 @@ func (r *queryResolver) AuthHealth(ctx context.Context) (string, error) {
 	return "ok", nil
 }
 
+// GetChallenge is the resolver for the getChallenge field.
+// 生成 challenge 用于前端进行 challenge-response 密码验证
+func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error) {
+	email, err := resolveEmailFromToken(token)
+	if err != nil {
+		return &model.ChallengeResult{Status: "error", Error: strPtr("unauthorized")}, nil
+	}
+
+	// 检查是否被锁定
+	if model.IsLocked(email) {
+		return &model.ChallengeResult{Status: "locked", Error: strPtr("Too many failed attempts")}, nil
+	}
+
+	// 获取用户 salt
+	user, err := model.GetAuthUser(email)
+	if err != nil || user == nil {
+		return &model.ChallengeResult{Status: "error", Error: strPtr("user not found")}, nil
+	}
+
+	if user.Salt == "" || user.DKHash == "" {
+		return &model.ChallengeResult{Status: "error", Error: strPtr("password not set")}, nil
+	}
+
+	// 生成 16 字节随机 challenge
+	challengeBytes := make([]byte, 16)
+	if _, err := rand.Read(challengeBytes); err != nil {
+		return &model.ChallengeResult{Status: "error", Error: strPtr("failed to generate challenge")}, nil
+	}
+	challenge := hex.EncodeToString(challengeBytes)
+
+	// 存储 challenge（5 分钟过期）— 简化实现，无原生 TTL
+	if err := model.PutChallenge(email, challenge, 300); err != nil {
+		return &model.ChallengeResult{Status: "error", Error: strPtr("failed to store challenge")}, nil
+	}
+
+	expiresAt := int(time.Now().Add(5 * time.Minute).Unix())
+	return &model.ChallengeResult{
+		Status:    "success",
+		Challenge: &challenge,
+		Salt:      &user.Salt,
+		ExpiresAt: &expiresAt,
+	}, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
@@ -303,3 +458,16 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// ── helper functions ────────────────────────────────────────
+
+func strPtr(s string) *string { return &s }
+
+// computeHMAC 计算 HMAC-SHA256，key 和 msg 都是 hex 字符串
+func computeHMAC(keyHex, msgHex string) string {
+	key, _ := hex.DecodeString(keyHex)
+	msg, _ := hex.DecodeString(msgHex)
+	mac := hmac.New(sha256.New, key)
+	mac.Write(msg)
+	return hex.EncodeToString(mac.Sum(nil))
+}

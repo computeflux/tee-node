@@ -11,27 +11,22 @@ import (
 // ── Gateway 持久化类型 ───────────────────────────────────
 
 type GatewayProviderInfo struct {
-	Type     string   `json:"name"`
-	BaseURL  string   `json:"baseURL"`
-	ModelIds []uint64 `json:"modelIds"`
-	Priority uint32   `json:"priority"`
-	IsActive bool     `json:"isActive"`
-	Owner    string   `json:"owner"`
-	ID       uint64   `json:"id"`
+	ID uint64 `json:"id"`
+	// Type string `json:"name"`
 }
 
 type GatewayTokenInfo struct {
+	ID        uint64 `json:"id"`
 	Owner     string `json:"owner"`
 	Key       string `json:"key"` // bearer token value
 	RateLimit uint32 `json:"rateLimit"`
 	IsActive  bool   `json:"isActive"`
 	CreatedAt uint64 `json:"createdAt"`
-	ID        uint64 `json:"id"`
 }
 
 type GatewayDailyUsage struct {
 	TokenID      uint64 `json:"tokenId"`
-	ProviderID   uint64 `json:"channelId"`
+	ProviderID   uint64 `json:"providerId"`
 	ModelID      uint64 `json:"modelId"`
 	Day          string `json:"day"`
 	Count        uint64 `json:"count"`

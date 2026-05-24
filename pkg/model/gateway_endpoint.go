@@ -10,7 +10,7 @@ import (
 
 type GatewayEndpoint struct {
 	ID         uint64 `json:"id"`
-	ProviderID uint64 `json:"channelId"`
+	ProviderID uint64 `json:"providerId"`
 	URL        string `json:"url"`
 	APIKey     string `json:"apiKey"`
 	Weight     uint32 `json:"weight"`

@@ -142,7 +142,7 @@ query { contractDryRun(caller, callerType, contract, mut, method, args) }
 
 ### B. Token API 转发 → tee-provider (积分模式)
 
-将 `token` 的 Relay 功能迁移到 tee-provider，**采用积分模式：用户充值积分，按各 Channel 设定的汇率扣费**。
+将 `token` 的 Relay 功能迁移到 tee-provider，**采用积分模式：用户充值积分，按各 Provider 设定的汇率扣费**。
 
 | token 功能 | tee-provider 对应层 | 去中心化增强 |
 |------------|--------------------|-------------|
@@ -150,9 +150,9 @@ query { contractDryRun(caller, callerType, contract, mut, method, args) }
 | 多供应商 Relay | HTTP: `services/gateway/relay.go` | 路由策略由合约配置 |
 | 速率限制 | HTTP: `services/gateway/ratelimit.go` | 分布式速率限制 |
 | 积分充值 | 合约: `contracts/gateway/` + HTTP: `services/gateway/points.go` | **链上充值/扣费** |
-| 汇率配置 | 合约: `contracts/gateway/` (每个 Channel 自行设定) | **供应商自主定价** |
+| 汇率配置 | 合约: `contracts/gateway/` (每个 Provider 自行设定) | **供应商自主定价** |
 | 用户管理 | 合约: `contracts/gateway/` + HTTP: `services/gateway/user.go` | DID 身份 |
-| Channel 管理 | 合约: `contracts/gateway/` + HTTP: `services/gateway/channel.go` | 配置变更需共识 |
+| Provider 管理 | 合约: `contracts/gateway/` + HTTP: `services/gateway/provider.go` | 配置变更需共识 |
 | Dashboard Web UI | `dashboard/` (静态托管) | API 指向 tee-provider |
 
 **积分模式核心逻辑**：
@@ -161,12 +161,12 @@ query { contractDryRun(caller, callerType, contract, mut, method, args) }
 用户充值 100 积分
      │
      ▼
-调用 GPT-4:   Channel A 设定 10 积分/1K tokens → 消耗 1000 tokens = 扣 10 积分
-调用 Claude:  Channel B 设定 5 积分/1K tokens  → 消耗 1000 tokens = 扣 5 积分
-调用 国产模型: Channel C 设定 1 积分/1K tokens  → 消耗 1000 tokens = 扣 1 积分
+调用 GPT-4:   Provider A 设定 10 积分/1K tokens → 消耗 1000 tokens = 扣 10 积分
+调用 Claude:  Provider B 设定 5 积分/1K tokens  → 消耗 1000 tokens = 扣 5 积分
+调用 国产模型: Provider C 设定 1 积分/1K tokens  → 消耗 1000 tokens = 扣 1 积分
 
-✓ 每个 Channel 独立设定自己的 model → points_per_1k 汇率
-✓ 用户一个积分余额通用所有模型，按各 Channel 汇率自动折算
+✓ 每个 Provider 独立设定自己的 model → points_per_1k 汇率
+✓ 用户一个积分余额通用所有模型，按各 Provider 汇率自动折算
 ✓ 不再有套餐/Product 概念，纯粹的"充值积分 → 按量消费"
 ```
 
@@ -217,9 +217,9 @@ tee-chain/contracts/
 └── gateway/                 # 新增：API 网关合约
     ├── gateway.go           # 合约主体
     ├── gateway_gen.go       # 代码生成
-    ├── types.go             # 类型定义 (ModelInfo, ChannelInfo, TokenInfo, ...)
+    ├── types.go             # 类型定义 (ModelInfo, ProviderInfo, TokenInfo, ...)
     ├── model.go             # 模型注册 / 更新价格
-    ├── channel.go           # Channel 创建 / 关联模型
+    ├── provider.go           # Provider 创建 / 关联模型
     ├── token.go             # API Token CRUD
     ├── points.go            # 积分充值 / 消费 / 提现
     └── abis/
@@ -335,21 +335,21 @@ POST /wallet/sign-transaction
 
 ## Gateway 合约 — 积分制 API 网关
 
-**核心思路**：模型独立注册（每个模型有自己的价格和供应商），Channel 通过 modelIds 关联已注册的模型。用户充值积分，Relay 时按模型价格自动扣费。
+**核心思路**：模型独立注册（每个模型有自己的价格和供应商），Provider 通过 modelIds 关联已注册的模型。用户充值积分，Relay 时按模型价格自动扣费。
 
 ### 积分流转模型
 
 ```
-+-- 模型与 Channel 注册（供应商）--------------------------+
++-- 模型与 Provider 注册（供应商）--------------------------+
 |                                                        |
 |  ① 注册模型 (RegisterModel)                             |
 |     provider -> Gateway.RegisterModel(name, pointsPer1K)|
 |     -> modelId=1, owner=provider, 模型独立存在           |
 |                                                        |
-|  ② 创建 Channel (CreateChannel)                         |
-|     provider -> Gateway.CreateChannel(name, baseUrl,    |
+|  ② 创建 Provider (CreateProvider)                         |
+|     provider -> Gateway.CreateProvider(name, baseUrl,    |
 |                     [modelId1, modelId2], priority)     |
-|     Channel 关联已注册的模型 ID 列表                     |
+|     Provider 关联已注册的模型 ID 列表                     |
 +--------------------------------------------------------+
 
 +-- 积分消费（Relay 自动触发）----------------------------+
@@ -379,10 +379,10 @@ POST /wallet/sign-transaction
 | `RegisterModel(owner, name, pointsPer1K)` | **供应商注册模型，设定积分价格** -> `modelId` |
 | `UpdateModel(modelId, pointsPer1K)` | 更新模型价格 (仅 owner) |
 | `DeactivateModel(modelId)` | 下架模型 (仅 owner) |
-| `CreateChannel(owner, name, baseUrl, modelIds, priority)` | 供应商创建 Channel，关联已注册模型 |
-| `UpdateChannel(channelId, modelIds, priority)` | 更新 Channel 关联的模型 |
+| `CreateProvider(owner, name, baseUrl, modelIds, priority)` | 供应商创建 Provider，关联已注册模型 |
+| `UpdateProvider(providerId, modelIds, priority)` | 更新 Provider 关联的模型 |
 | `Recharge(user, amount)` | 用户充值积分 (仅 sudo/管理员调用) |
-| `Consume(tokenId, channelId, modelId, tokensUsed)` | Relay 扣费：按模型价格扣积分 |
+| `Consume(tokenId, providerId, modelId, tokensUsed)` | Relay 扣费：按模型价格扣积分 |
 | `CreateToken(owner, rateLimit)` | 创建 API Token (不绑定模型) |
 | `RevokeToken(tokenId)` | 吊销 Token |
 | `Withdraw(modelId, amount)` | 供应商提取该模型的收益 |
@@ -396,8 +396,8 @@ POST /wallet/sign-transaction
 | `ListModels(startKey, size)` | 分页列出所有已注册模型 |
 | `GetToken(tokenId)` | 查询 Token 详情 |
 | `ListUserTokens(user, startKey, size)` | 分页列出用户 Token |
-| `GetChannel(channelId)` | 查询 Channel 及关联的 modelIds |
-| `ListActiveChannels(modelId)` | 列出支持某模型的可用 Channel (按优先级) |
+| `GetProvider(providerId)` | 查询 Provider 及关联的 modelIds |
+| `ListActiveProviders(modelId)` | 列出支持某模型的可用 Provider (按优先级) |
 | `GetUsage(tokenId, day)` | 查询某天用量 |
 
 ### Gateway 合约状态模型
@@ -411,15 +411,15 @@ type Gateway struct {
     models           *model.StoreMapping[uint64, ModelInfo]
     // 模型收益: modelId -> provider balance (按模型累积)
     providerBalances *model.StoreMapping[uint64, Amount]
-    // Channel: channelId -> ChannelInfo
-    channels         *model.StoreMapping[uint64, ChannelInfo]
+    // Provider: providerId -> ProviderInfo
+    providers         *model.StoreMapping[uint64, ProviderInfo]
     // API Token
     tokens           *model.StoreMapping[uint64, TokenInfo]
     userTokens       *model.StoreList2D[UniAddr, uint64, uint64]
     // 用量记录: "{tokenId}_{day}" -> DailyUsage
     usages           *model.StoreMapping[string, DailyUsage]
     nextModelId      *model.StoreValue[uint64]
-    nextChannelId    *model.StoreValue[uint64]
+    nextProviderId    *model.StoreValue[uint64]
     nextTokenId      *model.StoreValue[uint64]
 }
 
@@ -432,7 +432,7 @@ type ModelInfo struct {
     CreatedAt   uint64
 }
 
-type ChannelInfo struct {
+type ProviderInfo struct {
     Name       string
     BaseURL    string       // 供应商 API 地址
     ModelIds   []uint64     // 关联的模型 ID 列表
@@ -450,7 +450,7 @@ type TokenInfo struct {
 
 type DailyUsage struct {
     TokenId    uint64
-    ChannelId  uint64
+    ProviderId  uint64
     ModelId    uint64
     Day        string       // "2025-01-15"
     Count      uint64       // 调用次数
@@ -474,12 +474,12 @@ type DailyUsage struct {
 |    -> 余额不足则拒绝                                          |
 | ③ 根据请求 model 名称查找 modelId                            |
 |    Query Gateway.GetModel(modelId) -> ModelInfo              |
-| ④ Query Gateway.ListActiveChannels(modelId)                  |
-|    -> 按 Priority 选择最优 Channel                           |
-| ⑤ 转发请求到 Channel.BaseURL -> 收到响应                     |
+| ④ Query Gateway.ListActiveProviders(modelId)                  |
+|    -> 按 Priority 选择最优 Provider                           |
+| ⑤ 转发请求到 Provider.BaseURL -> 收到响应                     |
 | ⑥ 计算费用: cost = ceil(tokensUsed / 1000                    |
 |                         * model.PointsPer1K)                 |
-| ⑦ Mutation Gateway.Consume(tokenId, channelId,              |
+| ⑦ Mutation Gateway.Consume(tokenId, providerId,              |
 |                              modelId, tokensUsed)            |
 |    -> user.balance -= cost                                   |
 |    -> model.providerBalance += cost                          |
@@ -503,19 +503,19 @@ type DailyUsage struct {
 ③ 供应商 C 注册模型:
    RegisterModel(owner=C, name="qwen-turbo", pointsPer1K=1)   -> modelId=4
 
-④ 供应商 A 创建 Channel:
-   CreateChannel(owner=A, name="OpenAI通道", baseUrl="https://api.openai.com",
-                 modelIds=[1, 2], priority=10)  -> channelId=1
+④ 供应商 A 创建 Provider:
+   CreateProvider(owner=A, name="OpenAI通道", baseUrl="https://api.openai.com",
+                 modelIds=[1, 2], priority=10)  -> providerId=1
 
 ⑤ 用户调用 gpt-4:
-   请求 model="gpt-4" -> 匹配 modelId=1 -> 路由到 channelId=1
+   请求 model="gpt-4" -> 匹配 modelId=1 -> 路由到 providerId=1
    扣费: 1000 tokens * 30 积分/1K = 30 积分
 
 ⑥ 供应商 A 提现:
    Withdraw(modelId=1, amount=300)  // 从 gpt-4 收益中提取
 ```
 
-> **模型与 Channel 解耦**：模型通过 `RegisterModel` 独立注册并定价，Channel 通过 `modelIds` 关联模型。同一供应商可以用多个 Channel 提供不同模型组合，同一模型也可以被多个 Channel 引用（不同供应商各自定价）。
+> **模型与 Provider 解耦**：模型通过 `RegisterModel` 独立注册并定价，Provider 通过 `modelIds` 关联模型。同一供应商可以用多个 Provider 提供不同模型组合，同一模型也可以被多个 Provider 引用（不同供应商各自定价）。
 
 ---
 
@@ -584,7 +584,7 @@ tee-provider/
 │   │   ├── token.go                 # API Token 管理
 │   │   ├── points.go                # 积分充值/消费/提现
 │   │   ├── ratelimit.go             # 速率限制
-│   │   └── channel.go               # Channel + 汇率管理
+│   │   └── provider.go               # Provider + 汇率管理
 │   │
 │   └── recovery/                    # 社交恢复
 │

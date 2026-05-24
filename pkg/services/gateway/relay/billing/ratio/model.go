@@ -683,7 +683,7 @@ func UpdateModelRatioByJSONString(jsonStr string) error {
 	return json.Unmarshal([]byte(jsonStr), &ModelRatio)
 }
 
-func GetModelRatio(name string, channelType int) float64 {
+func GetModelRatio(name string, providerType int) float64 {
 	modelRatioLock.RLock()
 	defer modelRatioLock.RUnlock()
 	if strings.HasPrefix(name, "qwen-") && strings.HasSuffix(name, "-internet") {
@@ -692,7 +692,7 @@ func GetModelRatio(name string, channelType int) float64 {
 	if strings.HasPrefix(name, "command-") && strings.HasSuffix(name, "-internet") {
 		name = strings.TrimSuffix(name, "-internet")
 	}
-	model := fmt.Sprintf("%s(%d)", name, channelType)
+	model := fmt.Sprintf("%s(%d)", name, providerType)
 	if ratio, ok := ModelRatio[model]; ok {
 		return ratio
 	}
@@ -722,11 +722,11 @@ func UpdateCompletionRatioByJSONString(jsonStr string) error {
 	return json.Unmarshal([]byte(jsonStr), &CompletionRatio)
 }
 
-func GetCompletionRatio(name string, channelType int) float64 {
+func GetCompletionRatio(name string, providerType int) float64 {
 	if strings.HasPrefix(name, "qwen-") && strings.HasSuffix(name, "-internet") {
 		name = strings.TrimSuffix(name, "-internet")
 	}
-	model := fmt.Sprintf("%s(%d)", name, channelType)
+	model := fmt.Sprintf("%s(%d)", name, providerType)
 	if ratio, ok := CompletionRatio[model]; ok {
 		return ratio
 	}

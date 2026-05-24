@@ -1,12 +1,13 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/wetee-dao/ink.go/util"
 )
 
-// ── Provider / Channel ───────────────────────────────────
+// ── Provider / Provider ───────────────────────────────────
 
 func (g GatewayMutation) CreateProvider(
 	name, logoURL, description string,
@@ -138,18 +139,23 @@ func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]Provid
 }
 
 // GetProviderByName 返回指定名称的所有 Provider（使用 Name exact 索引）
-func (g GatewayQuery) GetProviderByName(name string) ([]ProviderInfo, error) {
+func (g GatewayQuery) GetProviderByName(name string) (*DataWithID[ProviderInfo], error) {
 	keys, err := g.providers.Query(g.api.GetTxn(), map[string]any{"Name": name})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ProviderInfo, 0, len(keys))
-	for _, k := range keys {
-		p, err := g.providers.Get(g.api.GetTxn(), k)
-		if err != nil || p == nil {
-			continue
-		}
-		out = append(out, *p)
+
+	if len(keys) == 0 {
+		return nil, errors.New("provider not found with name: " + name)
 	}
-	return out, nil
+
+	p, err := g.providers.Get(g.api.GetTxn(), keys[0])
+	if err != nil || p == nil {
+		return nil, errors.New("provider not found with name: " + name)
+	}
+
+	return &DataWithID[ProviderInfo]{
+		ID:   keys[0],
+		Data: *p,
+	}, nil
 }

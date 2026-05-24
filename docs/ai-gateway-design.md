@@ -146,14 +146,14 @@ sequenceDiagram
     Handler->>EndLimit: lim.Done()
     Handler->>Usage: recordUsageAsync(tokenID, day, providerID, tokens)
 
-    alt channel 满
+    alt provider 满
         Usage->>Usage: 日志记录 dropped
     end
 
     Usage->>Usage: 500ms 批量刷盘
     Usage->>Pebble: SetJson("GATEWAY", "usage:...")
 
-    Handler->>Handler: EmitChannelMetric(success)
+    Handler->>Handler: EmitProviderMetric(success)
     Handler->>Logger: GatewayLog() 写入 ./logs/gateway.log
 ```
 
@@ -323,7 +323,7 @@ flowchart TB
 - **URI 去重**：如果 `BaseURL` 末尾路径段与请求路径开头重复（如 `https://api.minimaxi.com/v1` + `/v1/chat/completions`），自动去重为 `https://api.minimaxi.com/v1/chat/completions`
 - **位置**：`pkg/api/gateway/auth_middleware.go`
 
-## 4. Channel / Provider 模型
+## 4. Provider / Provider 模型
 
 ### 4.1 核心概念
 
@@ -367,7 +367,7 @@ type Adaptor interface {
     DoRequest(ctx *RelayContext, meta *Meta, requestBody io.Reader) (*http.Response, error)
     DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (usage *Usage, err *ErrorWithStatusCode)
     GetModelList() []string
-    GetChannelName() string
+    GetProviderName() string
 }
 ```
 
@@ -425,14 +425,14 @@ if cost < 1 { cost = 1 }
 ```
 
 异步写入：
-- `recordUsageAsync()` 通过 channel（buffer 4096）发送到后台 goroutine
+- `recordUsageAsync()` 通过 provider（buffer 4096）发送到后台 goroutine
 - 每 **500ms** 批量聚合写入 PebbleDB
 - 聚合 key：`usage:{day}_{tokenID}`
 - 满时记录日志到 `./logs/gateway.log`
 
 ## 10. 健康监控
 
-- Channel 成功率 < 30% -> 记录日志告警（不再自动禁用本地 DB，Provider 状态由合约管理）
+- Provider 成功率 < 30% -> 记录日志告警（不再自动禁用本地 DB，Provider 状态由合约管理）
 - Endpoint 返回 401 / insufficient_quota / invalid_api_key -> 记录日志
 - 所有监控日志写入 `./logs/gateway.log`
 
@@ -444,7 +444,7 @@ Gateway 模块所有日志统一通过 `GatewayLog()` 输出到 `./logs/gateway.
 |---------|------|------|
 | 请求日志 | `[HTTP]` | method、path、status、耗时、IP |
 | 鉴权日志 | `[AUTH]` | token 验证结果 |
-| 监控日志 | `[MONITOR]` | channel 成功率、上游错误 |
+| 监控日志 | `[MONITOR]` | provider 成功率、上游错误 |
 | 用量日志 | `[USAGE]` | dropped record 告警 |
 | 扩容日志 | `[SCALER]` | 连接池扩缩容 |
 | 合约日志 | `[GATEWAY]` | 合约查询结果 |
@@ -539,7 +539,7 @@ Authorization: Bearer tee_<64 hex chars>
 ### 变更 6：清理废弃代码
 - **删除**：`seed.go`
 - **删除**：`pkg/model/gateway_store.go` 中未使用的 PebbleDB CRUD（SetGatewayModel/GetGatewayModel 等）
-- **删除**：`pkg/model/gateway_endpoint.go` 中基于 PebbleDB 的 `ListChannelEndpoints`
+- **删除**：`pkg/model/gateway_endpoint.go` 中基于 PebbleDB 的 `ListProviderEndpoints`
 - **保留**：`GetGatewayToken/SetGatewayToken/FindGatewayTokenByKey` 作为 legacy token fallback
 
 ---

@@ -49,18 +49,17 @@ func RegisterGatewayRoutes(r chi.Router) {
 
 func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	channel := GetChannelFromContext(r)
 	endpoint := GetEndpointFromContext(r)
-	modelName := GetModelFromContext(r)
+	model := GetModelFromContext(r)
 	token := GetTokenFromContext(r)
-	if channel == nil || endpoint == nil {
+	if endpoint == nil {
 		writeError(w, http.StatusServiceUnavailable, "no route", "server_error")
 		return
 	}
 
 	// Endpoint 级别限流 — 这才是真正的瓶颈
-	provider := relay.DetectProvider(endpoint.URL)
-	rpmLimit, maxConc := GetProviderLimits(provider)
+	providerType := relay.DetectProvider(endpoint.URL)
+	rpmLimit, maxConc := GetProviderLimits(providerType)
 	lim := getEndpointLimiter(endpoint.ID, rpmLimit)
 	lim.SetLimits(rpmLimit, maxConc)
 	if !lim.Allow() {
@@ -80,24 +79,25 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	json.Unmarshal(bodyBytes, &reqBody)
 
-	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelName, bodyBytes, reqBody.Stream)
-
 	// Business error (e.g. upstream 4xx): already contains status code and message.
+	usage, bizErr, err := relayToUpstream(w, r, endpoint, model.Data.Name, bodyBytes, reqBody.Stream)
 	if bizErr != nil {
-		EmitChannelMetric(channel.ID, false)
+		EmitProviderMetric(model.Data.ProviderID, false)
 		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
 		return
 	}
 
 	// Transport error (e.g. connection refused).
 	if err != nil {
-		EmitChannelMetric(channel.ID, false)
+		EmitProviderMetric(model.Data.ProviderID, false)
 		writeError(w, http.StatusBadGateway, err.Error(), "server_error")
 		return
 	}
 
-	EmitChannelMetric(channel.ID, true)
+	// 统计调用成功率和使用量
+	EmitProviderMetric(model.Data.ProviderID, true)
 
+	// 统计用户 Token 使用
 	var tokenID uint64
 	if token != nil {
 		tokenID = token.ID
@@ -106,27 +106,28 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if usage != nil {
 		totalTokens = usage.TotalTokens
 		cachedTokens = usage.PromptTokensDetails.CachedTokens
+		recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), model, uint64(totalTokens), uint64(cachedTokens))
 	}
-	recordUsageAsync(tokenID, time.Now().Format("2006-01-02"), channel.ID, uint64(totalTokens), uint64(cachedTokens))
 
+	// 记录调用时间
 	elapsed := time.Since(start)
 	tkns := 0
 	if usage != nil {
 		tkns = usage.TotalTokens
 	}
-	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, modelName, endpoint.URL, tkns, elapsed)
+	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, model.Data.Name, endpoint.URL, tkns, elapsed)
 }
 
 func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
-	ctx.Set("request_model", modelName)
 
-	meta := relay.GetByContext(ctx)
+	meta := relay.GetMetaByContext(ctx)
 	meta.BaseURL = endpoint.URL
 	meta.APIKey = endpoint.APIKey
 	meta.IsStream = isStream
+	meta.OriginModelName = modelName
 
-	adaptor := relay.GetAdaptorForProvider(relay.DetectProvider(endpoint.URL))
+	adaptor := relay.GetAdaptorForProviderType(relay.DetectProvider(endpoint.URL))
 	adaptor.Init(meta)
 
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))

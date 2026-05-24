@@ -46,6 +46,14 @@ type RecoveryResult {
   error: String
 }
 
+type ChallengeResult {
+  status: String!
+  challenge: String
+  salt: String
+  expiresAt: Int
+  error: String
+}
+
 # ── 输入类型 ────────────────────────────────────────────
 
 input TxInput {
@@ -77,11 +85,14 @@ extend type Mutation {
     codeVerifier: String
   ): AuthResponse!
 
-  """设置交易密码"""
-  setPassword(token: String!, passwordHash: String!): WalletResult!
+  """设置交易密码（同时传入 passwordHash 用于加密私钥，以及 salt + dkHash 用于 challenge-response）"""
+  setPassword(token: String!, passwordHash: String!, salt: String!, dkHash: String!): WalletResult!
 
-  """验证交易密码，返回短期签名 token"""
+  """验证交易密码，返回短期签名 token（旧接口，兼容模式）"""
   verifyPassword(token: String!, passwordHash: String!): SignSessionResult!
+
+  """验证挑战响应，返回短期签名 token"""
+  verifyResponse(token: String!, response: String!): SignSessionResult!
 
   """签名交易"""
   signTransaction(token: String!, tx: TxInput!): WalletResult!
@@ -110,4 +121,7 @@ extend type Query {
 
   """认证服务健康检查"""
   authHealth: String!
+
+  """获取签名挑战（用于 challenge-response 密码验证）"""
+  getChallenge(token: String!): ChallengeResult!
 }

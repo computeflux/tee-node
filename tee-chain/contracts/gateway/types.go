@@ -68,12 +68,17 @@ type ModelInfo struct {
 	APIKeyRefs   []string `json:"apiKeyRefs,omitempty"` // 引用标识列表，指向 EncryptedAPIKey
 }
 
+type DataWithID[T any] struct {
+	ID   uint64
+	Data T
+}
+
 type ModelInfoWithProvider struct {
 	Model    ModelInfo
 	Provider ProviderInfo
 }
 
-// ── Provider / Channel ──────────────────────────────────
+// ── Provider / Provider ──────────────────────────────────
 
 // ProviderInfo 去中心化 AI 服务提供者
 type ProviderInfo struct {

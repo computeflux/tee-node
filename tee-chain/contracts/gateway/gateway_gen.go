@@ -334,14 +334,18 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xb5, 0x1e, 0x55, 0x6b}:
-		if err := model.RequireArgLen(args, 1, "get_model_by_name"); err != nil {
+		if err := model.RequireArgLen(args, 2, "get_model_by_name"); err != nil {
 			return nil, err
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[0])
+		pid, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_by_name: pid: %w", err)
+		}
+		name, err := model.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("get_model_by_name: name: %w", err)
 		}
-		out, err := q.GetModelByName(name)
+		out, err := q.GetModelByName(pid, name)
 		if err != nil {
 			return nil, err
 		}

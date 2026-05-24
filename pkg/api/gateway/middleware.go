@@ -156,23 +156,23 @@ func CacheMiddleware(next http.Handler) http.Handler {
 
 // ── Provider Monitor ──────────────────────────────────────
 
-type channelMetric struct {
+type providerMetric struct {
 	recent []bool // true=success, false=fail
 }
 
 var (
-	channelMetrics   = make(map[uint64]*channelMetric)
-	channelMetricsMu sync.Mutex
+	providerMetrics   = make(map[uint64]*providerMetric)
+	providerMetricsMu sync.Mutex
 )
 
-func EmitChannelMetric(providerID uint64, success bool) {
-	channelMetricsMu.Lock()
-	defer channelMetricsMu.Unlock()
+func EmitProviderMetric(providerID uint64, success bool) {
+	providerMetricsMu.Lock()
+	defer providerMetricsMu.Unlock()
 
-	m, ok := channelMetrics[providerID]
+	m, ok := providerMetrics[providerID]
 	if !ok {
-		m = &channelMetric{}
-		channelMetrics[providerID] = m
+		m = &providerMetric{}
+		providerMetrics[providerID] = m
 	}
 
 	queueSize := 100
@@ -181,7 +181,7 @@ func EmitChannelMetric(providerID uint64, success bool) {
 	}
 	m.recent = append(m.recent, success)
 
-	// 监控低成功率 channel（只记录日志，不修改本地 DB；Provider 状态由合约管理）
+	// 监控低成功率 provider（只记录日志，不修改本地 DB；Provider 状态由合约管理）
 	threshold := 0.3
 	if len(m.recent) >= queueSize {
 		successCount := 0
@@ -192,14 +192,14 @@ func EmitChannelMetric(providerID uint64, success bool) {
 		}
 		rate := float64(successCount) / float64(len(m.recent))
 		if rate < threshold {
-			GATEWAYLOG().Printf("[MONITOR] channel %d success rate %.2f < %.2f, alerting",
+			GATEWAYLOG().Printf("[MONITOR] provider %d success rate %.2f < %.2f, alerting",
 				providerID, rate, threshold)
 			m.recent = nil
 		}
 	}
 }
 
-func ShouldDisableChannel(errMsg string, statusCode int) bool {
+func ShouldDisableProvider(errMsg string, statusCode int) bool {
 	if statusCode == http.StatusUnauthorized {
 		return true
 	}

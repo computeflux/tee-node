@@ -745,7 +745,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 |---|---|---|
 | 链上数据泄露 | 查询合约状态 | 链上仅密文，无明文 |
 | 单节点磁盘窃取 | 物理访问 pebble 文件 | sealing key 绑定 enclave，其他机器无法解封 |
-| 单节点内存转储 | 冷启动攻击 / side channel | TEE 内存加密，side channel 缓解由 TEE 硬件提供 |
+| 单节点内存转储 | 冷启动攻击 / side provider | TEE 内存加密，side provider 缓解由 TEE 硬件提供 |
 | 网络嗅探 | 中间人攻击 | RA + attested TLS，证书绑定到 RA 报告 |
 | 恶意节点加入 | 伪造 enclave | RA 验证 MRENCLAVE / MRSIGNER，仅合法 enclave 可加入 |
 | 旧 GK 泄露 | 历史密钥被破解 | GK 定期轮换，旧密文全部重新加密 |

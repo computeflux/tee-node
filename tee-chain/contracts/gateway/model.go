@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -279,20 +280,25 @@ func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error
 }
 
 // GetModelByName 返回指定名称的所有模型（使用 Name exact 索引）
-func (g GatewayQuery) GetModelByName(name string) ([]ModelInfo, error) {
-	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"Name": name})
+func (g GatewayQuery) GetModelByName(pid uint64, name string) (*DataWithID[ModelInfo], error) {
+	keys, err := g.models.Query(g.api.GetTxn(), map[string]any{"ProviderID": pid, "Name": name})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ModelInfo, 0, len(keys))
-	for _, k := range keys {
-		m, err := g.models.Get(g.api.GetTxn(), k)
-		if err != nil || m == nil {
-			continue
-		}
-		out = append(out, *m)
+
+	if len(keys) == 0 {
+		return nil, errors.New("model not found")
 	}
-	return out, nil
+
+	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	if err != nil || m == nil {
+		return nil, errors.New("model not found")
+	}
+
+	return &DataWithID[ModelInfo]{
+		ID:   keys[0],
+		Data: *m,
+	}, nil
 }
 
 // ── Encrypted API Key ────────────────────────────────────
