@@ -87,6 +87,7 @@ func FindTokenByKey(key string) *model.GatewayTokenInfo {
 
 	// Fallback: local PebbleDB cache
 	for _, tk := range GetCachedTokens() {
+		// fmt.Printf("[TokenCache] checking key %s against cached token %s (active=%v)\n", key, tk.Key, tk.IsActive)
 		if tk.Key == key && tk.IsActive {
 			return tk
 		}

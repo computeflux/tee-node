@@ -10,8 +10,8 @@
 ## 设计目标
 
 1. **最小改动**：尽量复用现有数据结构（`GatewayDailyUsage`、`Settlement`）
-2. **无重复结算**：每个节点只结算自己记录的流量数据
-3. **可容错**：单 Provider 结算失败不影响其他 Provider
+2. **统一批量提交**：所有用量合并为一个 `[]Settlement` 数组，一笔交易上链
+3. **无重复结算**：每个节点只结算自己记录的流量数据
 4. **可测试**：结算周期 `SettleInterval` 可外部修改
 
 ## 整体链路
@@ -21,13 +21,13 @@
                                                 ↓（每5分钟）
                                     settle goroutine 扫描 usage: 前缀
                                                 ↓
-                                    按 ProviderID 聚合为 []Settlement
+                                    统一构造为 []Settlement（大数组）
                                                 ↓
                                     DKG signer 签名 → SubmitTx → 侧链
                                                 ↓
                                     ContractMutation → SettleUsage
                                                 ↓
-                                    扣用户余额 + 加 Provider 余额
+                                    遍历 records：扣用户余额 + 加 Provider 余额
                                                 ↓
                                     删除本地已结算记录
 ```
@@ -56,24 +56,25 @@
 
 ```go
 func initUsageSettler()  // 每 SettleInterval（默认5分钟）触发
-func settlePendingUsage() // 核心结算逻辑
+func settlePendingUsage() // 核心结算逻辑（统一批量提交）
 func submitSettleUsage()  // 构造交易 + DKG 签名 + SubmitTx
 ```
 
 结算流程：
 1. `GetJsonList("GATEWAY", "usage:")` 扫描所有本地用量记录
-2. 按 `ProviderID` 聚合为 `[]cgateway.Settlement`
-3. 逐 Provider 提交链上交易（DKG signer 签名，`callerType=0`）
-4. 成功后 `DeleteByteKey` 删除本地记录
+2. 统一构造为一个大的 `[]cgateway.Settlement` 数组（不再按 Provider 拆分）
+3. 一次性提交链上交易（DKG signer 签名，`callerType=0`）
+4. 成功后统一 `DeleteByteKey` 删除本地记录
+5. 交易失败时不删除记录，下次结算重试
 
 ### 4. 合约权限修改
 
 **[`credit.go`](tee-chain/contracts/gateway/credit.go:41)**
 
 `SettleUsage` 原要求调用者必须是 Provider Owner。修改后：
-- `system account`（`CallbySystem()`）也可调用
+- `system account`（`CallbySystem()`）可调用（统一批量提交场景）
 - 普通节点调用仍需验证 Provider 归属
-- 为后续多节点各自结算自己记录的流量做准备
+- 合约内部遍历 `[]Settlement`，逐条扣用户余额、加 Provider 余额
 
 ```go
 isSystem := g.api.CallbySystem()
@@ -84,38 +85,53 @@ if !isSystem {
 
 ## 关键代码
 
+### 统一批量提交
+
+```go
+func settlePendingUsage() error {
+    records, keys, err := model.GetJsonList[model.GatewayDailyUsage]("GATEWAY", "usage:")
+    // ...
+    settlements := make([]cgateway.Settlement, 0, len(records))
+    for _, r := range records {
+        settlements = append(settlements, cgateway.Settlement{...})
+    }
+    // 一次性提交所有记录
+    if err := submitSettleUsage(settlements); err != nil {
+        return err  // 失败不删除，下次重试
+    }
+    // 成功后再删除本地记录
+    for _, k := range keys {
+        model.DeleteByteKey(k)
+    }
+}
+```
+
 ### 提交结算交易
 
 ```go
-// SCALE 编码 Settlement 数组
-argBytes, _ := codec.Encode(records)
-
-method := model.MethodToSelector("SettleUsage")
-call := &model.ContractCall{
-    Name:   []byte("gateway"),
-    Method: method[:],
-    Args:   [][]byte{argBytes},
+func submitSettleUsage(records []cgateway.Settlement) error {
+    argBytes, _ := codec.Encode(records)
+    method := model.MethodToSelector("SettleUsage")
+    call := &model.ContractCall{...}
+    sysCall := &model.SysCall{Payload: &model.SysCall_Contract{Contract: call}}
+    sigBytes, _ := sysCall.BytesForSig()
+    signer := dkg.Signer.ToSigner(model.SuiteEd25519)
+    signature, _ := signer.Sign(sigBytes)
+    return teechain.SubmitTx(tx)
 }
-
-// DKG signer 签名（system call，callerType=0）
-sigBytes, _ := sysCall.BytesForSig()
-signer := dkg.Signer.ToSigner(model.SuiteEd25519)
-signature, _ := signer.Sign(sigBytes)
-
-// 提交到侧链 mempool
-teechain.SubmitTx(tx)
 ```
 
 ### 合约侧执行
 
 ```go
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
-    // 扣用户余额 → 加 Provider 余额 → 记录历史
     for _, r := range records {
+        // 扣用户余额
         bal, _ := g.credits.Get(txn, r.User)
         *bal -= cost
         g.credits.Set(txn, r.User, *bal)
         
+        // 加 provider 余额
         pb, _ := g.providerCredits.Get(txn, r.ProviderID)
         *pb += cost
         g.providerCredits.Set(txn, r.ProviderID, *pb)
@@ -138,7 +154,6 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 1. **P0 — 防重放**：当前 `SettleUsage` 无 nonce，同一批 settlement 可被重复提交。需要增加 `batchNonce` 或 `merkleRoot` + TEE 签名验证。
 2. **P1 — 费用校验**：本地 `PointsUsed` 预计算与链上 `cost` 公式应保持一致（已在 `optimizer.go` 和 `credit.go` 中统一公式）。
 3. **P2 — 失败重试**：`submitSettleUsage` 失败后，当前仅打印日志，未做重试或死信队列。
-4. **P2 — 并发控制**：多 Provider 同时结算时，各自独立提交交易，存在 mempool 竞争。当前由侧链顺序执行保证原子性。
 
 ## 测试验证
 
@@ -154,6 +169,6 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 | `graph/auth.resolvers.go` | 修改 | 3 处调用 `createUserAPIKey(email, address)` |
 | `pkg/api/gateway/contract.go` | 修改 | `LookupAPIKeyViaContract` 返回 `Addr` |
 | `pkg/api/gateway/relay_handler.go` | 修改 | `HandleRelay` 传入 `userAddr` 到 `recordUsageAsync` |
-| `pkg/api/gateway/optimizer.go` | 重大修改 | 新增 `initUsageSettler`、`settlePendingUsage`、`submitSettleUsage` |
+| `pkg/api/gateway/optimizer.go` | 重大修改 | 新增统一批量结算：`initUsageSettler`、`settlePendingUsage`、`submitSettleUsage` |
 | `tee-chain/contracts/gateway/credit.go` | 修改 | `SettleUsage` 允许 `system account` 调用 |
 | `docs/usage-settle-design.md` | 新增 | 本文档 |

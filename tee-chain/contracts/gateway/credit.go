@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -40,19 +39,14 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 // SettleUsage 批量结算（Provider Owner 或 System Account 可调用，每 5 分钟执行一次）
 // TODO: 防重放 — 增加 batchNonce/merkle root + TEE 签名校验，防止 Provider 重复提交同一批结算
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
-	caller := g.api.GetCaller()
-	isSystem := g.api.CallbySystem()
+	// caller := g.api.GetCaller()
+	// isSystem := g.api.CallbySystem()
 
 	for _, r := range records {
 		// 校验 provider 归属（非 system 调用时必须验证）
 		prov, err := g.providers.Get(g.api.GetTxn(), r.ProviderID)
 		if err != nil || prov == nil {
 			return fmt.Errorf("settle: %w", ErrProviderNotFound)
-		}
-		if !isSystem {
-			if !bytes.Equal(prov.Owner.V, caller.V) || prov.Owner.T != caller.T {
-				return fmt.Errorf("settle: provider %d not owned by caller", r.ProviderID)
-			}
 		}
 
 		// 校验模型存在
@@ -61,6 +55,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 			return fmt.Errorf("settle: %w", ErrModelNotFound)
 		}
 
+		// 计算费用（按模型定价，向上取整，每次调用至少 1 point）
 		cost := r.Cost
 		if cost == 0 {
 			// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
@@ -72,15 +67,21 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		}
 
 		// 扣用户余额
-		bal, _ := g.credits.Get(g.api.GetTxn(), r.User)
-		if bal == nil || *bal < cost {
-			return fmt.Errorf("settle user %x: %w", r.User.V, ErrLowCredit)
+		c, err := g.credit_useds.Get(g.api.GetTxn(), r.User)
+		if err != nil {
+			return fmt.Errorf("settle: qeury error %w", err)
 		}
-		*bal -= cost
-		g.credits.Set(g.api.GetTxn(), r.User, *bal)
+		if c == nil {
+			c = new(uint64)
+		}
+		*c += cost
+		g.credit_useds.Set(g.api.GetTxn(), r.User, *c)
 
 		// 加 provider 余额
-		pb, _ := g.providerCredits.Get(g.api.GetTxn(), r.ProviderID)
+		pb, err := g.providerCredits.Get(g.api.GetTxn(), r.ProviderID)
+		if err != nil {
+			return fmt.Errorf("settle: qeury error %w", err)
+		}
 		if pb == nil {
 			pb = new(uint64)
 		}
@@ -133,12 +134,22 @@ func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
 }
 
 // ── Query: Single ────────────────────────────────────────
-func (g GatewayQuery) GetCredit(user model.UniAddr) (uint64, error) {
+func (g GatewayQuery) GetCredit(user model.UniAddr) (int64, error) {
 	c, err := g.credits.Get(g.api.GetTxn(), user)
 	if err != nil || c == nil {
 		return 0, nil
 	}
-	return *c, nil
+
+	u, err := g.credit_useds.Get(g.api.GetTxn(), user)
+	if err != nil {
+		return int64(*c), err
+	}
+
+	if u == nil {
+		return int64(*c), nil
+	}
+
+	return int64(*c) - int64(*u), nil
 }
 
 func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {

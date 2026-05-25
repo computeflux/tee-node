@@ -69,7 +69,6 @@ func initUsageWriter() {
 					} else {
 						batch[key] = &model.GatewayDailyUsage{
 							User:         r.user,
-							TokenID:      r.tokenID,
 							ProviderID:   r.model.Data.ProviderID,
 							ModelID:      r.model.ID,
 							Day:          r.day,
@@ -203,6 +202,9 @@ var (
 var SettleInterval = 5 * time.Minute
 
 func initUsageSettler() {
+	if err := settlePendingUsage(); err != nil {
+		GATEWAYLOG().Printf("[SETTLE] failed: %v", err)
+	}
 	settleOnce.Do(func() {
 		go func() {
 			settleTicker = time.NewTicker(SettleInterval)
@@ -226,7 +228,7 @@ func StopUsageSettler() {
 	close(settleDone)
 }
 
-// settlePendingUsage 扫描本地 PebbleDB 用量记录，构造 Settlement 批量上链。
+// settlePendingUsage 扫描本地 PebbleDB 用量记录，统一打包为一个大数组一次性上链。
 func settlePendingUsage() error {
 	// 1. 扫描本地 usage: 前缀的所有记录
 	records, keys, err := model.GetJsonList[model.GatewayDailyUsage]("GATEWAY", "usage:")
@@ -237,39 +239,34 @@ func settlePendingUsage() error {
 		return nil
 	}
 
-	// 2. 按 ProviderID 聚合为 Settlement 列表
-	byProvider := make(map[uint64][]cgateway.Settlement)
+	// 2. 统一构造 Settlement 大数组
+	settlements := make([]cgateway.Settlement, 0, len(records))
 	for _, r := range records {
-		// 跳过无效记录
-		if r == nil || r.ProviderID == 0 || r.ModelID == 0 {
+		if r == nil {
 			continue
 		}
-		byProvider[r.ProviderID] = append(byProvider[r.ProviderID], cgateway.Settlement{
+		settlements = append(settlements, cgateway.Settlement{
 			User:         r.User,
 			ModelID:      r.ModelID,
 			ProviderID:   r.ProviderID,
 			TokensUsed:   r.TokensUsed,
 			CachedTokens: r.CachedTokens,
-			Cost:         r.PointsUsed, // 本地已预计算费用
+			Cost:         r.PointsUsed,
 		})
 	}
-
-	// 3. 逐 Provider 提交结算交易
-	for providerID, settlements := range byProvider {
-		if len(settlements) == 0 {
-			continue
-		}
-		if err := submitSettleUsage(settlements); err != nil {
-			GATEWAYLOG().Printf("[SETTLE] provider=%d failed: %v", providerID, err)
-			// 单个 provider 失败不影响其他 provider
-			continue
-		}
-		GATEWAYLOG().Printf("[SETTLE] provider=%d settled %d records", providerID, len(settlements))
+	if len(settlements) == 0 {
+		return nil
 	}
 
-	// 4. 删除已结算记录
+	// 3. 一次性提交所有结算记录
+	if err := submitSettleUsage(settlements); err != nil {
+		GATEWAYLOG().Printf("[SETTLE] batch submit %d records failed: %v", len(settlements), err)
+		return fmt.Errorf("submit settlements: %w", err)
+	}
+	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(settlements), len(records))
+
+	// 4. 成功后再删除本地记录
 	for _, k := range keys {
-		// k 为完整 PebbleDB key（含 namespace 前缀），直接用 DeleteByteKey
 		if err := model.DeleteByteKey(k); err != nil {
 			GATEWAYLOG().Printf("[SETTLE] delete key error: %v", err)
 		}

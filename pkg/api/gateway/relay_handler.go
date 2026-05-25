@@ -51,7 +51,6 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	endpoint := GetEndpointFromContext(r)
 	modelData := GetModelFromContext(r)
-	token := GetTokenFromContext(r)
 	if endpoint == nil || modelData == nil {
 		writeError(w, http.StatusServiceUnavailable, "no route", "server_error")
 		return
@@ -98,17 +97,12 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	EmitProviderMetric(modelData.Data.ProviderID, true)
 
 	// 统计用户 Token 使用
-	var tokenID uint64
-	var userAddr model.UniAddr
-	if token != nil {
-		tokenID = token.ID
-		userAddr = token.Addr
-	}
+	token := GetTokenFromContext(r)
 	var totalTokens, cachedTokens int
 	if usage != nil {
 		totalTokens = usage.TotalTokens
 		cachedTokens = usage.PromptTokensDetails.CachedTokens
-		recordUsageAsync(userAddr, tokenID, time.Now().Format("2006-01-02"), modelData, uint64(totalTokens), uint64(cachedTokens))
+		recordUsageAsync(token.Addr, token.ID, time.Now().Format("2006-01-02"), modelData, uint64(totalTokens), uint64(cachedTokens))
 	}
 
 	// 记录调用时间

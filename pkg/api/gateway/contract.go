@@ -68,20 +68,6 @@ func lookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 	return LookupAPIKeyViaContract(key)
 }
 
-// providerTypeName 根据 ProviderType 返回名称。
-func providerTypeName(providerType uint16) string {
-	switch providerType {
-	case 1:
-		return "openai"
-	case 2:
-		return "anthropic"
-	case 3:
-		return "gemini"
-	default:
-		return "openai"
-	}
-}
-
 // providerDefaultURL 返回各供应商的默认官方地址。
 func providerDefaultURL(providerType uint16) string {
 	switch providerType {
@@ -97,7 +83,6 @@ func providerDefaultURL(providerType uint16) string {
 }
 
 // ── Model cache ──────────────────────────────────────────
-
 var gatewayModelCache = struct {
 	mu          sync.RWMutex
 	models      []cgateway.ModelInfo

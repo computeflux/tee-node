@@ -31,6 +31,7 @@ type Gateway struct {
 	api model.ContractApi
 
 	credits           *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v2_credits"`
+	credit_useds      *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v2_credit_useds"`
 	models            *model.IndexedList[uint64, ModelInfo]                     `store:"keyPfx:v2_models"`
 	providers         *model.IndexedList[uint64, ProviderInfo]                  `store:"keyPfx:v2_providers"`
 	providerByOwner   *model.StoreMapping[model.UniAddr, uint64]                `store:"keyPfx:v2_provider_by_owner"` // owner → providerID（一人一 provider）

@@ -39,6 +39,9 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 	// 注入合约查询桥接（Gateway 数据从合约读取）
 	gateway.SetContractBridge(s)
 
+	// 启动 Gateway 优化组件：异步用量 writer + 缓存刷新 + 限流器清理 + 用量结算
+	gateway.InitOptimizations()
+
 	// Phase 2: seed data
 	// gateway.InitSeedData()
 
