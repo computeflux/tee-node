@@ -139,7 +139,7 @@ type Settlement struct {
 
 // ── DailyUsage ───────────────────────────────────────────
 
-// DailyUsage 每日用量
+// DailyUsage 每日用量（已废弃，不再写入，保留类型用于兼容查询）
 type DailyUsage struct {
 	User         model.UniAddr `json:"user"`
 	ProviderID   uint64        `json:"providerId"`

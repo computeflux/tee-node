@@ -39,10 +39,6 @@ func RegisterGatewayRoutes(r chi.Router) {
 				r.Post("/audio/speech", HandleRelay)
 				r.Post("/audio/transcriptions", HandleRelay)
 			})
-
-			// 历史查询（不需要 DistributeMiddleware）
-			r.Get("/logs", HandleLogs)
-			r.Post("/data/export", HandleDataExport)
 		})
 	})
 }

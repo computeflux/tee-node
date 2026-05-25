@@ -1,11 +1,8 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
-
-	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/util"
+	"time"
 )
 
 // ── Gateway 持久化类型 ───────────────────────────────────
@@ -23,6 +20,15 @@ type GatewayTokenInfo struct {
 	RateLimit uint32  `json:"rateLimit"`
 	IsActive  bool    `json:"isActive"`
 	CreatedAt uint64  `json:"createdAt"`
+	ExpiresAt uint64  `json:"expiresAt"` // 过期时间（Unix 秒），0=永不过期
+}
+
+// IsExpired 检查 token 是否已过期。
+func (t *GatewayTokenInfo) IsExpired() bool {
+	if t.ExpiresAt == 0 {
+		return false
+	}
+	return time.Now().Unix() > int64(t.ExpiresAt)
 }
 
 type GatewayDailyUsage struct {
@@ -48,36 +54,27 @@ func GetGatewayToken(id uint64) (*GatewayTokenInfo, error) {
 	return GetJson[GatewayTokenInfo]("GATEWAY", fmt.Sprintf("token:%d", id))
 }
 
-// FindGatewayTokenByKey finds a token by its bearer key using prefix scan.
-func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
-	if DBINS == nil {
-		return nil
-	}
-	prefix := []byte(comboKey("GATEWAY", "token:"))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
-		LowerBound: prefix,
-		UpperBound: keyUpperBound(prefix),
-	})
-	if err != nil {
-		return nil
-	}
-	defer iter.Close()
+// SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。
+func SetGatewayTokenByKey(t *GatewayTokenInfo) error {
+	return SetJson("GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t)
+}
 
-	for iter.First(); iter.Valid(); iter.Next() {
-		v := iter.Value()
-		decrypted, err := util.Unseal(v, nil)
-		if err != nil {
-			continue
-		}
-		var tk GatewayTokenInfo
-		if json.Unmarshal(decrypted, &tk) != nil {
-			continue
-		}
-		if tk.IsActive && tk.Key == key {
-			return &tk
-		}
+// GetGatewayTokenByKey 通过 API Key 直接查询 token（O(1)，不遍历）。
+func GetGatewayTokenByKey(key string) (*GatewayTokenInfo, error) {
+	return GetJson[GatewayTokenInfo]("GATEWAY", fmt.Sprintf("token_by_key:%s", key))
+}
+
+// FindGatewayTokenByKey 通过 key 索引直接查询（O(1)），同时检查是否过期。
+// 不再遍历整个 token 表。
+func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
+	tk, err := GetGatewayTokenByKey(key)
+	if err != nil || tk == nil {
+		return nil
 	}
-	return nil
+	if !tk.IsActive || tk.IsExpired() {
+		return nil
+	}
+	return tk
 }
 
 func ListUserGatewayTokens(user string, startKey uint64, size int) ([]*GatewayTokenInfo, error) {

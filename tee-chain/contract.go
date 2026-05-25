@@ -125,28 +125,6 @@ func (app *TeeChain) GatewayGetRechargeHistory(user model.UniAddr, offset uint64
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetRechargeHistory(user, offset, limit)
 }
 
-// GatewayGetSettlementHistory 查询 Provider 结算历史。
-func (app *TeeChain) GatewayGetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]gateway.SettlementRecord, error) {
-	runtime, err := app.gatewayRuntime()
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetSettlementHistory(providerID, offset, limit)
-}
-
-// GatewayGetUsageHistory 查询用户在某 Provider+Model 上的用量历史（按日聚合）。
-func (app *TeeChain) GatewayGetUsageHistory(user model.UniAddr, providerID uint64, modelID uint64, startDay string, endDay string) ([]gateway.DailyUsage, error) {
-	runtime, err := app.gatewayRuntime()
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetUsageHistory(user, providerID, modelID, startDay, endDay)
-}
-
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
 	var err error
 	defer func() {

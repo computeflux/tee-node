@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,7 +30,6 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		token := findTokenCached(key)
-		fmt.Println(token.Addr)
 		if token == nil {
 			GATEWAYLOG().Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")

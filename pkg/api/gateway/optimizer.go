@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
@@ -107,7 +108,7 @@ func StopUsageWriter() {
 
 func recordUsageAsync(user model.UniAddr, tokenID uint64, day string, model *cgateway.DataWithID[cgateway.ModelInfo], tokens uint64, cachedTokens uint64) {
 	initUsageWriter()
-	fmt.Println("[OPTIMIZER:recordUsageAsync] args:", tokenID, day, model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
+	fmt.Println("[OPTIMIZER:recordUsageAsync]:", hex.EncodeToString(model.Data.Owner.V), day, model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
 	usageCh <- usageRecord{user, tokenID, day, model, tokens, cachedTokens}
 }
 

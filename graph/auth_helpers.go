@@ -33,14 +33,17 @@ func createUserAPIKey(owner string, addrHex string) string {
 		}
 	}
 
-	model.SetGatewayToken(nextID, &model.GatewayTokenInfo{
+	token := &model.GatewayTokenInfo{
 		Owner:     owner,
 		Addr:      addr,
 		Key:       apiKey,
 		RateLimit: 60,
 		IsActive:  true,
 		CreatedAt: uint64(time.Now().Unix()),
-	})
+		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()), // 默认1天过期
+	}
+	model.SetGatewayToken(nextID, token)
+	model.SetGatewayTokenByKey(token) // 同时写入 key 索引，供 O(1) 查询
 	model.SetNextID("gateway_token", nextID+1)
 	gateway.InvalidateCache()
 	return apiKey
@@ -66,9 +69,14 @@ func resolveEmailFromToken(token string) (string, error) {
 	}
 
 	// Fallback: PebbleDB（Web3Auth 登录生成的临时 key）
-	tk := model.FindGatewayTokenByKey(token)
-	if tk != nil && tk.IsActive {
-		return tk.Owner, nil
+	tk, _ := model.GetGatewayTokenByKey(token)
+	if tk != nil {
+		if tk.IsExpired() {
+			return "", fmt.Errorf("token expired")
+		}
+		if tk.IsActive {
+			return tk.Owner, nil
+		}
 	}
 
 	return "", fmt.Errorf("unauthorized")
