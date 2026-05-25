@@ -22,6 +22,10 @@ type UniAddr struct {
 	V []byte
 }
 
+func (a UniAddr) String() string {
+	return fmt.Sprint(a.T) + ":" + hex.EncodeToString(a.V)
+}
+
 type Amount = types.U256
 
 var ZeroAmount = types.NewU256(*big.NewInt(0))

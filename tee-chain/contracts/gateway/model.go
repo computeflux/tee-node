@@ -14,7 +14,6 @@ func (g GatewayMutation) RegisterModel(
 	inputModalities uint8,
 	contextLength uint64,
 	inPrice, cachedPrice, outPrice uint64,
-	modelID string,
 	providerType uint16,
 	uri string,
 	apiKeys []string,
@@ -46,7 +45,7 @@ func (g GatewayMutation) RegisterModel(
 		if key == "" {
 			continue
 		}
-		ref := fmt.Sprintf("%s_%d_%d", modelID, g.api.GetHeight(), i)
+		ref := fmt.Sprintf("%s_%d_%d", name, g.api.GetHeight(), i)
 		gk, err := model.GetGlobalKey()
 		if err != nil {
 			return fmt.Errorf("kms not ready: %w", err)
@@ -77,7 +76,6 @@ func (g GatewayMutation) RegisterModel(
 		InPrice:         inPrice,
 		CachedPrice:     cachedPrice,
 		OutPrice:        outPrice,
-		ModelID:         modelID,
 		ProviderType:    providerType,
 		URI:             uri,
 		APIKeyRefs:      refs,
@@ -88,17 +86,17 @@ func (g GatewayMutation) RegisterModel(
 }
 
 func (g GatewayMutation) UpdateModel(
-	modelID uint64,
+	ID uint64,
 	inputModalities uint8,
 	contextLength uint64,
 	inPrice, cachedPrice, outPrice uint64,
-	modelIDStr string,
+	Name string,
 	providerType uint16,
 	uri string,
 	apiKeys []string,
 ) error {
 	// 获取当前模型，保存旧 APIKeyRefs 用于清理
-	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	cur, err := g.models.Get(g.api.GetTxn(), ID)
 	if err != nil || cur == nil {
 		return fmt.Errorf("model not found")
 	}
@@ -113,15 +111,18 @@ func (g GatewayMutation) UpdateModel(
 		if key == "" {
 			continue
 		}
-		ref := fmt.Sprintf("%s_%d_%d", modelIDStr, g.api.GetHeight(), i)
+
+		ref := fmt.Sprintf("%s_%d_%d", Name, g.api.GetHeight(), i)
 		gk, err := model.GetGlobalKey()
 		if err != nil {
 			return fmt.Errorf("kms not ready: %w", err)
 		}
+
 		ek, err := model.EncryptWithGK(gk, ref, key)
 		if err != nil {
 			return fmt.Errorf("encrypt api key failed: %w", err)
 		}
+
 		if err := g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
 			Ref:        ref,
 			Ciphertext: ek.Ciphertext,
@@ -133,13 +134,12 @@ func (g GatewayMutation) UpdateModel(
 	}
 
 	// 更新模型字段
-	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	if err := g.models.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfo) {
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
 		m.InPrice = inPrice
 		m.CachedPrice = cachedPrice
 		m.OutPrice = outPrice
-		m.ModelID = modelIDStr
 		m.ProviderType = providerType
 		m.URI = uri
 		m.APIKeyRefs = refs
@@ -163,6 +163,30 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 
 func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
 	return g.models.Get(g.api.GetTxn(), modelID)
+}
+
+func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
+	models := make([]ModelInfo, 0, len(IDs))
+	for _, id := range IDs {
+		m, err := g.models.Get(g.api.GetTxn(), id)
+		if err != nil || m == nil {
+			continue
+		}
+		models = append(models, *m)
+	}
+
+	out := make([]ModelInfoWithProvider, 0, len(models))
+	for i := range models {
+		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].ProviderID)
+		if prov == nil {
+			continue
+		}
+		out = append(out, ModelInfoWithProvider{
+			Model:    models[i],
+			Provider: *prov,
+		})
+	}
+	return out, nil
 }
 
 func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
@@ -246,8 +270,10 @@ func (g GatewayQuery) GetModelCount() (uint64, error) {
 
 func (g GatewayQuery) QueryModels(
 	modalities uint8,
-	minContext, maxContext, maxPrice uint64,
-	offset uint64, limit uint32,
+	minContext, maxContext,
+	maxPrice uint64,
+	offset uint64,
+	limit uint32,
 ) ([]ModelInfo, error) {
 	txn := g.api.GetTxn()
 
@@ -308,7 +334,7 @@ func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error
 }
 
 // GetModelByName 返回指定名称的所有模型（使用 Name exact 索引）
-func (g GatewayQuery) GetModelByName(pid uint64, name string) (*DataWithID[ModelInfo], error) {
+func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
 	keys, err := g.models.Query(g.api.GetTxn(), model.QueryAND{
 		model.QueryCond{Field: "ProviderID", Val: pid},
 		model.QueryCond{Field: "Name", Val: name},
@@ -326,7 +352,7 @@ func (g GatewayQuery) GetModelByName(pid uint64, name string) (*DataWithID[Model
 		return nil, errors.New("model not found")
 	}
 
-	return &DataWithID[ModelInfo]{
+	return &ModelInfoWithID{
 		ID:   keys[0],
 		Data: *m,
 	}, nil

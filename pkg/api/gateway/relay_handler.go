@@ -98,7 +98,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if usage != nil {
 		totalTokens = usage.TotalTokens
 		cachedTokens = usage.PromptTokensDetails.CachedTokens
-		recordUsageAsync(token.Addr, token.ID, time.Now().Format("2006-01-02"), modelData, uint64(totalTokens), uint64(cachedTokens))
+		recordUsageAsync(token.Addr, token.ID, modelData, uint64(totalTokens), uint64(cachedTokens))
 	}
 
 	// 记录调用时间

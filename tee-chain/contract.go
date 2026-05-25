@@ -82,7 +82,7 @@ func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
 }
 
 // GatewayGetModelByName 按名称查询活跃模型（走 string exact 索引，O(1) 查询）。
-func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.DataWithID[gateway.ModelInfo], error) {
+func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.ModelInfoWithID, error) {
 	runtime, err := app.gatewayRuntime()
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.Da
 }
 
 // GatewayGetProviderByName 按名称查询 Provider（走 string exact 索引，O(1) 查询）。
-func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.DataWithID[gateway.ProviderInfo], error) {
+func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.ProviderInfoWithID, error) {
 	runtime, err := app.gatewayRuntime()
 	if err != nil {
 		return nil, err

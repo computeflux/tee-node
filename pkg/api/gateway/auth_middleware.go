@@ -163,7 +163,7 @@ func GetEndpointFromContext(r *http.Request) *model.GatewayEndpoint {
 	return e
 }
 
-func GetModelFromContext(r *http.Request) *cgateway.DataWithID[cgateway.ModelInfo] {
-	m, _ := r.Context().Value(ctxModel).(*cgateway.DataWithID[cgateway.ModelInfo])
+func GetModelFromContext(r *http.Request) *cgateway.ModelInfoWithID {
+	m, _ := r.Context().Value(ctxModel).(*cgateway.ModelInfoWithID)
 	return m
 }

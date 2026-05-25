@@ -24,8 +24,8 @@ func createUserAPIKey(owner string, addrHex string) string {
 	apiKey := generateAPIKey()
 	nextID := model.GetNextID("gateway_token")
 
-	// 构造 UniAddr：以太坊地址 callerType=1（EVM），去掉 0x 前缀
-	addr := model.UniAddr{T: 1, V: []byte{}}
+	// 构造 UniAddr：以太坊地址 callerType=2（EVM），去掉 0x 前缀
+	addr := model.UniAddr{T: 2, V: []byte{}}
 	if addrHex != "" && addrHex != "0x" {
 		addrHex = strings.TrimPrefix(addrHex, "0x")
 		if b, err := hex.DecodeString(addrHex); err == nil && len(b) == 20 {

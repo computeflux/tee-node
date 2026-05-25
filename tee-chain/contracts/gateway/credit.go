@@ -23,12 +23,10 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 	}
 
 	// 记录充值历史
-	day := fmt.Sprintf("%d", g.api.GetHeight()/7200) // 约每日一个区块高度周期
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
 		User:   user,
 		Amount: amount,
-		Day:    day,
-		Block:  g.api.GetHeight(),
+		Time:   g.api.GetBlockTime(),
 	})
 	return nil
 }
@@ -56,14 +54,13 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		}
 
 		// 计算费用（按模型定价，向上取整，每次调用至少 1 point）
-		cost := r.Cost
+		var cost uint64 = 0
+
+		// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
+		uncached := r.TokensUsed - r.CachedTokens
+		cost = (uncached*m.InPrice + r.CachedTokens*m.CachedPrice) / 1_000_000
 		if cost == 0 {
-			// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
-			uncached := r.TokensUsed - r.CachedTokens
-			cost = (uncached*m.InPrice + r.CachedTokens*m.CachedPrice + 999) / 1000
-		}
-		if cost < 1 {
-			cost = 1
+			continue
 		}
 
 		// 扣用户余额
@@ -88,18 +85,18 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		*pb += cost
 		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
 
-		// 记录结算历史
-		day := fmt.Sprintf("%d", g.api.GetHeight()/7200)
-		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, SettlementRecord{
+		// 记录结算历史（Provider 维度）
+		record := SettlementRecord{
 			ProviderID:   r.ProviderID,
 			User:         r.User,
 			ModelID:      r.ModelID,
 			TokensUsed:   r.TokensUsed,
 			CachedTokens: r.CachedTokens,
 			Cost:         cost,
-			Day:          day,
-			Block:        g.api.GetHeight(),
-		})
+			Time:         g.api.GetBlockTime(),
+		}
+		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, record)
+		_, _ = g.userSettlementHistory.Insert(g.api.GetTxn(), r.User, record)
 	}
 	return nil
 }
@@ -156,16 +153,30 @@ func (g GatewayQuery) GetRechargeHistory(user model.UniAddr, offset uint64, limi
 	if err != nil {
 		return nil, err
 	}
+
 	// DescList 从最新开始返回，若 offset > 0 需要跳过前面条目
 	if int(offset) >= len(records) {
 		return []RechargeRecord{}, nil
 	}
+
 	return records[offset:], nil
 }
 
 // GetSettlementHistory 查询 Provider 结算历史（按时间倒序）
 func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]SettlementRecord, error) {
 	_, records, err := g.settlementHistory.DescList(g.api.GetTxn(), providerID, (*uint32)(nil), limit)
+	if err != nil {
+		return nil, err
+	}
+	if int(offset) >= len(records) {
+		return []SettlementRecord{}, nil
+	}
+	return records[offset:], nil
+}
+
+// GetUserSettlementHistory 查询用户的结算历史（按时间倒序）
+func (g GatewayQuery) GetUserSettlementHistory(user model.UniAddr, offset uint64, limit uint32) ([]SettlementRecord, error) {
+	_, records, err := g.userSettlementHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
 	if err != nil {
 		return nil, err
 	}

@@ -161,7 +161,7 @@ func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]Provid
 }
 
 // GetProviderByName 返回指定名称的所有 Provider（使用 Name exact 索引）
-func (g GatewayQuery) GetProviderByName(name string) (*DataWithID[ProviderInfo], error) {
+func (g GatewayQuery) GetProviderByName(name string) (*ProviderInfoWithID, error) {
 	keys, err := g.providers.Query(g.api.GetTxn(), model.QueryCond{Field: "Name", Val: name})
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (g GatewayQuery) GetProviderByName(name string) (*DataWithID[ProviderInfo],
 		return nil, errors.New("provider not found with name: " + name)
 	}
 
-	return &DataWithID[ProviderInfo]{
+	return &ProviderInfoWithID{
 		ID:   keys[0],
 		Data: *p,
 	}, nil

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
@@ -20,8 +19,7 @@ import (
 type usageRecord struct {
 	user         model.UniAddr
 	tokenID      uint64
-	day          string
-	model        *cgateway.DataWithID[cgateway.ModelInfo]
+	model        *cgateway.ModelInfoWithID
 	tokens       uint64
 	cachedTokens uint64
 }
@@ -54,29 +52,19 @@ func initUsageWriter() {
 			for {
 				select {
 				case r := <-usageCh:
-					key := r.day + "_" + uintToStr(r.tokenID) + "_" + uintToStr(r.model.ID)
-					var effectiveTokens uint64
-					if r.cachedTokens >= r.tokens {
-						effectiveTokens = r.tokens / 10
-					} else {
-						effectiveTokens = r.cachedTokens/10 + (r.tokens - r.cachedTokens)
-					}
-					points := (effectiveTokens + 999) / 1000
+					key := uintToStr(r.tokenID) + "_" + uintToStr(r.model.ID)
 					if u, ok := batch[key]; ok {
 						u.Count++
 						u.TokensUsed += r.tokens
 						u.CachedTokens += r.cachedTokens
-						u.PointsUsed += points
 					} else {
 						batch[key] = &model.GatewayDailyUsage{
 							User:         r.user,
-							ProviderID:   r.model.Data.ProviderID,
 							ModelID:      r.model.ID,
-							Day:          r.day,
+							ProviderID:   r.model.Data.ProviderID,
 							Count:        1,
 							TokensUsed:   r.tokens,
 							CachedTokens: r.cachedTokens,
-							PointsUsed:   points,
 						}
 					}
 				case <-ticker.C:
@@ -106,10 +94,10 @@ func StopUsageWriter() {
 	usageWg.Wait()
 }
 
-func recordUsageAsync(user model.UniAddr, tokenID uint64, day string, model *cgateway.DataWithID[cgateway.ModelInfo], tokens uint64, cachedTokens uint64) {
+func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, tokens uint64, cachedTokens uint64) {
 	initUsageWriter()
-	fmt.Println("[OPTIMIZER:recordUsageAsync]:", hex.EncodeToString(model.Data.Owner.V), day, model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
-	usageCh <- usageRecord{user, tokenID, day, model, tokens, cachedTokens}
+	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
+	usageCh <- usageRecord{user, tokenID, model, tokens, cachedTokens}
 }
 
 func uintToStr(n uint64) string {
@@ -252,7 +240,7 @@ func settlePendingUsage() error {
 			ProviderID:   r.ProviderID,
 			TokensUsed:   r.TokensUsed,
 			CachedTokens: r.CachedTokens,
-			Cost:         r.PointsUsed,
+			Count:        r.Count,
 		})
 	}
 	if len(settlements) == 0 {

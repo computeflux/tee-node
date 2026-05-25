@@ -27,6 +27,7 @@ package model
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -370,6 +371,73 @@ func (l *IndexedList[K, V]) RebuildIndex(txn *Txn) error {
 // Query 组合索引查询，返回匹配的 key 列表。
 func (l *IndexedList[K, V]) Query(txn *Txn, expr QueryExpr) ([]K, error) {
 	return l.idx.query(txn, expr)
+}
+
+// ListByQuery 分页列表（升序）：先用 QueryExpr 过滤出匹配的 id，再按 key 升序从 startKey 起取最多 size 条。
+func (l *IndexedList[K, V]) ListByQuery(txn *Txn, expr QueryExpr, startKey K, size uint32) ([]K, []V, error) {
+	if size == 0 {
+		return nil, nil, nil
+	}
+	ids, err := l.idx.query(txn, expr)
+	if err != nil {
+		return nil, nil, err
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return compareListIndex(ids[i], ids[j]) < 0
+	})
+	var outKeys []K
+	var outVals []V
+	for _, id := range ids {
+		if compareListIndex(id, startKey) < 0 {
+			continue
+		}
+		if len(outKeys) >= int(size) {
+			break
+		}
+		v, err := l.StoreList.Get(txn, id)
+		if err != nil {
+			return nil, nil, err
+		}
+		if v != nil {
+			outKeys = append(outKeys, id)
+			outVals = append(outVals, *v)
+		}
+	}
+	return outKeys, outVals, nil
+}
+
+// DescListByQuery 分页列表（降序）：先用 QueryExpr 过滤出匹配的 id，再按 key 降序从 startKey 向前取最多 size 条。
+// startKey 为 nil 时表示从最大 id 开始。
+func (l *IndexedList[K, V]) DescListByQuery(txn *Txn, expr QueryExpr, startKey *K, size uint32) ([]K, []V, error) {
+	if size == 0 {
+		return nil, nil, nil
+	}
+	ids, err := l.idx.query(txn, expr)
+	if err != nil {
+		return nil, nil, err
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return compareListIndex(ids[i], ids[j]) > 0
+	})
+	var outKeys []K
+	var outVals []V
+	for _, id := range ids {
+		if startKey != nil && compareListIndex(id, *startKey) > 0 {
+			continue
+		}
+		if len(outKeys) >= int(size) {
+			break
+		}
+		v, err := l.StoreList.Get(txn, id)
+		if err != nil {
+			return nil, nil, err
+		}
+		if v != nil {
+			outKeys = append(outKeys, id)
+			outVals = append(outVals, *v)
+		}
+	}
+	return outKeys, outVals, nil
 }
 
 // ── helpers ──────────────────────────────────────────────

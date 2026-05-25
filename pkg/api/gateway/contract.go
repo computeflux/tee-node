@@ -137,7 +137,7 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 
 // findGatewayModelByName 按模型名称从合约查询（必须活跃）。
 // 直接走链上 string exact 索引，O(1) 查询，避免本地缓存全量遍历。
-func findGatewayModelByName(pid uint64, name string) *cgateway.DataWithID[cgateway.ModelInfo] {
+func findGatewayModelByName(pid uint64, name string) *cgateway.ModelInfoWithID {
 	bridge := getBridge()
 	if bridge == nil {
 		return nil
@@ -151,7 +151,7 @@ func findGatewayModelByName(pid uint64, name string) *cgateway.DataWithID[cgatew
 	return model
 }
 
-func findProviderName(name string) *cgateway.DataWithID[cgateway.ProviderInfo] {
+func findProviderName(name string) *cgateway.ProviderInfoWithID {
 	bridge := getBridge()
 	if bridge == nil {
 		return nil

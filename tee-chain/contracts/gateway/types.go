@@ -70,9 +70,16 @@ type ModelInfo struct {
 	CreatedAt uint64 `json:"createdAt"`
 }
 
-type DataWithID[T any] struct {
-	ID   uint64
-	Data T
+// ModelInfoWithID 是 DataWithID[ModelInfo] 的非泛型版本，用于合约 metadata 兼容。
+type ModelInfoWithID struct {
+	ID   uint64    `json:"id"`
+	Data ModelInfo `json:"data"`
+}
+
+// ProviderInfoWithID 是 DataWithID[ProviderInfo] 的非泛型版本，用于合约 metadata 兼容。
+type ProviderInfoWithID struct {
+	ID   uint64       `json:"id"`
+	Data ProviderInfo `json:"data"`
 }
 
 type ModelInfoWithProvider struct {
@@ -134,7 +141,7 @@ type Settlement struct {
 	ProviderID   uint64        `json:"providerId"`
 	TokensUsed   uint64        `json:"tokensUsed"`
 	CachedTokens uint64        `json:"cachedTokens"`
-	Cost         uint64        `json:"cost"`
+	Count        uint16        `json:"count"`
 }
 
 // ── DailyUsage ───────────────────────────────────────────
@@ -144,7 +151,6 @@ type DailyUsage struct {
 	User         model.UniAddr `json:"user"`
 	ProviderID   uint64        `json:"providerId"`
 	ModelID      uint64        `json:"modelId"`
-	Day          string        `json:"day"`
 	Count        uint64        `json:"count"`
 	TokensUsed   uint64        `json:"tokensUsed"`
 	CachedTokens uint64        `json:"cachedTokens"`
@@ -155,22 +161,21 @@ type DailyUsage struct {
 
 // RechargeRecord 单笔充值记录
 type RechargeRecord struct {
-	User   model.UniAddr `json:"user"`
+	User   model.UniAddr `json:"user" idx:"exact"`
 	Amount uint64        `json:"amount"`
-	Day    string        `json:"day"`
-	Block  int64         `json:"block"`
+	Time   int64         `json:"time"`
 }
 
 // ── SettlementHistory ────────────────────────────────────
 
 // SettlementRecord 单笔结算记录（Provider 视角）
 type SettlementRecord struct {
-	ProviderID   uint64        `json:"providerId"`
-	User         model.UniAddr `json:"user"`
+	ProviderID   uint64        `json:"providerId" idx:"exact"`
+	User         model.UniAddr `json:"user" idx:"exact"`
 	ModelID      uint64        `json:"modelId"`
 	TokensUsed   uint64        `json:"tokensUsed"`
 	CachedTokens uint64        `json:"cachedTokens"`
 	Cost         uint64        `json:"cost"`
-	Day          string        `json:"day"`
-	Block        int64         `json:"block"`
+	Count        uint16        `json:"count"`
+	Time         int64         `json:"time"`
 }

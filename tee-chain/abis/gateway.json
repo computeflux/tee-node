@@ -270,7 +270,7 @@
         "args": [
           {
             "docs": [],
-            "label": "model_i_d",
+            "label": "i_d",
             "type": {
               "displayName": [
                 "u64"
@@ -330,7 +330,7 @@
           },
           {
             "docs": [],
-            "label": "model_i_d_str",
+            "label": "name",
             "type": {
               "displayName": [
                 "string"
@@ -470,16 +470,6 @@
                 "u64"
               ],
               "type": 3
-            }
-          },
-          {
-            "docs": [],
-            "label": "model_i_d",
-            "type": {
-              "displayName": [
-                "string"
-              ],
-              "type": 14
             }
           },
           {
@@ -631,9 +621,55 @@
           "displayName": [
             "Result"
           ],
-          "type": 38
+          "type": 41
         },
         "selector": "0x55c04847"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "user",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "offset",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "get_user_settlement_history",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 47
+        },
+        "selector": "0x56b906c0"
       },
       {
         "args": [
@@ -657,7 +693,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 32
+          "type": 36
         },
         "selector": "0x59d9424a"
       },
@@ -760,7 +796,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 32
+          "type": 36
         },
         "selector": "0x60d00c96"
       },
@@ -806,7 +842,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 44
+          "type": 47
         },
         "selector": "0x74d599fb"
       },
@@ -945,6 +981,32 @@
         "args": [
           {
             "docs": [],
+            "label": "i_ds",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "get_models",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 34
+        },
+        "selector": "0xa1119c12"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "provider_i_d",
             "type": {
               "displayName": [
@@ -989,7 +1051,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 34
+          "type": 37
         },
         "selector": "0xb34c16d8"
       },
@@ -1097,7 +1159,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 32
+          "type": 36
         },
         "selector": "0xc1511fbf"
       },
@@ -1173,7 +1235,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 47
+          "type": 34
         },
         "selector": "0xc3ef490c"
       },
@@ -1245,7 +1307,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 41
+          "type": 44
         },
         "selector": "0xc89f2f8f"
       },
@@ -1271,7 +1333,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 32
+          "type": 36
         },
         "selector": "0xcd2ef88d"
       },
@@ -1333,7 +1395,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 32
+          "type": 36
         },
         "selector": "0xdaa1c2d5"
       },
@@ -1359,7 +1421,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 36
+          "type": 39
         },
         "selector": "0xe2a8c1e4"
       },
@@ -1744,8 +1806,8 @@
                 "type": 3
               },
               {
-                "name": "Cost",
-                "type": 3
+                "name": "Count",
+                "type": 1
               }
             ]
           }
@@ -2118,10 +2180,21 @@
       "id": 28,
       "type": {
         "def": {
-          "composite": {}
+          "composite": {
+            "fields": [
+              {
+                "name": "ID",
+                "type": 3
+              },
+              {
+                "name": "Data",
+                "type": 26
+              }
+            ]
+          }
         },
         "path": [
-          "DataWithID[ModelInfo]"
+          "ModelInfoWithID"
         ]
       }
     },
@@ -2213,65 +2286,26 @@
       "id": 31,
       "type": {
         "def": {
-          "sequence": {
-            "type": 26
+          "composite": {
+            "fields": [
+              {
+                "name": "Model",
+                "type": 26
+              },
+              {
+                "name": "Provider",
+                "type": 32
+              }
+            ]
           }
         },
-        "params": [
-          {
-            "name": "T",
-            "type": 26
-          }
-        ],
         "path": [
-          "Vec"
+          "ModelInfoWithProvider"
         ]
       }
     },
     {
       "id": 32,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 31
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 31
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 33,
       "type": {
         "def": {
           "composite": {
@@ -2345,6 +2379,25 @@
       }
     },
     {
+      "id": 33,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 31
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 31
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
       "id": 34,
       "type": {
         "def": {
@@ -2390,10 +2443,18 @@
       "id": 35,
       "type": {
         "def": {
-          "composite": {}
+          "sequence": {
+            "type": 26
+          }
         },
+        "params": [
+          {
+            "name": "T",
+            "type": 26
+          }
+        ],
         "path": [
-          "DataWithID[ProviderInfo]"
+          "Vec"
         ]
       }
     },
@@ -2446,6 +2507,112 @@
           "variant": {
             "variants": [
               {
+                "fields": [
+                  {
+                    "type": 32
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 32
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ID",
+                "type": 3
+              },
+              {
+                "name": "Data",
+                "type": 32
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProviderInfoWithID"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 38
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 38
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
                 "index": 0,
                 "name": "None"
               },
@@ -2469,97 +2636,6 @@
         ],
         "path": [
           "Option"
-        ]
-      }
-    },
-    {
-      "id": 38,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 37
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 37
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 39,
-      "type": {
-        "def": {
-          "composite": {
-            "fields": [
-              {
-                "name": "User",
-                "type": 13
-              },
-              {
-                "name": "Amount",
-                "type": 3
-              },
-              {
-                "name": "Day",
-                "type": 14
-              },
-              {
-                "name": "Block",
-                "type": 4
-              }
-            ]
-          }
-        },
-        "path": [
-          "RechargeRecord"
-        ]
-      }
-    },
-    {
-      "id": 40,
-      "type": {
-        "def": {
-          "sequence": {
-            "type": 39
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 39
-          }
-        ],
-        "path": [
-          "Vec"
         ]
       }
     },
@@ -2612,42 +2688,22 @@
           "composite": {
             "fields": [
               {
-                "name": "ProviderID",
-                "type": 3
-              },
-              {
                 "name": "User",
                 "type": 13
               },
               {
-                "name": "ModelID",
+                "name": "Amount",
                 "type": 3
               },
               {
-                "name": "TokensUsed",
-                "type": 3
-              },
-              {
-                "name": "CachedTokens",
-                "type": 3
-              },
-              {
-                "name": "Cost",
-                "type": 3
-              },
-              {
-                "name": "Day",
-                "type": 14
-              },
-              {
-                "name": "Block",
+                "name": "Time",
                 "type": 4
               }
             ]
           }
         },
         "path": [
-          "SettlementRecord"
+          "RechargeRecord"
         ]
       }
     },
@@ -2719,18 +2775,42 @@
           "composite": {
             "fields": [
               {
-                "name": "Model",
-                "type": 26
+                "name": "ProviderID",
+                "type": 3
               },
               {
-                "name": "Provider",
-                "type": 33
+                "name": "User",
+                "type": 13
+              },
+              {
+                "name": "ModelID",
+                "type": 3
+              },
+              {
+                "name": "TokensUsed",
+                "type": 3
+              },
+              {
+                "name": "CachedTokens",
+                "type": 3
+              },
+              {
+                "name": "Cost",
+                "type": 3
+              },
+              {
+                "name": "Count",
+                "type": 1
+              },
+              {
+                "name": "Time",
+                "type": 4
               }
             ]
           }
         },
         "path": [
-          "ModelInfoWithProvider"
+          "SettlementRecord"
         ]
       }
     },
@@ -2800,13 +2880,13 @@
       "type": {
         "def": {
           "sequence": {
-            "type": 33
+            "type": 32
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 33
+            "type": 32
           }
         ],
         "path": [
