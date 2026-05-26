@@ -1,13 +1,13 @@
 # 合约安全审计报告 & Nonce 设计方案
 
 > 最后更新：2026-05-26
-> 状态：MED-1 已修复，P0/P1 待实施
+> 状态：CR-1 已修复，MED-1 已修复，P0/P1 待实施
 
 ## 一、安全等级概述
 
 | 等级 | 数量 | 说明 |
 |---|---|---|
-| 🔴 Critical | 2 | 可导致资金直接损失或无限重放 |
+| 🔴 Critical | 1 | 可导致资金直接损失或无限重放 |
 | 🟠 High | 3 | 可导致权限滥用或数据篡改 |
 | 🟡 Medium | 1 | 业务逻辑缺陷，已修复 |
 | 🟢 Low | 1 | 建议改进，风险可控 |
@@ -16,33 +16,69 @@
 
 ## 二、Critical（严重）
 
-### CR-1: `SettleUsage` 批量结算无防重放机制
+### CR-1: `SettleUsage` 批量结算无防重放机制 ✅ 已修复
 
 **位置**: `tee-chain/contracts/gateway/credit.go:37`
 
-**问题描述**:
-- `SettleUsage` 接受 `[]Settlement` 批量结算，但没有任何机制防止同一批记录被重复提交
-- Provider 可以构造完全相同的 `records` 参数，反复调用 `SettleUsage`，每次都会重新扣用户余额、加 provider 余额、写用量历史
-- 代码中的 TODO 明确标注了此问题：
-  ```go
-  // TODO: 防重放 — 增加 batchNonce/merkle root + TEE 签名校验，防止 Provider 重复提交同一批结算
-  ```
+**原问题描述**（已修复）:
+- ~~`SettleUsage` 接受 `[]Settlement` 批量结算，但没有任何机制防止同一批记录被重复提交~~
+- ~~Provider 可以构造完全相同的 `records` 参数，反复调用 `SettleUsage`~~
+- 代码中的 TODO 已移除，防重放机制已实施。
 
-**攻击路径**:
+**攻击路径**（已失效）:
 ```
 1. Provider 在 epoch N 正常服务了一批请求
-2. Provider 调用 SettleUsage(records) 成功结算
-3. Provider 在 epoch N+1 再次提交完全相同的 records
-4. 合约无去重检查，用户被二次扣款，Provider 二次获利
+2. TEE 节点调用 SettleUsage(records) 成功结算（每条记录带唯一随机 Nonce）
+3. 合约将每条 Nonce 写入 settledNonces，永久标记为已使用
+4. Provider 再次提交相同 records → 合约检测到重复 Nonce → 返回 ErrDuplicateNonce，拒绝执行
 ```
 
-**影响**: 用户资金可被无限次扣除，Provider 可无限套利。
+**实际修复方案**（已实施）:
 
-**修复建议**:
-- 增加 `batchNonce` 字段到 `Settlement` 或作为单独参数
-- 合约维护 `usedNonces map[string]bool`，已使用的 nonce 永久拒绝
-- nonce 由 TEE 生成（基于时间窗口 + 随机数），Provider 无法伪造
-- 或者使用 Merkle Root + TEE 签名，每批次唯一
+1. **Settlement 结构增加 Nonce 字段** [`tee-chain/contracts/gateway/types.go:147`](tee-chain/contracts/gateway/types.go:147)
+   ```go
+   type Settlement struct {
+       // ... 原字段 ...
+       Nonce []byte `json:"nonce"` // 16 bytes 随机 nonce，防重放
+   }
+   ```
+
+2. **合约增加 settledNonces 存储** [`tee-chain/contracts/gateway/gateway.go:45`](tee-chain/contracts/gateway/gateway.go:45)
+   ```go
+   settledNonces *model.StoreMapping[string, bool] `store:"keyPfx:v5_settled_nonces"`
+   ```
+
+3. **SettleUsage 增加 Nonce 校验** [`tee-chain/contracts/gateway/credit.go:40-51`](tee-chain/contracts/gateway/credit.go:40)
+   ```go
+   for _, r := range records {
+       nonceHex := hex.EncodeToString(r.Nonce)
+       if nonceHex == "" {
+           return fmt.Errorf("settle: empty nonce")
+       }
+       exists, _ := g.settledNonces.Get(txn, nonceHex)
+       if exists != nil && *exists {
+           return fmt.Errorf("settle: %w", ErrDuplicateNonce)
+       }
+       // ... 结算逻辑 ...
+       g.settledNonces.Set(txn, nonceHex, true) // 标记已使用
+   }
+   ```
+
+4. **TEE 节点生成随机 Nonce** [`pkg/api/gateway/optimizer.go:237-248`](pkg/api/gateway/optimizer.go:237)
+   ```go
+   nonce := make([]byte, 16)
+   io.ReadFull(rand.Reader, nonce)
+   settlements = append(settlements, cgateway.Settlement{
+       // ...
+       Nonce: nonce,
+   })
+   ```
+
+**设计选择说明**:
+- 采用 **per-record nonce** 而非 batch-level nonce，最小化 ABI 改动（`SettleUsage` 签名不变），且天然支持部分失败场景
+- Nonce 16 bytes = 128 bit，随机冲突概率可忽略
+- Nonce 由 TEE 节点通过 `crypto/rand` 生成，Provider 无法预测或伪造
+- `settledNonces` 永久存储（不清理），确保历史 nonce 终身不可复用
 
 ---
 

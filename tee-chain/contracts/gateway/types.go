@@ -144,6 +144,7 @@ type Settlement struct {
 	TokenOut    uint64        `json:"tokensOut"`
 	CachedToken uint64        `json:"cachedToken"`
 	Count       uint16        `json:"count"`
+	Nonce       []byte        `json:"nonce"` // 16 bytes 随机 nonce，防重放
 }
 
 // ── DailyUsage ───────────────────────────────────────────

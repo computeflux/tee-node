@@ -2,7 +2,9 @@ package gateway
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -231,11 +233,15 @@ func settlePendingUsage() error {
 		return nil
 	}
 
-	// 2. 统一构造 Settlement 大数组
+	// 2. 统一构造 Settlement 大数组，每条记录带唯一随机 Nonce（防重放）
 	settlements := make([]cgateway.Settlement, 0, len(records))
 	for _, r := range records {
 		if r == nil {
 			continue
+		}
+		nonce := make([]byte, 16)
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			return fmt.Errorf("generate nonce: %w", err)
 		}
 		settlements = append(settlements, cgateway.Settlement{
 			User:        r.User,
@@ -245,6 +251,7 @@ func settlePendingUsage() error {
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Count:       r.Count,
+			Nonce:       nonce,
 		})
 	}
 	if len(settlements) == 0 {

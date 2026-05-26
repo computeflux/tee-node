@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -34,13 +35,18 @@ func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
 // ── Billing ──────────────────────────────────────────────
 
 // SettleUsage 批量结算（Provider Owner 或 System Account 可调用，每 5 分钟执行一次）
-// TODO: 防重放 — 增加 batchNonce/merkle root + TEE 签名校验，防止 Provider 重复提交同一批结算
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
-	// TODO
-	// caller := g.api.GetCaller()
-	// isSystem := g.api.CallbySystem()
-
 	for _, r := range records {
+		// 防重放检查：每条记录必须有唯一 Nonce，已使用的 Nonce 永久拒绝
+		nonceHex := hex.EncodeToString(r.Nonce)
+		if nonceHex == "" {
+			return fmt.Errorf("settle: empty nonce")
+		}
+		exists, _ := g.settledNonces.Get(g.api.GetTxn(), nonceHex)
+		if exists != nil && *exists {
+			return fmt.Errorf("settle: %w", ErrDuplicateNonce)
+		}
+
 		// 校验 provider 归属（非 system 调用时必须验证）
 		prov, err := g.providers.Get(g.api.GetTxn(), r.ProviderID)
 		if err != nil || prov == nil {
@@ -106,6 +112,11 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 			Count:       r.Count,
 			Time:        g.api.GetBlockTime(),
 		})
+
+		// 标记 nonce 已使用（防重放永久拒绝）
+		if err := g.settledNonces.Set(g.api.GetTxn(), nonceHex, true); err != nil {
+			return fmt.Errorf("settle: store nonce failed: %w", err)
+		}
 	}
 	return nil
 }

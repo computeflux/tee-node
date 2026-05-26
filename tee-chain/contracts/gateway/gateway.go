@@ -24,6 +24,7 @@ var (
 	ErrProviderNotFound = errors.New("provider not found")
 	ErrAPIKeyNotFound   = errors.New("api key not found")
 	ErrNotOwner         = errors.New("not owner")
+	ErrDuplicateNonce   = errors.New("duplicate settlement nonce")
 )
 
 // Gateway API 网关合约
@@ -41,6 +42,7 @@ type Gateway struct {
 	rechargeHistory       *model.StoreList2D[model.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`        // user → []RechargeRecord
 	settlementHistory     *model.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:v4_settlement_history"`      // providerID → []SettlementRecord
 	userSettlementHistory *model.StoreList2D[model.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"` // user → []SettlementRecord
+	settledNonces         *model.StoreMapping[string, bool]                               `store:"keyPfx:v5_settled_nonces"`          // hex(nonce) → true，防重放
 }
 
 type GatewayQuery struct{ Gateway }
