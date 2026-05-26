@@ -28,7 +28,7 @@ func (g GatewayMutation) RegisterAPIKey(keyHash []byte, rateLimit uint32) error 
 		KeyHash:   keyHash,
 		RateLimit: rateLimit,
 		IsActive:  true,
-		CreatedAt: uint64(g.api.GetHeight()),
+		CreatedAt: uint64(g.api.GetBlockTime()),
 	})
 }
 

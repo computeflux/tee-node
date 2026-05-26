@@ -57,8 +57,8 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		var cost uint64 = 0
 
 		// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
-		uncached := r.TokensUsed - r.CachedTokens
-		cost = (uncached*m.InPrice + r.CachedTokens*m.CachedPrice) / 1_000_000
+		uncached := r.TokensIn - r.CachedToken
+		cost = (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
 		if cost == 0 {
 			continue
 		}
@@ -86,17 +86,26 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
 
 		// 记录结算历史（Provider 维度）
-		record := SettlementRecord{
-			ProviderID:   r.ProviderID,
-			User:         r.User,
-			ModelID:      r.ModelID,
-			TokensUsed:   r.TokensUsed,
-			CachedTokens: r.CachedTokens,
-			Cost:         cost,
-			Time:         g.api.GetBlockTime(),
-		}
-		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, record)
-		_, _ = g.userSettlementHistory.Insert(g.api.GetTxn(), r.User, record)
+		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, ProviderSettlementRecord{
+			User:        r.User,
+			ModelID:     r.ModelID,
+			TokensIn:    r.TokensIn,
+			TokenOut:    r.TokenOut,
+			CachedToken: r.CachedToken,
+			Cost:        cost,
+			Count:       r.Count,
+			Time:        g.api.GetBlockTime(),
+		})
+		_, _ = g.userSettlementHistory.Insert(g.api.GetTxn(), r.User, UserSettlementRecord{
+			ProviderID:  r.ProviderID,
+			ModelID:     r.ModelID,
+			TokensIn:    r.TokensIn,
+			TokenOut:    r.TokenOut,
+			CachedToken: r.CachedToken,
+			Cost:        cost,
+			Count:       r.Count,
+			Time:        g.api.GetBlockTime(),
+		})
 	}
 	return nil
 }
@@ -163,25 +172,25 @@ func (g GatewayQuery) GetRechargeHistory(user model.UniAddr, offset uint64, limi
 }
 
 // GetSettlementHistory 查询 Provider 结算历史（按时间倒序）
-func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]SettlementRecord, error) {
+func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]ProviderSettlementRecord, error) {
 	_, records, err := g.settlementHistory.DescList(g.api.GetTxn(), providerID, (*uint32)(nil), limit)
 	if err != nil {
 		return nil, err
 	}
 	if int(offset) >= len(records) {
-		return []SettlementRecord{}, nil
+		return []ProviderSettlementRecord{}, nil
 	}
 	return records[offset:], nil
 }
 
 // GetUserSettlementHistory 查询用户的结算历史（按时间倒序）
-func (g GatewayQuery) GetUserSettlementHistory(user model.UniAddr, offset uint64, limit uint32) ([]SettlementRecord, error) {
+func (g GatewayQuery) GetUserSettlementHistory(user model.UniAddr, offset uint64, limit uint32) ([]UserSettlementRecord, error) {
 	_, records, err := g.userSettlementHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
 	if err != nil {
 		return nil, err
 	}
 	if int(offset) >= len(records) {
-		return []SettlementRecord{}, nil
+		return []UserSettlementRecord{}, nil
 	}
 	return records[offset:], nil
 }

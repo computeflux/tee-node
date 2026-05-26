@@ -183,9 +183,9 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: outPrice: %w", err)
 		}
-		Name, err := model.DecodeScaleArgBytes[string](args[6])
+		name, err := model.DecodeScaleArgBytes[string](args[6])
 		if err != nil {
-			return fmt.Errorf("update_model: Name: %w", err)
+			return fmt.Errorf("update_model: name: %w", err)
 		}
 		providerType, err := model.DecodeScaleArgBytes[uint16](args[7])
 		if err != nil {
@@ -199,7 +199,7 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: apiKeys: %w", err)
 		}
-		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, Name, providerType, uri, apiKeys)
+		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, name, providerType, uri, apiKeys)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -656,8 +656,8 @@ func NewGateway(api model.ContractApi) *Gateway {
 		apiKeys:               model.NewIndexedStore[string, APIKeyInfo]("gateway", "v2_api_key_"),
 		encryptedKeys:         &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "v2_encrypted_key_"},
 		rechargeHistory:       model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
-		settlementHistory:     model.NewStoreList2D[uint64, uint32, SettlementRecord]("gateway", "v2_settlement_history_k1_to_id_", "v2_settlement_history_k1_length_", "v2_settlement_history_k2_next_", "v2_settlement_history_store_"),
-		userSettlementHistory: model.NewStoreList2D[model.UniAddr, uint32, SettlementRecord]("gateway", "v2_user_settlement_history_k1_to_id_", "v2_user_settlement_history_k1_length_", "v2_user_settlement_history_k2_next_", "v2_user_settlement_history_store_"),
+		settlementHistory:     model.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v4_settlement_history_k1_to_id_", "v4_settlement_history_k1_length_", "v4_settlement_history_k2_next_", "v4_settlement_history_store_"),
+		userSettlementHistory: model.NewStoreList2D[model.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
 	}
 }
 

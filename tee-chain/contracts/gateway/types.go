@@ -83,6 +83,7 @@ type ProviderInfoWithID struct {
 }
 
 type ModelInfoWithProvider struct {
+	ID       uint64 `json:"id"`
 	Model    ModelInfo
 	Provider ProviderInfo
 }
@@ -136,25 +137,27 @@ type APIKeyInfo struct {
 
 // Settlement 单笔结算记录
 type Settlement struct {
-	User         model.UniAddr `json:"user"`
-	ModelID      uint64        `json:"modelId"`
-	ProviderID   uint64        `json:"providerId"`
-	TokensUsed   uint64        `json:"tokensUsed"`
-	CachedTokens uint64        `json:"cachedTokens"`
-	Count        uint16        `json:"count"`
+	User        model.UniAddr `json:"user"`
+	ModelID     uint64        `json:"modelId"`
+	ProviderID  uint64        `json:"providerId"`
+	TokensIn    uint64        `json:"tokensIn"`
+	TokenOut    uint64        `json:"tokensOut"`
+	CachedToken uint64        `json:"cachedToken"`
+	Count       uint16        `json:"count"`
 }
 
 // ── DailyUsage ───────────────────────────────────────────
 
 // DailyUsage 每日用量（已废弃，不再写入，保留类型用于兼容查询）
 type DailyUsage struct {
-	User         model.UniAddr `json:"user"`
-	ProviderID   uint64        `json:"providerId"`
-	ModelID      uint64        `json:"modelId"`
-	Count        uint64        `json:"count"`
-	TokensUsed   uint64        `json:"tokensUsed"`
-	CachedTokens uint64        `json:"cachedTokens"`
-	PointsUsed   uint64        `json:"pointsUsed"`
+	User        model.UniAddr `json:"user"`
+	ProviderID  uint64        `json:"providerId"`
+	ModelID     uint64        `json:"modelId"`
+	Count       uint64        `json:"count"`
+	TokensIn    uint64        `json:"tokensIn"`
+	TokenOut    uint64        `json:"tokensOut"`
+	CachedToken uint64        `json:"cachedToken"`
+	PointsUsed  uint64        `json:"pointsUsed"`
 }
 
 // ── RechargeHistory ──────────────────────────────────────
@@ -169,13 +172,25 @@ type RechargeRecord struct {
 // ── SettlementHistory ────────────────────────────────────
 
 // SettlementRecord 单笔结算记录（Provider 视角）
-type SettlementRecord struct {
-	ProviderID   uint64        `json:"providerId" idx:"exact"`
-	User         model.UniAddr `json:"user" idx:"exact"`
-	ModelID      uint64        `json:"modelId"`
-	TokensUsed   uint64        `json:"tokensUsed"`
-	CachedTokens uint64        `json:"cachedTokens"`
-	Cost         uint64        `json:"cost"`
-	Count        uint16        `json:"count"`
-	Time         int64         `json:"time"`
+type UserSettlementRecord struct {
+	ProviderID  uint64 `json:"providerId"`
+	ModelID     uint64 `json:"modelId"`
+	TokensIn    uint64 `json:"tokensIn"`
+	TokenOut    uint64 `json:"tokensOut"`
+	CachedToken uint64 `json:"cachedToken"`
+	Cost        uint64 `json:"cost"`
+	Count       uint16 `json:"count"`
+	Time        int64  `json:"time"`
+}
+
+// SettlementRecord 单笔结算记录（Provider 视角）
+type ProviderSettlementRecord struct {
+	User        model.UniAddr `json:"user" idx:"exact"`
+	ModelID     uint64        `json:"modelId"`
+	TokensIn    uint64        `json:"tokensIn"`
+	TokenOut    uint64        `json:"tokensOut"`
+	CachedToken uint64        `json:"cachedToken"`
+	Cost        uint64        `json:"cost"`
+	Count       uint16        `json:"count"`
+	Time        int64         `json:"time"`
 }

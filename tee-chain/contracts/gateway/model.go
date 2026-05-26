@@ -90,7 +90,7 @@ func (g GatewayMutation) UpdateModel(
 	inputModalities uint8,
 	contextLength uint64,
 	inPrice, cachedPrice, outPrice uint64,
-	Name string,
+	name string,
 	providerType uint16,
 	uri string,
 	apiKeys []string,
@@ -112,7 +112,7 @@ func (g GatewayMutation) UpdateModel(
 			continue
 		}
 
-		ref := fmt.Sprintf("%s_%d_%d", Name, g.api.GetHeight(), i)
+		ref := fmt.Sprintf("%s_%d_%d", name, g.api.GetHeight(), i)
 		gk, err := model.GetGlobalKey()
 		if err != nil {
 			return fmt.Errorf("kms not ready: %w", err)
@@ -143,6 +143,7 @@ func (g GatewayMutation) UpdateModel(
 		m.ProviderType = providerType
 		m.URI = uri
 		m.APIKeyRefs = refs
+		m.Name = name
 		m.CreatedAt = uint64(g.api.GetBlockTime())
 	}); err != nil {
 		return err
@@ -182,6 +183,7 @@ func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
 			continue
 		}
 		out = append(out, ModelInfoWithProvider{
+			ID:       IDs[i],
 			Model:    models[i],
 			Provider: *prov,
 		})

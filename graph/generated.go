@@ -84,6 +84,7 @@ type ComplexityRoot struct {
 		ContractCall       func(childComplexity int, caller string, callerType int, contract string, method string, args []string, signature string) int
 		Faucet             func(childComplexity int, caller string, callerType int) int
 		InitDiskKey        func(childComplexity int, index string, user string) int
+		LoginWithWallet    func(childComplexity int, address string, signature string, message string) int
 		RequestOtp         func(childComplexity int, email string, clientID string) int
 		RequestRecovery    func(childComplexity int, recoveryEmail string) int
 		SetPassword        func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
@@ -172,6 +173,7 @@ type MutationResolver interface {
 	VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error)
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
 	ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error)
+	LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error)
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
@@ -387,6 +389,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.InitDiskKey(childComplexity, args["index"].(string), args["user"].(string)), true
+
+	case "Mutation.loginWithWallet":
+		if e.complexity.Mutation.LoginWithWallet == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_loginWithWallet_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.LoginWithWallet(childComplexity, args["address"].(string), args["signature"].(string), args["message"].(string)), true
 
 	case "Mutation.requestOTP":
 		if e.complexity.Mutation.RequestOtp == nil {
@@ -1330,6 +1344,80 @@ func (ec *executionContext) field_Mutation_init_disk_key_argsUser(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_loginWithWallet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_loginWithWallet_argsAddress(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["address"] = arg0
+	arg1, err := ec.field_Mutation_loginWithWallet_argsSignature(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["signature"] = arg1
+	arg2, err := ec.field_Mutation_loginWithWallet_argsMessage(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["message"] = arg2
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_loginWithWallet_argsAddress(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["address"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+	if tmp, ok := rawArgs["address"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_loginWithWallet_argsSignature(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["signature"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+	if tmp, ok := rawArgs["signature"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_loginWithWallet_argsMessage(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["message"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+	if tmp, ok := rawArgs["message"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_requestOTP_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2090,24 +2178,6 @@ func (ec *executionContext) field_Mutation_verifyResponse_argsToken(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["response"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("response"))
-	if tmp, ok := rawArgs["response"]; ok {
-		return ec.unmarshalNString2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
 func (ec *executionContext) field_Mutation_verifyResponse_argsChallenge(
 	ctx context.Context,
 	rawArgs map[string]any,
@@ -2119,6 +2189,24 @@ func (ec *executionContext) field_Mutation_verifyResponse_argsChallenge(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("challenge"))
 	if tmp, ok := rawArgs["challenge"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["response"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("response"))
+	if tmp, ok := rawArgs["response"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -4087,6 +4175,73 @@ func (ec *executionContext) fieldContext_Mutation_claimOrderToken(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_claimOrderToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_loginWithWallet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_loginWithWallet(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().LoginWithWallet(rctx, fc.Args["address"].(string), fc.Args["signature"].(string), fc.Args["message"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*auth.AuthResponse)
+	fc.Result = res
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AuthResponse_success(ctx, field)
+			case "userInfo":
+				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
+			case "token":
+				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "address":
+				return ec.fieldContext_AuthResponse_address(ctx, field)
+			case "error":
+				return ec.fieldContext_AuthResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_loginWithWallet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8557,6 +8712,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "claimOrderToken":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_claimOrderToken(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "loginWithWallet":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_loginWithWallet(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

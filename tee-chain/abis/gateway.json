@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 51
+        "type": 54
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 52
+        "type": 55
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -549,7 +549,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 49
+          "type": 52
         },
         "selector": "0x36e09037"
       },
@@ -667,7 +667,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 47
+          "type": 50
         },
         "selector": "0x56b906c0"
       },
@@ -1123,7 +1123,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 49
+          "type": 52
         },
         "selector": "0xbd24209b"
       },
@@ -1261,7 +1261,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 50
+          "type": 53
         },
         "selector": "0xc533a84f"
       },
@@ -1798,11 +1798,15 @@
                 "type": 3
               },
               {
-                "name": "TokensUsed",
+                "name": "TokensIn",
                 "type": 3
               },
               {
-                "name": "CachedTokens",
+                "name": "TokenOut",
+                "type": 3
+              },
+              {
+                "name": "CachedToken",
                 "type": 3
               },
               {
@@ -2288,6 +2292,10 @@
         "def": {
           "composite": {
             "fields": [
+              {
+                "name": "ID",
+                "type": 3
+              },
               {
                 "name": "Model",
                 "type": 26
@@ -2775,10 +2783,6 @@
           "composite": {
             "fields": [
               {
-                "name": "ProviderID",
-                "type": 3
-              },
-              {
                 "name": "User",
                 "type": 13
               },
@@ -2787,11 +2791,15 @@
                 "type": 3
               },
               {
-                "name": "TokensUsed",
+                "name": "TokensIn",
                 "type": 3
               },
               {
-                "name": "CachedTokens",
+                "name": "TokenOut",
+                "type": 3
+              },
+              {
+                "name": "CachedToken",
                 "type": 3
               },
               {
@@ -2810,7 +2818,7 @@
           }
         },
         "path": [
-          "SettlementRecord"
+          "ProviderSettlementRecord"
         ]
       }
     },
@@ -2879,14 +2887,60 @@
       "id": 48,
       "type": {
         "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ProviderID",
+                "type": 3
+              },
+              {
+                "name": "ModelID",
+                "type": 3
+              },
+              {
+                "name": "TokensIn",
+                "type": 3
+              },
+              {
+                "name": "TokenOut",
+                "type": 3
+              },
+              {
+                "name": "CachedToken",
+                "type": 3
+              },
+              {
+                "name": "Cost",
+                "type": 3
+              },
+              {
+                "name": "Count",
+                "type": 1
+              },
+              {
+                "name": "Time",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "UserSettlementRecord"
+        ]
+      }
+    },
+    {
+      "id": 49,
+      "type": {
+        "def": {
           "sequence": {
-            "type": 32
+            "type": 48
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 32
+            "type": 48
           }
         ],
         "path": [
@@ -2895,7 +2949,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 50,
       "type": {
         "def": {
           "variant": {
@@ -2903,7 +2957,7 @@
               {
                 "fields": [
                   {
-                    "type": 48
+                    "type": 49
                   }
                 ],
                 "index": 0,
@@ -2924,7 +2978,7 @@
         "params": [
           {
             "name": "T",
-            "type": 48
+            "type": 49
           },
           {
             "name": "E",
@@ -2937,7 +2991,68 @@
       }
     },
     {
-      "id": 50,
+      "id": 51,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 32
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 32
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 51
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 51
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 53,
       "type": {
         "def": {
           "variant": {
@@ -2979,7 +3094,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 54,
       "type": {
         "def": {
           "primitive": "u128"
@@ -2990,7 +3105,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 55,
       "type": {
         "def": {
           "composite": {

@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -38,10 +37,19 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	provider := "email_passwordless"
 	address := r.WalletSvc.DeriveAddress(email)
 	apiKey := createUserAPIKey(email, address)
-	model.PutAuthUser(&model.AuthUser{
-		Email:   email,
-		Address: address,
-	})
+
+	// 仅在用户不存在时创建，避免覆盖已有的 Salt/DKHash/PasswordHash
+	if existing, _ := model.GetAuthUser(email); existing == nil {
+		model.PutAuthUser(&model.AuthUser{
+			Email:   email,
+			Address: address,
+		})
+	} else {
+		// 更新地址（可能因恢复等原因变化）
+		existing.Address = address
+		model.PutAuthUser(existing)
+	}
+
 	return &auth.AuthResponse{
 		Success:  true,
 		Token:    apiKey,
@@ -95,10 +103,15 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		VerifierID:   oauthUser.ProviderID,
 	}
 
-	// 持久化（只存最小信息）
-	model.PutAuthUser(&model.AuthUser{
-		Email: oauthUser.Email, Address: address,
-	})
+	// 持久化：仅在用户不存在时创建，避免覆盖已有的密码数据
+	if existing, _ := model.GetAuthUser(oauthUser.Email); existing == nil {
+		model.PutAuthUser(&model.AuthUser{
+			Email: oauthUser.Email, Address: address,
+		})
+	} else {
+		existing.Address = address
+		model.PutAuthUser(existing)
+	}
 
 	return &auth.AuthResponse{
 		Success: true, UserInfo: userInfo, Token: apiKey, Address: address,
@@ -118,13 +131,14 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	}
 	// 存储密码信息到用户记录
 	user, _ := model.GetAuthUser(email)
-	if user != nil {
-		user.PasswordHash = passwordHash
-		user.Salt = salt
-		user.DKHash = dkHash
-		if err := model.PutAuthUser(user); err != nil {
-			return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
-		}
+	if user == nil {
+		user = &model.AuthUser{Email: email}
+	}
+	user.PasswordHash = passwordHash
+	user.Salt = salt
+	user.DKHash = dkHash
+	if err := model.PutAuthUser(user); err != nil {
+		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 	return &auth.WalletResult{Status: "ok"}, nil
 }
@@ -395,6 +409,23 @@ func (r *mutationResolver) ClaimOrderToken(ctx context.Context, address string, 
 	}, nil
 }
 
+// LoginWithWallet is the resolver for the loginWithWallet field.
+// 外部钱包（MetaMask 等）通过 EIP-191 personal_sign 签名验证身份，返回 API Token。
+func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error) {
+	if !verifyEIP191Signature(address, signature, message) {
+		return &auth.AuthResponse{Success: false, Error: "invalid signature"}, nil
+	}
+
+	// 以 address 作为 owner 标识生成 API Key
+	apiKey := createUserAPIKey(address, address)
+
+	return &auth.AuthResponse{
+		Success: true,
+		Token:   apiKey,
+		Address: address,
+	}, nil
+}
+
 // OauthURL is the resolver for the oauthURL field.
 func (r *queryResolver) OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error) {
 	switch provider {
@@ -470,16 +501,3 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-
-// ── helper functions ────────────────────────────────────────
-
-func strPtr(s string) *string { return &s }
-
-// computeHMAC 计算 HMAC-SHA256，key 和 msg 都是 hex 字符串
-func computeHMAC(keyHex, msgHex string) string {
-	key, _ := hex.DecodeString(keyHex)
-	msg, _ := hex.DecodeString(msgHex)
-	mac := hmac.New(sha256.New, key)
-	mac.Write(msg)
-	return hex.EncodeToString(mac.Sum(nil))
-}

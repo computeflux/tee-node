@@ -32,12 +32,13 @@ func (t *GatewayTokenInfo) IsExpired() bool {
 }
 
 type GatewayDailyUsage struct {
-	User         UniAddr `json:"user"`
-	ProviderID   uint64  `json:"providerId"`
-	ModelID      uint64  `json:"modelId"`
-	Count        uint16  `json:"count"`
-	TokensUsed   uint64  `json:"tokensUsed"`
-	CachedTokens uint64  `json:"cachedTokens"`
+	User        UniAddr `json:"user"`
+	ProviderID  uint64  `json:"providerId"`
+	ModelID     uint64  `json:"modelId"`
+	Count       uint16  `json:"count"`
+	TokenIn     uint64  `json:"tokensIn"`
+	TokenOut    uint64  `json:"tokensOut"`
+	CachedToken uint64  `json:"cachedToken"`
 }
 
 // ── Token ────────────────────────────────────────────────

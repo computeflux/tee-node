@@ -17,11 +17,12 @@ import (
 // 批量写入 Pebble，避免每个请求都同步写磁盘
 
 type usageRecord struct {
-	user         model.UniAddr
-	tokenID      uint64
-	model        *cgateway.ModelInfoWithID
-	tokens       uint64
-	cachedTokens uint64
+	user        model.UniAddr
+	tokenID     uint64
+	model       *cgateway.ModelInfoWithID
+	tokenIn     uint64
+	tokenOut    uint64
+	cachedToken uint64
 }
 
 var (
@@ -55,16 +56,18 @@ func initUsageWriter() {
 					key := uintToStr(r.tokenID) + "_" + uintToStr(r.model.ID)
 					if u, ok := batch[key]; ok {
 						u.Count++
-						u.TokensUsed += r.tokens
-						u.CachedTokens += r.cachedTokens
+						u.TokenIn += r.tokenIn
+						u.TokenOut += r.tokenOut
+						u.CachedToken += r.cachedToken
 					} else {
 						batch[key] = &model.GatewayDailyUsage{
-							User:         r.user,
-							ModelID:      r.model.ID,
-							ProviderID:   r.model.Data.ProviderID,
-							Count:        1,
-							TokensUsed:   r.tokens,
-							CachedTokens: r.cachedTokens,
+							User:        r.user,
+							ModelID:     r.model.ID,
+							ProviderID:  r.model.Data.ProviderID,
+							Count:       1,
+							TokenIn:     r.tokenIn,
+							TokenOut:    r.tokenOut,
+							CachedToken: r.cachedToken,
 						}
 					}
 				case <-ticker.C:
@@ -94,10 +97,10 @@ func StopUsageWriter() {
 	usageWg.Wait()
 }
 
-func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, tokens uint64, cachedTokens uint64) {
+func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
 	initUsageWriter()
 	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
-	usageCh <- usageRecord{user, tokenID, model, tokens, cachedTokens}
+	usageCh <- usageRecord{user, tokenID, model, in, out, cachedTokens}
 }
 
 func uintToStr(n uint64) string {
@@ -235,12 +238,13 @@ func settlePendingUsage() error {
 			continue
 		}
 		settlements = append(settlements, cgateway.Settlement{
-			User:         r.User,
-			ModelID:      r.ModelID,
-			ProviderID:   r.ProviderID,
-			TokensUsed:   r.TokensUsed,
-			CachedTokens: r.CachedTokens,
-			Count:        r.Count,
+			User:        r.User,
+			ModelID:     r.ModelID,
+			ProviderID:  r.ProviderID,
+			TokensIn:    r.TokenIn,
+			TokenOut:    r.TokenOut,
+			CachedToken: r.CachedToken,
+			Count:       r.Count,
 		})
 	}
 	if len(settlements) == 0 {
