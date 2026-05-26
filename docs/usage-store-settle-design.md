@@ -87,24 +87,24 @@ for _, key := range settledKeys {
 - 如果结算交易失败，记录不能删除
 - 需要维护一个"待结算"和"已结算"的状态机
 
-## 混合方案推荐（兼顾性能和可靠性）
+## 混合方案推荐（当前实际实现）
 
 ```
 请求 → recordUsageAsync → usageCh（仅做聚合，不落盘）
-                                ↓
-                    goroutine 每 5秒 flush 到 PebbleDB
-                                ↓
-                    PebbleDB 中保存完整用量记录
-                                ↓
-                    每5分钟后台扫描 → 构造 Settlement → 上链
-                                ↓
-                    上链成功后删除本地记录
+                                 ↓
+                     goroutine 每 100ms flush 到 PebbleDB（阻塞写入，channel 容量 65536）
+                                 ↓
+                     PebbleDB 中保存完整用量记录
+                                 ↓
+                     每5分钟后台扫描 → 构造 Settlement → 上链
+                                 ↓
+                     上链成功后删除本地记录
 ```
 
 **优点**：
-1. 请求路径仍走 channel（零延迟）
-2. 但 flush 间隔可放宽到 5秒（因为数据不用于实时结算，只用于5分钟后的批量结算）
-3. 崩溃时最多丢失 5秒 数据（可接受）
+1. 请求路径走 channel（零延迟）
+2. goroutine 每 100ms 批量 flush，channel 容量 65536，阻塞写入（不丢弃）
+3. 崩溃时最多丢失 100ms 数据
 4. 5分钟定时结算从 PebbleDB 读取，数据完整
 
 ## 结论
@@ -113,6 +113,11 @@ for _, key := range settledKeys {
 
 如果当前系统的 QPS < 100/s，直接落盘完全可行，且代码更简单。如果 QPS > 1000/s，建议使用上述**混合方案**：channel 做请求路径缓冲，goroutine 定期（如 5秒）批量 flush 到 PebbleDB，再定时（5分钟）扫描上链。
 
-**实施优先级**：
-- P0: 如果当前系统 QPS 不高，可直接改为同步落盘
-- P1: 如果 QPS 高，先保持当前 channel 方案，增加"5分钟定时扫描 PebbleDB 上链"的后台任务
+**当前状态**：当前系统已采用上述混合方案（channel 缓冲 + 100ms flush + 5分钟定时结算），并针对以下风险做了修复：
+- channel 容量 4096 → 65536
+- 去掉 `select default` 丢弃逻辑，改为阻塞写入
+- ticker 间隔缩短到 100ms
+
+**实施优先级**（历史建议）：
+- P0: 如果系统 QPS 不高，可直接改为同步落盘
+- P1: 如果 QPS 高，保持 channel 方案，增加 5分钟定时扫描 PebbleDB 上链的后台任务

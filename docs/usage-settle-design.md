@@ -9,7 +9,7 @@
 
 ## 设计目标
 
-1. **最小改动**：尽量复用现有数据结构（`GatewayDailyUsage`、`Settlement`）
+1. **最小改动**：尽量复用现有数据结构（`GatewayDailyUsage` 仅作为本地 PebbleDB 缓冲，`Settlement` 作为链上结算参数）
 2. **统一批量提交**：所有用量合并为一个 `[]Settlement` 数组，一笔交易上链
 3. **无重复结算**：每个节点只结算自己记录的流量数据
 4. **可测试**：结算周期 `SettleInterval` 可外部修改
@@ -41,8 +41,10 @@
 - 新：增加 `Addr model.UniAddr`（含 `T` + `V`，用于链上结算）
 - 修改点：`graph/auth_helpers.go` 的 `createUserAPIKey` 在创建 token 时从 `address`（Ethereum hex）构造 `UniAddr{T: 1, V: 20bytes}`
 
-**[`GatewayDailyUsage`](pkg/model/gateway_store.go:28) 增加 `User` 字段**
-- 新增 `User model.UniAddr` —— 结算时直接作为 `Settlement.User` 使用
+**[`GatewayDailyUsage`](pkg/model/gateway_store.go:34) 字段说明**
+- `User model.UniAddr` —— 结算时直接作为 `Settlement.User` 使用
+- `TokenIn`、`TokenOut`、`CachedToken` —— 三维用量指标（替代旧版的单一 `TokensUsed`）
+- 仅作为本地 PebbleDB 缓冲，**不再写入合约 `DailyUsage`**（该存储已废弃）
 
 ### 2. 用量记录时传入完整用户信息
 
@@ -126,18 +128,40 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 ```go
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
     for _, r := range records {
-        // 扣用户余额
-        bal, _ := g.credits.Get(txn, r.User)
-        *bal -= cost
-        g.credits.Set(txn, r.User, *bal)
-        
+        // 校验 provider 归属
+        prov, _ := g.providers.Get(txn, r.ProviderID)
+        // 校验模型存在
+        m, _ := g.models.Get(txn, r.ModelID)
+
+        // 计算费用（三维定价）
+        uncached := r.TokensIn - r.CachedToken
+        cost := (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
+        if cost == 0 {
+            continue
+        }
+
+        // 累加用户已用额度（credit_useds），不直接扣除 credits
+        c, _ := g.credit_useds.Get(txn, r.User)
+        *c += cost
+        g.credit_useds.Set(txn, r.User, *c)
+
         // 加 provider 余额
         pb, _ := g.providerCredits.Get(txn, r.ProviderID)
         *pb += cost
         g.providerCredits.Set(txn, r.ProviderID, *pb)
+
+        // 记录结算历史（双写：Provider 维度 + User 维度）
+        g.settlementHistory.Insert(txn, r.ProviderID, ProviderSettlementRecord{...})
+        g.userSettlementHistory.Insert(txn, r.User, UserSettlementRecord{...})
     }
 }
 ```
+
+> **关键变更**：
+> - 结算不再直接扣除 `credits`，而是累加到 `credit_useds`，用户实际余额 = `credits - credit_useds`
+> - 用量字段从单一 `TokensUsed` 改为 `TokensIn` / `TokenOut` / `CachedToken` 三维指标
+> - 计费公式：`cost = (uncached*InPrice + cached*CachedPrice + out*OutPrice) / 1_000_000`
+> - 结算历史双写：`settlementHistory`（Provider 维度）+ `userSettlementHistory`（User 维度）
 
 ## 与已有系统的兼容性
 

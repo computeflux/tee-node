@@ -1,12 +1,15 @@
 # 合约安全审计报告 & Nonce 设计方案
 
+> 最后更新：2026-05-26
+> 状态：MED-1 已修复，P0/P1 待实施
+
 ## 一、安全等级概述
 
 | 等级 | 数量 | 说明 |
 |---|---|---|
 | 🔴 Critical | 2 | 可导致资金直接损失或无限重放 |
 | 🟠 High | 3 | 可导致权限滥用或数据篡改 |
-| 🟡 Medium | 2 | 业务逻辑缺陷，可能被利用 |
+| 🟡 Medium | 1 | 业务逻辑缺陷，已修复 |
 | 🟢 Low | 1 | 建议改进，风险可控 |
 
 ---
@@ -15,7 +18,7 @@
 
 ### CR-1: `SettleUsage` 批量结算无防重放机制
 
-**位置**: `tee-chain/contracts/gateway/credit.go:42`
+**位置**: `tee-chain/contracts/gateway/credit.go:37`
 
 **问题描述**:
 - `SettleUsage` 接受 `[]Settlement` 批量结算，但没有任何机制防止同一批记录被重复提交
@@ -79,25 +82,25 @@
 
 ### HI-1: `SettleUsage` 的 Cost=0 时自动计算完全依赖链下诚实
 
-**位置**: `tee-chain/contracts/gateway/credit.go:62-66`
+**位置**: `tee-chain/contracts/gateway/credit.go:57-64`
 
 **问题描述**:
-- 当 `r.Cost == 0` 时，合约自动计算费用：
+- 合约自动计算费用：
   ```go
-  uncached := r.TokensUsed - r.CachedTokens
-  cost = (uncached*m.InPrice + r.CachedTokens*m.CachedPrice + 999) / 1000
+  uncached := r.TokensIn - r.CachedToken
+  cost = (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
   ```
-- 所有输入 `TokensUsed`、`CachedTokens` 都来自 Provider 提交的 `records`
-- Provider 可以伪造 `TokensUsed=0`、`CachedTokens=0`，则 `cost=0`
-- 或者伪造巨大的 `TokensUsed`，让用户承担超额费用
-- 虽然 `cost < 1` 时强制设为 `1`，但这只是最小值保护
+- 所有输入 `TokensIn`、`CachedToken`、`TokenOut` 都来自 Provider 提交的 `records`
+- Provider 可以伪造 `TokensIn=0`、`CachedToken=0`、`TokenOut=0`，则 `cost=0`
+- 或者伪造巨大的 `TokensIn`，让用户承担超额费用
+- 虽然 `cost == 0` 时 `continue` 跳过，但这只是最小值保护
 
 **攻击路径**:
 ```
 1. Provider 真实服务消耗了用户 1000 tokens
-2. Provider 提交 Settlement{TokensUsed: 0, CachedTokens: 0}
-3. 合约计算 cost = (0 + 0 + 999) / 1000 = 0 → 被强制设为 1
-4. 用户只被扣 1 point，Provider 本应获得 1000*InPrice/1000 的收益被窃取
+2. Provider 提交 Settlement{TokensIn: 0, CachedToken: 0, TokenOut: 0}
+3. 合约计算 cost = 0 → continue 跳过
+4. 用户不被扣费，Provider 无收益（但服务了请求）
 ```
 
 **影响**: Provider 可以少报用量少扣费，或者多报用量多扣费。结算数据不可信。
@@ -111,7 +114,7 @@
 
 ### HI-2: `Recharge` / `Withdraw` 仅靠 `CallbySystem()` 权限检查
 
-**位置**: `tee-chain/contracts/gateway/credit.go:14`, `credit.go:116`
+**位置**: `tee-chain/contracts/gateway/credit.go:12`, `credit.go:114`
 
 **问题描述**:
 - `Recharge` 和 `Withdraw` 都检查 `!g.api.CallbySystem()`，只有 sudo 账户可调用
@@ -131,7 +134,7 @@
 
 ### HI-3: `SettleUsage` 结算频率无链上限制
 
-**位置**: `tee-chain/contracts/gateway/credit.go:42`
+**位置**: `tee-chain/contracts/gateway/credit.go:38`
 
 **问题描述**:
 - 注释说"每 5 分钟执行一次"，但这只是业务约定，链上没有任何限制
@@ -156,31 +159,17 @@
 
 ## 四、Medium（中危）
 
-### MED-1: 每日用量 key 使用固定字符串 `"today"` 而非实际日期
+### MED-1: 每日用量 key 使用固定字符串 `"today"` 而非实际日期 ✅ 已修复
 
-**位置**: `tee-chain/contracts/gateway/credit.go:88`
+**位置**: ~~`tee-chain/contracts/gateway/credit.go`~~ — `DailyUsage` 已废弃，不再写入
 
-**问题描述**:
-```go
-dayKey := fmt.Sprintf("%x_%d_%d_%s", r.User.V, r.ProviderID, r.ModelID, "today")
-```
-- `"today"` 是固定字符串，不随实际日期变化
-- 这导致跨天的用量被累积到同一个 key 中
-- 虽然 `GetUsageHistory` 按天查询，但存储侧没有按天隔离
-
-**影响**: 用量统计混乱，无法准确获取每日用量。如果按天做用量上限限制，此 bug 会导致限制失效。
-
-**修复建议**:
-```go
-day := fmt.Sprintf("%d", g.api.GetHeight()/7200) // 已有
-dayKey := fmt.Sprintf("%x_%d_%d_%s", r.User.V, r.ProviderID, r.ModelID, day)
-```
+**修复状态**: 已移除 `DailyUsage` 写入逻辑。本地用量记录通过 `usage:tokenID_modelID` key 聚合，结算后删除。不再需要按天隔离。
 
 ---
 
 ### MED-2: `APIKeyInfo.RateLimit` 只在链上存储，不主动限流
 
-**位置**: `tee-chain/contracts/gateway/types.go:122`
+**位置**: `tee-chain/contracts/gateway/types.go:133`
 
 **问题描述**:
 - `APIKeyInfo` 有 `RateLimit uint32` 字段，表示每分钟最大请求数
@@ -200,7 +189,7 @@ dayKey := fmt.Sprintf("%x_%d_%d_%s", r.User.V, r.ProviderID, r.ModelID, day)
 
 ### LOW-1: `UpdateModel` 不允许改 name，但 `CreatedAt` 被覆盖
 
-**位置**: `tee-chain/contracts/gateway/model.go:115-124`
+**位置**: `tee-chain/contracts/gateway/model.go:147`
 
 **问题描述**:
 - `UpdateModel` 中 `CreatedAt` 被设为当前区块时间：`m.CreatedAt = uint64(g.api.GetBlockTime())`
@@ -344,9 +333,10 @@ type Settlement struct {
     User         model.UniAddr `json:"user"`
     ModelID      uint64        `json:"modelId"`
     ProviderID   uint64        `json:"providerId"`
-    TokensUsed   uint64        `json:"tokensUsed"`
-    CachedTokens uint64        `json:"cachedTokens"`
-    Cost         uint64        `json:"cost"`
+    TokensIn     uint64        `json:"tokensIn"`
+    TokenOut     uint64        `json:"tokenOut"`
+    CachedToken  uint64        `json:"cachedToken"`
+    Count        uint16        `json:"count"`
     WindowID     uint64        `json:"windowId"`  // NEW: 结算窗口 ID（如 height/720）
 }
 
@@ -375,14 +365,14 @@ func (g GatewayMutation) SettleUsage(batchNonce uint64, records []Settlement) er
 
 ### 6.6 推荐实施路径
 
-| 阶段 | 内容 | 优先级 |
-|---|---|---|
-| P0 | 立即在 `SettleUsage` 增加 `batchNonce` + 合约维护 `usedBatchNonces` | Critical |
-| P1 | 为所有合约增加用户级 `nonce` 机制（方案 A） | High |
-| P2 | `SettleUsage` 增加 TEE 签名验证，确保用量数据真实 | High |
-| P3 | 增加链上结算频率限制（`lastSettleBlock`） | Medium |
-| P4 | 修复 `"today"` key 为实际日期 | Medium |
-| P5 | 增加 `RateLimit` 网关层执行 | Medium |
+| 阶段 | 内容 | 优先级 | 状态 |
+|---|---|---|---|
+| P0 | 立即在 `SettleUsage` 增加 `batchNonce` + 合约维护 `usedBatchNonces` | Critical | 🔲 待实施 |
+| P1 | 为所有合约增加用户级 `nonce` 机制（方案 A） | High | 🔲 待实施 |
+| P2 | `SettleUsage` 增加 TEE 签名验证，确保用量数据真实 | High | 🔲 待实施 |
+| P3 | 增加链上结算频率限制（`lastSettleBlock`） | Medium | 🔲 待实施 |
+| P4 | 增加 `RateLimit` 网关层执行 | Medium | 🔲 待实施 |
+| P5 | 修复 `UpdateModel` 不应覆盖 `CreatedAt` | Low | 🔲 待实施 |
 
 ---
 

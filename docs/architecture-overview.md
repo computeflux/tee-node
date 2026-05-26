@@ -1,7 +1,7 @@
 # tee-node 总体架构设计
 
 > 基于 docs/ 目录设计文档的综合分析  
-> 最后更新：2026-05-21
+> 最后更新：2026-05-26
 
 ---
 
@@ -104,7 +104,7 @@
   4. GzipDecodeMiddleware — gzip 解压
   5. RateLimitMiddleware — IP 级别滑动窗口限流（60 次/分钟）
   6. CacheMiddleware — 缓存控制
-  7. TokenAuthMiddleware — `X-API-Key` / `Bearer` 鉴权
+  7. TokenAuthMiddleware — `Authorization: Bearer <apiKey>` 鉴权
   8. DistributeMiddleware — 解析 model → 选 provider → 选 endpoint
 - **适配器**：
   | 服务商 | 适配器 | 认证方式 |
@@ -114,11 +114,14 @@
   | Gemini | `GeminiAdaptor` | `x-goog-api-key` |
   | DeepSeek/Groq/Mistral/Cohere/XAI/Ollama | `OpenAIAdaptor`（兼容）| `Bearer` |
 - **路由策略**：Sticky Balancer（FNV-32a Hash），同一用户绑定同一 endpoint
-- **计费模型**：
+- **计费模型**（2026-05-26 更新）：
   ```
-  cost = ceil(tokensUsed / 1000) * pointsPer1K + promptPricing
+  uncached = TokenIn - CachedToken
+  cost = (uncached * InPrice + CachedToken * CachedPrice + TokenOut * OutPrice) / 1_000_000
+  if cost == 0 { continue }
   ```
-  异步批量写入（500ms 刷盘，4096 buffer）
+  异步批量写入（100ms 刷盘，65536 buffer，阻塞写入不丢弃）
+- **结算机制**：每5分钟 `settlePendingUsage()` 扫描本地用量，统一构造 `[]Settlement` 一次性上链（DKG 签名 + `callerType=0`）
 
 ### 3.5 Web3Auth（迁移中）
 
@@ -136,14 +139,16 @@
 ### 3.6 API Key 管理
 
 - **格式**：`tee_<64 hex chars>`（256 bit 熵）
+- **本地索引**：`SetGatewayTokenByKey` / `GetGatewayTokenByKey` O(1) 查询，不再遍历 DB
+- **过期机制**：默认 1 天过期（`ExpiresAt` 字段）
 - **安全模型**：
   - 链上仅存 `blake2b(apiKey)` 哈希，原始 key 绝不上链
   - 攻击者看到 hash 无法逆推 apiKey
   - 抢注 hash 纯 DoS，用户换 key 即可
 - **生命周期**：
   1. 用户离线生成 → 链上 `RegisterAPIKey(keyHash, rateLimit)`
-  2. 日常调用带 `X-API-Key` 或 `Authorization: Bearer`
-  3. TEE 查链 `LookupAPIKey(hash)` 验证 `isActive` + `rateLimit`
+  2. 日常调用带 `Authorization: Bearer <apiKey>`
+  3. TEE 查链 `LookupAPIKey(hash)` 验证 `isActive`
   4. 每 5 分钟 `SettleUsage` 批量结算
 
 ---
@@ -154,9 +159,9 @@
 
 | Phase | 内容 | 周期 | 状态 |
 |:---:|------|:---:|:---:|
-| 1 | web3auth → GraphQL（OTP/OAuth/钱包/签名） | 2-3 周 | 设计中 |
+| 1 | web3auth → GraphQL（OTP/OAuth/钱包/签名） | 2-3 周 | 已落地 |
 | 2 | token 中继 → REST（chi + adaptor + 计费） | 2-3 周 | 已落地 |
-| 3 | 合约层实现（`contracts/auth/` + `contracts/gateway/`） | 3-4 周 | 设计中 |
+| 3 | 合约层实现（`contracts/auth/` + `contracts/gateway/`） | 3-4 周 | 已落地（Gateway 合约） |
 | 4 | DKG 阈值签名替代单节点签名 | 3-4 周 | 规划中 |
 | 5 | 统一部署（Dockerfile / K8s / 环境变量） | 1 周 | 规划中 |
 
@@ -184,6 +189,7 @@
 4. **TEE 验证**：生成 TEE 报告，证明代码在可信环境中运行
 5. **端到端加密**：从用户上传到 Pod 解密全程加密
 6. **Hash 不可逆**：API Key 链上仅存 blake2b 哈希
+7. **TEE KMS**：Provider API Key 通过全局对称密钥加密，链上只存引用标识
 
 ---
 
@@ -191,9 +197,19 @@
 
 | 文档 | 说明 |
 |------|------|
-| `MIGRATION_PLAN.md` | web3auth + token 融合方案 |
-| `ai-gateway-design.md` | AI Gateway 详细设计（中间件 / 适配器 / 计费） |
+| `mirgration.md` | web3auth + token 融合方案 |
+| `ai-gateway-design.md` | AI Gateway 详细设计（中间件 / 适配器 / 计费 / 结算） |
 | `api-key-design.md` | API Key 链上注册与认证设计 |
+| `api-history-endpoints.md` | 历史查询接口（充值 / 结算） |
+| `contract-storage-design.md` | 合约存储分层设计（IndexedList / StoreList2D） |
+| `contract-security-analysis.md` | 合约安全审计与 Nonce 设计方案 |
+| `settlement-dual-storage-design.md` | 结算记录双存储设计说明 |
+| `tee-kms-design.md` | TEE 全局 KMS 设计方案 |
 | `relay-design.md` | 主链→侧链 Relay 同步架构 |
 | `tee-chain-design.md` | 侧链整体架构（DKG / 秘密管理 / 交易处理） |
 | `tee-tx-retry-design.md` | 交易失败重试机制 |
+| `usage-settle-design.md` | 用量上链结算架构设计 |
+
+---
+
+*文档更新：2026-05-26*

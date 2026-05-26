@@ -1,22 +1,25 @@
 # TEE 全局 KMS 设计方案：API Key 安全存储与多节点共享
 
+> 最后更新：2026-05-26
+> 状态：已落地 — TEE KMS 加密 API Key，链上只存引用标识
+
 ## 1. 背景与问题
 
 ### 1.1 当前方案的问题
 
-`tee-chain/contracts/gateway/types.go` 中的 `ModelInfo` 结构体直接存储明文 API Key：
+`tee-chain/contracts/gateway/types.go` 中的 `ModelInfo` 结构体不再直接存储明文 API Key：
 
 ```go
 type ModelInfo struct {
     // ...
-    APIKeys []string `json:"apiKeys,omitempty"` // 明文 API Key 直接上链
+    APIKeyRefs []string `json:"apiKeyRefs,omitempty"` // 引用标识列表，指向 EncryptedAPIKey
 }
 ```
 
-**风险：**
-- 合约状态可通过 ABI 查询，API Key 面临暴露风险
-- TEE 侧链的 pebble 存储虽有加密，但合约查询路径仍可能暴露 key
-- 不满足"最小权限原则"：链上不应存储任何可直接使用的凭证
+**已解决：**
+- ✅ 合约状态通过 ABI 查询时，API Key 不再暴露（链上仅存引用标识）
+- ✅ TEE 侧链的 pebble 存储中，`EncryptedAPIKey` 被 `sealing key` 保护
+- ✅ 满足"最小权限原则"：链上不应存储任何可直接使用的凭证
 
 ### 1.2 多节点场景的额外约束
 
@@ -55,8 +58,8 @@ type ModelInfo struct {
         │                     │                     │
    ┌────▼────┐           ┌────▼────┐           ┌────▼────┐
    │ Node 0  │           │ Node 1  │           │ Node N  │
-   │ ┌─────┐ │           │ ┌─────┐ │           │ ┌─────┐ │
-   │ │ GK  │ │◄─────────►│ │ GK  │ │◄─────────►│ │ GK  │ │
+   │ ┌─────┐ │◄─────────►│ ┌─────┐ │◄─────────►│ ┌─────┐ │
+   │ │ GK  │ │           │ │ GK  │ │           │ │ GK  │ │
    │ │(sealed)│           │ │(sealed)│           │ │(sealed)│
    │ └─────┘ │  RA+TLS   │ └─────┘ │  RA+TLS   │ └─────┘ │
    └─────────┘           └─────────┘           └─────────┘
@@ -105,21 +108,24 @@ type EncryptedAPIKey struct {
 
 // ModelInfo 链上只存引用标识
 type ModelInfo struct {
-    Name            string        `json:"name"`
+    Name            string        `json:"name" idx:"exact"`
     Owner           model.UniAddr `json:"owner"`
-    ProviderID      uint64        `json:"providerId"`
-    PointsPer1K     uint64        `json:"pointsPer1K"`
-    IsActive        bool          `json:"isActive"`
-    CreatedAt       uint64        `json:"createdAt"`
+    ProviderID      uint64        `json:"providerId" idx:"exact"`
     InputModalities uint8         `json:"inputModalities" idx:"exact"`
-    ContextLength   uint64        `json:"contextLength"   idx:"bucket:4000,8000,..."`
-    PromptPricing   uint64        `json:"promptPricing"   idx:"bucket:1,5,..."`
+    ContextLength   uint64        `json:"contextLength" idx:"range"`
+    InPrice         uint64        `json:"inPrice" idx:"range"`
+    CachedPrice     uint64        `json:"cachedPrice"`
+    OutPrice        uint64        `json:"outPrice"`
     ProviderType    uint16        `json:"providerType"`
     ModelID         string        `json:"modelId"`
     URI             string        `json:"uri,omitempty"`
     APIKeyRefs      []string      `json:"apiKeyRefs,omitempty"` // 引用标识列表
+    IsActive        bool          `json:"isActive" idx:"exact"`
+    CreatedAt       uint64        `json:"createdAt"`
 }
 ```
+
+> **注意**：旧版文档中的 `PointsPer1K` 和 `PromptPricing` 字段已废弃，当前使用 `InPrice`/`CachedPrice`/`OutPrice` 三维定价模型。
 
 **合约新增方法：**
 
@@ -186,7 +192,7 @@ func (g GatewayQuery) GetEncryptedAPIKey(ref string) (*EncryptedAPIKey, error)
 // pkg/model/tee_kms.go
 const KMSKeyspace = "TEEKMS"
 
-// SealedGK 被 sealing key 保护的 GK
+// SealedGK 被本地 sealing key 保护的 GK
 type SealedGK struct {
     Ciphertext []byte `json:"ciphertext"` // sealing_key(GK)
     SealedAt   int64  `json:"sealedAt"`   // 封印时间戳
@@ -509,19 +515,20 @@ type EncryptedAPIKey struct {
 
 // ModelInfo APIKeys → APIKeyRefs（链上只存引用标识）
 type ModelInfo struct {
-    Name            string        `json:"name"`
+    Name            string        `json:"name" idx:"exact"`
     Owner           model.UniAddr `json:"owner"`
-    ProviderID      uint64        `json:"providerId"`
-    PointsPer1K     uint64        `json:"pointsPer1K"`
-    IsActive        bool          `json:"isActive"`
-    CreatedAt       uint64        `json:"createdAt"`
+    ProviderID      uint64        `json:"providerId" idx:"exact"`
     InputModalities uint8         `json:"inputModalities" idx:"exact"`
-    ContextLength   uint64        `json:"contextLength"   idx:"bucket:4000,..."`
-    PromptPricing   uint64        `json:"promptPricing"   idx:"bucket:1,..."`
+    ContextLength   uint64        `json:"contextLength" idx:"range"`
+    InPrice         uint64        `json:"inPrice" idx:"range"`
+    CachedPrice     uint64        `json:"cachedPrice"`
+    OutPrice        uint64        `json:"outPrice"`
     ProviderType    uint16        `json:"providerType"`
     ModelID         string        `json:"modelId"`
     URI             string        `json:"uri,omitempty"`
     APIKeyRefs      []string      `json:"apiKeyRefs,omitempty"` // 引用标识列表
+    IsActive        bool          `json:"isActive" idx:"exact"`
+    CreatedAt       uint64        `json:"createdAt"`
 }
 ```
 
@@ -531,14 +538,17 @@ type ModelInfo struct {
 type Gateway struct {
     api model.ContractApi
 
-    credits         *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:credits"`
-    models          *model.IndexedList[uint64, ModelInfo]      `store:"keyPfx:v0_models"`
-    providers       *model.IndexedList[uint64, ProviderInfo]   `store:"keyPfx:v0_providers"`
-    providerByOwner *model.StoreMapping[model.UniAddr, uint64] `store:"keyPfx:v0_provider_by_owner"`
-    providerCredits *model.StoreMapping[uint64, uint64]
-    apiKeys         *model.StoreMapping[string, APIKeyInfo]
-    usages          *model.StoreMapping[string, DailyUsage]
-    encryptedKeys   *model.StoreMapping[string, EncryptedAPIKey] // ref → EncryptedAPIKey
+    credits               *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credits"`
+    credit_useds          *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credit_useds"`
+    models                *model.IndexedList[uint64, ModelInfo]                           `store:"keyPfx:v2_models"`
+    providers             *model.IndexedList[uint64, ProviderInfo]                        `store:"keyPfx:v2_providers"`
+    providerByOwner       *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_provider_by_owner"`
+    providerCredits       *model.StoreMapping[uint64, uint64]                             `store:"keyPfx:v2_provider_credit"`
+    apiKeys               *model.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:v2_api_key"`
+    encryptedKeys         *model.StoreMapping[string, EncryptedAPIKey]                    `store:"keyPfx:v2_encrypted_key"`
+    rechargeHistory       *model.StoreList2D[model.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`
+    settlementHistory     *model.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:v4_settlement_history"`
+    userSettlementHistory *model.StoreList2D[model.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"`
 }
 ```
 
@@ -547,16 +557,18 @@ type Gateway struct {
 ```go
 // RegisterModel 注册模型（apiKeyRefs 替代 apiKeys）
 func (g GatewayMutation) RegisterModel(
-    name string, pointsPer1K uint64,
-    inputModalities uint8, contextLength uint64, promptPricing uint64,
-    modelID string, providerType uint16, uri string, apiKeyRefs []string,
+    name string,
+    inputModalities uint8, contextLength uint64,
+    inPrice, cachedPrice, outPrice uint64,
+    providerType uint16, uri string, apiKeys []string,
 ) error
 
 // UpdateModel 更新模型
 func (g GatewayMutation) UpdateModel(
-    modelID uint64, pointsPer1K uint64,
-    inputModalities uint8, contextLength uint64, promptPricing uint64,
-    modelIDStr string, providerType uint16, uri string, apiKeyRefs []string,
+    ID uint64,
+    inputModalities uint8, contextLength uint64,
+    inPrice, cachedPrice, outPrice uint64,
+    name string, providerType uint16, uri string, apiKeys []string,
 ) error
 
 // ListModels / ListActiveModels 分页查询（匹配 IndexedList 签名）
@@ -743,7 +755,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 
 | 威胁模型 | 攻击方式 | 防护措施 |
 |---|---|---|
-| 链上数据泄露 | 查询合约状态 | 链上仅密文，无明文 |
+| 链上数据泄露 | 查询合约状态 | 链上仅密文和引用标识，无明文 |
 | 单节点磁盘窃取 | 物理访问 pebble 文件 | sealing key 绑定 enclave，其他机器无法解封 |
 | 单节点内存转储 | 冷启动攻击 / side provider | TEE 内存加密，side provider 缓解由 TEE 硬件提供 |
 | 网络嗅探 | 中间人攻击 | RA + attested TLS，证书绑定到 RA 报告 |
@@ -762,3 +774,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 | 链上密文同步 | 随区块同步 | 无额外延迟 |
 | 新节点加入 | ~100ms | 一次 RA + TLS 握手 |
 | GK 轮换（批量重加密） | 取决于 key 数量 | 离线操作，不影响运行时 |
+
+---
+
+*文档更新：2026-05-26*

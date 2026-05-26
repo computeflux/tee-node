@@ -68,7 +68,7 @@ web3auth/back/                         tee-provider/
 ────────────────────────────────────────────────────────────
 config/config.go          → pkg/api/auth/config.go         (去掉端口，只保留业务配置)
 model/types.go            → 输入类型写入 graph/auth.graphqls
-                            内部类型保留在 pkg/api/auth/types.go
+                             内部类型保留在 pkg/api/auth/types.go
 storage/store.go          → pkg/model/auth_store.go         (合并到主 Pebble)
 service/otp.go            → services/auth/otp.go            (不变)
 service/email.go          → services/auth/email.go          (不变)
@@ -622,47 +622,97 @@ func (a AuthQuery) GetRecovery(emailHash H160) (*RecoveryConfig, error) { ... }
 
 ### 4.2 Gateway 合约 (`contracts/gateway/`)
 
+> ⚠️ **注意**：以下字段描述反映最新代码实现。旧版文档中的 `StoreMapping` / `Amount` / `PointsPer1K` / `PromptPricing` 等已过时。
+
 ```go
 type Gateway struct {
-    api              model.ContractApi
-    balances         *model.StoreMapping[UniAddr, Amount]       // 用户积分
-    models           *model.StoreMapping[uint64, ModelInfo]     // 独立注册的模型
-    providerBalances *model.StoreMapping[uint64, Amount]        // 模型收益
-    providers         *model.StoreMapping[uint64, ProviderInfo]   // Provider
-    tokens           *model.StoreMapping[uint64, TokenInfo]     // API token
-    usages           *model.StoreMapping[string, DailyUsage]
+    api model.ContractApi
+
+    // 用户余额（总充值 - 已使用）
+    credits               *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credits"`
+    credit_useds          *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credit_useds"`
+
+    // 模型与 Provider（IndexedList 带 exact/bucket 索引）
+    models                *model.IndexedList[uint64, ModelInfo]                           `store:"keyPfx:v2_models"`
+    providers             *model.IndexedList[uint64, ProviderInfo]                        `store:"keyPfx:v2_providers"`
+
+    // Provider 关联
+    providerByOwner       *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_provider_by_owner"`
+    providerCredits       *model.StoreMapping[uint64, uint64]                             `store:"keyPfx:v2_provider_credit"`
+
+    // API Key（IndexedStore 带 OwnerKey 索引）
+    apiKeys               *model.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:v2_api_key"`
+
+    // 加密 API Key（TEE KMS）
+    encryptedKeys         *model.StoreMapping[string, EncryptedAPIKey]                    `store:"keyPfx:v2_encrypted_key"`
+
+    // 历史记录（StoreList2D 双写）
+    rechargeHistory       *model.StoreList2D[model.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`
+    settlementHistory     *model.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:v4_settlement_history"`
+    userSettlementHistory *model.StoreList2D[model.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"`
 }
-
-type ModelInfo struct {
-    Name        string
-    Owner       UniAddr
-    PointsPer1K uint64
-    IsActive    bool
-}
-
-type ProviderInfo struct {
-    Name     string
-    BaseURL  string
-    ModelIds []uint64      // 关联已注册的模型
-    Priority uint32
-    IsActive bool
-    Owner    UniAddr
-}
-
-// Mutation
-func (g GatewayMutation) RegisterModel(owner UniAddr, name string, pointsPer1K uint64) error { ... }
-func (g GatewayMutation) CreateProvider(owner UniAddr, name, baseUrl string, modelIds []uint64, prio uint32) error { ... }
-func (g GatewayMutation) Recharge(user UniAddr, amount Amount) error { ... }
-func (g GatewayMutation) Consume(tokenId, providerId, modelId uint64, tokensUsed uint64) error { ... }
-func (g GatewayMutation) Withdraw(modelId uint64, amount Amount) error { ... }
-func (g GatewayMutation) CreateToken(owner UniAddr, rateLimit uint32) error { ... }
-
-// Query
-func (g GatewayQuery) GetBalance(user UniAddr) (*Amount, error) { ... }
-func (g GatewayQuery) GetModel(modelId uint64) (*ModelInfo, error) { ... }
-func (g GatewayQuery) GetProvider(providerId uint64) (*ProviderInfo, error) { ... }
-func (g GatewayQuery) ListActiveProviders(modelId uint64) ([]uint64, error) { ... }
 ```
+
+**`ModelInfo`**（当前字段）：
+```go
+type ModelInfo struct {
+    Name            string        `json:"name" idx:"exact"`
+    Owner           model.UniAddr `json:"owner"`
+    ProviderID      uint64        `json:"providerId" idx:"exact"`
+    InputModalities uint8         `json:"inputModalities" idx:"exact"`
+    ContextLength   uint64        `json:"contextLength" idx:"range"`
+    InPrice         uint64        `json:"inPrice" idx:"range"`
+    CachedPrice     uint64        `json:"cachedPrice"`
+    OutPrice        uint64        `json:"outPrice"`
+    ProviderType    uint16        `json:"providerType"`
+    ModelID         string        `json:"modelId"`
+    URI             string        `json:"uri,omitempty"`
+    APIKeyRefs      []string      `json:"apiKeyRefs,omitempty"`
+    IsActive        bool          `json:"isActive" idx:"exact"`
+    CreatedAt       uint64        `json:"createdAt"`
+}
+```
+
+**`ProviderInfo`**（当前字段）：
+```go
+type ProviderInfo struct {
+    Owner         model.UniAddr `json:"owner"`
+    Name          string        `json:"name" idx:"exact"`
+    LogoURL       string        `json:"logoUrl"`
+    Description   string        `json:"description"`
+    ModelIds      []uint64      `json:"modelIds"`
+    Region        uint8         `json:"region" idx:"exact"`
+    Deposit       uint64        `json:"deposit"`
+    FeeRate       uint32        `json:"feeRate"`
+    Priority      uint32        `json:"priority"`
+    TotalRequests uint64        `json:"totalRequests"`
+    SuccessRate   uint32        `json:"successRate"`
+    AvgLatency    uint32        `json:"avgLatency"`
+    UptimeSLA     uint32        `json:"uptimeSLA"`
+    IsActive      bool          `json:"isActive" idx:"exact"`
+    CreatedAt     uint64        `json:"createdAt"`
+}
+```
+
+**关键 Mutation**：
+- `RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)` — 自动用 TEE KMS 加密 apiKeys，链上只存 ref
+- `UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, name, providerType, uri, apiKeys)` — 支持更新 name（含 ProviderID+Name 唯一性检查）
+- `CreateProvider(name, logoURL, description, region, deposit)` — 注册 Provider
+- `UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)` — 更新 Provider
+- `Recharge(user, amount)` — system account 调用，用户充值
+- `SettleUsage(records []Settlement)` — 批量结算（system account 或 Provider Owner）
+- `Withdraw(providerID, amount)` — system account 调用，Provider 提现
+
+**关键 Query**：
+- `GetCredit(user)` → `int64`（总充值 - 已使用）
+- `GetProviderCredit(providerID)` → `uint64`
+- `GetModel(modelID)` → `*ModelInfo`
+- `GetModelByName(pid, name)` → `*ModelInfoWithID`
+- `GetModelsByProvider(providerID)` → `[]ModelInfo`
+- `ListActiveModelsWithinProvider(minContext, maxContext, minPrice, maxPrice, offset, limit)` → `[]ModelInfoWithProvider`
+- `GetRechargeHistory(user, offset, limit)` → `[]RechargeRecord`
+- `GetSettlementHistory(providerID, offset, limit)` → `[]ProviderSettlementRecord`
+- `GetUserSettlementHistory(user, offset, limit)` → `[]UserSettlementRecord`
 
 ### 4.3 合约注册
 

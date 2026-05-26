@@ -98,32 +98,39 @@ GraphQL 中受 `@AuthCheck` 保护的操作统一从 HTTP Header 读取 API Key�
 
 ```go
 type GatewayTokenInfo struct {
-    Owner     string `json:"owner"`     // 用户 email 或地址
-    Key       string `json:"key"`       // bearer token value
-    RateLimit uint32 `json:"rateLimit"`
-    IsActive  bool   `json:"isActive"`
-    CreatedAt uint64 `json:"createdAt"`
-    ID        uint64 `json:"id"`
+    ID        uint64  `json:"id"`
+    Owner     string  `json:"owner"`     // 用户 email 或地址
+    Addr      UniAddr `json:"addr"`      // 完整的链上地址（含 T+V），用于结算
+    Key       string  `json:"key"`       // bearer token value
+    RateLimit uint32  `json:"rateLimit"`
+    IsActive  bool    `json:"isActive"`
+    CreatedAt uint64  `json:"createdAt"`
+    ExpiresAt uint64  `json:"expiresAt"` // 过期时间（Unix 秒），0=永不过期
 }
 ```
 
-API Key 信息现在**优先从链上合约查询**，回退到本地 PebbleDB：
+API Key 信息现在**优先从链上合约查询**，回退到本地 PebbleDB 的 O(1) key 索引：
 
 ```go
-// 优先走合约查询
+// 优先走合约查询，回退到本地 O(1) key 索引
 func FindTokenByKey(key string) *GatewayTokenInfo {
+    // 1. 先查合约
     if tk := lookupAPIKeyViaContract(key); tk != nil {
         return tk
     }
-    // Fallback: local PebbleDB cache
-    for _, tk := range GetCachedTokens() {
-        if tk.Key == key && tk.IsActive {
-            return tk
-        }
+    // 2. Fallback: 本地 PebbleDB O(1) key 索引（不再遍历全表）
+    tk, err := model.GetGatewayTokenByKey(key)
+    if err != nil || tk == nil {
+        return nil
     }
-    return nil
+    if !tk.IsActive || tk.IsExpired() {
+        return nil
+    }
+    return tk
 }
 ```
+
+> **变更说明**：本地 token 查询已从遍历全表改为通过 `token_by_key:` 前缀做 O(1) 直接索引，同时在 [`pkg/model/gateway_store.go`](pkg/model/gateway_store.go:55) 中增加了 `SetGatewayTokenByKey`/`GetGatewayTokenByKey` 方法。`ExpiresAt` 字段支持 token 过期校验。
 
 ---
 

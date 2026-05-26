@@ -1,17 +1,21 @@
 # AI 模型请求转发（Gateway Relay）逻辑文档
 
 > 审查范围：`pkg/api/gateway/`、`pkg/services/gateway/relay/`、`pkg/model/gateway_*.go`
-> 最后更新：2026-05-21
+> 最后更新：2026-05-26
 
 ## 1. 架构概述
 
 `tee-node` 中的 Gateway 模块是一个 **AI API 统一网关**，对外提供兼容 OpenAI SDK 的 REST API（`/v1/chat/completions` 等），对内将请求转发到不同的上游 AI 提供商（OpenAI、Anthropic、Gemini 等），同时完成认证、路由、协议转换、限流、计费、监控等功能。
 
-**核心变更（2026-05-21）**：
+**核心变更（2026-05-26）**:
 - 认证统一为单一 API Key（`Authorization: Bearer <key>`），JWT 和 Legacy Polkadot 鉴权已移除
 - 所有 Gateway 数据（模型、Provider、API Key）**必须从链上合约查询**，本地 PebbleDB seed 数据已废弃
 - 请求模型必须在合约中存在且活跃，否则返回 404
 - Gateway 日志统一写入 `./logs/gateway.log`，不再输出到终端
+- **用量统计改为 `TokenIn`/`TokenOut`/`CachedToken` 三维指标**
+- **结算 goroutine 每5分钟批量提交 `[]Settlement` 到侧链**
+- **Token 缓存改为 key 索引 O(1) 查询，不再遍历 DB**
+- **用量 writer ticker 间隔从 500ms 缩短到 100ms**
 
 ### 1.1 泳道架构图（请求完整生命周期）
 
@@ -74,7 +78,7 @@ sequenceDiagram
     Route->>Route: parseProviderModel()<br/>-> provider="openai", model="gpt-4"
     Route->>Route: 替换 body 中的 model 为 "gpt-4"（去掉 provider 前缀）
     Route->>Contract: findGatewayModelByName("gpt-4")
-    Contract-->>Route: ModelInfo (URI, APIKeys, ProviderType)
+    Contract-->>Route: ModelInfo (URI, APIKeyRefs, ProviderType)
 
     alt 模型不存在或未激活
         Route-->>User: 404 model not found
@@ -84,7 +88,7 @@ sequenceDiagram
         Route-->>User: 400 invalid_request
     end
 
-    Route->>Route: buildEndpointsFromModel()<br/>从 ModelInfo.URI + APIKeys 构建 endpoints
+    Route->>Route: buildEndpointsFromModel()<br/>从 ModelInfo.URI + APIKeyRefs 动态构建 endpoints
     Route->>Route: sticky hash 选 endpoint
     Route->>Handler: ctx: provider + model + endpoint + bodyBytes
 
@@ -144,13 +148,13 @@ sequenceDiagram
     Adaptor-->>Handler: *Usage, nil, nil
 
     Handler->>EndLimit: lim.Done()
-    Handler->>Usage: recordUsageAsync(tokenID, day, providerID, tokens)
+    Handler->>Usage: recordUsageAsync(userAddr, tokenID, model, tokenIn, tokenOut, cachedToken)
 
     alt provider 满
         Usage->>Usage: 日志记录 dropped
     end
 
-    Usage->>Usage: 500ms 批量刷盘
+    Usage->>Usage: 100ms 批量刷盘
     Usage->>Pebble: SetJson("GATEWAY", "usage:...")
 
     Handler->>Handler: EmitProviderMetric(success)
@@ -178,7 +182,7 @@ flowchart LR
     end
 
     subgraph Contract["链上合约"]
-        Model["ModelInfo（URI/APIKeys）"]
+        Model["ModelInfo（URI/APIKeyRefs）"]
         Prov["ProviderInfo"]
         Key["APIKeyInfo"]
     end
@@ -242,7 +246,7 @@ flowchart TB
 ② 请求 ID -> 生成或透传 X-Request-Id，用于链路追踪
   |
   v
-③ 日志记录 -> 记录 method、path、status、耗时、远程地址（写入 gateway.log）
+③ 日志记录 -> 记录 method、path、status code、耗时、远程 IP
   |
   v
 ④ GZip 解压 -> 如果 Content-Encoding: gzip，自动解压请求体
@@ -269,7 +273,7 @@ flowchart TB
 ⑪ 响应处理 -> 流式（SSE 透传）或非流式（返回 JSON）
   |
   v
-⑫ 用量记录 -> 异步写入 tokens 使用量和积分消耗
+⑫ 用量记录 -> 异步写入 TokenIn/TokenOut/CachedToken
   |
   v
 ⑬ 返回客户端
@@ -308,7 +312,7 @@ flowchart TB
 - **功能**：从 `Authorization: Bearer <key>` 提取 API Key，**链上合约** `LookupAPIKey(hash)` 验证有效性
 - **失败**：返回 401 `missing api key` 或 `invalid api key`
 - **位置**：`pkg/api/gateway/auth_middleware.go`
-- **注意**：不再使用本地 PebbleDB token 缓存做首要验证
+- **注意**：不再使用本地 PebbleDB token 缓存做首要验证；本地缓存仅作为 key 索引加速
 
 ### 3.8 DistributeMiddleware
 - **功能**：核心路由中间件，基于**链上合约数据**决定请求转发到哪个上游端点
@@ -317,7 +321,7 @@ flowchart TB
   2. **替换 body 中的 model 字段**为纯模型名（去掉 provider 前缀），不改变其他字段
   3. **从合约查询模型** `findGatewayModelByName(actualModel)`，验证存在且活跃
   4. 验证请求的 Provider 与模型所属 Provider 一致
-  5. 从合约 `ModelInfo.URI` + `ModelInfo.APIKeys` **动态构建 endpoints**
+  5. 从合约 `ModelInfo.URI` + `ModelInfo.APIKeyRefs` **动态构建 endpoints**
   6. 使用 **一致性 Hash（FNV-32a）** 选择 endpoint，实现用户粘性
   7. 将 provider、model、endpoint、bodyBytes 注入 context
 - **URI 去重**：如果 `BaseURL` 末尾路径段与请求路径开头重复（如 `https://api.minimaxi.com/v1` + `/v1/chat/completions`），自动去重为 `https://api.minimaxi.com/v1/chat/completions`
@@ -329,18 +333,18 @@ flowchart TB
 
 | 概念 | 类型 | 说明 |
 |------|------|------|
-| **Model** | `cgateway.ModelInfo`（链上） | AI 模型定义，包含 `URI`、`APIKeys`、`ProviderType`、`PointsPer1K` |
+| **Model** | `cgateway.ModelInfo`（链上） | AI 模型定义，包含 `URI`、`APIKeyRefs`、`ProviderType`、`InPrice`/`CachedPrice`/`OutPrice` |
 | **Provider** | `cgateway.ProviderInfo`（链上） | 上游服务商，由 `ProviderType` 映射为名称 |
-| **Endpoint** | `GatewayEndpoint`（内存） | 从合约 `ModelInfo.URI` + `APIKeys` 动态构建 |
-| **Token** | `GatewayTokenInfo` | 用户 API Key，用于鉴权和计费 |
-| **DailyUsage** | `GatewayDailyUsage` | 按天统计的用量（token 数、积分消耗），写入 PebbleDB |
+| **Endpoint** | `GatewayEndpoint`（内存） | 从合约 `ModelInfo.URI` + `APIKeyRefs` 动态构建 |
+| **Token** | `GatewayTokenInfo` | 用户 API Key，用于鉴权和计费，含 `Addr`（UniAddr）用于结算 |
+| **DailyUsage** | `GatewayDailyUsage` | 按模型统计的用量（TokenIn、TokenOut、CachedToken），写入 PebbleDB |
 
 ### 4.2 数据关系
 
 ```mermaid
 erDiagram
-    APIKeyInfo ||--o{ DailyUsage : "消耗"
-    ModelInfo ||--o{ GatewayEndpoint : "URI+APIKeys 动态构建"
+    APIKeyInfo ||--o{ GatewayDailyUsage : "消耗"
+    ModelInfo ||--o{ GatewayEndpoint : "URI+APIKeyRefs 动态构建"
     ProviderInfo ||--o{ ModelInfo : "通过 ProviderType 关联"
 ```
 
@@ -353,7 +357,7 @@ erDiagram
 | Gemini | 3 | `https://generativelanguage.googleapis.com` | `GeminiAdaptor`（格式转换） |
 | 其他（DeepSeek/Groq/Mistral/Cohere/XAI/Ollama/MiniMax 等） | 自定义 URI | 合约 `ModelInfo.URI` | `OpenAIAdaptor`（兼容） |
 
-**注意**：所有服务商的 URI 和 API Keys 均从链上合约 `ModelInfo` 读取，不再使用本地 seed 数据。
+**注意**：所有服务商的 URI 和 API Keys 均从链上合约 `ModelInfo` 读取，不再使用本地 seed 数据。API Keys 通过 TEE KMS 加密存储，链上只存 `APIKeyRefs` 引用标识。
 
 ## 5. Adaptor 模式
 
@@ -392,7 +396,7 @@ type Adaptor interface {
 - 用户通过 `userKey` 做 FNV-32a Hash 分配 endpoint
 - 同一用户永久绑定同一 endpoint（直到 endpoint 故障）
 - 最大化上游 server-side cache 命中，降低成本
-- Endpoints 从合约 `ModelInfo.APIKeys` 动态构建，而非 PebbleDB
+- Endpoints 从合约 `ModelInfo.APIKeyRefs` 动态构建，而非 PebbleDB
 
 ## 7. HTTP 连接池 & Auto Scaler
 
@@ -420,15 +424,23 @@ Auto Scaler 每 10s tick：
 
 计费公式（合约层）：
 ```
-cost = (tokensUsed + 999) / 1000 * model.PointsPer1K + model.PromptPricing
-if cost < 1 { cost = 1 }
+cost = (uncached * InPrice + cached * CachedPrice + tokenOut * OutPrice) / 1_000_000
+uncached = TokenIn - CachedToken
+if cost == 0 { continue }
 ```
 
 异步写入：
-- `recordUsageAsync()` 通过 provider（buffer 4096）发送到后台 goroutine
-- 每 **500ms** 批量聚合写入 PebbleDB
-- 聚合 key：`usage:{day}_{tokenID}`
-- 满时记录日志到 `./logs/gateway.log`
+- `recordUsageAsync()` 通过 channel（65536 buffer，**阻塞写入不丢弃**）发送到后台 goroutine
+- 每 **100ms** 批量聚合写入 PebbleDB
+- 聚合 key：`usage:tokenID_modelID`
+- 字段：`TokenIn`、`TokenOut`、`CachedToken`、`Count`
+
+结算流程（每5分钟）：
+- `settlePendingUsage()` 扫描 `usage:` 前缀记录
+- 统一构造 `[]cgateway.Settlement`
+- DKG 签名 + `SubmitTx` 上链
+- 合约 `SettleUsage` 逐条扣用户余额、加 Provider 余额、双写结算历史
+- 成功后删除本地记录
 
 ## 10. 健康监控
 
@@ -449,6 +461,7 @@ Gateway 模块所有日志统一通过 `GatewayLog()` 输出到 `./logs/gateway.
 | 扩容日志 | `[SCALER]` | 连接池扩缩容 |
 | 合约日志 | `[GATEWAY]` | 合约查询结果 |
 | 初始化日志 | `[OPT]` | 后台服务启动 |
+| 结算日志 | `[SETTLE]` | 批量结算提交/失败 |
 
 ## 12. 项目结构
 
@@ -461,8 +474,8 @@ tee-node/
 │   │   ├── auth_middleware.go     ← 鉴权 + 合约路由 + Balancer
 │   │   ├── rate_limit.go         ← Endpoint 并发限流
 │   │   ├── auto_scaler.go        ← 连接池自动伸缩
-│   │   ├── cache.go              ← Token 缓存 (legacy fallback)
-│   │   ├── optimizer.go          ← 异步用量写入
+│   │   ├── cache.go              ← Token key 索引（O(1)查询）
+│   │   ├── optimizer.go          ← 异步用量写入 + 结算 goroutine
 │   │   ├── contract.go           ← 合约查询桥接 + 模型缓存
 │   │   ├── logger.go             ← Gateway 专用日志文件
 │   │   └── seed.go               ← ~~已删除~~
@@ -479,12 +492,14 @@ tee-node/
 │   │       ├── meta.go            ← Meta 上下文
 │   │       └── pool.go            ← HTTP 连接池
 │   └── model/
-│       ├── gateway_store.go       ← 数据模型（已删除 PebbleDB CRUD）
+│       ├── gateway_store.go       ← 数据模型（Token key 索引 + DailyUsage）
 │       └── gateway_endpoint.go    ← Endpoint + Sticky Balancer
 ├── tee-chain/contracts/gateway/   ← 链上 Gateway 合约
 │   ├── gateway.go                 ← 合约入口
 │   ├── model.go                   ← 模型注册/查询
 │   ├── provider.go                ← Provider 注册/查询
+│   ├── credit.go                  ← 充值/结算/提现
+│   ├── api_key.go                 ← API Key 注册/查询
 │   └── types.go                   ← ModelInfo/ProviderInfo/APIKeyInfo
 └── docs/
     ├── ai-gateway-design.md       ← 本文档
@@ -510,6 +525,32 @@ Authorization: Bearer tee_<64 hex chars>
 
 # 附录 A：重大变更记录
 
+## 2026-05-26 用量结算 + Token 索引优化
+
+### 变更 1：用量字段从单一 `tokens` 改为三维指标
+- **旧**：`TokensUsed uint64`（单一 token 数）
+- **新**：`TokenIn` + `TokenOut` + `CachedToken`（分别对应 prompt、completion、cached prompt tokens）
+- **影响**：计费公式更新为 `(uncached*InPrice + cached*CachedPrice + tokenOut*OutPrice) / 1_000_000`
+
+### 变更 2：结算 goroutine 统一批量提交
+- **新增**：`initUsageSettler()` 每5分钟扫描本地用量，统一构造 `[]Settlement` 一次性上链
+- **权限**：`callerType=0` system call，DKG 签名提交
+- **删除**：不再按 Provider 拆分多笔交易
+
+### 变更 3：Token 缓存改为 key 索引
+- **旧**：`RefreshTokenCache` 遍历所有 token ID（O(N)）
+- **新**：`SetGatewayTokenByKey` / `GetGatewayTokenByKey` O(1) 索引
+- **过期**：Token 默认 1 天过期（`ExpiresAt` 字段）
+
+### 变更 4：用量 writer 优化
+- **ticker**：500ms → 100ms
+- **channel**：4096 → 65536
+- **丢弃逻辑**：`select default` → 阻塞写入
+
+### 变更 5：合约 DailyUsage 废弃
+- **删除**：`credit.go` 中 `DailyUsage` 写入逻辑
+- **保留**：`types.go` 中类型定义供兼容
+
 ## 2026-05-21 统一鉴权 + 合约化
 
 ### 变更 1：统一鉴权为单一 API Key
@@ -521,7 +562,7 @@ Authorization: Bearer tee_<64 hex chars>
 - **移除**：`seed.go`（本地 seed 数据初始化）、`InitSeedData()` 调用
 - **移除**：`findProviderCached()`、`pickEndpoint()` 等基于 PebbleDB 的旧路由逻辑
 - **新增**：`contract.go` 合约查询桥接，`findGatewayModelByName()` 从合约查模型
-- **新增**：`buildEndpointsFromModel()` 从合约 `ModelInfo.URI` + `APIKeys` 动态构建 endpoints
+- **新增**：`buildEndpointsFromModel()` 从合约 `ModelInfo.URI` + `APIKeyRefs` 动态构建 endpoints
 - **模型验证**：`DistributeMiddleware` 先查询合约验证模型存在，404 拦截不存在模型
 
 ### 变更 3：URI 去重
@@ -540,9 +581,9 @@ Authorization: Bearer tee_<64 hex chars>
 - **删除**：`seed.go`
 - **删除**：`pkg/model/gateway_store.go` 中未使用的 PebbleDB CRUD（SetGatewayModel/GetGatewayModel 等）
 - **删除**：`pkg/model/gateway_endpoint.go` 中基于 PebbleDB 的 `ListProviderEndpoints`
-- **保留**：`GetGatewayToken/SetGatewayToken/FindGatewayTokenByKey` 作为 legacy token fallback
+- **保留**：`GetGatewayToken/SetGatewayToken/FindGatewayTokenByKey` 作为 key 索引查询
 
 ---
 
-*文档生成/更新：2026-05-21*
+*文档生成/更新：2026-05-26*
 *基于代码版本：`tee-node` 项目当前仓库状态*

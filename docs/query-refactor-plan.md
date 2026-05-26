@@ -1,5 +1,8 @@
 # 索引查询条件重构方案
 
+> 最后更新：2026-05-26
+> 状态：已落地 — 所有调用方已迁移到 `QueryExpr` 表达式树
+
 ## 1. 背景与问题
 
 当前 `Query` 使用 `map[string]any` 表示查询条件：
@@ -58,40 +61,28 @@ type QueryOR []QueryExpr
 
 ## 3. 影响范围
 
-### 需修改的文件
+### 已修改的文件
 
-| 文件 | 修改内容 |
-|---|---|
-| `pkg/model/contract_index.go` | `IntersectIDs` 返回空切片；添加 `UnionIDs` |
-| `pkg/model/contract_indexer.go` | 添加 `QueryExpr/QueryCond/QueryAND/QueryOR` 类型；重写 `query` / `Query` 签名 |
-| `tee-chain/contracts/gateway/api_key.go` | `Query` 调用改用 `QueryCond` |
-| `tee-chain/contracts/gateway/provider.go` | `Query` 调用改用 `QueryCond` |
-| `tee-chain/contracts/gateway/model.go` | `Query` 多条件调用改用 `QueryAND` |
-| `pkg/model/contract_indexer_test.go` | 所有测试用例改用新 API |
+| 文件 | 修改内容 | 状态 |
+|---|---|---|
+| `pkg/model/contract_index.go` | `IntersectIDs` 返回空切片；添加 `UnionIDs` | ✅ |
+| `pkg/model/contract_indexer.go` | 添加 `QueryExpr/QueryCond/QueryAND/QueryOR` 类型；重写 `query` / `Query` 签名 | ✅ |
+| `tee-chain/contracts/gateway/api_key.go` | `Query` 调用改用 `QueryCond` | ✅ |
+| `tee-chain/contracts/gateway/provider.go` | `Query` 调用改用 `QueryCond` | ✅ |
+| `tee-chain/contracts/gateway/model.go` | `Query` 多条件调用改用 `QueryAND` | ✅ |
+| `pkg/model/contract_indexer_test.go` | 所有测试用例改用新 API | ✅ |
 
 ### 调用方迁移示例
 
-#### 单条件（最小改动）
+#### 单条件
 
 ```go
-// 原
-ids, _ := models.Query(txn, map[string]any{"ProviderID": pid})
-
-// 新
 ids, _ := models.Query(txn, model.QueryCond{Field: "ProviderID", Val: pid})
 ```
 
 #### 多条件 AND
 
 ```go
-// 原
-filter := map[string]any{
-    "IsActive": uint64(1),
-    "ContextLength": model.Range{Min: 100, Max: 200},
-}
-ids, _ := models.Query(txn, filter)
-
-// 新
 ids, _ := models.Query(txn, model.QueryAND{
     model.QueryCond{Field: "IsActive", Val: uint64(1)},
     model.QueryCond{Field: "ContextLength", Val: model.Range{Min: 100, Max: 200}},
@@ -110,7 +101,7 @@ if minContext != 0 || maxContext != 0 {
 }
 if maxPrice != 0 {
     exprs = append(exprs, model.QueryCond{
-        Field: "PromptPricing",
+        Field: "InPrice",
         Val:   model.Range{Min: 0, Max: maxPrice},
     })
 }
@@ -127,7 +118,11 @@ ids, _ := models.Query(txn, exprs)
 
 1. [x] 修改 `contract_index.go` — 修复 `IntersectIDs` 空交集 bug
 2. [x] 修改 `contract_indexer.go` — 定义新类型，重写 `query`
-3. [ ] 修改调用方：`api_key.go`、`provider.go`、`model.go`
-4. [ ] 更新测试：`contract_indexer_test.go`
-5. [ ] `go build ./...` 验证编译
-6. [ ] `go test ./pkg/model/...` 跑测试
+3. [x] 修改调用方：`api_key.go`、`provider.go`、`model.go`
+4. [x] 更新测试：`contract_indexer_test.go`
+5. [x] `go build ./...` 验证编译
+6. [x] `go test ./pkg/model/...` 跑测试
+
+---
+
+*文档更新：2026-05-26*
