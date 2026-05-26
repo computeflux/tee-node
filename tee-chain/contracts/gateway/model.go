@@ -133,7 +133,7 @@ func (g GatewayMutation) UpdateModel(
 		refs = append(refs, ref)
 	}
 
-	// 更新模型字段
+	// 更新模型字段（CreatedAt 保持不变，不覆盖首次注册时间）
 	if err := g.models.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfo) {
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
@@ -144,7 +144,6 @@ func (g GatewayMutation) UpdateModel(
 		m.URI = uri
 		m.APIKeyRefs = refs
 		m.Name = name
-		m.CreatedAt = uint64(g.api.GetBlockTime())
 	}); err != nil {
 		return err
 	}

@@ -116,6 +116,7 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 			}
 			newEvents = append(newEvents, cachedEvent{ev: ev, cachedAt: time.Now(), txBytes: txBytes})
 		}
+
 		// 追加到缓存 (保持 nonce 递增顺序) | append to cache (maintaining nonce order)
 		app.relayCache.events[chainID] = append(cached, newEvents...)
 		app.relayCache.mu.Unlock()
@@ -166,14 +167,18 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 
 // signAndBuildRelayTx 用 DKG signer 签名 relay SysCall, 返回 tx bytes | Sign relay SysCall with DKG signer, return tx bytes
 func (app *TeeChain) signAndBuildRelayTx(sysCall *model.SysCall) ([]byte, error) {
+	var callerType uint32 = 0
+
+	// DKG 签名 | DKG sign
+	signer := app.dkg.Signer.ToSigner(model.SuiteEd25519)
+	nonce := GetNodeNextNonce(signer)
+
 	// 获取签名哈希 | get signature hash
-	sigBytes, err := sysCall.BytesForSig()
+	sigBytes, err := sysCall.BytesForSig(nonce)
 	if err != nil {
 		return nil, errors.Wrap(err, "BytesForSig")
 	}
 
-	// DKG 签名 | DKG sign
-	signer := app.dkg.Signer.ToSigner(model.SuiteEd25519)
 	signature, err := signer.Sign(sigBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "Sign")
@@ -185,7 +190,8 @@ func (app *TeeChain) signAndBuildRelayTx(sysCall *model.SysCall) ([]byte, error)
 	tx := &model.Tx{
 		Caller:     signer.Public(),
 		Call:       buf.Bytes(),
-		CallerType: 0,
+		CallerType: callerType,
+		Nonce:      nonce,
 		Signature:  signature,
 	}
 

@@ -150,7 +150,7 @@ func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcess
 		}
 	}
 
-	status := app.ProcessTx(req.Txs, req.Time)
+	status := app.ProcessTx(req.Txs, req.Height, req.Time)
 	return &abci.ResponseProcessProposal{Status: status}, nil
 }
 

@@ -44,13 +44,15 @@ extend type Mutation {
     caller: String!
     """ 地址类型，0 => TEE, 1 => polkadot_sign """
     callerType: Int!
+    """ 用户级严格递增 nonce（从 1 开始）"""
+    nonce: Int!
     """ 合约名，如 dao """
     contract: String!
     """ dao：方法名，如 join、transfer """
     method: String!
     """ 每项 hex(SCALE(单参))；init 为 3～4 个参数分别编码 members、publicJoin、sudoAccount、[defaultTrack] """
     args: [String!]!
-    """ 签名，如 0x..."""
+    """ 对 caller || caller_type || nonce || call 的签名"""
     signature: String!
   ): Boolean!
 }

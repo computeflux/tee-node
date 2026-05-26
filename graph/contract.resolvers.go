@@ -13,6 +13,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -52,8 +53,9 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		},
 	}
 
+	nonce := teechain.GetNodeNextNonce(signer)
 	// First occurrence: SystemContractInit
-	sigBytes, err := sysCall.BytesForSig()
+	sigBytes, err := sysCall.BytesForSig(nonce)
 	if err != nil {
 		return false, gqlerror.Errorf("BytesForSig: %v", err)
 	}
@@ -62,7 +64,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("Sign: %v", err)
 	}
 
-	err = SubmitContractCall(signer.Public(), 0, contract, method, argBytes, signature)
+	err = SubmitContractCall(signer.Public(), 0, nonce, contract, method, argBytes, signature)
 	if err != nil {
 		return false, gqlerror.Errorf("SystemContractInit DecodeCaller: %v", err)
 	}
@@ -106,13 +108,14 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 	}
 
 	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
+	nonce := teechain.GetNodeNextNonce(signer)
 	sysCall := &model.SysCall{
 		Payload: &model.SysCall_Contract{
 			Contract: call,
 		},
 	}
 
-	sigBytes, err := sysCall.BytesForSig()
+	sigBytes, err := sysCall.BytesForSig(nonce)
 	if err != nil {
 		return false, gqlerror.Errorf("BytesForSig: %v", err)
 	}
@@ -121,7 +124,7 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 		return false, gqlerror.Errorf("Sign: %v", err)
 	}
 
-	if err := SubmitContractCall(signer.Public(), 0, contract, model.MethodToSelector("Mint"), argBytes, signature); err != nil {
+	if err := SubmitContractCall(signer.Public(), 0, nonce, contract, model.MethodToSelector("Mint"), argBytes, signature); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)
 	}
 
@@ -129,7 +132,7 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 }
 
 // ContractCall is the resolver for the contractCall field.
-func (r *mutationResolver) ContractCall(ctx context.Context, caller string, callerType int, contract string, method string, args []string, signature string) (bool, error) {
+func (r *mutationResolver) ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (bool, error) {
 	if callerType == 0 {
 		return false, gqlerror.Errorf("ContractCall: only caller type >0 is supported")
 	}
@@ -149,7 +152,7 @@ func (r *mutationResolver) ContractCall(ctx context.Context, caller string, call
 		return false, gqlerror.Errorf("ContractCall DecodeString sign: %v", err)
 	}
 
-	if err := SubmitContractCall(callerBytes, uint32(callerType), contract, model.MethodToSelector(method), argBytes, sig); err != nil {
+	if err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, model.MethodToSelector(method), argBytes, sig); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)
 	}
 	return true, nil

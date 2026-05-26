@@ -19,6 +19,7 @@ const (
 	CodeTypeBanned          uint32 = 3
 	CodeInvalidTEE          uint32 = 4
 	CodeInvalidNode         uint32 = 5
+	CodeTypeInvalidNonce    uint32 = 6
 )
 
 const (

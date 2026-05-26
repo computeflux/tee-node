@@ -9,8 +9,9 @@ option go_package = "";
 message Tx{
   bytes caller = 10;   // 交易发起方（公钥，用于验证签名）
   uint32 caller_type = 12; // 0 => TEE, 10000 => ed25519, 1 => polkadot_sign(contract)
+  uint64 nonce = 14;   // 用户级严格递增 nonce，防重放
   bytes call = 13; // call bytes
-  bytes signature = 11; // 对 Tx 的签名（签名为空时签名字段不参与序列化，即对 payload+caller 的序列化结果签名）
+  bytes signature = 11; // 对 Tx 的签名（签名为空时签名字段不参与序列化，即对 payload+caller+nonce 的序列化结果签名）
 }
 
 message SysCall{

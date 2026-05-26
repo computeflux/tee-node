@@ -6,10 +6,10 @@ import (
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing/bls12381/circl"
 	"go.dedis.ch/kyber/v4/share"
-	"go.dedis.ch/kyber/v4/sign/bls"
-	"go.dedis.ch/kyber/v4/sign/tbls"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
+	"go.dedis.ch/kyber/v4/sign/bls"
 	"go.dedis.ch/kyber/v4/sign/schnorr"
+	"go.dedis.ch/kyber/v4/sign/tbls"
 )
 
 // TestEIP2537RoundTrip verifies G1/G2 conversion and negation round-trip.

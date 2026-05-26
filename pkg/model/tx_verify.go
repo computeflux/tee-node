@@ -14,6 +14,7 @@ import (
 )
 
 // VerifyTxSigner 验证交易发起方：caller 对 Tx（不含 signature）的签名必须有效
+// 签名数据包含 caller + caller_type + nonce + call，nonce 不可被篡改。
 func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")
@@ -35,7 +36,7 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 		return nil, err
 	}
 
-	err = SideSysCallVerify(caller, tx.CallerType, call, sig)
+	err = SideSysCallVerify(caller, tx.CallerType, tx.Nonce, call, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -43,26 +44,26 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 	return call, nil
 }
 
-func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signature []byte) error {
+func SideSysCallVerify(caller []byte, callerType uint32, nonce uint64, call *SysCall, signature []byte) error {
 	switch callerType {
-	case 0: // node ed25519
-		sigBytes, err := call.BytesForSig()
+	case 0: // chain node ed25519
+		sigBytes, err := call.BytesForSig(nonce)
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}
 		if !Ed25519SignVerify(caller, sigBytes, signature) {
 			return errors.New("invalid signature")
 		}
-	case 1: // polkadot sign sr25519 side contract
-		sigBytes, err := call.BytesForSig()
+	case 1: // polkadot signature of sr25519
+		sigBytes, err := call.BytesForSig(nonce)
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}
 		if err := SideContractPolkadotVerify(caller, sigBytes, signature); err != nil {
 			return errors.Wrap(err, "contract")
 		}
-	case 2: // EVM Wallet signature
-		sigBytes, err := call.BytesForSig()
+	case 2: // EVM Wallet signature of secp256k1
+		sigBytes, err := call.BytesForSig(nonce)
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}

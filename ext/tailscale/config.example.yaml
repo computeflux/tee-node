@@ -1,0 +1,64 @@
+# ── Tailscale TEE 跨区域代理配置 ──────────────────────────────
+
+tailscale:
+    auth_key: "tskey-auth-xxxxxxxxxxxxxx"
+    hostname: "tee-node-us-east"
+    ephemeral: false
+
+# ── 代理配置 ─────────────────────────────────────────────────
+proxy:
+    listen_addr: ":8080"
+    read_timeout: 30s
+    write_timeout: 60s
+    idle_timeout: 120s
+
+    # HTTP/2 cleartext 多路复用
+    enable_h2c: true
+
+    # 启动时预热连接到已知目标
+    pre_connect: true
+    pre_connect_conns: 2
+
+    # 连接池
+    max_idle_conns: 512
+    max_idle_conns_per_host: 32
+
+# ── 路由规则 ─────────────────────────────────────────────────
+# 5 级优先级：region 精确匹配 → chain+service → 同 region peer → 任意 peer → fallback
+
+routes:
+    # region-specific: US 用户优先走 US 节点
+    - chain_id: "polkadot"
+      service: "rpc"
+      target: "tee-node-us-east:9944"
+      region: "us-east"
+
+    - chain_id: "polkadot"
+      service: "rpc"
+      target: "tee-node-eu-west:9944"
+      region: "eu-west"
+
+    # chain+service: 任意 region 的兜底
+    - chain_id: "polkadot"
+      service: "graphql"
+      target: "tee-node-eu-west:4000"
+
+    - chain_id: "ethereum"
+      service: "rpc"
+      target: "tee-node-ap-southeast:8545"
+
+fallback: "tee-node-us-east:3000"
+
+# ── 本节点广告的服务 ─────────────────────────────────────────
+services:
+    - chain_id: "polkadot"
+      service: "rpc"
+      port: 9944
+      region: "us-east"
+      priority: 10
+
+    - chain_id: "polkadot"
+      service: "graphql"
+      port: 4000
+      region: "us-east"
+      priority: 10

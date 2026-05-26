@@ -304,17 +304,19 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 		},
 	}
 
-	// 使用节点私钥签名（system call，callerType=0，代表节点本身）
-	sigBytes, err := sysCall.BytesForSig()
-	if err != nil {
-		return fmt.Errorf("BytesForSig: %w", err)
-	}
-
 	dkg := bridge.GetDKG()
 	if dkg == nil || dkg.Signer == nil {
 		return fmt.Errorf("dkg signer not ready")
 	}
 	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
+	nonce := teechain.GetNodeNextNonce(signer)
+
+	// 使用节点私钥签名（system call，callerType=0，代表节点本身）
+	sigBytes, err := sysCall.BytesForSig(nonce)
+	if err != nil {
+		return fmt.Errorf("BytesForSig: %w", err)
+	}
+
 	signature, err := signer.Sign(sigBytes)
 	if err != nil {
 		return fmt.Errorf("sign: %w", err)
@@ -327,6 +329,7 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 		Call:       buf.Bytes(),
 		CallerType: 0,
 		Signature:  signature,
+		Nonce:      nonce,
 	}
 
 	return teechain.SubmitTx(tx)

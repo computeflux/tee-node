@@ -100,9 +100,32 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time
 
 			hubCalls = append(hubCalls, p.HubCall)
 		case *model.SysCall_Contract:
-			err = app.ContractMutation(tx.GetCaller(), tx.GetCallerType(), txn, height, p.Contract)
+			caller := tx.GetCaller()
+			callerType := tx.GetCallerType()
+			txNonce := tx.GetNonce()
+
+			// 获取当前 nonce
+			currentNonce, err := TxnGetCurrentCallerNonce(txn, caller, callerType)
+			if err != nil {
+				return nil, errors.Wrap(err, "get caller nonce")
+			}
+
+			expectedNonce := currentNonce + 1
+			if txNonce != expectedNonce {
+				return nil, errors.Errorf(
+					"invalid nonce: expected %d, got %d (caller %x, type %d)",
+					expectedNonce, txNonce, caller, callerType,
+				)
+			}
+
+			err = app.ContractMutation(caller, callerType, txn, height, p.Contract)
 			if err != nil {
 				return nil, errors.Wrap(err, "contract mutation error")
+			}
+
+			// 合约执行成功后，原子更新 nonce
+			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
+				return nil, errors.Wrap(err, "update caller nonce")
 			}
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)

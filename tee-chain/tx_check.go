@@ -24,6 +24,21 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 		return CodeTypeInvalidTxFormat
 	}
 
+	// 验证合约交易 nonce（预校验，减少无效交易进入 mempool）
+	call := new(model.SysCall)
+	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err == nil {
+		if contract := call.GetContract(); contract != nil {
+			txNonce := txbox.GetNonce()
+			currentNonce := GetCurrentCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
+			expectedNonce := currentNonce + 1
+			if txNonce != expectedNonce {
+				fmt.Printf("CheckTx invalid nonce: expected %d, got %d (caller %x, type %d)\n",
+					expectedNonce, txNonce, txbox.GetCaller(), txbox.GetCallerType())
+				return CodeTypeInvalidNonce
+			}
+		}
+	}
+
 	// 验证节点之间的数据交换需要验证彼此的节点ID
 	if txbox.CallerType == 0 {
 		if len(txbox.Caller) == 0 {

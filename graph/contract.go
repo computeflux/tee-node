@@ -46,8 +46,9 @@ func decodeArgs(args []string) ([][]byte, error) {
 	return argsBytes, nil
 }
 
-// SubmitContractCall 提交合约调用
-func SubmitContractCall(caller []byte, callerType uint32, contract string, method [4]byte, argsBytes [][]byte, signature []byte) error {
+// SubmitContractCall 提交合约调用（用户自行管理 nonce）。
+// nonce 必须严格递增，且已包含在 signature 的签名数据中。
+func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract string, method [4]byte, argsBytes [][]byte, signature []byte) error {
 	c := &model.ContractCall{
 		Name:   []byte(contract),
 		Method: method[:],
@@ -59,7 +60,7 @@ func SubmitContractCall(caller []byte, callerType uint32, contract string, metho
 		},
 	}
 
-	err := model.SideSysCallVerify(caller, callerType, call, signature)
+	err := model.SideSysCallVerify(caller, callerType, nonce, call, signature)
 	if err != nil {
 		return fmt.Errorf("SubmitContractCall: contract verify: %w", err)
 	}
@@ -69,6 +70,7 @@ func SubmitContractCall(caller []byte, callerType uint32, contract string, metho
 	tx := &model.Tx{
 		Caller:     caller,
 		CallerType: callerType,
+		Nonce:      nonce,
 		Call:       buf.Bytes(),
 		Signature:  signature,
 	}

@@ -30,12 +30,14 @@ func GetTxBytes(tx *model.Tx) []byte {
 }
 
 func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
-	sigbt, err := call.BytesForSig()
+	signer := s.NodePriv.ToSigner(model.SuiteEd25519)
+	nonce := GetNodeNextNonce(signer)
+
+	sigbt, err := call.BytesForSig(nonce)
 	if err != nil {
 		return errors.Errorf("BytesForSig: %v", err)
 	}
 
-	signer := s.NodePriv.ToSigner(model.SuiteEd25519)
 	signature, err := signer.Sign(sigbt)
 	if err != nil {
 		return errors.Errorf("Sign: %v", err)
@@ -47,6 +49,7 @@ func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
 		Caller:     signer.Public(),
 		Call:       buf.Bytes(),
 		CallerType: 0,
+		Nonce:      nonce,
 		Signature:  signature,
 	}
 
@@ -54,16 +57,18 @@ func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
 }
 
 func (s *TeeChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
-	sigbt, err := call.BytesForSig()
-	if err != nil {
-		return nil, errors.Errorf("BytesForSig: %v", err)
-	}
 	dkg := s.GetDKG()
 	if dkg == nil || dkg.Signer == nil {
 		return nil, errors.Errorf("DKG signer not initialized")
 	}
 
 	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
+	nonce := GetNodeNextNonce(signer)
+	sigbt, err := call.BytesForSig(nonce)
+	if err != nil {
+		return nil, errors.Errorf("BytesForSig: %v", err)
+	}
+
 	signature, err := signer.Sign(sigbt)
 	if err != nil {
 		return nil, errors.Errorf("Sign: %v", err)
@@ -75,6 +80,7 @@ func (s *TeeChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 		Caller:     signer.Public(),
 		Call:       buf.Bytes(),
 		CallerType: 0,
+		Nonce:      nonce,
 		Signature:  signature,
 	}
 	return GetTxBytes(tx), nil
