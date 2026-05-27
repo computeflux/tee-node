@@ -121,6 +121,18 @@ func GetKey(namespace, key string) ([]byte, error) {
 	return util.Unseal(value, nil)
 }
 
+func GetFromByteKey(key []byte) ([]byte, error) {
+	if DBINS == nil {
+		return nil, errors.New("db not initialized")
+	}
+	value, _, err := DBINS.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	return util.Unseal(value, nil)
+}
+
 func GetJson[T any](namespace, key string) (*T, error) {
 	v, err := GetKey(namespace, key)
 	if err != nil {

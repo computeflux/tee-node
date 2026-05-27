@@ -1631,21 +1631,26 @@
               {
                 "fields": [],
                 "index": 1,
-                "name": "LowCredit"
+                "name": "DuplicateNonce"
               },
               {
                 "fields": [],
                 "index": 2,
-                "name": "ModelNotFound"
+                "name": "LowCredit"
               },
               {
                 "fields": [],
                 "index": 3,
-                "name": "NotOwner"
+                "name": "ModelNotFound"
               },
               {
                 "fields": [],
                 "index": 4,
+                "name": "NotOwner"
+              },
+              {
+                "fields": [],
+                "index": 5,
                 "name": "ProviderNotFound"
               }
             ]
@@ -1798,7 +1803,7 @@
                 "type": 3
               },
               {
-                "name": "TokensIn",
+                "name": "TokenIn",
                 "type": 3
               },
               {
@@ -1812,6 +1817,10 @@
               {
                 "name": "Count",
                 "type": 1
+              },
+              {
+                "name": "Nonce",
+                "type": 15
               }
             ]
           }
@@ -2791,7 +2800,7 @@
                 "type": 3
               },
               {
-                "name": "TokensIn",
+                "name": "TokenIn",
                 "type": 3
               },
               {
@@ -2898,7 +2907,7 @@
                 "type": 3
               },
               {
-                "name": "TokensIn",
+                "name": "TokenIn",
                 "type": 3
               },
               {

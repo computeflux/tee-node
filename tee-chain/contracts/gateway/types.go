@@ -140,7 +140,7 @@ type Settlement struct {
 	User        model.UniAddr `json:"user"`
 	ModelID     uint64        `json:"modelId"`
 	ProviderID  uint64        `json:"providerId"`
-	TokensIn    uint64        `json:"tokensIn"`
+	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`
 	CachedToken uint64        `json:"cachedToken"`
 	Count       uint16        `json:"count"`
@@ -155,7 +155,7 @@ type DailyUsage struct {
 	ProviderID  uint64        `json:"providerId"`
 	ModelID     uint64        `json:"modelId"`
 	Count       uint64        `json:"count"`
-	TokensIn    uint64        `json:"tokensIn"`
+	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`
 	CachedToken uint64        `json:"cachedToken"`
 	PointsUsed  uint64        `json:"pointsUsed"`
@@ -176,7 +176,7 @@ type RechargeRecord struct {
 type UserSettlementRecord struct {
 	ProviderID  uint64 `json:"providerId"`
 	ModelID     uint64 `json:"modelId"`
-	TokensIn    uint64 `json:"tokensIn"`
+	TokenIn     uint64 `json:"TokenIn"`
 	TokenOut    uint64 `json:"tokensOut"`
 	CachedToken uint64 `json:"cachedToken"`
 	Cost        uint64 `json:"cost"`
@@ -188,7 +188,7 @@ type UserSettlementRecord struct {
 type ProviderSettlementRecord struct {
 	User        model.UniAddr `json:"user" idx:"exact"`
 	ModelID     uint64        `json:"modelId"`
-	TokensIn    uint64        `json:"tokensIn"`
+	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`
 	CachedToken uint64        `json:"cachedToken"`
 	Cost        uint64        `json:"cost"`

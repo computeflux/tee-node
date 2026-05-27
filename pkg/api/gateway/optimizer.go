@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -10,8 +9,6 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	teechain "github.com/computeflux/tee-provider/tee-chain"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 )
 
@@ -247,7 +244,7 @@ func settlePendingUsage() error {
 			User:        r.User,
 			ModelID:     r.ModelID,
 			ProviderID:  r.ProviderID,
-			TokensIn:    r.TokenIn,
+			TokenIn:     r.TokenIn,
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Count:       r.Count,
@@ -275,7 +272,7 @@ func settlePendingUsage() error {
 	return nil
 }
 
-// submitSettleUsage 提交 SettleUsage 合约调用（DKG signer 签名）。
+// submitSettleUsage 提交 SettleUsage 合约调用（通过 TxManager 统一提交，自动重试）。
 func submitSettleUsage(records []cgateway.Settlement) error {
 	bridge := getBridge()
 	if bridge == nil {
@@ -292,47 +289,9 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 	}
 
 	method := model.MethodToSelector("SettleUsage")
-	call := &model.ContractCall{
-		Name:   []byte("gateway"),
-		Method: method[:],
-		Args:   [][]byte{argBytes},
-	}
 
-	sysCall := &model.SysCall{
-		Payload: &model.SysCall_Contract{
-			Contract: call,
-		},
-	}
-
-	dkg := bridge.GetDKG()
-	if dkg == nil || dkg.Signer == nil {
-		return fmt.Errorf("dkg signer not ready")
-	}
-	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
-	nonce := teechain.GetNodeNextNonce(signer)
-
-	// 使用节点私钥签名（system call，callerType=0，代表节点本身）
-	sigBytes, err := sysCall.BytesForSig(nonce)
-	if err != nil {
-		return fmt.Errorf("BytesForSig: %w", err)
-	}
-
-	signature, err := signer.Sign(sigBytes)
-	if err != nil {
-		return fmt.Errorf("sign: %w", err)
-	}
-
-	buf := new(bytes.Buffer)
-	protoio.WriteMessage(sysCall, buf)
-	tx := &model.Tx{
-		Caller:     signer.Public(),
-		Call:       buf.Bytes(),
-		CallerType: 0,
-		Signature:  signature,
-		Nonce:      nonce,
-	}
-
-	return teechain.SubmitTx(tx)
+	err = bridge.SubmitContract("gateway", method[:], [][]byte{argBytes})
+	return err
 }
 
 // ── Startup init ─────────────────────────────────────────

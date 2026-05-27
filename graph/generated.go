@@ -108,6 +108,7 @@ type ComplexityRoot struct {
 		AuthHealth     func(childComplexity int) int
 		ChainInfo      func(childComplexity int) int
 		ContractDryRun func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
+		ContractNonce  func(childComplexity int, caller string, callerType int) int
 		GetChallenge   func(childComplexity int, token string) int
 		OauthURL       func(childComplexity int, provider string) int
 		SecretRsa      func(childComplexity int) int
@@ -188,6 +189,7 @@ type QueryResolver interface {
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
+	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -585,6 +587,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ContractDryRun(childComplexity, args["caller"].(string), args["callerType"].(int), args["contract"].(string), args["mut"].(bool), args["method"].(string), args["args"].([]string)), true
+
+	case "Query.contractNonce":
+		if e.complexity.Query.ContractNonce == nil {
+			break
+		}
+
+		args, err := ec.field_Query_contractNonce_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ContractNonce(childComplexity, args["caller"].(string), args["callerType"].(int)), true
 
 	case "Query.getChallenge":
 		if e.complexity.Query.GetChallenge == nil {
@@ -2405,6 +2419,57 @@ func (ec *executionContext) field_Query_contractDryRun_argsArgs(
 	}
 
 	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_contractNonce_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_contractNonce_argsCaller(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["caller"] = arg0
+	arg1, err := ec.field_Query_contractNonce_argsCallerType(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["callerType"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_contractNonce_argsCaller(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["caller"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("caller"))
+	if tmp, ok := rawArgs["caller"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_contractNonce_argsCallerType(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (int, error) {
+	if _, ok := rawArgs["callerType"]; !ok {
+		var zeroVal int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("callerType"))
+	if tmp, ok := rawArgs["callerType"]; ok {
+		return ec.unmarshalNInt2int(ctx, tmp)
+	}
+
+	var zeroVal int
 	return zeroVal, nil
 }
 
@@ -5019,6 +5084,61 @@ func (ec *executionContext) fieldContext_Query_contractDryRun(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_contractDryRun_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_contractNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_contractNonce(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ContractNonce(rctx, fc.Args["caller"].(string), fc.Args["callerType"].(int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_contractNonce(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_contractNonce_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8989,6 +9109,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_contractDryRun(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "contractNonce":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_contractNonce(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

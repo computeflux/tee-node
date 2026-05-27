@@ -36,7 +36,7 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 		return nil, err
 	}
 
-	err = SideSysCallVerify(caller, tx.CallerType, tx.Nonce, call, sig)
+	err = SideSysCallVerify(caller, tx.CallerType, call, sig)
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +44,10 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 	return call, nil
 }
 
-func SideSysCallVerify(caller []byte, callerType uint32, nonce uint64, call *SysCall, signature []byte) error {
+func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signature []byte) error {
 	switch callerType {
 	case 0: // chain node ed25519
-		sigBytes, err := call.BytesForSig(nonce)
+		sigBytes, err := call.BytesForSig()
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}
@@ -55,7 +55,7 @@ func SideSysCallVerify(caller []byte, callerType uint32, nonce uint64, call *Sys
 			return errors.New("invalid signature")
 		}
 	case 1: // polkadot signature of sr25519
-		sigBytes, err := call.BytesForSig(nonce)
+		sigBytes, err := call.BytesForSig()
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}
@@ -63,7 +63,7 @@ func SideSysCallVerify(caller []byte, callerType uint32, nonce uint64, call *Sys
 			return errors.Wrap(err, "contract")
 		}
 	case 2: // EVM Wallet signature of secp256k1
-		sigBytes, err := call.BytesForSig(nonce)
+		sigBytes, err := call.BytesForSig()
 		if err != nil {
 			return errors.Wrap(err, "marshal syscall for sig")
 		}

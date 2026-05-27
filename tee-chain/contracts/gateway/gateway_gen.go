@@ -658,6 +658,7 @@ func NewGateway(api model.ContractApi) *Gateway {
 		rechargeHistory:       model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
 		settlementHistory:     model.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v4_settlement_history_k1_to_id_", "v4_settlement_history_k1_length_", "v4_settlement_history_k2_next_", "v4_settlement_history_store_"),
 		userSettlementHistory: model.NewStoreList2D[model.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
+		settledNonces:         &model.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v5_settled_nonces_"},
 	}
 }
 

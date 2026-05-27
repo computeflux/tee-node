@@ -19,6 +19,13 @@ extend type Query {
     """ 每项 hex(SCALE(单参))，顺序与链上 ExecuteQuery 一致 """
     args: [String!]!
   ): String!
+
+  contractNonce(
+    """ 调用方地址（32 字节 hex 或 SS58）"""
+    caller: String!
+    """ 地址类型，0 => TEE, 1 => polkadot_sign """
+    callerType: Int!
+  ): Int!
 }
 
 extend type Mutation {

@@ -35,6 +35,7 @@ func (g GatewayMutation) RegisterModel(
 	if err != nil {
 		return err
 	}
+
 	if len(existing) > 0 {
 		return errors.New("model name already exists for this provider")
 	}
@@ -45,15 +46,18 @@ func (g GatewayMutation) RegisterModel(
 		if key == "" {
 			continue
 		}
+
 		ref := fmt.Sprintf("%s_%d_%d", name, g.api.GetHeight(), i)
 		gk, err := model.GetGlobalKey()
 		if err != nil {
 			return fmt.Errorf("kms not ready: %w", err)
 		}
+
 		ek, err := model.EncryptWithGK(gk, ref, key)
 		if err != nil {
 			return fmt.Errorf("encrypt api key failed: %w", err)
 		}
+
 		if err := g.encryptedKeys.Set(txn, ref, EncryptedAPIKey{
 			Ref:        ref,
 			Ciphertext: ek.Ciphertext,

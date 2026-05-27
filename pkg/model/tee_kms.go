@@ -77,6 +77,12 @@ func SealGlobalKey(gk *GlobalKey) error {
 	return SetKey(KMSKeyspace, GKVersionKey, verB)
 }
 
+// HasGlobalKey 检查本地是否已存储 GK。
+func HasGlobalKey() bool {
+	_, err := GetKey(KMSKeyspace, GKRefKey)
+	return err == nil
+}
+
 // UnsealGlobalKey 从 pebble 加载并解封 GK
 func UnsealGlobalKey() (*GlobalKey, error) {
 	b, err := GetKey(KMSKeyspace, GKRefKey)
@@ -197,6 +203,7 @@ func GenerateAndSealGlobalKey() (*GlobalKey, error) {
 	}
 	// 同时加载到内存缓存
 	gkCache = gk
+	gkCacheErr = nil
 	gkCacheInit = true
 	return gk, nil
 }
@@ -209,14 +216,9 @@ func ImportGlobalKey(plaintext []byte, version uint32) error {
 		return err
 	}
 	gkCache = gk
+	gkCacheErr = nil
 	gkCacheInit = true
 	return nil
-}
-
-// HasGlobalKey 检查本地是否已存储 GK。
-func HasGlobalKey() bool {
-	_, err := GetKey(KMSKeyspace, GKRefKey)
-	return err == nil
 }
 
 // ── 导出 / 导入（部署时管理员安全传递） ──────────────────

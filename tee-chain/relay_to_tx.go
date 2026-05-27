@@ -8,14 +8,10 @@
 package teechain
 
 import (
-	"bytes"
 	"sync"
 	"time"
 
-	"github.com/cockroachdb/errors"
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 )
@@ -110,7 +106,7 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 			n := start + uint64(i)
 			ev := relay.BuildSyncEvent(chainID, n, 0, rec.TargetContract, rec.EventType, rec.EventData)
 			sysCall := relay.MakeRelaySysCall(ev)
-			txBytes, err := app.signAndBuildRelayTx(sysCall)
+			txBytes, err := app.SignAndBuildRelayTx(sysCall)
 			if err != nil {
 				continue
 			}
@@ -163,37 +159,4 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 		}
 	}
 	return txs
-}
-
-// signAndBuildRelayTx 用 DKG signer 签名 relay SysCall, 返回 tx bytes | Sign relay SysCall with DKG signer, return tx bytes
-func (app *TeeChain) signAndBuildRelayTx(sysCall *model.SysCall) ([]byte, error) {
-	var callerType uint32 = 0
-
-	// DKG 签名 | DKG sign
-	signer := app.dkg.Signer.ToSigner(model.SuiteEd25519)
-	nonce := GetNodeNextNonce(signer)
-
-	// 获取签名哈希 | get signature hash
-	sigBytes, err := sysCall.BytesForSig(nonce)
-	if err != nil {
-		return nil, errors.Wrap(err, "BytesForSig")
-	}
-
-	signature, err := signer.Sign(sigBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "Sign")
-	}
-
-	// 构造 Tx | Build Tx
-	buf := new(bytes.Buffer)
-	protoio.WriteMessage(sysCall, buf)
-	tx := &model.Tx{
-		Caller:     signer.Public(),
-		Call:       buf.Bytes(),
-		CallerType: callerType,
-		Nonce:      nonce,
-		Signature:  signature,
-	}
-
-	return GetTxBytes(tx), nil
 }

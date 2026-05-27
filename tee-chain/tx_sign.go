@@ -9,14 +9,49 @@ import (
 	"github.com/cometbft/cometbft/mempool"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/wetee-dao/ink.go"
+	"golang.org/x/crypto/blake2b"
 )
+
+// TxHash 计算交易唯一标识（blake2b）
+func TxHash(tx *model.Tx) string {
+	bt := GetTxBytes(tx)
+	h := blake2b.Sum256(bt)
+	return fmt.Sprintf("%x", h)
+}
+
+// signTx 签名并构造 Tx
+func signTx(call *model.SysCall, signer ink.SignerType) (*model.Tx, error) {
+	sigBytes, err := call.BytesForSig()
+	if err != nil {
+		return nil, fmt.Errorf("BytesForSig: %w", err)
+	}
+	signature, err := signer.Sign(sigBytes)
+	if err != nil {
+		return nil, fmt.Errorf("sign: %w", err)
+	}
+	buf := new(bytes.Buffer)
+	if err := protoio.WriteMessage(call, buf); err != nil {
+		return nil, fmt.Errorf("marshal syscall: %w", err)
+	}
+	return &model.Tx{
+		Caller:     signer.Public(),
+		CallerType: 0,
+		Call:       buf.Bytes(),
+		Signature:  signature,
+	}, nil
+}
 
 // Submit tx to teechain
 func SubmitTx(tx *model.Tx) error {
+	return submitBytes(GetTxBytes(tx))
+}
+
+func submitBytes(txBytes []byte) error {
 	if TeeChainNode == nil {
 		return fmt.Errorf("side chain node is not initialized")
 	}
-	return TeeChainNode.Mempool().CheckTx(GetTxBytes(tx), func(r *abci.ResponseCheckTx) {}, mempool.TxInfo{
+	return TeeChainNode.Mempool().CheckTx(txBytes, func(r *abci.ResponseCheckTx) {}, mempool.TxInfo{
 		SenderP2PID: TeeChainNode.NodeInfo().ID(),
 	})
 }
@@ -29,87 +64,41 @@ func GetTxBytes(tx *model.Tx) []byte {
 	return buf.Bytes()
 }
 
+// SubmitCallFromNode 使用节点私钥签名并提交系统交易（nonce=0）
 func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
+	if s.NodePriv == nil {
+		return fmt.Errorf("node private key not initialized")
+	}
 	signer := s.NodePriv.ToSigner(model.SuiteEd25519)
-	nonce := GetNodeNextNonce(signer)
-
-	sigbt, err := call.BytesForSig(nonce)
+	tx, err := signTx(call, signer)
 	if err != nil {
-		return errors.Errorf("BytesForSig: %v", err)
+		return err
 	}
-
-	signature, err := signer.Sign(sigbt)
-	if err != nil {
-		return errors.Errorf("Sign: %v", err)
-	}
-
-	buf := new(bytes.Buffer)
-	protoio.WriteMessage(call, buf)
-	tx := &model.Tx{
-		Caller:     signer.Public(),
-		Call:       buf.Bytes(),
-		CallerType: 0,
-		Nonce:      nonce,
-		Signature:  signature,
-	}
-
 	return SubmitTx(tx)
 }
 
+// GetCallBytesFromNode 使用 DKG 签名构造交易并返回 tx bytes
 func (s *TeeChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 	dkg := s.GetDKG()
 	if dkg == nil || dkg.Signer == nil {
-		return nil, errors.Errorf("DKG signer not initialized")
+		return nil, errors.New("DKG signer not initialized")
 	}
-
-	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
-	nonce := GetNodeNextNonce(signer)
-	sigbt, err := call.BytesForSig(nonce)
+	tx, err := signTx(call, dkg.Signer.ToSigner(model.SuiteEd25519))
 	if err != nil {
-		return nil, errors.Errorf("BytesForSig: %v", err)
-	}
-
-	signature, err := signer.Sign(sigbt)
-	if err != nil {
-		return nil, errors.Errorf("Sign: %v", err)
-	}
-
-	buf := new(bytes.Buffer)
-	protoio.WriteMessage(call, buf)
-	tx := &model.Tx{
-		Caller:     signer.Public(),
-		Call:       buf.Bytes(),
-		CallerType: 0,
-		Nonce:      nonce,
-		Signature:  signature,
+		return nil, err
 	}
 	return GetTxBytes(tx), nil
 }
 
-// func (s *TeeChain) SignTxWithNode(tx *model.Tx) error {
-// 	// 获取 DKG Signer
-// 	dkg := s.GetDKG()
-// 	if dkg == nil || dkg.Signer == nil {
-// 		return errors.Errorf("DKG signer not initialized")
-// 	}
-// 	signer := dkg.Signer.ToSigner()
-// 	fmt.Println(signer.PublicKey)
-
-// 	// 计算签名数据并签名
-// 	txBytes, err := model.TxBytesForSigning(tx)
-// 	if err != nil {
-// 		return errors.Errorf("SignTxWithNode: %v", err)
-// 	}
-
-// 	signature, err := signer.Sign(txBytes)
-// 	if err != nil {
-// 		return errors.Errorf("Sign: %v", err)
-// 	}
-
-// 	// 设置签名者信息
-// 	tx.Caller = signer.PublicKey
-// 	tx.CallerType = 10000
-// 	tx.Signature = signature
-
-// 	return nil
-// }
+// SignAndBuildRelayTx 为 relay 事件预签名交易
+func (s *TeeChain) SignAndBuildRelayTx(call *model.SysCall) ([]byte, error) {
+	dkg := s.GetDKG()
+	if dkg == nil || dkg.Signer == nil {
+		return nil, errors.New("DKG signer not initialized")
+	}
+	tx, err := signTx(call, dkg.Signer.ToSigner(model.SuiteEd25519))
+	if err != nil {
+		return nil, err
+	}
+	return GetTxBytes(tx), nil
+}

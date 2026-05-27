@@ -29,7 +29,8 @@ type TeeChain struct {
 	p2p      *bftbrigde.BTFReactor
 	NodePriv *model.PrivKey
 
-	txCh *model.PersistChan[*model.BlockPartialSign]
+	txCh      *model.PersistChan[*model.BlockPartialSign]
+	txReadyCh chan struct{} // 通知 ApplyToChain 可以提交新交易到区块
 
 	onGoingBlock        *model.Txn
 	onGoingValidators   []abci.ValidatorUpdate
@@ -55,6 +56,11 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 			return nil, err
 		}
 		c.txCh = txCh
+
+		// 初始化交易就绪通知 channel
+		c.txReadyCh = make(chan struct{}, 1)
+		// 启动后台 goroutine 异步执行 ApplyToChain
+		go c.applyTxLoop()
 	}
 
 	return c, nil
@@ -247,7 +253,29 @@ func (app *TeeChain) Commit(_ context.Context, _ *abci.RequestCommit) (*abci.Res
 	LogWithTime("💤 Commit")
 	util.LogWithGreen("END BLOCK  ", "--------------------------------------------------------------")
 
+	// 异步通知 ApplyToChain 可以提交新交易到区块
+	app.notifyApplyToChain()
 	return &abci.ResponseCommit{}, nil
+}
+
+// notifyApplyToChain 非阻塞通知后台 goroutine 执行 ApplyToChain
+func (app *TeeChain) notifyApplyToChain() {
+	if app.txReadyCh == nil {
+		return
+	}
+	select {
+	case app.txReadyCh <- struct{}{}:
+		// 成功通知
+	default:
+		// channel 已满（上一个通知还未处理），跳过即可
+	}
+}
+
+// applyTxLoop 后台 goroutine，监听 txReadyCh 异步执行 ApplyToChain
+func (app *TeeChain) applyTxLoop() {
+	for range app.txReadyCh {
+		app.ApplyToChain()
+	}
 }
 
 func (app *TeeChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (*abci.ResponseExtendVote, error) {

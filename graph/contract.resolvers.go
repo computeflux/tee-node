@@ -31,42 +31,14 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 		return false, gqlerror.Errorf("DKG not initialized")
 	}
 
-	// 创建合同调用
+	// 构造合约调用
 	argBytes := [][]byte{}
-	method := model.MethodToSelector("Init")
-	call := &model.ContractCall{
-		Name:   []byte(contract),
-		Method: method[:],
-		Args:   argBytes,
-	}
+	method := model.MethodToSelectorBytes("Init")
 
-	// 获取 DKG Signer
-	dkg := teeChain.GetDKG()
-	if dkg == nil || dkg.Signer == nil {
-		return false, gqlerror.Errorf("DKG not initialized")
-	}
-
-	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
-	sysCall := &model.SysCall{
-		Payload: &model.SysCall_Contract{
-			Contract: call,
-		},
-	}
-
-	nonce := teechain.GetNodeNextNonce(signer)
-	// First occurrence: SystemContractInit
-	sigBytes, err := sysCall.BytesForSig(nonce)
+	// 节点合约交易走 TxManager
+	err := teeChain.SubmitContract(contract, method, argBytes)
 	if err != nil {
-		return false, gqlerror.Errorf("BytesForSig: %v", err)
-	}
-	signature, err := signer.Sign(sigBytes)
-	if err != nil {
-		return false, gqlerror.Errorf("Sign: %v", err)
-	}
-
-	err = SubmitContractCall(signer.Public(), 0, nonce, contract, method, argBytes, signature)
-	if err != nil {
-		return false, gqlerror.Errorf("SystemContractInit DecodeCaller: %v", err)
+		return false, gqlerror.Errorf("SystemContractInit submit: %v", err)
 	}
 
 	return true, nil
@@ -95,40 +67,14 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 	argBytes := [][]byte{tobt, valuebt}
 	contract := "gov"
 	method := model.MethodToSelectorBytes("Mint")
-	call := &model.ContractCall{
-		Name:   []byte(contract),
-		Method: method,
-		Args:   argBytes,
-	}
 
-	// 获取 DKG Signer
-	dkg := teeChain.GetDKG()
-	if dkg == nil || dkg.SystemPubKey() == nil {
-		return false, gqlerror.Errorf("DKG not initialized")
-	}
-
-	signer := dkg.Signer.ToSigner(model.SuiteEd25519)
-	nonce := teechain.GetNodeNextNonce(signer)
-	sysCall := &model.SysCall{
-		Payload: &model.SysCall_Contract{
-			Contract: call,
-		},
-	}
-
-	sigBytes, err := sysCall.BytesForSig(nonce)
+	// 节点合约交易走 TxManager
+	err = teeChain.SubmitContract(contract, method, argBytes)
 	if err != nil {
-		return false, gqlerror.Errorf("BytesForSig: %v", err)
-	}
-	signature, err := signer.Sign(sigBytes)
-	if err != nil {
-		return false, gqlerror.Errorf("Sign: %v", err)
+		return false, gqlerror.Errorf("Faucet submit: %v", err)
 	}
 
-	if err := SubmitContractCall(signer.Public(), 0, nonce, contract, model.MethodToSelector("Mint"), argBytes, signature); err != nil {
-		return false, gqlerror.Errorf("SubmitTx: %v", err)
-	}
-
-	return true, err
+	return true, nil
 }
 
 // ContractCall is the resolver for the contractCall field.
@@ -152,6 +98,7 @@ func (r *mutationResolver) ContractCall(ctx context.Context, caller string, call
 		return false, gqlerror.Errorf("ContractCall DecodeString sign: %v", err)
 	}
 
+	// 用户交易走原始路径，不经 TxManager（TxManager 仅用于节点自身交易）
 	if err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, model.MethodToSelector(method), argBytes, sig); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)
 	}
@@ -175,4 +122,18 @@ func (r *queryResolver) ContractDryRun(ctx context.Context, caller string, calle
 	}
 
 	return ContractDryRun(callerBt, callerType, contract, mut, method, argBytes)
+}
+
+// ContractNonce is the resolver for the contractNonce field.
+func (r *queryResolver) ContractNonce(ctx context.Context, caller string, callerType int) (int, error) {
+	if callerType == 0 {
+		return 0, gqlerror.Errorf("ContractDryRun: only caller type >0 is supported")
+	}
+
+	callerBt, err := DecodeCaller(caller)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(teechain.GetCurrentCallerNonce(callerBt, uint32(callerType))) + 1, nil
 }

@@ -102,9 +102,8 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time
 		case *model.SysCall_Contract:
 			caller := tx.GetCaller()
 			callerType := tx.GetCallerType()
-			txNonce := tx.GetNonce()
+			txNonce := p.Contract.GetNonce()
 
-			// 获取当前 nonce
 			currentNonce, err := TxnGetCurrentCallerNonce(txn, caller, callerType)
 			if err != nil {
 				return nil, errors.Wrap(err, "get caller nonce")

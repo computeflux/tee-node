@@ -63,7 +63,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		var cost uint64 = 0
 
 		// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
-		uncached := r.TokensIn - r.CachedToken
+		uncached := r.TokenIn - r.CachedToken
 		cost = (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
 		if cost == 0 {
 			continue
@@ -95,7 +95,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, ProviderSettlementRecord{
 			User:        r.User,
 			ModelID:     r.ModelID,
-			TokensIn:    r.TokensIn,
+			TokenIn:     r.TokenIn,
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Cost:        cost,
@@ -105,7 +105,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		_, _ = g.userSettlementHistory.Insert(g.api.GetTxn(), r.User, UserSettlementRecord{
 			ProviderID:  r.ProviderID,
 			ModelID:     r.ModelID,
-			TokensIn:    r.TokensIn,
+			TokenIn:     r.TokenIn,
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Cost:        cost,

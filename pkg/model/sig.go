@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 )
 
-func (c *SysCall) BytesForSig(nonce uint64) ([]byte, error) {
+func (c *SysCall) BytesForSig() ([]byte, error) {
 	if call := c.GetContract(); call != nil {
-		return ContractForSig(call, Uint64ToBytes(nonce)), nil
+		return ContractForSig(call), nil
 	}
 
 	data, err := c.XXX_Marshal(nil, true)
@@ -17,9 +17,9 @@ func (c *SysCall) BytesForSig(nonce uint64) ([]byte, error) {
 	return data, nil
 }
 
-func ContractForSig(call *ContractCall, nonce []byte) []byte {
+func ContractForSig(call *ContractCall) []byte {
 	parts := append([][]byte{[]byte("<Bytes>"), call.Name, call.Method[:]}, call.Args...)
-	parts = append(parts, nonce)
+	parts = append(parts, Uint64ToBytes(call.Nonce))
 	parts = append(parts, []byte("</Bytes>"))
 	return bytes.Join(parts, nil)
 }

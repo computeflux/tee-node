@@ -28,10 +28,10 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	call := new(model.SysCall)
 	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err == nil {
 		if contract := call.GetContract(); contract != nil {
-			txNonce := txbox.GetNonce()
+			txNonce := contract.GetNonce()
 			currentNonce := GetCurrentCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
 			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce {
+			if txNonce < expectedNonce {
 				fmt.Printf("CheckTx invalid nonce: expected %d, got %d (caller %x, type %d)\n",
 					expectedNonce, txNonce, txbox.GetCaller(), txbox.GetCallerType())
 				return CodeTypeInvalidNonce
