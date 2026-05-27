@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/auth"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/gov"
@@ -58,6 +57,6 @@ func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
 		return SetContractInited(runtime.GetTxn(), string(call.Name))
 	}
 
-	util.LogOk("Contract Call "+string(call.Name)+" -> err", err)
+	// util.LogOk("Contract Call "+string(call.Name)+" -> err", err)
 	return err
 }

@@ -60,11 +60,13 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 				util.LogWithGray("PrepareTx", "Skip contract tx: failed to get nonce, err:", err, "caller", fmt.Sprintf("%x", txbox.GetCaller()))
 				continue
 			}
+
 			expectedNonce := currentNonce + 1
 			if contractNonce != expectedNonce {
 				util.LogWithGray("PrepareTx", "Skip contract tx with invalid nonce, expected", expectedNonce, "got", contractNonce, "caller", fmt.Sprintf("%x", txbox.GetCaller()))
 				continue
 			}
+
 			// 在 txn 中更新 nonce，使后续同 caller 交易的 nonce 校验基于最新状态
 			if err := TxnSetCallerNonce(txn, txbox.GetCaller(), txbox.GetCallerType(), contractNonce); err != nil {
 				util.LogWithGray("PrepareTx", "Skip contract tx: failed to set nonce, err:", err, "caller", fmt.Sprintf("%x", txbox.GetCaller()))

@@ -31,8 +31,32 @@ func (app *TeeChain) SubmitContract(contract string, method []byte, argsBytes []
 		return fmt.Errorf("persist contract call: %w", err)
 	}
 
+	// 如果上一个区块 commit 超过 3 秒，立即触发 ApplyToChain，减少交易等待时间
+	if !app.lastCommitAt.IsZero() && time.Since(app.lastCommitAt) > 3*time.Second {
+		util.LogWithYellow("TX-POOL", "last commit > 3s, notify apply immediately")
+		app.notifyApplyToChain()
+	}
+
 	util.LogWithGreen("TX-POOL", "queued:", contract, hex.EncodeToString(method[:4]))
 	return nil
+}
+
+// notifyApplyToChain 非阻塞通知后台 goroutine 执行 ApplyToChain
+func (app *TeeChain) notifyApplyToChain() {
+	if app.txReadyCh == nil {
+		return
+	}
+	select {
+	case app.txReadyCh <- struct{}{}:
+	default:
+	}
+}
+
+// applyTxLoop 后台 goroutine，监听 txReadyCh 异步执行 ApplyToChain
+func (app *TeeChain) applyTxLoop() {
+	for range app.txReadyCh {
+		app.ApplyToChain()
+	}
 }
 
 // ApplyToChain 从交易池取出所有合约调用，批量签名并提交到链上

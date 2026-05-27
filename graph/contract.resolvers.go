@@ -98,6 +98,12 @@ func (r *mutationResolver) ContractCall(ctx context.Context, caller string, call
 		return false, gqlerror.Errorf("ContractCall DecodeString sign: %v", err)
 	}
 
+	// 先 DryRun 验证合约执行逻辑，避免无效交易进入 mempool
+	_, err = ContractDryRun(callerBytes, callerType, contract, true, method, argBytes)
+	if err != nil {
+		return false, gqlerror.Errorf("ContractDryRun failed: %v", err)
+	}
+
 	// 用户交易走原始路径，不经 TxManager（TxManager 仅用于节点自身交易）
 	if err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, model.MethodToSelector(method), argBytes, sig); err != nil {
 		return false, gqlerror.Errorf("SubmitTx: %v", err)

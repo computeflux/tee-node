@@ -9,6 +9,7 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 	"github.com/pkg/errors"
@@ -119,30 +120,30 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time
 
 			err = app.ContractMutation(caller, callerType, txn, height, p.Contract)
 			if err != nil {
-				return nil, errors.Wrap(err, "contract mutation error")
+				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
+				res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
+				continue
 			}
 
 			// 合约执行成功后，原子更新 nonce
 			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
-				return nil, errors.Wrap(err, "update caller nonce")
+				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))
+				res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
+				continue
 			}
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				pub, err := app.GetDkgPubkey()
-				if err != nil {
-					return nil, errors.Wrap(err, "dkg not init")
-				}
-
+				pub, _ := app.GetDkgPubkey()
 				runtime := contracts.NewRuntime(height, time, txn, model.UniAddr{
 					V: pub.ToBytes(),
 				}, model.UniAddr{
 					V: pub.ToBytes(),
 				})
-
-				// ApplyRelayEvent 内部有 txn 级别 nonce 校验 (ProcessProposal 已做 DB 级别校验)
 				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
-					return nil, errors.Wrap(err, "apply relay event")
+					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
+					res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
+					continue
 				}
 			}
 		default:
