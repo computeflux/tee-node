@@ -42,7 +42,7 @@
     │                              │  8. 汇总所有用量记录           │
     │                              │  for each record:            │
     │                              │    cost = (uncached*InPrice + cached*CachedPrice + tokenOut*OutPrice) / 1_000_000│
-    │                              │    settlements += {user, model, provider, tokensIn, tokenOut, cached, count}│
+    │                              │    settlements += {user, model, provider, TokenIn, tokenOut, cached, count}│
     │                              │                              │
     │                              │  9. SettleUsage(settlements) ─>│
     │                              │           遍历每条:           │
@@ -143,7 +143,7 @@ type Settlement struct {
     User         model.UniAddr `json:"user"`         // 用户
     ModelID      uint64        `json:"modelId"`      // 使用的模型
     ProviderID   uint64        `json:"providerId"`   // 服务提供者
-    TokensIn     uint64        `json:"tokensIn"`     // prompt tokens
+    TokenIn     uint64        `json:"TokenIn"`     // prompt tokens
     TokenOut     uint64        `json:"tokenOut"`     // completion tokens
     CachedToken  uint64        `json:"cachedToken"`  // cached prompt tokens
     Count        uint16        `json:"count"`        // 请求次数
@@ -154,7 +154,7 @@ type ProviderSettlementRecord struct {
     ProviderID  uint64        `json:"providerId"`
     User        model.UniAddr `json:"user"`
     ModelID     uint64        `json:"modelId"`
-    TokensIn    uint64        `json:"tokensIn"`
+    TokenIn    uint64        `json:"TokenIn"`
     TokenOut    uint64        `json:"tokenOut"`
     CachedToken uint64        `json:"cachedToken"`
     Cost        uint64        `json:"cost"`
@@ -166,7 +166,7 @@ type ProviderSettlementRecord struct {
 type UserSettlementRecord struct {
     ProviderID  uint64        `json:"providerId"`
     ModelID     uint64        `json:"modelId"`
-    TokensIn    uint64        `json:"tokensIn"`
+    TokenIn    uint64        `json:"TokenIn"`
     TokenOut    uint64        `json:"tokenOut"`
     CachedToken uint64        `json:"cachedToken"`
     Cost        uint64        `json:"cost"`
@@ -200,7 +200,7 @@ type UserSettlementRecord struct {
 ### 费用计算
 
 ```
-uncached = TokensIn - CachedToken
+uncached = TokenIn - CachedToken
 cost = (uncached * InPrice + CachedToken * CachedPrice + TokenOut * OutPrice) / 1_000_000
 if cost == 0 { continue }  // 跳过零费用记录
 ```

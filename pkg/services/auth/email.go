@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/smtp"
@@ -63,7 +64,6 @@ func (s *SMTPEmailService) SendOTP(to, otp string) error {
 }
 
 func (s *SMTPEmailService) send(to, subject, body string) error {
-	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	msg := fmt.Sprintf(
 		"From: %s <%s>\r\n"+
 			"To: %s\r\n"+
@@ -75,6 +75,61 @@ func (s *SMTPEmailService) send(to, subject, body string) error {
 		s.fromName, s.from, to, subject, body,
 	)
 
+	addr := fmt.Sprintf("%s:%d", s.host, s.port)
+
+	// 端口 465 使用 TLS 直连（SMTPS），端口 587 使用 STARTTLS
+	if s.port == 465 {
+		return s.sendViaTLS(addr, to, msg)
+	}
+	return s.sendViaSTARTTLS(addr, to, msg)
+}
+
+// sendViaTLS 用于端口 465 的 SSL/TLS 直连（如飞书、QQ 邮箱）
+func (s *SMTPEmailService) sendViaTLS(addr, to, msg string) error {
+	tlsConfig := &tls.Config{
+		ServerName: s.host,
+	}
+	conn, err := tls.Dial("tcp", addr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("tls dial: %w", err)
+	}
+	defer conn.Close()
+
+	client, err := smtp.NewClient(conn, s.host)
+	if err != nil {
+		return fmt.Errorf("smtp client: %w", err)
+	}
+	defer client.Close()
+
+	if s.user != "" && s.password != "" {
+		auth := smtp.PlainAuth("", s.user, s.password, s.host)
+		if err := client.Auth(auth); err != nil {
+			return fmt.Errorf("smtp auth: %w", err)
+		}
+	}
+
+	if err := client.Mail(s.from); err != nil {
+		return fmt.Errorf("smtp mail: %w", err)
+	}
+	if err := client.Rcpt(to); err != nil {
+		return fmt.Errorf("smtp rcpt: %w", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("smtp data: %w", err)
+	}
+	if _, err := w.Write([]byte(msg)); err != nil {
+		return fmt.Errorf("smtp write: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("smtp close data: %w", err)
+	}
+	return client.Quit()
+}
+
+// sendViaSTARTTLS 用于端口 587 的标准 STARTTLS（如 Gmail）
+func (s *SMTPEmailService) sendViaSTARTTLS(addr, to, msg string) error {
 	var auth smtp.Auth
 	if s.user != "" && s.password != "" {
 		auth = smtp.PlainAuth("", s.user, s.password, s.host)

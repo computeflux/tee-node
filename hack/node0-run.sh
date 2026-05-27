@@ -146,7 +146,6 @@ export TEE_GENESIS_NODE=true
 
 export JWT_SECRET="${JWT_SECRET:-dev-jwt-secret-change-in-production}"
 export SEED_SECRET="${SEED_SECRET:-dev-seed-secret-change-in-production}"
-export MOCK_EMAIL="${MOCK_EMAIL:-true}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:5173,http://xiaobai.asyou.me:5174}"
 
 # ---- Google OAuth ----
@@ -155,22 +154,23 @@ export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-GOCSPX-Ga7nzm5DC4dD9kOr6iE6
 export GOOGLE_REDIRECT_URL="${GOOGLE_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
 
 # ---- GitHub OAuth (optional) ----
-export GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-}"
-export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-}"
-export GITHUB_REDIRECT_URL="${GITHUB_REDIRECT_URL:-}"
+export GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-Ov23lioDBYC59lwL07p6}"
+export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-efd1ff9c815b4353d4f57ed85847c17c2f498df5}"
+export GITHUB_REDIRECT_URL="${GITHUB_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
 
 # ---- X/Twitter OAuth (optional) ----
-export TWITTER_CLIENT_ID="${TWITTER_CLIENT_ID:-}"
-export TWITTER_CLIENT_SECRET="${TWITTER_CLIENT_SECRET:-}"
-export TWITTER_REDIRECT_URL="${TWITTER_REDIRECT_URL:-}"
+export TWITTER_CLIENT_ID="${TWITTER_CLIENT_ID:-MFEzY1J1SWsyQlZyVXAxeTF1TDM6MTpjaQ}"
+export TWITTER_CLIENT_SECRET="${TWITTER_CLIENT_SECRET:-M74QGQdYEq-8Uyl3TTUVbWOqvYWEYHVLz5uibXbv_R9ARJbptE}"
+export TWITTER_REDIRECT_URL="${TWITTER_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
 
 # ---- SMTP (email OTP) ----
-export SMTP_HOST="${SMTP_HOST:-}"
-export SMTP_PORT="${SMTP_PORT:-587}"
-export SMTP_USER="${SMTP_USER:-}"
-export SMTP_PASSWORD="${SMTP_PASSWORD:-}"
-export SMTP_FROM="${SMTP_FROM:-}"
-export SMTP_FROM_NAME="${SMTP_FROM_NAME:-TEE Auth}"
+export MOCK_EMAIL="${MOCK_EMAIL:-false}"
+export SMTP_HOST="${SMTP_HOST:-smtp.feishu.cn}"
+export SMTP_PORT="${SMTP_PORT:-465}"
+export SMTP_USER="${SMTP_USER:-bai@asyou.me}"
+export SMTP_PASSWORD="${SMTP_PASSWORD:-lgMoryDJQuM88BoL}"
+export SMTP_FROM="${SMTP_FROM:-bai@asyou.me}"
+export SMTP_FROM_NAME="${SMTP_FROM_NAME:-compute flux}"
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /

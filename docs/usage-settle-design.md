@@ -134,7 +134,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
         m, _ := g.models.Get(txn, r.ModelID)
 
         // 计算费用（三维定价）
-        uncached := r.TokensIn - r.CachedToken
+        uncached := r.TokenIn - r.CachedToken
         cost := (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
         if cost == 0 {
             continue
@@ -159,7 +159,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 
 > **关键变更**：
 > - 结算不再直接扣除 `credits`，而是累加到 `credit_useds`，用户实际余额 = `credits - credit_useds`
-> - 用量字段从单一 `TokensUsed` 改为 `TokensIn` / `TokenOut` / `CachedToken` 三维指标
+> - 用量字段从单一 `TokensUsed` 改为 `TokenIn` / `TokenOut` / `CachedToken` 三维指标
 > - 计费公式：`cost = (uncached*InPrice + cached*CachedPrice + out*OutPrice) / 1_000_000`
 > - 结算历史双写：`settlementHistory`（Provider 维度）+ `userSettlementHistory`（User 维度）
 

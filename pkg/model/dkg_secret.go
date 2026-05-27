@@ -64,9 +64,9 @@ func (d *PriShareWithSuite) UnmarshalJSON(bt []byte) error {
 	}
 
 	if jsonData.Suite == "" {
-		return fmt.Errorf("PriShareWithSuite.UnmarshalJSON err: missing suite in PriShareWithSuite JSON")
+		// 旧数据未存储 suite 字段，默认回退到 ed25519
+		jsonData.Suite = "ed25519"
 	}
-	// Default to ed25519 for backward compatibility.
 
 	var parseErr error
 	st, parseErr := SuiteTypeFromString(jsonData.Suite)
@@ -86,4 +86,8 @@ func (d *PriShareWithSuite) UnmarshalJSON(bt []byte) error {
 	}
 
 	return nil
+}
+
+func (d *PriShareWithSuite) String() {
+
 }

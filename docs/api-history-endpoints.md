@@ -32,7 +32,7 @@ type ProviderSettlementRecord struct {
     ProviderID  uint64        `json:"providerId"`
     User        model.UniAddr `json:"user"`
     ModelID     uint64        `json:"modelId"`
-    TokensIn    uint64        `json:"tokensIn"`
+    TokenIn    uint64        `json:"TokenIn"`
     TokenOut    uint64        `json:"tokenOut"`
     CachedToken uint64        `json:"cachedToken"`
     Cost        uint64        `json:"cost"`
@@ -44,7 +44,7 @@ type ProviderSettlementRecord struct {
 type UserSettlementRecord struct {
     ProviderID  uint64        `json:"providerId"`
     ModelID     uint64        `json:"modelId"`
-    TokensIn    uint64        `json:"tokensIn"`
+    TokenIn    uint64        `json:"TokenIn"`
     TokenOut    uint64        `json:"tokenOut"`
     CachedToken uint64        `json:"cachedToken"`
     Cost        uint64        `json:"cost"`

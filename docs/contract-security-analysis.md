@@ -199,7 +199,7 @@
 **位置**: `tee-chain/contracts/gateway/credit.go:62-69`, `pkg/api/gateway/relay_handler.go:97-98`
 
 **原问题描述**（已缓解）:
-- ~~合约自动计算费用的输入 `TokensIn`、`CachedToken`、`TokenOut` 全部来自链下~~
+- ~~合约自动计算费用的输入 `TokenIn`、`CachedToken`、`TokenOut` 全部来自链下~~
 - ~~若链下数据可被 Provider 伪造，则存在少报/多报风险~~
 
 **实际架构设计**（已实施）：
@@ -458,7 +458,7 @@ type Settlement struct {
     User         model.UniAddr `json:"user"`
     ModelID      uint64        `json:"modelId"`
     ProviderID   uint64        `json:"providerId"`
-    TokensIn     uint64        `json:"tokensIn"`
+    TokenIn     uint64        `json:"TokenIn"`
     TokenOut     uint64        `json:"tokenOut"`
     CachedToken  uint64        `json:"cachedToken"`
     Count        uint16        `json:"count"`

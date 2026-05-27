@@ -122,6 +122,8 @@ func fromStore(stored []distKeyShareStore) map[model.SuiteType]*model.DistKeySha
 		}
 		// Ensure the commits know their suite for point unmarshalling.
 		s.Commits.Suite = s.Suite
+		// Ensure the PriShare knows its suite for scalar unmarshalling.
+		s.PriShare.Suite = s.Suite
 		out[st] = &model.DistKeyShare{
 			CommitsWrap:  s.Commits,
 			PriShareWrap: s.PriShare,

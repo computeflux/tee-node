@@ -4,14 +4,25 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // OTPService 生成、存储、验证 OTP（使用 Pebble 持久化）
+// 包含防刷机制：发送频率限制、验证错误次数限制、日发送上限
 type OTPService struct {
-	ttl time.Duration
+	ttl             time.Duration
+	sendInterval    time.Duration // 两次发送最小间隔
+	maxVerifyFails  int           // 最大验证失败次数（锁定）
+	maxDailySends   int           // 每日最大发送次数
+	mu              sync.RWMutex
+	sendRecords     map[string]time.Time // email -> 上次发送时间
+	verifyFailCount map[string]int       // email -> 连续验证失败次数
 }
 
 func NewOTPService(ttlMins int) *OTPService {
@@ -19,31 +30,71 @@ func NewOTPService(ttlMins int) *OTPService {
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}
+	s := &OTPService{
+		ttl:             ttl,
+		sendInterval:    60 * time.Second,
+		maxVerifyFails:  5,
+		maxDailySends:   10,
+		sendRecords:     make(map[string]time.Time),
+		verifyFailCount: make(map[string]int),
+	}
 	// 启动后台清理
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
-			// OTP 通过 TTL 在 Verify 时检查过期
+			s.cleanup()
 		}
 	}()
-	return &OTPService{ttl: ttl}
+	return s
 }
 
 // Generate 生成 OTP 并存储到 Pebble
 func (s *OTPService) Generate(email, clientID string) (string, error) {
+	key := normalizeEmail(email)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 1. 检查发送频率
+	if lastSend, ok := s.sendRecords[key]; ok {
+		if time.Since(lastSend) < s.sendInterval {
+			return "", fmt.Errorf("please wait %ds before requesting another OTP", int(s.sendInterval.Seconds()-time.Since(lastSend).Seconds()))
+		}
+	}
+
+	// 2. 检查日发送上限
+	dailyCount, err := s.getDailySendCount(key)
+	if err != nil {
+		util.LogWithYellow("OTP", "failed to get daily count for", email, ":", err)
+	}
+	if dailyCount >= s.maxDailySends {
+		return "", fmt.Errorf("daily OTP limit reached, please try again tomorrow")
+	}
+
+	// 3. 检查是否因验证失败被锁定
+	if fails := s.verifyFailCount[key]; fails >= s.maxVerifyFails {
+		return "", fmt.Errorf("account locked due to too many failed attempts, please request a new OTP")
+	}
+
+	// 4. 生成 OTP
 	otp, err := generateNumericOTP(6)
 	if err != nil {
 		return "", fmt.Errorf("generate otp: %w", err)
 	}
 
-	key := normalizeEmail(email)
-
-	// 存储到 Pebble（带过期时间戳前缀）
+	// 5. 存储到 Pebble（带过期时间戳前缀）
 	data := fmt.Sprintf("%d:%s:%s", time.Now().Add(s.ttl).Unix(), otp, clientID)
 	if err := model.PutOTP(key, data); err != nil {
 		return "", fmt.Errorf("store otp: %w", err)
 	}
+
+	// 6. 更新发送记录
+	s.sendRecords[key] = time.Now()
+	s.incrementDailySendCount(key)
+
+	// 7. 清除之前的验证失败次数
+	delete(s.verifyFailCount, key)
 
 	return otp, nil
 }
@@ -51,6 +102,14 @@ func (s *OTPService) Generate(email, clientID string) (string, error) {
 // Verify 验证 OTP
 func (s *OTPService) Verify(email, otp string) error {
 	key := normalizeEmail(email)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 检查是否被锁定
+	if fails := s.verifyFailCount[key]; fails >= s.maxVerifyFails {
+		return fmt.Errorf("account locked due to too many failed attempts, please request a new OTP")
+	}
 
 	stored, err := model.GetOTP(key)
 	if err != nil {
@@ -60,30 +119,79 @@ func (s *OTPService) Verify(email, otp string) error {
 	// 解析: expiresAt:otp:clientID
 	var expiresAt int64
 	var storedOTP string
-	if _, err := fmt.Sscanf(stored, "%d:%s:", &expiresAt, &storedOTP); err != nil {
+	parts := strings.SplitN(stored, ":", 3)
+	if len(parts) >= 2 {
+		expiresAt, _ = strconv.ParseInt(parts[0], 10, 64)
+		storedOTP = parts[1]
+	} else {
 		// 兼容简单格式
 		storedOTP = stored
-	}
-	if len(storedOTP) > 6 {
-		storedOTP = storedOTP[:6]
 	}
 
 	if time.Now().Unix() > expiresAt && expiresAt > 0 {
 		model.DeleteOTP(key)
+		delete(s.verifyFailCount, key)
 		return fmt.Errorf("OTP expired")
 	}
 
 	if storedOTP != otp {
-		return fmt.Errorf("invalid OTP")
+		s.verifyFailCount[key]++
+		remaining := s.maxVerifyFails - s.verifyFailCount[key]
+		if remaining <= 0 {
+			model.DeleteOTP(key)
+			return fmt.Errorf("too many failed attempts, OTP has been invalidated, please request a new one")
+		}
+		return fmt.Errorf("invalid OTP, %d attempts remaining", remaining)
 	}
 
-	// 验证成功，删除
+	// 验证成功，清理
 	model.DeleteOTP(key)
+	delete(s.verifyFailCount, key)
+	delete(s.sendRecords, key)
 	return nil
 }
 
+// ── 日发送计数（基于 Pebble 存储，跨重启有效）──
+
+func (s *OTPService) dailyCountKey(email string) string {
+	today := time.Now().Format("2006-01-02")
+	return fmt.Sprintf("otp_daily:%s:%s", today, email)
+}
+
+func (s *OTPService) getDailySendCount(email string) (int, error) {
+	key := s.dailyCountKey(email)
+	b, err := model.GetKey("WEB3AUTH", key)
+	if err != nil {
+		return 0, nil
+	}
+	n, _ := strconv.Atoi(string(b))
+	return n, nil
+}
+
+func (s *OTPService) incrementDailySendCount(email string) {
+	key := s.dailyCountKey(email)
+	count, _ := s.getDailySendCount(email)
+	count++
+	model.SetKey("WEB3AUTH", key, []byte(strconv.Itoa(count)))
+}
+
+// cleanup 清理过期的内存记录
+func (s *OTPService) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 清理超过 24 小时的发送记录
+	for k, t := range s.sendRecords {
+		if time.Since(t) > 24*time.Hour {
+			delete(s.sendRecords, k)
+		}
+	}
+	// 清理超过 24 小时的失败计数
+	// 注意：这里不清理，因为失败计数应在成功验证或发送新 OTP 时清除
+}
+
 func normalizeEmail(email string) string {
-	return email
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 func generateNumericOTP(length int) (string, error) {
