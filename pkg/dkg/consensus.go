@@ -408,7 +408,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 
 	util.LogOk("DKG consensus", "state migrated", "epoch", epoch, "threshold", threshold)
 
-	// DKG 组网成功后，触发 GK 同步（新节点从此处获取 Global Key）
+	// DKG 组网成功后，触发 GK + 配置同步（新节点从此处一次性获取 Global Key 和所有密封配置）
 	dkg.SyncGlobalKeyFromPeers()
 
 	dkg.SendNewEpochPartialSigToSponsor()

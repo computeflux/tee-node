@@ -288,6 +288,25 @@ func DeletekeysByPrefix(namespace, key string) error {
 	return txn.Commit(pebble.Sync)
 }
 
+// ListKeysByPrefix 返回指定 namespace+key 前缀下的所有原始 key（含 namespace）
+func ListKeysByPrefix(namespace, key string) ([]string, error) {
+	rkey := []byte(comboKey(namespace, key))
+	iter, err := DBINS.NewIter(&pebble.IterOptions{
+		LowerBound: rkey,
+		UpperBound: keyUpperBound(rkey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	keys := make([]string, 0)
+	for iter.First(); iter.Valid(); iter.Next() {
+		keys = append(keys, string(iter.Key()))
+	}
+	return keys, nil
+}
+
 func comboKey(namespace, key string) string {
 	return namespace + "_" + key
 }

@@ -54,6 +54,26 @@ func main() {
 				util.LogWithYellow("TEE KMS", "Genesis GK generated (new nodes will auto-sync via DKG):")
 				fmt.Printf("TEE_KMS_BACKUP_KEY=%s TEE_KMS_BACKUP_VERSION=%d\n", exported, version)
 			}
+
+			// 从环境变量读取敏感配置并密封存储
+			if !model.HasConfigNamespace("auth") {
+				authEnvKeys := []string{
+					"JWT_SECRET", "SEED_SECRET", "CORS_ORIGINS",
+					"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URL",
+					"GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_REDIRECT_URL",
+					"TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "TWITTER_REDIRECT_URL",
+					"SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "SMTP_FROM_NAME",
+				}
+				if err := model.SealAllConfigFromEnv("auth", authEnvKeys, gk); err != nil {
+					log.Fatalf("failed to seal auth config: %v", err)
+				}
+				// 特殊处理：整数类型需要额外密封（转为字符串）
+				model.SealConfigValue("auth", "SMTP_PORT",
+					fmt.Sprintf("%d", util.GetEnvInt("SMTP_PORT", 587)), gk)
+				model.SealConfigValue("auth", "MOCK_EMAIL",
+					fmt.Sprintf("%t", util.GetEnv("MOCK_EMAIL", "true") == "true"), gk)
+				util.LogWithYellow("TEE CFG", "Auth config sealed from env vars")
+			}
 		} else {
 			// 非 genesis 节点：允许暂时无 GK，DKG 组网成功后会自动从 peers 同步
 			util.LogWithYellow("TEE KMS", "Global key not found locally, will sync from peers after DKG join")
