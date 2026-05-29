@@ -126,6 +126,53 @@
         "args": [
           {
             "docs": [],
+            "label": "model_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "ref",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
+            "label": "new_api_key",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "update_model_a_p_i_key_ref",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x09b87688"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "provider_i_d",
             "type": {
               "displayName": [
@@ -330,16 +377,6 @@
           },
           {
             "docs": [],
-            "label": "name",
-            "type": {
-              "displayName": [
-                "string"
-              ],
-              "type": 14
-            }
-          },
-          {
-            "docs": [],
             "label": "provider_type",
             "type": {
               "displayName": [
@@ -356,16 +393,6 @@
                 "string"
               ],
               "type": 14
-            }
-          },
-          {
-            "docs": [],
-            "label": "api_keys",
-            "type": {
-              "displayName": [
-                "Vec"
-              ],
-              "type": 16
             }
           }
         ],
@@ -409,6 +436,43 @@
           "type": 11
         },
         "selector": "0x2808831a"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "model_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "ref",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "delete_model_a_p_i_key_ref",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x31df1bb3"
       },
       {
         "args": [
@@ -516,6 +580,43 @@
           "type": 11
         },
         "selector": "0x32253e95"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "key_hash",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 15
+            }
+          },
+          {
+            "docs": [],
+            "label": "rate_limit",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "update_a_p_i_key",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x366e821a"
       },
       {
         "args": [
@@ -1398,6 +1499,43 @@
           "type": 36
         },
         "selector": "0xdaa1c2d5"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "model_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "api_key",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "add_model_a_p_i_key_ref",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xe21a5089"
       },
       {
         "args": [

@@ -17,6 +17,19 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 	methodSel := [4]byte(call.Method[:4])
 	args := call.Args
 	switch methodSel {
+	case [4]byte{0xe2, 0x1a, 0x50, 0x89}:
+		if err := model.RequireArgLen(args, 2, "add_model_a_p_i_key_ref"); err != nil {
+			return err
+		}
+		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("add_model_a_p_i_key_ref: modelID: %w", err)
+		}
+		apiKey, err := model.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("add_model_a_p_i_key_ref: apiKey: %w", err)
+		}
+		return m.AddModelAPIKeyRef(modelID, apiKey)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
 		if err := model.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err
@@ -51,6 +64,19 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 			return fmt.Errorf("deactivate_model: modelID: %w", err)
 		}
 		return m.DeactivateModel(modelID)
+	case [4]byte{0x31, 0xdf, 0x1b, 0xb3}:
+		if err := model.RequireArgLen(args, 2, "delete_model_a_p_i_key_ref"); err != nil {
+			return err
+		}
+		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("delete_model_a_p_i_key_ref: modelID: %w", err)
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("delete_model_a_p_i_key_ref: ref: %w", err)
+		}
+		return m.DeleteModelAPIKeyRef(modelID, ref)
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
@@ -155,8 +181,21 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 			return fmt.Errorf("settle_usage: records: %w", err)
 		}
 		return m.SettleUsage(records)
+	case [4]byte{0x36, 0x6e, 0x82, 0x1a}:
+		if err := model.RequireArgLen(args, 2, "update_a_p_i_key"); err != nil {
+			return err
+		}
+		keyHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		if err != nil {
+			return fmt.Errorf("update_a_p_i_key: keyHash: %w", err)
+		}
+		rateLimit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return fmt.Errorf("update_a_p_i_key: rateLimit: %w", err)
+		}
+		return m.UpdateAPIKey(keyHash, rateLimit)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := model.RequireArgLen(args, 10, "update_model"); err != nil {
+		if err := model.RequireArgLen(args, 8, "update_model"); err != nil {
 			return err
 		}
 		ID, err := model.DecodeScaleArgBytes[uint64](args[0])
@@ -183,23 +222,32 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: outPrice: %w", err)
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[6])
-		if err != nil {
-			return fmt.Errorf("update_model: name: %w", err)
-		}
-		providerType, err := model.DecodeScaleArgBytes[uint16](args[7])
+		providerType, err := model.DecodeScaleArgBytes[uint16](args[6])
 		if err != nil {
 			return fmt.Errorf("update_model: providerType: %w", err)
 		}
-		uri, err := model.DecodeScaleArgBytes[string](args[8])
+		uri, err := model.DecodeScaleArgBytes[string](args[7])
 		if err != nil {
 			return fmt.Errorf("update_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[9])
-		if err != nil {
-			return fmt.Errorf("update_model: apiKeys: %w", err)
+		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri)
+	case [4]byte{0x09, 0xb8, 0x76, 0x88}:
+		if err := model.RequireArgLen(args, 3, "update_model_a_p_i_key_ref"); err != nil {
+			return err
 		}
-		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, name, providerType, uri, apiKeys)
+		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("update_model_a_p_i_key_ref: modelID: %w", err)
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("update_model_a_p_i_key_ref: ref: %w", err)
+		}
+		newApiKey, err := model.DecodeScaleArgBytes[string](args[2])
+		if err != nil {
+			return fmt.Errorf("update_model_a_p_i_key_ref: newApiKey: %w", err)
+		}
+		return m.UpdateModelAPIKeyRef(modelID, ref, newApiKey)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -687,4 +735,5 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
+	[4]byte{0xc3, 0x97, 0xc4, 0x04}: "update_model_api_key_ref",
 }

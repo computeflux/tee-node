@@ -52,6 +52,26 @@ func (g GatewayMutation) RevokeAPIKey(keyHash []byte) error {
 	})
 }
 
+// UpdateAPIKey 更新 API Key 配置
+func (g GatewayMutation) UpdateAPIKey(keyHash []byte, rateLimit uint32) error {
+	if len(keyHash) != 32 {
+		return fmt.Errorf("keyHash must be 32 bytes")
+	}
+	owner := g.api.GetCaller()
+	hexKey := hex.EncodeToString(keyHash)
+
+	info, err := g.apiKeys.Primary.Get(g.api.GetTxn(), hexKey)
+	if err != nil || info == nil {
+		return ErrAPIKeyNotFound
+	}
+	if !bytes.Equal(info.Owner.V, owner.V) || info.Owner.T != owner.T {
+		return ErrNotOwner
+	}
+	return g.apiKeys.Update(g.api.GetTxn(), hexKey, func(cur *APIKeyInfo) {
+		cur.RateLimit = rateLimit
+	})
+}
+
 // LookupAPIKey TEE 提供方根据 hash 查找 API Key 对应的用户
 func (g GatewayQuery) LookupAPIKey(keyHash []byte) (*APIKeyInfo, error) {
 	if len(keyHash) != 32 {

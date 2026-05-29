@@ -8,6 +8,7 @@ import (
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/version"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
@@ -39,6 +40,17 @@ type TeeChain struct {
 
 	relay      *relay.Engine
 	relayCache *relayCache
+
+	lastProposerWasMe bool // 上一个区块是否由本节点出块
+}
+
+// myProposerAddress 返回本节点对应的 CometBFT proposer address
+func (app *TeeChain) myProposerAddress() []byte {
+	if app.NodePriv == nil {
+		return nil
+	}
+	pub := app.NodePriv.GetPublicForSuite(model.SuiteEd25519)
+	return crypto.AddressHash(pub.PublicKey)
 }
 
 func NewTeeChain(light bool) (*TeeChain, error) {
@@ -132,6 +144,7 @@ func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepare
 	}
 
 	epochStatus := app.GetEpochStatus()
+
 	// Check if it is in the epoch transition phase
 	if len(epochTx) == 0 && time.Now().Unix()-int64(epochStatus) > 120 {
 		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, true)
@@ -221,6 +234,7 @@ func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeB
 
 	// save proposer of currut block
 	app.currProposerAddress = req.ProposerAddress
+	app.lastProposerWasMe = bytes.Equal(req.ProposerAddress, app.myProposerAddress())
 
 	app.state.Height = req.Height
 	response := &abci.ResponseFinalizeBlock{

@@ -19,7 +19,7 @@ import (
 func generateAPIKey() string {
 	b := make([]byte, 32)
 	rand.Read(b)
-	return "tee_" + hex.EncodeToString(b)
+	return "auth_tee_" + hex.EncodeToString(b)
 }
 
 // createUserAPIKey creates and stores a new API Key for the given user.

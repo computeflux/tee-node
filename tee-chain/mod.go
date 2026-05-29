@@ -55,8 +55,8 @@ func InitTeeChain(
 	p2pConf.Seeds = ""
 
 	consensusConf := cfg.DefaultConsensusConfig()
-	consensusConf.CreateEmptyBlocks = true
-	consensusConf.CreateEmptyBlocksInterval = time.Minute * 10
+	consensusConf.CreateEmptyBlocks = false
+	consensusConf.CreateEmptyBlocksInterval = time.Minute * 6
 
 	rpcConf := cfg.DefaultRPCConfig()
 	rpcConf.CORSAllowedOrigins = []string{"*"}

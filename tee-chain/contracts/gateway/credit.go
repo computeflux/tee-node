@@ -44,7 +44,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		}
 		exists, _ := g.settledNonces.Get(g.api.GetTxn(), nonceHex)
 		if exists != nil && *exists {
-			return fmt.Errorf("settle: %w", ErrDuplicateNonce)
+			return nil
 		}
 
 		// 校验 provider 归属（非 system 调用时必须验证）

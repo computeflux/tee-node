@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 )
@@ -52,6 +53,7 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		util.LogWithGray("RELAY-WORKER", "fetch skipped: chains/relay/dkg not ready")
 		return
 	}
+
 	// 遍历所有已注册的主链 | iterate all registered main chains
 	for _, c := range chains.Chains {
 		if c == nil {
@@ -102,6 +104,7 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 			app.relayCache.mu.Unlock()
 			continue
 		}
+
 		for i, rec := range records {
 			n := start + uint64(i)
 			ev := relay.BuildSyncEvent(chainID, n, 0, rec.TargetContract, rec.EventType, rec.EventData)
@@ -118,6 +121,10 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		app.relayCache.mu.Unlock()
 		if len(newEvents) > 0 {
 			util.LogOk("RELAY-WORKER", "cached", len(newEvents), "new events, chain", chainID, "total cached", len(app.relayCache.events[chainID]))
+			// 如果上一个区块由本节点出块，提交空交易触发共识
+			if app.lastProposerWasMe {
+				go app.submitEmptyTx()
+			}
 		}
 	}
 }
@@ -159,4 +166,23 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 		}
 	}
 	return txs
+}
+
+// submitEmptyTx 提交一个空交易（SysCall_Empty）到 mempool，用于在 CreateEmptyBlocks=false 时触发共识
+func (app *TeeChain) submitEmptyTx() {
+	if app.NodePriv == nil {
+		return
+	}
+	call := &model.SysCall{Payload: &model.SysCall_Empty{Empty: time.Now().Unix()}}
+	signer := app.NodePriv.ToSigner(model.SuiteEd25519)
+	tx, err := signTx(call, signer)
+	if err != nil {
+		util.LogWithRed("RELAY-WORKER", "submit empty tx failed:", err)
+		return
+	}
+	if err := SubmitTx(tx); err != nil {
+		util.LogWithRed("RELAY-WORKER", "submit empty tx failed:", err)
+		return
+	}
+	util.LogWithYellow("RELAY-WORKER", "submitted empty tx to trigger consensus")
 }
