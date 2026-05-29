@@ -39,9 +39,9 @@ func (dkg *DKG) reState() error {
 	dkg.DkgKeyShares = fromStore(raw.DkgKeyShares)
 
 	if dkg.DkgPubKeys != nil {
-		for _, pubKey := range dkg.DkgPubKeys {
+		for s, pubKey := range dkg.DkgPubKeys {
 			if pubKey != nil {
-				util.LogWithCyan("DKG PUBKEY", pubKey.AccountString())
+				util.LogWithCyan("DKG PUBKEY", s.String(), pubKey.AccountString())
 			}
 		}
 	}

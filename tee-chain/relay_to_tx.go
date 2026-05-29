@@ -121,12 +121,40 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		app.relayCache.mu.Unlock()
 		if len(newEvents) > 0 {
 			util.LogOk("RELAY-WORKER", "cached", len(newEvents), "new events, chain", chainID, "total cached", len(app.relayCache.events[chainID]))
-			// 如果上一个区块由本节点出块，提交空交易触发共识
-			if app.lastProposerWasMe {
-				go app.submitEmptyTx()
-			}
 		}
 	}
+
+	// 如果缓存中存在成熟事件且本节点是上一个出块者，提交空交易触发共识
+	if app.lastProposerWasMe && app.hasMatureRelayEvents() {
+		go app.submitEmptyTx()
+	}
+}
+
+// hasMatureRelayEvents 检查缓存中是否存在已成熟但未打包的事件
+func (app *TeeChain) hasMatureRelayEvents() bool {
+	if app.relayCache == nil {
+		return false
+	}
+	app.relayCache.mu.RLock()
+	defer app.relayCache.mu.RUnlock()
+
+	now := time.Now()
+	for chainID, events := range app.relayCache.events {
+		last, _ := app.relay.LastNonce(chainID)
+		for _, ce := range events {
+			if ce.ev.Nonce <= last {
+				continue
+			}
+			if ce.ev.Nonce != last+1 {
+				break
+			}
+			if now.Sub(ce.cachedAt) >= relayMinCacheAge {
+				return true
+			}
+			break
+		}
+	}
+	return false
 }
 
 // relayMinCacheAge 事件最少缓存时间 (确保其他验证者也拿到了) | Minimum cache age (ensure other validators also fetched)

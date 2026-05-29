@@ -38,7 +38,6 @@ type Engine struct {
 
 // NewEngine 创建引擎 | Create engine
 func NewEngine() *Engine {
-	util.LogWithGreen(RELAY_KEY, "engine created")
 	return &Engine{}
 }
 

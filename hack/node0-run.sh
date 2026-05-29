@@ -172,6 +172,9 @@ export SMTP_PASSWORD="${SMTP_PASSWORD:-lgMoryDJQuM88BoL}"
 export SMTP_FROM="${SMTP_FROM:-bai@asyou.me}"
 export SMTP_FROM_NAME="${SMTP_FROM_NAME:-compute flux}"
 
+
+# OE_SIMULATION=1
+
 # run from / so relative ./token_chain_data resolves to /token_chain_data
-cd /
+cd / 
 ego run "$ROOT_DIR/hack/build/dsecret"

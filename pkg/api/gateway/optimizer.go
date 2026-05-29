@@ -187,16 +187,17 @@ var (
 	settleOnce   sync.Once
 	settleTicker *time.Ticker
 	settleDone   = make(chan struct{})
+	settleMu     sync.Mutex
 )
 
 // SettleInterval 结算周期（5分钟），可通过测试修改
-var SettleInterval = 5 * time.Minute
+var SettleInterval = 1 * time.Minute
 
 func initUsageSettler() {
-	if err := settlePendingUsage(); err != nil {
-		GATEWAYLOG().Printf("[SETTLE] failed: %v", err)
-	}
 	settleOnce.Do(func() {
+		if err := settlePendingUsage(); err != nil {
+			GATEWAYLOG().Printf("[SETTLE] init failed: %v", err)
+		}
 		go func() {
 			settleTicker = time.NewTicker(SettleInterval)
 			defer settleTicker.Stop()
@@ -221,6 +222,9 @@ func StopUsageSettler() {
 
 // settlePendingUsage 扫描本地 PebbleDB 用量记录，统一打包为一个大数组一次性上链。
 func settlePendingUsage() error {
+	settleMu.Lock()
+	defer settleMu.Unlock()
+
 	// 1. 扫描本地 usage: 前缀的所有记录
 	records, keys, err := model.GetJsonList[model.GatewayDailyUsage]("GATEWAY", "usage:")
 	if err != nil {
@@ -236,10 +240,12 @@ func settlePendingUsage() error {
 		if r == nil {
 			continue
 		}
+
 		nonce := make([]byte, 16)
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 			return fmt.Errorf("generate nonce: %w", err)
 		}
+
 		settlements = append(settlements, cgateway.Settlement{
 			User:        r.User,
 			ModelID:     r.ModelID,
@@ -262,12 +268,16 @@ func settlePendingUsage() error {
 	}
 	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(settlements), len(records))
 
-	// 4. 成功后再删除本地记录
+	// 4. 成功后再删除本地记录（任一删除失败即返回 error，避免重复提交）
+	deleted := 0
 	for _, k := range keys {
 		if err := model.DeleteByteKey(k); err != nil {
-			GATEWAYLOG().Printf("[SETTLE] delete key error: %v", err)
+			GATEWAYLOG().Printf("[SETTLE] delete usage key=%x failed: %v", k, err)
+			return fmt.Errorf("[SETTLE] delete usage key failed: %w", err)
 		}
+		deleted++
 	}
+	GATEWAYLOG().Printf("[SETTLE] deleted %d local usage records", deleted)
 
 	return nil
 }
@@ -282,6 +292,13 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 		return nil
 	}
 
+	// 检查交易池中是否已有待处理的 settle_usage，
+	// 若有则跳过本次提交，避免重复写入池中。
+	if bridge.HasPendingContract("settle_usage") {
+		GATEWAYLOG().Printf("[SETTLE] tx pool already has pending settle_usage, skip this round")
+		return fmt.Errorf("settle_usage already pending in tx pool, skip")
+	}
+
 	// SCALE 编码 Settlement 数组
 	argBytes, err := codec.Encode(records)
 	if err != nil {
@@ -290,7 +307,8 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 
 	method := model.MethodToSelector("SettleUsage")
 
-	err = bridge.SubmitContract("gateway", method[:], [][]byte{argBytes})
+	// 使用固定 dedupKey，确保交易池中最多只有一个 settle_usage 调用。
+	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage")
 	return err
 }
 

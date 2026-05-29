@@ -91,7 +91,6 @@ type ComplexityRoot struct {
 		SignMessage        func(childComplexity int, token string, message string, from string, passwordHash *string) int
 		SignTransaction    func(childComplexity int, token string, tx auth.TxInput) int
 		SocialLogin        func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string) int
-		StartEpoch         func(childComplexity int) int
 		SystemContractInit func(childComplexity int, contract string) int
 		UploadSecret       func(childComplexity int, index string, secret string, hash string, user string) int
 		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
@@ -175,7 +174,6 @@ type MutationResolver interface {
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
 	ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error)
 	LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error)
-	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
 	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (bool, error)
@@ -475,13 +473,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SocialLogin(childComplexity, args["provider"].(string), args["idToken"].(*string), args["code"].(*string), args["codeVerifier"].(*string)), true
-
-	case "Mutation.start_epoch":
-		if e.complexity.Mutation.StartEpoch == nil {
-			break
-		}
-
-		return e.complexity.Mutation.StartEpoch(childComplexity), true
 
 	case "Mutation.systemContractInit":
 		if e.complexity.Mutation.SystemContractInit == nil {
@@ -4332,50 +4323,6 @@ func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Co
 	if fc.Args, err = ec.field_Mutation_loginWithWallet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_start_epoch(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_start_epoch(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().StartEpoch(rctx)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_start_epoch(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
 	}
 	return fc, nil
 }
@@ -8862,13 +8809,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "loginWithWallet":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_loginWithWallet(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "start_epoch":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_start_epoch(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

@@ -2,7 +2,6 @@ package teechain
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -19,14 +18,34 @@ type PendingContractCall struct {
 	Args     [][]byte `json:"args"`
 }
 
+// HasPendingContract 检查指定 dedupKey 是否已在交易池中有待处理的调用。
+func (app *TeeChain) HasPendingContract(dedupKey string) bool {
+	pending, _ := model.GetJson[PendingContractCall](contractPoolNS, dedupKey)
+	return pending != nil
+}
+
 // SubmitContract 将合约调用写入交易池（持久化到 DB）
 func (app *TeeChain) SubmitContract(contract string, method []byte, argsBytes [][]byte) error {
+	return app.SubmitContractWithDedup(contract, method, argsBytes, "")
+}
+
+// SubmitContractWithDedup 将合约调用写入交易池，支持去重 key。
+// 若 dedupKey 非空，同一 dedupKey 的新调用会覆盖旧调用，保证池中只有一个。
+func (app *TeeChain) SubmitContractWithDedup(contract string, method []byte, argsBytes [][]byte, dedupKey string) error {
 	call := &PendingContractCall{
 		Contract: contract,
 		Method:   method,
 		Args:     argsBytes,
 	}
-	key := contractPoolKey()
+
+	var key string
+	if dedupKey != "" {
+		key = dedupKey
+		_ = model.DeleteKey(contractPoolNS, key)
+	} else {
+		key = contractPoolKey()
+	}
+
 	if err := model.SetJson(contractPoolNS, key, call); err != nil {
 		return fmt.Errorf("persist contract call: %w", err)
 	}
@@ -37,7 +56,7 @@ func (app *TeeChain) SubmitContract(contract string, method []byte, argsBytes []
 		app.notifyApplyToChain()
 	}
 
-	util.LogWithGreen("TX-POOL", "queued:", contract, hex.EncodeToString(method[:4]))
+	util.LogWithGreen("TX-POOL", "queued:", contract)
 	return nil
 }
 

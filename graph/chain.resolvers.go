@@ -6,31 +6,12 @@ package graph
 
 import (
 	"context"
-	"time"
 
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
-
-// StartEpoch is the resolver for the start_epoch field.
-// 使用 DKG Signer 签名交易并提交空块，触发新区块生成
-func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
-	// 创建空块交易
-	call := &model.SysCall{
-		Payload: &model.SysCall_Empty{
-			Empty: time.Now().Unix(),
-		},
-	}
-
-	// 提交交易
-	if err := teeChain.SubmitCallFromNode(call); err != nil {
-		return false, gqlerror.Errorf("SubmitTx: %v", err)
-	}
-
-	return true, nil
-}
 
 // ChainInfo is the resolver for the chain_info field.
 func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, error) {
@@ -65,3 +46,27 @@ func (r *queryResolver) Validators(ctx context.Context) ([]string, error) {
 	}
 	return list, nil
 }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
+	// 创建空块交易
+	call := &model.SysCall{
+		Payload: &model.SysCall_Empty{
+			Empty: time.Now().Unix(),
+		},
+	}
+
+	// 提交交易
+	if err := teeChain.SubmitCallFromNode(call); err != nil {
+		return false, gqlerror.Errorf("SubmitTx: %v", err)
+	}
+
+	return true, nil
+}
+*/
