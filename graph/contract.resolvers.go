@@ -141,5 +141,5 @@ func (r *queryResolver) ContractNonce(ctx context.Context, caller string, caller
 		return 0, err
 	}
 
-	return int(teechain.GetCurrentCallerNonce(callerBt, uint32(callerType))) + 1, nil
+	return int(teechain.GetNextCallerNonce(callerBt, uint32(callerType))), nil
 }

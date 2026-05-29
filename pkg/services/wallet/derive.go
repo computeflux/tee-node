@@ -15,24 +15,25 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // WalletService 密钥派生、签名、加密
 type WalletService struct {
-	seedSecret string
-	jwtSecret  string
+	tc *teechain.TeeChain
 }
 
-func NewWalletService(cfg *auth.AuthConfig) *WalletService {
-	return &WalletService{
-		seedSecret: cfg.SeedSecret,
-		jwtSecret:  cfg.JWTSecret,
-	}
+func NewWalletService(tc *teechain.TeeChain) *WalletService {
+	return &WalletService{tc: tc}
+}
+
+func (s *WalletService) cfg() *auth.AuthConfig {
+	return auth.LoadConfig(s.tc)
 }
 
 // DeriveSeed email → 确定性种子 (HMAC-SHA256)
 func (s *WalletService) DeriveSeed(email string) string {
-	mac := hmac.New(sha256.New, []byte(s.seedSecret))
+	mac := hmac.New(sha256.New, []byte(s.cfg().SeedSecret))
 	mac.Write([]byte(email))
 	return hex.EncodeToString(mac.Sum(nil))
 }
@@ -40,7 +41,7 @@ func (s *WalletService) DeriveSeed(email string) string {
 // DerivePrivateKey email → ECDSA 私钥
 func (s *WalletService) DerivePrivateKey(email string) (*ecdsa.PrivateKey, error) {
 	seed := s.DeriveSeed(email)
-	mac := hmac.New(sha256.New, []byte(s.seedSecret))
+	mac := hmac.New(sha256.New, []byte(s.cfg().SeedSecret))
 	mac.Write([]byte("eth-key:" + seed))
 	keyBytes := mac.Sum(nil)
 	return ethcrypto.ToECDSA(keyBytes)
@@ -64,7 +65,7 @@ func (s *WalletService) DeriveAddress(email string) string {
 // ── Server-side key wrapping ─────────────────────────────
 
 func (s *WalletService) serverKey(email string) []byte {
-	h := sha256.Sum256([]byte(s.jwtSecret + ":keywrap:" + email))
+	h := sha256.Sum256([]byte(s.cfg().JWTSecret + ":keywrap:" + email))
 	return h[:]
 }
 

@@ -11,7 +11,6 @@ import (
 	"github.com/cometbft/cometbft/privval"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/graph"
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
@@ -39,49 +38,7 @@ func main() {
 	}
 	defer db.Close()
 
-	// Init TEE KMS Global Key
-	gk, err := model.InitGlobalKeyAtStartup()
-	if err != nil {
-		if os.Getenv("TEE_GENESIS_NODE") == "true" {
-			util.LogWithYellow("TEE KMS", "Generating new global key as genesis node")
-			gk, err = model.GenerateAndSealGlobalKey()
-			if err != nil {
-				log.Fatalf("failed to generate global key: %v", err)
-			}
-			// 导出 GK（供管理员记录，但新节点现在通过 DKG 自动同步，无需手动设置）
-			exported, version, err := model.ExportGlobalKeyBase64()
-			if err == nil {
-				util.LogWithYellow("TEE KMS", "Genesis GK generated (new nodes will auto-sync via DKG):")
-				fmt.Printf("TEE_KMS_BACKUP_KEY=%s TEE_KMS_BACKUP_VERSION=%d\n", exported, version)
-			}
-
-			// 从环境变量读取敏感配置并密封存储
-			if !model.HasConfigNamespace("auth") {
-				authEnvKeys := []string{
-					"JWT_SECRET", "SEED_SECRET", "CORS_ORIGINS",
-					"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URL",
-					"GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_REDIRECT_URL",
-					"TWITTER_CLIENT_ID", "TWITTER_CLIENT_SECRET", "TWITTER_REDIRECT_URL",
-					"SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "SMTP_FROM_NAME",
-				}
-				if err := model.SealAllConfigFromEnv("auth", authEnvKeys, gk); err != nil {
-					log.Fatalf("failed to seal auth config: %v", err)
-				}
-				// 特殊处理：整数类型需要额外密封（转为字符串）
-				model.SealConfigValue("auth", "SMTP_PORT",
-					fmt.Sprintf("%d", util.GetEnvInt("SMTP_PORT", 587)), gk)
-				model.SealConfigValue("auth", "MOCK_EMAIL",
-					fmt.Sprintf("%t", util.GetEnv("MOCK_EMAIL", "true") == "true"), gk)
-				util.LogWithYellow("TEE CFG", "Auth config sealed from env vars")
-			}
-		} else {
-			// 非 genesis 节点：允许暂时无 GK，DKG 组网成功后会自动从 peers 同步
-			util.LogWithYellow("TEE KMS", "Global key not found locally, will sync from peers after DKG join")
-		}
-	} else {
-		util.LogWithYellow("TEE KMS", "Global key loaded from local seal")
-	}
-	_ = gk
+	// TEE 节点启动
 
 	// init teechain node key
 	_, p2pKey, err := model.GetP2PKey()
@@ -170,16 +127,14 @@ func main() {
 	}()
 
 	// ── 初始化 Web3Auth 服务 ──────────────────────────────
-	authCfg := auth.LoadConfig()
-	walletSvc := wallet.NewWalletService(authCfg)
-	emailSvc := authsvc.NewEmailService(authCfg)
-	oauthSvc := authsvc.NewOAuthService(authCfg)
-	otpSvc := authsvc.NewOTPService(authCfg.OTPTTLMins)
+	walletSvc := wallet.NewWalletService(teeChain)
+	emailSvc := authsvc.NewEmailService(teeChain)
+	oauthSvc := authsvc.NewOAuthService(teeChain)
+	otpSvc := authsvc.NewOTPService(5)
 
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{
 		TeeChain:  teeChain,
-		AuthCfg:   authCfg,
 		WalletSvc: walletSvc,
 		EmailSvc:  emailSvc,
 		OAuthSvc:  oauthSvc,

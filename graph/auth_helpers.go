@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/model"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // generateAPIKey generates a new API key in the format tee_<64 hex chars>
@@ -121,4 +123,25 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 
 	recoveredAddr := ethcrypto.PubkeyToAddress(*pubKey).Hex()
 	return strings.EqualFold(recoveredAddr, address)
+}
+
+// getAuthUserFromContract 优先从链上合约读取 AuthUser；链上读不到时回退到本地存储。
+func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*model.AuthUser, error) {
+	if tc != nil {
+		ref := "auth_user:" + email
+		rec, err := tc.AuthGetAuthUser(ref)
+		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
+			var u model.AuthUser
+			if json.Unmarshal(rec.Ciphertext, &u) == nil {
+				return &u, nil
+			}
+		}
+	}
+
+	// 回退到本地存储（用户注册后尚未上链时数据在本地）
+	user, err := model.GetJson[model.AuthUser]("WEB3AUTH", "u:"+email)
+	if err != nil || user == nil {
+		return nil, fmt.Errorf("auth user not found")
+	}
+	return user, nil
 }

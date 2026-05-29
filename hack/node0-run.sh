@@ -173,8 +173,7 @@ export SMTP_FROM="${SMTP_FROM:-bai@asyou.me}"
 export SMTP_FROM_NAME="${SMTP_FROM_NAME:-compute flux}"
 
 
-# OE_SIMULATION=1
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd / 
-ego run "$ROOT_DIR/hack/build/dsecret"
+OE_SIMULATION=1 ego run "$ROOT_DIR/hack/build/dsecret"

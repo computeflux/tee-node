@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -13,8 +12,6 @@ import (
 
 const callerNoncePrefix = "call_nonce"
 
-var nonceMu sync.Mutex
-
 func GetNodeNextNonce(node ink.SignerType) uint64 {
 	return GetNextCallerNonce(node.Public(), 0)
 }
@@ -22,24 +19,12 @@ func GetNodeNextNonce(node ink.SignerType) uint64 {
 // GetNextCallerNonce 返回下一个可用 nonce（只读，不写 DB）。
 // DB 仅在 FinalizeTx 成功提交时通过 txn 更新。
 func GetNextCallerNonce(caller []byte, callerType uint32) uint64 {
-	nonceMu.Lock()
-	defer nonceMu.Unlock()
-
 	key := GetCallerNonceKey(caller, callerType)
 	bt, err := model.GetFromByteKey([]byte(key))
 	if err != nil || len(bt) == 0 {
 		return 1
 	}
 	return binary.BigEndian.Uint64(bt) + 1
-}
-
-func GetCurrentCallerNonce(caller []byte, callerType uint32) uint64 {
-	key := GetCallerNonceKey(caller, callerType)
-	bt, err := model.GetFromByteKey([]byte(key))
-	if err != nil || len(bt) == 0 {
-		return 0
-	}
-	return binary.BigEndian.Uint64(bt)
 }
 
 func TxnGetCurrentCallerNonce(txn *model.Txn, caller []byte, callerType uint32) (uint64, error) {

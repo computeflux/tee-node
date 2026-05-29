@@ -116,6 +116,105 @@ func (d AuthMutation) ExecCall(call *model.ContractCall) error {
 			return fmt.Errorf("update_share_root: newRoot: %w", err)
 		}
 		return m.UpdateShareRoot(emailHash, newRoot)
+	case [4]byte{0x20, 0x2e, 0xc2, 0x31}:
+		if err := model.RequireArgLen(args, 3, "store_encrypted_auth_user"); err != nil {
+			return err
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return fmt.Errorf("store_encrypted_auth_user: ref: %w", err)
+		}
+		ciphertext, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("store_encrypted_auth_user: ciphertext: %w", err)
+		}
+		return m.StoreAuthUser(ref, ciphertext)
+	case [4]byte{0x91, 0xc9, 0xa2, 0x43}:
+		if err := model.RequireArgLen(args, 3, "store_encrypted_private_key"); err != nil {
+			return err
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return fmt.Errorf("store_encrypted_private_key: ref: %w", err)
+		}
+		ciphertext, err := model.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("store_encrypted_private_key: ciphertext: %w", err)
+		}
+		return m.StorePrivateKey(ref, ciphertext)
+	case [4]byte{0xa1, 0xcf, 0x3e, 0x8b}:
+		if err := model.RequireArgLen(args, 17, "set_config"); err != nil {
+			return err
+		}
+		cors, err := model.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return fmt.Errorf("set_config: cors: %w", err)
+		}
+		smtpHost, err := model.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpHost: %w", err)
+		}
+		smtpPort, err := model.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpPort: %w", err)
+		}
+		smtpUser, err := model.DecodeScaleArgBytes[string](args[3])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpUser: %w", err)
+		}
+		smtpPwd, err := model.DecodeScaleArgBytes[string](args[4])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpPwd: %w", err)
+		}
+		smtpFrom, err := model.DecodeScaleArgBytes[string](args[5])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpFrom: %w", err)
+		}
+		smtpFromName, err := model.DecodeScaleArgBytes[string](args[6])
+		if err != nil {
+			return fmt.Errorf("set_config: smtpFromName: %w", err)
+		}
+		mockEmail, err := model.DecodeScaleArgBytes[bool](args[7])
+		if err != nil {
+			return fmt.Errorf("set_config: mockEmail: %w", err)
+		}
+		gID, err := model.DecodeScaleArgBytes[string](args[8])
+		if err != nil {
+			return fmt.Errorf("set_config: googleID: %w", err)
+		}
+		gSec, err := model.DecodeScaleArgBytes[string](args[9])
+		if err != nil {
+			return fmt.Errorf("set_config: googleSecret: %w", err)
+		}
+		gRedir, err := model.DecodeScaleArgBytes[string](args[10])
+		if err != nil {
+			return fmt.Errorf("set_config: googleRedirect: %w", err)
+		}
+		ghID, err := model.DecodeScaleArgBytes[string](args[11])
+		if err != nil {
+			return fmt.Errorf("set_config: githubID: %w", err)
+		}
+		ghSec, err := model.DecodeScaleArgBytes[string](args[12])
+		if err != nil {
+			return fmt.Errorf("set_config: githubSecret: %w", err)
+		}
+		ghRedir, err := model.DecodeScaleArgBytes[string](args[13])
+		if err != nil {
+			return fmt.Errorf("set_config: githubRedirect: %w", err)
+		}
+		twID, err := model.DecodeScaleArgBytes[string](args[14])
+		if err != nil {
+			return fmt.Errorf("set_config: twitterID: %w", err)
+		}
+		twSec, err := model.DecodeScaleArgBytes[string](args[15])
+		if err != nil {
+			return fmt.Errorf("set_config: twitterSecret: %w", err)
+		}
+		twRedir, err := model.DecodeScaleArgBytes[string](args[16])
+		if err != nil {
+			return fmt.Errorf("set_config: twitterRedirect: %w", err)
+		}
+		return m.SetConfig(cors, smtpHost, smtpPort, smtpUser, smtpPwd, smtpFrom, smtpFromName, mockEmail, gID, gSec, gRedir, ghID, ghSec, ghRedir, twID, twSec, twRedir)
 	default:
 		return fmt.Errorf("auth: unknown method %q", methodSel)
 	}
@@ -171,6 +270,32 @@ func (q AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
+	case [4]byte{0x34, 0x0b, 0x39, 0x55}:
+		if err := model.RequireArgLen(args, 1, "get_encrypted_auth_user"); err != nil {
+			return nil, err
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_encrypted_auth_user: ref: %w", err)
+		}
+		out, err := q.GetAuthUser(ref)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
+	case [4]byte{0xaa, 0xcc, 0xc6, 0x21}:
+		if err := model.RequireArgLen(args, 1, "get_encrypted_private_key"); err != nil {
+			return nil, err
+		}
+		ref, err := model.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_encrypted_private_key: ref: %w", err)
+		}
+		out, err := q.GetPrivateKey(ref)
+		if err != nil {
+			return nil, err
+		}
+		return codec.Encode(out)
 	default:
 		return nil, fmt.Errorf("auth: unknown query method %q", methodSel)
 	}
@@ -178,14 +303,17 @@ func (q AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 
 func NewAuth(api model.ContractApi) *Auth {
 	return &Auth{
-		api:          api,
-		users:        &model.StoreMapping[[]byte, UserInfo]{Namespace: "auth", KeyPrefix: "user_"},
-		shareRoots:   &model.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_root_"},
-		recoveries:   &model.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "recoverie_"},
-		recoveryReqs: &model.StoreMapping[[]byte, RecoveryRequest]{Namespace: "auth", KeyPrefix: "recovery_req_"},
-		dkgPubKey:    &model.StoreValue[[]byte]{Namespace: "auth", Key: "dkg_pub_key"},
-		threshold:    &model.StoreValue[uint32]{Namespace: "auth", Key: "threshold"},
-		totalNodes:   &model.StoreValue[uint32]{Namespace: "auth", Key: "total_nodes"},
+		api:           api,
+		users:         &model.StoreMapping[[]byte, UserInfo]{Namespace: "auth", KeyPrefix: "user_"},
+		shareRoots:    &model.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_root_"},
+		recoveries:    &model.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "recoverie_"},
+		recoveryReqs:  &model.StoreMapping[[]byte, RecoveryRequest]{Namespace: "auth", KeyPrefix: "recovery_req_"},
+		encryptedAuth: &model.StoreMapping[string, AuthUserRecord]{Namespace: "auth", KeyPrefix: "enc_auth_"},
+		encryptedKey:  &model.StoreMapping[string, PrivateKeyRecord]{Namespace: "auth", KeyPrefix: "enc_key_"},
+		dkgPubKey:     &model.StoreValue[[]byte]{Namespace: "auth", Key: "dkg_pub_key"},
+		threshold:     &model.StoreValue[uint32]{Namespace: "auth", Key: "threshold"},
+		totalNodes:    &model.StoreValue[uint32]{Namespace: "auth", Key: "total_nodes"},
+		config:        &model.StoreValue[AuthConfig]{Namespace: "auth", Key: "config"},
 	}
 }
 
@@ -194,4 +322,6 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x7d, 0x24, 0x4c, 0x3f}: "get_recovery",
 	[4]byte{0x62, 0x76, 0x14, 0x9a}: "get_user",
 	[4]byte{0x03, 0x2c, 0x9f, 0x3b}: "has_key",
+	[4]byte{0x34, 0x0b, 0x39, 0x55}: "get_encrypted_auth_user",
+	[4]byte{0xaa, 0xcc, 0xc6, 0x21}: "get_encrypted_private_key",
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
@@ -18,7 +17,6 @@ type Resolver struct {
 	TeeChain *teechain.TeeChain
 
 	// Web3Auth 服务
-	AuthCfg   *auth.AuthConfig
 	WalletSvc *wallet.WalletService
 	EmailSvc  authsvc.EmailService
 	OAuthSvc  *authsvc.OAuthService

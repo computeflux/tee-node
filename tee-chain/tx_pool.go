@@ -5,22 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/batch"
 )
 
 const contractPoolNS = "CONTRACT_TX"
 
-// PendingContractCall 池中的待提交合约调用
-type PendingContractCall struct {
-	Contract string   `json:"contract"`
-	Method   []byte   `json:"method"`
-	Args     [][]byte `json:"args"`
-}
-
 // HasPendingContract 检查指定 dedupKey 是否已在交易池中有待处理的调用。
 func (app *TeeChain) HasPendingContract(dedupKey string) bool {
-	pending, _ := model.GetJson[PendingContractCall](contractPoolNS, dedupKey)
+	pending, _ := model.GetJson[batch.BatchCall](contractPoolNS, dedupKey)
 	return pending != nil
 }
 
@@ -32,10 +27,10 @@ func (app *TeeChain) SubmitContract(contract string, method []byte, argsBytes []
 // SubmitContractWithDedup 将合约调用写入交易池，支持去重 key。
 // 若 dedupKey 非空，同一 dedupKey 的新调用会覆盖旧调用，保证池中只有一个。
 func (app *TeeChain) SubmitContractWithDedup(contract string, method []byte, argsBytes [][]byte, dedupKey string) error {
-	call := &PendingContractCall{
-		Contract: contract,
-		Method:   method,
-		Args:     argsBytes,
+	call := &batch.BatchCall{
+		Name:   []byte(contract),
+		Method: method,
+		Args:   argsBytes,
 	}
 
 	var key string
@@ -56,7 +51,7 @@ func (app *TeeChain) SubmitContractWithDedup(contract string, method []byte, arg
 		app.notifyApplyToChain()
 	}
 
-	util.LogWithGreen("TX-POOL", "queued:", contract)
+	util.LogWithGreen("TX-POOL", "add tx of", contract)
 	return nil
 }
 
@@ -78,13 +73,14 @@ func (app *TeeChain) applyTxLoop() {
 	}
 }
 
-// ApplyToChain 从交易池取出所有合约调用，批量签名并提交到链上
+// ApplyToChain 从交易池取出所有合约调用，打包为 batch 合约单交易提交。
+// 多笔 pending call 合并为 execute_batch，共用节点 nonce，原子执行。
 func (app *TeeChain) ApplyToChain() {
 	if app.NodePriv == nil {
 		return
 	}
 
-	calls, keys, err := model.GetJsonList[PendingContractCall](contractPoolNS, "")
+	calls, keys, err := model.GetJsonList[batch.BatchCall](contractPoolNS, "")
 	if err != nil {
 		util.LogWithRed("TX-POOL", "read pool failed:", err)
 		return
@@ -93,41 +89,60 @@ func (app *TeeChain) ApplyToChain() {
 		return
 	}
 
-	util.LogWithGreen("TX-POOL", fmt.Sprintf("applying %d pending contract calls", len(calls)))
+	util.LogWithGreen("TX-POOL", fmt.Sprintf("applying %d pending contract calls via batch", len(calls)))
 
-	signer := app.NodePriv.ToSigner(model.SuiteEd25519)
-	nonce := GetNodeNextNonce(signer)
+	// 1) 收集有效的 pending calls
+	batchCalls := make([]batch.BatchCall, 0, len(calls))
+	validKeys := make([][]byte, 0, len(calls))
 	for i, c := range calls {
 		if c == nil {
 			_ = model.DeleteByteKey(keys[i])
 			continue
 		}
+		batchCalls = append(batchCalls, *c)
+		validKeys = append(validKeys, keys[i])
+	}
 
-		call := &model.SysCall{
-			Payload: &model.SysCall_Contract{
-				Contract: &model.ContractCall{
-					Name:   []byte(c.Contract),
-					Method: c.Method,
-					Args:   c.Args,
-					Nonce:  nonce,
-				},
+	if len(batchCalls) == 0 {
+		return
+	}
+
+	// 2) 编码参数：SCALE([]BatchCall)
+	argsBytes, err := codec.Encode(batchCalls)
+	if err != nil {
+		util.LogWithRed("TX-POOL", "encode batch calls failed:", err)
+		return
+	}
+
+	// 3) 构造 batch 合约 execute_batch 调用
+	signer := app.NodePriv.ToSigner(model.SuiteEd25519)
+	nonce := GetNodeNextNonce(signer)
+	call := &model.SysCall{
+		Payload: &model.SysCall_Contract{
+			Contract: &model.ContractCall{
+				Name:   []byte("batch"),
+				Method: model.MethodToSelectorBytes("execute_batch"),
+				Args:   [][]byte{argsBytes},
+				Nonce:  nonce,
 			},
-		}
-		nonce++
+		},
+	}
 
-		tx, err := signTx(call, signer)
-		if err != nil {
-			util.LogWithRed("TX-POOL", "sign failed:", c.Contract, err)
-			continue
-		}
+	// 4) 签名并提交单笔 batch 交易
+	tx, err := signTx(call, signer)
+	if err != nil {
+		util.LogWithRed("TX-POOL", "sign batch tx failed:", err)
+		return
+	}
 
-		if err := SubmitTx(tx); err != nil {
-			util.LogWithRed("TX-POOL", "submit failed:", c.Contract, err)
-			continue
-		}
+	if err := SubmitTx(tx); err != nil {
+		util.LogWithRed("TX-POOL", "submit batch tx failed:", err)
+		return
+	}
 
-		// 提交成功，从池中删除
-		_ = model.DeleteByteKey(keys[i])
+	// 5) 提交成功，清空池中的所有相关 pending calls
+	for _, k := range validKeys {
+		_ = model.DeleteByteKey(k)
 	}
 
 	util.LogWithGreen("TX-POOL", "batch apply complete")

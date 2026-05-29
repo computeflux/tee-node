@@ -13,6 +13,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/cosmos/gogoproto/proto"
+	"github.com/pkg/errors"
 
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
@@ -56,7 +57,7 @@ func (app *TeeChain) myProposerAddress() []byte {
 func NewTeeChain(light bool) (*TeeChain, error) {
 	state, err := loadAppState()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "LoadAppState")
 	}
 
 	c := &TeeChain{
@@ -72,6 +73,7 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 
 		// 初始化交易就绪通知 channel
 		c.txReadyCh = make(chan struct{}, 1)
+
 		// 启动后台 goroutine 异步执行 ApplyToChain
 		go c.applyTxLoop()
 	}

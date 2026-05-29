@@ -53,10 +53,6 @@ func PutAuthUser(u *AuthUser) error {
 	return SetKey("WEB3AUTH", "u:"+u.Email, b)
 }
 
-func GetAuthUser(email string) (*AuthUser, error) {
-	return GetJson[AuthUser]("WEB3AUTH", "u:"+email)
-}
-
 // ── Session ───────────────────────────────────────────────
 
 func PutAuthSession(s *AuthSession) error {

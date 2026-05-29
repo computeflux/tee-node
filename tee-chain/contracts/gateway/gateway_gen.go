@@ -72,11 +72,11 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("delete_model_a_p_i_key_ref: modelID: %w", err)
 		}
-		ref, err := model.DecodeScaleArgBytes[string](args[1])
+		index, err := model.DecodeScaleArgBytes[int](args[1])
 		if err != nil {
-			return fmt.Errorf("delete_model_a_p_i_key_ref: ref: %w", err)
+			return fmt.Errorf("delete_model_a_p_i_key_ref: index: %w", err)
 		}
-		return m.DeleteModelAPIKeyRef(modelID, ref)
+		return m.DeleteModelAPIKeyRef(modelID, index)
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
@@ -105,23 +105,6 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 			return fmt.Errorf("register_a_p_i_key: rateLimit: %w", err)
 		}
 		return m.RegisterAPIKey(keyHash, rateLimit)
-	case [4]byte{0xfb, 0x09, 0xd8, 0xfc}:
-		if err := model.RequireArgLen(args, 3, "register_encrypted_a_p_i_key"); err != nil {
-			return err
-		}
-		ref, err := model.DecodeScaleArgBytes[string](args[0])
-		if err != nil {
-			return fmt.Errorf("register_encrypted_a_p_i_key: ref: %w", err)
-		}
-		ciphertext, err := model.DecodeScaleArgBytes[[]byte](args[1])
-		if err != nil {
-			return fmt.Errorf("register_encrypted_a_p_i_key: ciphertext: %w", err)
-		}
-		nonce, err := model.DecodeScaleArgBytes[[]byte](args[2])
-		if err != nil {
-			return fmt.Errorf("register_encrypted_a_p_i_key: nonce: %w", err)
-		}
-		return m.RegisterEncryptedAPIKey(ref, ciphertext, nonce)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
 		if err := model.RequireArgLen(args, 9, "register_model"); err != nil {
 			return err
@@ -158,11 +141,11 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		encryptedKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
 		if err != nil {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
-		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)
+		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, encryptedKeys)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
 		if err := model.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
@@ -239,15 +222,15 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model_a_p_i_key_ref: modelID: %w", err)
 		}
-		ref, err := model.DecodeScaleArgBytes[string](args[1])
+		index, err := model.DecodeScaleArgBytes[int](args[1])
 		if err != nil {
-			return fmt.Errorf("update_model_a_p_i_key_ref: ref: %w", err)
+			return fmt.Errorf("update_model_a_p_i_key_ref: index: %w", err)
 		}
 		newApiKey, err := model.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("update_model_a_p_i_key_ref: newApiKey: %w", err)
 		}
-		return m.UpdateModelAPIKeyRef(modelID, ref, newApiKey)
+		return m.UpdateModelAPIKeyRef(modelID, index, newApiKey)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -334,19 +317,6 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("get_credit: user: %w", err)
 		}
 		out, err := q.GetCredit(user)
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
-	case [4]byte{0x08, 0xfd, 0x68, 0x35}:
-		if err := model.RequireArgLen(args, 1, "get_encrypted_a_p_i_key"); err != nil {
-			return nil, err
-		}
-		ref, err := model.DecodeScaleArgBytes[string](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("get_encrypted_a_p_i_key: ref: %w", err)
-		}
-		out, err := q.GetEncryptedAPIKey(ref)
 		if err != nil {
 			return nil, err
 		}
@@ -702,7 +672,6 @@ func NewGateway(api model.ContractApi) *Gateway {
 		providerByOwner:       &model.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_by_owner_"},
 		providerCredits:       &model.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_credit_"},
 		apiKeys:               model.NewIndexedStore[string, APIKeyInfo]("gateway", "v2_api_key_"),
-		encryptedKeys:         &model.StoreMapping[string, EncryptedAPIKey]{Namespace: "gateway", KeyPrefix: "v2_encrypted_key_"},
 		rechargeHistory:       model.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
 		settlementHistory:     model.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v4_settlement_history_k1_to_id_", "v4_settlement_history_k1_length_", "v4_settlement_history_k2_next_", "v4_settlement_history_store_"),
 		userSettlementHistory: model.NewStoreList2D[model.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
@@ -713,7 +682,6 @@ func NewGateway(api model.ContractApi) *Gateway {
 var MethodMap = map[[4]byte]string{
 	[4]byte{0x42, 0xcc, 0x03, 0xe6}: "get_a_p_i_keys_by_owner",
 	[4]byte{0x04, 0x60, 0x1f, 0xca}: "get_credit",
-	[4]byte{0x08, 0xfd, 0x68, 0x35}: "get_encrypted_a_p_i_key",
 	[4]byte{0xd3, 0xff, 0x81, 0xe9}: "get_model",
 	[4]byte{0xb5, 0x1e, 0x55, 0x6b}: "get_model_by_name",
 	[4]byte{0x05, 0xed, 0xba, 0xf5}: "get_model_count",

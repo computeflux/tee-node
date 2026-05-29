@@ -7,6 +7,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/auth"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/batch"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/gov"
 )
@@ -23,6 +24,9 @@ func Query(call *model.ContractCall, runtime model.ContractApi) (data []byte, er
 	case "gateway":
 		ins := gateway.NewGateway(runtime)
 		return gateway.GatewayQuery{Gateway: *ins}.ExecQuery(call)
+	case "batch":
+		ins := batch.NewBatch(runtime)
+		return batch.BatchQuery{Batch: *ins}.ExecQuery(call)
 	default:
 		return nil, fmt.Errorf("unsupported contract: %s", string(call.Name))
 	}
@@ -48,6 +52,10 @@ func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
 	case "gateway":
 		ins := gateway.NewGateway(runtime)
 		mutation := gateway.GatewayMutation{Gateway: *ins}
+		err = mutation.ExecCall(call)
+	case "batch":
+		ins := batch.NewBatch(runtime)
+		mutation := batch.BatchMutation{Batch: *ins}
 		err = mutation.ExecCall(call)
 	default:
 		return fmt.Errorf("unsupported contract: %s", string(call.Name))

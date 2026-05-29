@@ -38,7 +38,6 @@ type Gateway struct {
 	providerByOwner       *model.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_provider_by_owner"`       // owner → providerID（一人一 provider）
 	providerCredits       *model.StoreMapping[uint64, uint64]                             `store:"keyPfx:v2_provider_credit"`         // providerID → accumulated credits
 	apiKeys               *model.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:v2_api_key"`                 // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
-	encryptedKeys         *model.StoreMapping[string, EncryptedAPIKey]                    `store:"keyPfx:v2_encrypted_key"`           // ref → EncryptedAPIKey
 	rechargeHistory       *model.StoreList2D[model.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`        // user → []RechargeRecord
 	settlementHistory     *model.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:v4_settlement_history"`      // providerID → []SettlementRecord
 	userSettlementHistory *model.StoreList2D[model.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"` // user → []SettlementRecord
@@ -47,6 +46,7 @@ type Gateway struct {
 
 type GatewayQuery struct{ Gateway }
 type GatewayMutation struct{ Gateway }
+type GatewaySecret struct{ Gateway }
 
 // ── Init ─────────────────────────────────────────────────
 func (g GatewayMutation) Init() error {

@@ -9,6 +9,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -38,8 +39,8 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	address := r.WalletSvc.DeriveAddress(email)
 	apiKey := createUserAPIKey(email, address)
 
-	// 仅在用户不存在时创建，避免覆盖已有的 Salt/DKHash/PasswordHash
-	if existing, _ := model.GetAuthUser(email); existing == nil {
+	// 仅从合约读取用户，避免本地读取
+	if existing, _ := getAuthUserFromContract(r.TeeChain, email); existing == nil {
 		model.PutAuthUser(&model.AuthUser{
 			Email:   email,
 			Address: address,
@@ -103,8 +104,8 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		VerifierID:   oauthUser.ProviderID,
 	}
 
-	// 持久化：仅在用户不存在时创建，避免覆盖已有的密码数据
-	if existing, _ := model.GetAuthUser(oauthUser.Email); existing == nil {
+	// 仅从合约读取用户，避免本地读取
+	if existing, _ := getAuthUserFromContract(r.TeeChain, oauthUser.Email); existing == nil {
 		model.PutAuthUser(&model.AuthUser{
 			Email: oauthUser.Email, Address: address,
 		})
@@ -130,7 +131,7 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 	// 存储密码信息到用户记录
-	user, _ := model.GetAuthUser(email)
+	user, _ := getAuthUserFromContract(r.TeeChain, email)
 	if user == nil {
 		user = &model.AuthUser{Email: email}
 	}
@@ -140,6 +141,13 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	if err := model.PutAuthUser(user); err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
+
+	// 异步上链：同步 AuthUser 到合约，支持跨节点登录
+	go func(u *model.AuthUser) {
+		plain, _ := json.Marshal(u)
+		_ = r.TeeChain.AuthStoreAuthUser("auth_user:"+u.Email, plain)
+	}(user)
+
 	return &auth.WalletResult{Status: "ok"}, nil
 }
 
@@ -151,8 +159,8 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
 	}
 
-	// 验证密码 hash
-	user, err := model.GetAuthUser(email)
+	// 从合约读取用户并验证密码 hash
+	user, err := getAuthUserFromContract(r.TeeChain, email)
 	if err != nil || user == nil {
 		e := "user not found"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
@@ -208,8 +216,8 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 		return &model.SignSessionResult{Status: "locked", Error: &e}, nil
 	}
 
-	// 获取用户信息
-	user, err := model.GetAuthUser(email)
+	// 从合约读取用户信息
+	user, err := getAuthUserFromContract(r.TeeChain, email)
 	if err != nil || user == nil {
 		e := "user not found"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
@@ -456,8 +464,8 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 		return &model.ChallengeResult{Status: "locked", Error: strPtr("Too many failed attempts")}, nil
 	}
 
-	// 获取用户 salt
-	user, err := model.GetAuthUser(email)
+	// 从合约读取用户 salt
+	user, err := getAuthUserFromContract(r.TeeChain, email)
 	if err != nil || user == nil {
 		return &model.ChallengeResult{Status: "error", Error: strPtr("user not found")}, nil
 	}

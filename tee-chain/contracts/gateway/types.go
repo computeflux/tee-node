@@ -38,15 +38,6 @@ const (
 	ProviderCohere                     // 8
 )
 
-// ── Encrypted API Key ────────────────────────────────────
-
-// EncryptedAPIKey 链上存储的加密 API Key（明文永不上链）
-type EncryptedAPIKey struct {
-	Ref        string `json:"ref"`        // 引用标识，如 "openai-prod-v2"
-	Ciphertext []byte `json:"ciphertext"` // AES-GCM(GK, apiKey)
-	Nonce      []byte `json:"nonce"`      // GCM nonce
-}
-
 // ── Model ────────────────────────────────────────────────
 
 // ModelInfo 独立注册的模型
@@ -61,10 +52,10 @@ type ModelInfo struct {
 	OutPrice        uint64        `json:"outPrice"`
 
 	// 供应商配置
-	ProviderType uint16   `json:"providerType"`         // 供应商类型 (openai, claude, ...)
-	ModelID      string   `json:"modelId"`              // 模型 ID
-	URI          string   `json:"uri,omitempty"`        // 自定义端点，为空则用供应商官方地址
-	APIKeyRefs   []string `json:"apiKeyRefs,omitempty"` // 引用标识列表，指向 EncryptedAPIKey
+	ProviderType uint16   `json:"providerType"`      // 供应商类型 (openai, claude, ...)
+	ModelID      string   `json:"modelId"`           // 模型 ID
+	URI          string   `json:"uri,omitempty"`     // 自定义端点，为空则用供应商官方地址
+	APIKeys      []string `json:"apiKeys,omitempty"` // API Key 列表
 
 	IsActive  bool   `json:"isActive" idx:"exact"`
 	CreatedAt uint64 `json:"createdAt"`

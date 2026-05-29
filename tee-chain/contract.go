@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/auth"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
 )
 
@@ -92,6 +94,39 @@ func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.Mo
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetModelByName(pid, name)
 }
 
+// GatewaySecretGetModel 查询单个 Model（TEE 内部，不脱敏）。
+func (app *TeeChain) GatewaySecretGetModel(id uint64) (*gateway.ModelInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewaySecret{Gateway: *gateway.NewGateway(runtime)}.GetModel(id)
+}
+
+// GatewaySecretGetModelByName 按名称查询模型（TEE 内部，不脱敏）。
+func (app *TeeChain) GatewaySecretGetModelByName(pid uint64, name string) (*gateway.ModelInfoWithID, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewaySecret{Gateway: *gateway.NewGateway(runtime)}.GetModelByName(pid, name)
+}
+
+// GatewaySecretListActiveModels 查询活跃模型列表（TEE 内部，不脱敏）。
+func (app *TeeChain) GatewaySecretListActiveModels(offset uint64, limit uint32) ([]gateway.ModelInfo, error) {
+	runtime, err := app.gatewayRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewaySecret{Gateway: *gateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
+}
+
 // GatewayGetProviderByName 按名称查询 Provider（走 string exact 索引，O(1) 查询）。
 func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.ProviderInfoWithID, error) {
 	runtime, err := app.gatewayRuntime()
@@ -103,17 +138,6 @@ func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.ProviderInf
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetProviderByName(name)
 }
 
-// GatewayGetEncryptedAPIKey 查询加密 API Key。
-func (app *TeeChain) GatewayGetEncryptedAPIKey(ref string) (*gateway.EncryptedAPIKey, error) {
-	runtime, err := app.gatewayRuntime()
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetEncryptedAPIKey(ref)
-}
-
 // GatewayGetRechargeHistory 查询用户充值历史。
 func (app *TeeChain) GatewayGetRechargeHistory(user model.UniAddr, offset uint64, limit uint32) ([]gateway.RechargeRecord, error) {
 	runtime, err := app.gatewayRuntime()
@@ -123,6 +147,67 @@ func (app *TeeChain) GatewayGetRechargeHistory(user model.UniAddr, offset uint64
 	defer runtime.GetTxn().Rollback()
 
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetRechargeHistory(user, offset, limit)
+}
+
+// ── Auth 合约桥接 ──────────────────────────────────────────
+
+func (app *TeeChain) authRuntime() (*contracts.Runtime, error) {
+	if model.DBINS == nil {
+		return nil, fmt.Errorf("DBINS is nil")
+	}
+	txn := model.DBINS.NewTransaction()
+	var sudo model.UniAddr
+	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
+		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
+	}
+	return contracts.NewRuntime(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo), nil
+}
+
+// AuthGetAuthUser 查询 Web3Auth 用户信息。
+func (app *TeeChain) AuthGetAuthUser(ref string) (*auth.AuthUserRecord, error) {
+	runtime, err := app.authRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return auth.AuthQuery{Auth: *auth.NewAuth(runtime)}.GetAuthUser(ref)
+}
+
+// AuthGetPrivateKey 查询用户私钥。
+func (app *TeeChain) AuthGetPrivateKey(ref string) (*auth.PrivateKeyRecord, error) {
+	runtime, err := app.authRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return auth.AuthQuery{Auth: *auth.NewAuth(runtime)}.GetPrivateKey(ref)
+}
+
+// AuthStoreAuthUser 将 Web3Auth 用户信息提交到链上合约。
+func (app *TeeChain) AuthStoreAuthUser(ref string, ciphertext []byte) error {
+	refBytes, _ := codec.Encode(ref)
+	cipherBytes, _ := codec.Encode(ciphertext)
+	nonceBytes, _ := codec.Encode([]byte{})
+	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_encrypted_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
+}
+
+// AuthGetConfig 查询认证服务配置（TEE 内部，不对外）
+func (app *TeeChain) AuthGetConfig() (*auth.AuthConfig, error) {
+	runtime, err := app.authRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return auth.AuthSecret{Auth: *auth.NewAuth(runtime)}.GetConfig()
+}
+func (app *TeeChain) AuthStorePrivateKey(ref string, ciphertext []byte) error {
+	refBytes, _ := codec.Encode(ref)
+	cipherBytes, _ := codec.Encode(ciphertext)
+	nonceBytes, _ := codec.Encode([]byte{})
+	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_encrypted_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {

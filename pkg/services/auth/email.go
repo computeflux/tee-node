@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // EmailService 邮件发送接口
@@ -139,7 +140,8 @@ func (s *SMTPEmailService) sendViaSTARTTLS(addr, to, msg string) error {
 
 // ── Factory ───────────────────────────────────────────────
 
-func NewEmailService(cfg *auth.AuthConfig) EmailService {
+func NewEmailService(tc *teechain.TeeChain) EmailService {
+	cfg := auth.LoadConfig(tc)
 	if cfg.MockEmail {
 		return NewMockEmailService(cfg.SMTPFromName)
 	}

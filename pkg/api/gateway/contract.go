@@ -135,16 +135,15 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 	return models
 }
 
-// findGatewayModelByName 按模型名称从合约查询（必须活跃）。
-// 直接走链上 string exact 索引，O(1) 查询，避免本地缓存全量遍历。
+// findGatewayModelByName 按模型名称从合约查询（必须活跃），TEE 内部使用，返回完整 API Key。
 func findGatewayModelByName(pid uint64, name string) *cgateway.ModelInfoWithID {
 	bridge := getBridge()
 	if bridge == nil {
 		return nil
 	}
-	model, err := bridge.GatewayGetModelByName(pid, name)
+	model, err := bridge.GatewaySecretGetModelByName(pid, name)
 	if err != nil {
-		GATEWAYLOG().Printf("[GATEWAY] GetModelByName name=%s err=%v", name, err)
+		GATEWAYLOG().Printf("[GATEWAY] SecretGetModelByName name=%s err=%v", name, err)
 		return nil
 	}
 
@@ -164,48 +163,19 @@ func findProviderName(name string) *cgateway.ProviderInfoWithID {
 	return provider
 }
 
-// buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表。
-// 使用 TEE KMS 解密链上存储的加密 API Key（明文永不上链）。
+// buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表
 func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
 	url := m.URI
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
 	}
 
-	if len(m.APIKeyRefs) == 0 {
-		GATEWAYLOG().Printf("[GATEWAY] GetGlobalKey failed: APIKeyRefs is 【】")
+	if len(m.APIKeys) == 0 {
 		return nil
 	}
 
-	// 获取全局密钥（内存缓存，~0 开销）
-	gk, err := model.GetGlobalKey()
-	if err != nil {
-		GATEWAYLOG().Printf("[GATEWAY] GetGlobalKey failed: %v", err)
-		return nil
-	}
-
-	bridge := getBridge()
-
-	eps := make([]*model.GatewayEndpoint, 0, len(m.APIKeyRefs))
-	for i, ref := range m.APIKeyRefs {
-		var apiKey string
-		if bridge != nil {
-			encKey, err := bridge.GatewayGetEncryptedAPIKey(ref)
-			if err != nil || encKey == nil {
-				GATEWAYLOG().Printf("[GATEWAY] get encrypted key ref=%s err=%v", ref, err)
-				continue
-			}
-			kmsKey := &model.KMSKey{
-				Ref:        encKey.Ref,
-				Ciphertext: encKey.Ciphertext,
-				Nonce:      encKey.Nonce,
-			}
-			apiKey, err = model.DecryptWithGK(gk, kmsKey)
-			if err != nil {
-				GATEWAYLOG().Printf("[GATEWAY] decrypt ref=%s err=%v", ref, err)
-				continue
-			}
-		}
+	eps := make([]*model.GatewayEndpoint, 0, len(m.APIKeys))
+	for i, apiKey := range m.APIKeys {
 		if apiKey == "" {
 			continue
 		}

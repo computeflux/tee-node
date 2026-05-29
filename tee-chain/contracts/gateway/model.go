@@ -2,13 +2,36 @@ package gateway
 
 import (
 	"errors"
-	"fmt"
+	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
+// maskAPIKey 保留前 1/3 明文，后 2/3 替换为 *
+func maskAPIKey(key string) string {
+	if len(key) <= 3 {
+		return strings.Repeat("*", len(key))
+	}
+	show := len(key) / 3
+	if show == 0 {
+		show = 1
+	}
+	maskLen := len(key) - show
+	return key[:show] + strings.Repeat("*", maskLen)
+}
+
+// maskAPIKeys 对所有 API Key 做脱敏处理
+func maskAPIKeys(keys []string) []string {
+	masked := make([]string, len(keys))
+	for i, k := range keys {
+		masked[i] = maskAPIKey(k)
+	}
+	return masked
+}
+
 // ── Model ────────────────────────────────────────────────
 
+// RegisterModel 注册模型
 func (g GatewayMutation) RegisterModel(
 	name string,
 	inputModalities uint8,
@@ -23,7 +46,7 @@ func (g GatewayMutation) RegisterModel(
 	// 必须已注册 Provider
 	provID, err := g.providerByOwner.Get(g.api.GetTxn(), owner)
 	if err != nil || provID == nil {
-		return fmt.Errorf("must create a provider before registering models")
+		return err
 	}
 
 	// ProviderID + Name 唯一性检查
@@ -40,8 +63,15 @@ func (g GatewayMutation) RegisterModel(
 		return errors.New("model name already exists for this provider")
 	}
 
-	// 1. 先注册模型（不存 ref），获取 modelID 用于生成唯一 ref
-	modelID, err := g.models.Insert(txn, ModelInfo{
+	// 过滤空 key
+	keys := make([]string, 0, len(apiKeys))
+	for _, k := range apiKeys {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+
+	_, err = g.models.Insert(txn, ModelInfo{
 		Name:            name,
 		Owner:           owner,
 		ProviderID:      *provID,
@@ -54,51 +84,9 @@ func (g GatewayMutation) RegisterModel(
 		OutPrice:        outPrice,
 		ProviderType:    providerType,
 		URI:             uri,
-		APIKeyRefs:      nil,
+		APIKeys:         keys,
 	})
-	if err != nil {
-		return err
-	}
-
-	// 2. 注册每个 apiKey（明文 → TEE KMS 加密 → 链上存储 ref）
-	refs := make([]string, 0, len(apiKeys))
-	for i, key := range apiKeys {
-		if key == "" {
-			continue
-		}
-
-		prefix := key
-		if len(prefix) > 0 {
-			prefix = prefix[:(len(prefix)+1)/2]
-		}
-		ref := fmt.Sprintf("%s_%d_%d_%d", prefix, modelID, g.api.GetHeight(), i)
-		gk, err := model.GetGlobalKey()
-		if err != nil {
-			return fmt.Errorf("kms not ready: %w", err)
-		}
-
-		ek, err := model.EncryptWithGK(gk, ref, key)
-		if err != nil {
-			return fmt.Errorf("encrypt api key failed: %w", err)
-		}
-
-		if err := g.encryptedKeys.Set(txn, ref, EncryptedAPIKey{
-			Ref:        ref,
-			Ciphertext: ek.Ciphertext,
-			Nonce:      ek.Nonce,
-		}); err != nil {
-			return fmt.Errorf("store encrypted key failed: %w", err)
-		}
-		refs = append(refs, ref)
-	}
-
-	// 3. 更新模型写入 APIKeyRefs
-	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
-		m.APIKeyRefs = refs
-	}); err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (g GatewayMutation) UpdateModel(
@@ -109,16 +97,11 @@ func (g GatewayMutation) UpdateModel(
 	providerType uint16,
 	uri string,
 ) error {
-	// 获取当前模型
 	cur, err := g.models.Get(g.api.GetTxn(), ID)
 	if err != nil || cur == nil {
-		return fmt.Errorf("model not found")
+		return err
 	}
 
-	// ProviderID + Name 唯一性检查（name 不允许修改，但防御性检查）
-	// 如果未来允许改 name，需要在此排除自身 ID 后做冲突检查
-
-	// 更新模型字段（CreatedAt 保持不变，不覆盖首次注册时间；APIKeyRefs 保持不变）
 	if err := g.models.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfo) {
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
@@ -137,103 +120,45 @@ func (g GatewayMutation) UpdateModel(
 func (g GatewayMutation) AddModelAPIKeyRef(modelID uint64, apiKey string) error {
 	cur, err := g.models.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
-		return fmt.Errorf("model not found")
+		return err
 	}
 	if apiKey == "" {
-		return fmt.Errorf("api key cannot be empty")
-	}
-
-	prefix := apiKey
-	if len(prefix) > 0 {
-		prefix = prefix[:(len(prefix)+1)/2]
-	}
-	ref := fmt.Sprintf("%s_%d_%d_%d", prefix, modelID, g.api.GetHeight(), len(cur.APIKeyRefs))
-	gk, err := model.GetGlobalKey()
-	if err != nil {
-		return fmt.Errorf("kms not ready: %w", err)
-	}
-
-	ek, err := model.EncryptWithGK(gk, ref, apiKey)
-	if err != nil {
-		return fmt.Errorf("encrypt api key failed: %w", err)
-	}
-
-	if err := g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
-		Ref:        ref,
-		Ciphertext: ek.Ciphertext,
-		Nonce:      ek.Nonce,
-	}); err != nil {
-		return fmt.Errorf("store encrypted key failed: %w", err)
+		return errors.New("api key cannot be empty")
 	}
 
 	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
-		m.APIKeyRefs = append(m.APIKeyRefs, ref)
+		m.APIKeys = append(m.APIKeys, apiKey)
 	})
 }
 
-func (g GatewayMutation) DeleteModelAPIKeyRef(modelID uint64, ref string) error {
+func (g GatewayMutation) DeleteModelAPIKeyRef(modelID uint64, index int) error {
 	cur, err := g.models.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
-		return fmt.Errorf("model not found")
-	}
-
-	newRefs := make([]string, 0, len(cur.APIKeyRefs))
-	found := false
-	for _, r := range cur.APIKeyRefs {
-		if r == ref {
-			found = true
-			continue
-		}
-		newRefs = append(newRefs, r)
-	}
-	if !found {
-		return fmt.Errorf("ref not found in model")
-	}
-
-	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
-		m.APIKeyRefs = newRefs
-	}); err != nil {
 		return err
 	}
+	if index < 0 || index >= len(cur.APIKeys) {
+		return errors.New("index out of range")
+	}
 
-	_ = g.encryptedKeys.Delete(g.api.GetTxn(), ref)
-	return nil
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.APIKeys = append(m.APIKeys[:index], m.APIKeys[index+1:]...)
+	})
 }
 
-func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, ref, newApiKey string) error {
+func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, index int, newApiKey string) error {
 	cur, err := g.models.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
-		return fmt.Errorf("model not found")
+		return err
 	}
-
-	found := false
-	for _, r := range cur.APIKeyRefs {
-		if r == ref {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return fmt.Errorf("ref not found in model")
+	if index < 0 || index >= len(cur.APIKeys) {
+		return errors.New("index out of range")
 	}
 	if newApiKey == "" {
-		return fmt.Errorf("api key cannot be empty")
+		return errors.New("api key cannot be empty")
 	}
 
-	gk, err := model.GetGlobalKey()
-	if err != nil {
-		return fmt.Errorf("kms not ready: %w", err)
-	}
-
-	ek, err := model.EncryptWithGK(gk, ref, newApiKey)
-	if err != nil {
-		return fmt.Errorf("encrypt api key failed: %w", err)
-	}
-
-	return g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
-		Ref:        ref,
-		Ciphertext: ek.Ciphertext,
-		Nonce:      ek.Nonce,
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.APIKeys[index] = newApiKey
 	})
 }
 
@@ -244,7 +169,12 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 }
 
 func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
-	return g.models.Get(g.api.GetTxn(), modelID)
+	m, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || m == nil {
+		return nil, err
+	}
+	m.APIKeys = maskAPIKeys(m.APIKeys)
+	return m, nil
 }
 
 func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
@@ -254,6 +184,7 @@ func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
 		if err != nil || m == nil {
 			continue
 		}
+		m.APIKeys = maskAPIKeys(m.APIKeys)
 		models = append(models, *m)
 	}
 
@@ -274,7 +205,13 @@ func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
 
 func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
 	_, vals, err := g.models.List(g.api.GetTxn(), offset, limit)
-	return vals, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range vals {
+		vals[i].APIKeys = maskAPIKeys(vals[i].APIKeys)
+	}
+	return vals, nil
 }
 
 func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32) ([]ModelInfo, error) {
@@ -302,7 +239,14 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 	if err != nil {
 		return nil, err
 	}
-	return g.listModelsByIDs(ids, offset, limit)
+	models, err := g.listModelsByIDs(ids, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	for i := range models {
+		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+	}
+	return models, nil
 }
 
 func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error) {
@@ -310,7 +254,14 @@ func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error)
 	if err != nil {
 		return nil, err
 	}
-	return g.listModelsByIDs(ids, 0, 10000)
+	models, err := g.listModelsByIDs(ids, 0, 10000)
+	if err != nil {
+		return nil, err
+	}
+	for i := range models {
+		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+	}
+	return models, nil
 }
 
 func (g GatewayQuery) ListActiveModelsWithinProvider(
@@ -378,7 +329,6 @@ func (g GatewayQuery) QueryModels(
 		return nil, err
 	}
 
-	// 按位查询无法用 exact 索引，需二次过滤
 	if modalities != 0 {
 		filtered := make([]ModelInfo, 0, len(models))
 		for _, m := range models {
@@ -396,10 +346,13 @@ func (g GatewayQuery) QueryModels(
 	if end > uint64(len(models)) {
 		end = uint64(len(models))
 	}
-	return models[offset:end], nil
+	models = models[offset:end]
+	for i := range models {
+		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+	}
+	return models, nil
 }
 
-// GetModelsByProvider 返回某个 Provider 注册的所有模型（使用 ProviderID exact 索引）
 func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error) {
 	keys, err := g.models.Query(g.api.GetTxn(), model.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
@@ -411,13 +364,45 @@ func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error
 		if err != nil || m == nil {
 			continue
 		}
+		m.APIKeys = maskAPIKeys(m.APIKeys)
 		out = append(out, *m)
 	}
 	return out, nil
 }
 
-// GetModelByName 返回指定名称的所有模型（使用 Name exact 索引）
 func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), model.QueryAND{
+		model.QueryCond{Field: "ProviderID", Val: pid},
+		model.QueryCond{Field: "Name", Val: name},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(keys) == 0 {
+		return nil, errors.New("model not found")
+	}
+
+	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	if err != nil || m == nil {
+		return nil, errors.New("model not found")
+	}
+
+	m.APIKeys = maskAPIKeys(m.APIKeys)
+	return &ModelInfoWithID{
+		ID:   keys[0],
+		Data: *m,
+	}, nil
+}
+
+// ── GatewaySecret ──────────────────────────────────────────
+// 节点内部使用，返回未脱敏的完整数据
+
+func (g GatewaySecret) GetModel(modelID uint64) (*ModelInfo, error) {
+	return g.models.Get(g.api.GetTxn(), modelID)
+}
+
+func (g GatewaySecret) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
 	keys, err := g.models.Query(g.api.GetTxn(), model.QueryAND{
 		model.QueryCond{Field: "ProviderID", Val: pid},
 		model.QueryCond{Field: "Name", Val: name},
@@ -441,22 +426,38 @@ func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID,
 	}, nil
 }
 
-// ── Encrypted API Key ────────────────────────────────────
-
-func (g GatewayMutation) RegisterEncryptedAPIKey(ref string, ciphertext, nonce []byte) error {
-	if len(ciphertext) == 0 || len(nonce) == 0 {
-		return fmt.Errorf("ciphertext and nonce required")
+func (g GatewaySecret) GetModels(IDs []uint64) ([]ModelInfo, error) {
+	out := make([]ModelInfo, 0, len(IDs))
+	for _, id := range IDs {
+		m, err := g.models.Get(g.api.GetTxn(), id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
 	}
-	if existing, _ := g.encryptedKeys.Get(g.api.GetTxn(), ref); existing != nil {
-		return fmt.Errorf("ref %s already exists", ref)
-	}
-	return g.encryptedKeys.Set(g.api.GetTxn(), ref, EncryptedAPIKey{
-		Ref:        ref,
-		Ciphertext: ciphertext,
-		Nonce:      nonce,
-	})
+	return out, nil
 }
 
-func (g GatewayQuery) GetEncryptedAPIKey(ref string) (*EncryptedAPIKey, error) {
-	return g.encryptedKeys.Get(g.api.GetTxn(), ref)
+func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), model.QueryCond{Field: "IsActive", Val: uint64(1)})
+	if err != nil {
+		return nil, err
+	}
+	end := offset + uint64(limit)
+	if uint64(len(ids)) <= offset {
+		return nil, nil
+	}
+	if end > uint64(len(ids)) {
+		end = uint64(len(ids))
+	}
+	txn := g.api.GetTxn()
+	out := make([]ModelInfo, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		m, err := g.models.Get(txn, id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
 }

@@ -9,45 +9,28 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // OAuthService 社交登录验证
 type OAuthService struct {
-	googleClientID     string
-	googleClientSecret string
-	googleRedirectURL  string
-
-	githubClientID     string
-	githubClientSecret string
-	githubRedirectURL  string
-
-	xClientID     string
-	xClientSecret string
-	xRedirectURL  string
+	tc *teechain.TeeChain
 }
 
-func NewOAuthService(cfg *auth.AuthConfig) *OAuthService {
-	return &OAuthService{
-		googleClientID:     cfg.GoogleClientID,
-		googleClientSecret: cfg.GoogleClientSecret,
-		googleRedirectURL:  cfg.GoogleRedirectURL,
+func NewOAuthService(tc *teechain.TeeChain) *OAuthService {
+	return &OAuthService{tc: tc}
+}
 
-		githubClientID:     cfg.GitHubClientID,
-		githubClientSecret: cfg.GitHubClientSecret,
-		githubRedirectURL:  cfg.GitHubRedirectURL,
-
-		xClientID:     cfg.TwitterClientID,
-		xClientSecret: cfg.TwitterClientSecret,
-		xRedirectURL:  cfg.TwitterRedirectURL,
-	}
+func (s *OAuthService) cfg() *auth.AuthConfig {
+	return auth.LoadConfig(s.tc)
 }
 
 // ── Auth URLs ─────────────────────────────────────────────
 
 func (s *OAuthService) GoogleAuthURL(state string) string {
 	q := url.Values{}
-	q.Set("client_id", s.googleClientID)
-	q.Set("redirect_uri", s.googleRedirectURL)
+	q.Set("client_id", s.cfg().GoogleClientID)
+	q.Set("redirect_uri", s.cfg().GoogleRedirectURL)
 	q.Set("response_type", "code")
 	q.Set("scope", "openid email profile")
 	return "https://accounts.google.com/o/oauth2/v2/auth?" + q.Encode()
@@ -55,8 +38,8 @@ func (s *OAuthService) GoogleAuthURL(state string) string {
 
 func (s *OAuthService) GitHubAuthURL(state string) string {
 	q := url.Values{}
-	q.Set("client_id", s.githubClientID)
-	q.Set("redirect_uri", s.githubRedirectURL)
+	q.Set("client_id", s.cfg().GitHubClientID)
+	q.Set("redirect_uri", s.cfg().GitHubRedirectURL)
 	q.Set("scope", "user:email")
 	return "https://github.com/login/oauth/authorize?" + q.Encode()
 }
@@ -89,7 +72,7 @@ func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*auth.OAuthUserInfo,
 	if tokenInfo.Error != "" {
 		return nil, fmt.Errorf("google token error: %s — %s", tokenInfo.Error, tokenInfo.ErrorDesc)
 	}
-	if tokenInfo.Aud != s.googleClientID {
+	if tokenInfo.Aud != s.cfg().GoogleClientID {
 		return nil, fmt.Errorf("token audience mismatch")
 	}
 	if tokenInfo.Email == "" {
@@ -104,9 +87,9 @@ func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*auth.OAuthUserInfo,
 func (s *OAuthService) ExchangeGoogleCode(code string) (*auth.OAuthUserInfo, error) {
 	data := url.Values{}
 	data.Set("code", code)
-	data.Set("client_id", s.googleClientID)
-	data.Set("client_secret", s.googleClientSecret)
-	data.Set("redirect_uri", s.googleRedirectURL)
+	data.Set("client_id", s.cfg().GoogleClientID)
+	data.Set("client_secret", s.cfg().GoogleClientSecret)
+	data.Set("redirect_uri", s.cfg().GoogleRedirectURL)
 	data.Set("grant_type", "authorization_code")
 
 	resp, err := http.Post("https://oauth2.googleapis.com/token",
@@ -160,9 +143,9 @@ func (s *OAuthService) ExchangeGoogleCode(code string) (*auth.OAuthUserInfo, err
 func (s *OAuthService) ExchangeGitHubCode(code string) (*auth.OAuthUserInfo, error) {
 	data := url.Values{}
 	data.Set("code", code)
-	data.Set("client_id", s.githubClientID)
-	data.Set("client_secret", s.githubClientSecret)
-	data.Set("redirect_uri", s.githubRedirectURL)
+	data.Set("client_id", s.cfg().GitHubClientID)
+	data.Set("client_secret", s.cfg().GitHubClientSecret)
+	data.Set("redirect_uri", s.cfg().GitHubRedirectURL)
 
 	req, _ := http.NewRequest("POST", "https://github.com/login/oauth/access_token",
 		strings.NewReader(data.Encode()))
@@ -254,14 +237,14 @@ func (s *OAuthService) ExchangeXCode(code, codeVerifier string) (*auth.OAuthUser
 	data := url.Values{}
 	data.Set("code", code)
 	data.Set("grant_type", "authorization_code")
-	data.Set("client_id", s.xClientID)
-	data.Set("redirect_uri", s.xRedirectURL)
+	data.Set("client_id", s.cfg().TwitterClientID)
+	data.Set("redirect_uri", s.cfg().TwitterRedirectURL)
 	data.Set("code_verifier", codeVerifier)
 
 	req, _ := http.NewRequest("POST", "https://api.twitter.com/2/oauth2/token",
 		strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(s.xClientID, s.xClientSecret)
+	req.SetBasicAuth(s.cfg().TwitterClientID, s.cfg().TwitterClientSecret)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

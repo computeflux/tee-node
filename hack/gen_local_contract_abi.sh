@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate *_gen.go (ExecCall / ExecQuery) and tee-chain/abis/*.json
-# for all contracts: gov, auth, gateway.
+# for all contracts: gov, auth, gateway, batch.
 ROOT="$(cd "$(dirname "$0")/../" && pwd)"
 cd "$ROOT"
 
@@ -33,6 +33,15 @@ go run "$GEN" \
   -mutation GatewayMutation \
   -query GatewayQuery \
   -struct Gateway
+
+# ── batch ──────────────────────────────────────────────────
+echo ">>> batch"
+go run "$GEN" \
+  -dir ./tee-chain/contracts/batch \
+  -out ./tee-chain/contracts/batch/batch_gen.go \
+  -mutation BatchMutation \
+  -query BatchQuery \
+  -struct Batch
 
 # ── Sync ABI to dapp ───────────────────────────────────────
 echo ">>> sync ABI to dapp"
