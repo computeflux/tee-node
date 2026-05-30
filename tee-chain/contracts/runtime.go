@@ -14,7 +14,7 @@ import (
 // 它实现了 model.ContractApi 接口，在 FinalizeTx / Query 等路径中传入区块高度、交易和调用方信息。
 // 每次合约调用都会创建一个新的 Runtime 实例，确保执行上下文的隔离性。
 type Runtime struct {
-	time   time.Time     // 当前区块时间戳，用于时间相关的业务逻辑判断
+	unix   int64         // 当前区块时间戳，用于时间相关的业务逻辑判断
 	height int64         // 当前区块高度，用于时间相关的业务逻辑判断
 	txn    *model.Txn    // 当前交易对象，包含交易的签名和原始数据
 	caller model.UniAddr // 调用者地址，标识合约方法的调用发起方
@@ -30,8 +30,8 @@ type Runtime struct {
 //
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
-func NewRuntime(height int64, time time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr) *Runtime {
-	return &Runtime{height: height, time: time, txn: txn, caller: caller, sudo: sudo}
+func NewRuntime(height int64, ts time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr) *Runtime {
+	return &Runtime{unix: ts.Unix(), height: height, txn: txn, caller: caller, sudo: sudo}
 }
 
 // GetHeight 获取当前区块高度。
@@ -47,7 +47,7 @@ func (r *Runtime) GetHeight() int64 {
 // 返回:
 //   - int64: 当前区块时间戳（单位：秒）
 func (r *Runtime) GetBlockTime() int64 {
-	return r.time.Unix()
+	return r.unix
 }
 
 // GetTxn 获取当前交易对象。
@@ -136,6 +136,7 @@ func SetContractInited(txn *model.Txn, contract string) error {
 func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
+		unix:   r.unix,
 		height: r.height,
 		txn:    r.txn,
 		caller: r.caller, // 保持原始调用者
@@ -158,6 +159,7 @@ func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, 
 func (r *Runtime) Call(target model.UniAddr, call model.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
+		unix:   r.unix,
 		height: r.height,
 		txn:    r.txn,
 		caller: r.caller, // 保持原始调用者

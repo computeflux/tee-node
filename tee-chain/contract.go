@@ -13,7 +13,7 @@ import (
 
 // ── Gateway 非 codec 查询接口（供 HTTP 层直接调用）──────
 
-func (app *TeeChain) gatewayRuntime() (*contracts.Runtime, error) {
+func (app *TeeChain) contractRuntime() (*contracts.Runtime, error) {
 	if model.DBINS == nil {
 		return nil, fmt.Errorf("DBINS is nil")
 	}
@@ -30,7 +30,7 @@ func (app *TeeChain) gatewayRuntime() (*contracts.Runtime, error) {
 
 // GatewayLookupAPIKey 根据 keyHash 查询链上 API Key 信息。
 func (app *TeeChain) GatewayLookupAPIKey(keyHash []byte) (*gateway.APIKeyInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (app *TeeChain) GatewayLookupAPIKey(keyHash []byte) (*gateway.APIKeyInfo, e
 
 // GatewayListActiveModels 查询链上活跃模型列表。
 func (app *TeeChain) GatewayListActiveModels(offset uint64, limit uint32) ([]gateway.ModelInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (app *TeeChain) GatewayListActiveModels(offset uint64, limit uint32) ([]gat
 
 // GatewayListActiveProviders 查询链上活跃 Provider 列表。
 func (app *TeeChain) GatewayListActiveProviders(offset uint64, limit uint32) ([]gateway.ProviderInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (app *TeeChain) GatewayListActiveProviders(offset uint64, limit uint32) ([]
 
 // GatewayGetProvider 查询单个 Provider。
 func (app *TeeChain) GatewayGetProvider(id uint64) (*gateway.ProviderInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (app *TeeChain) GatewayGetProvider(id uint64) (*gateway.ProviderInfo, error
 
 // GatewayGetModel 查询单个 Model。
 func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (app *TeeChain) GatewayGetModel(id uint64) (*gateway.ModelInfo, error) {
 
 // GatewayGetModelByName 按名称查询活跃模型（走 string exact 索引，O(1) 查询）。
 func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.ModelInfoWithID, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (app *TeeChain) GatewayGetModelByName(pid uint64, name string) (*gateway.Mo
 
 // GatewaySecretGetModel 查询单个 Model（TEE 内部，不脱敏）。
 func (app *TeeChain) GatewaySecretGetModel(id uint64) (*gateway.ModelInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (app *TeeChain) GatewaySecretGetModel(id uint64) (*gateway.ModelInfo, error
 
 // GatewaySecretGetModelByName 按名称查询模型（TEE 内部，不脱敏）。
 func (app *TeeChain) GatewaySecretGetModelByName(pid uint64, name string) (*gateway.ModelInfoWithID, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (app *TeeChain) GatewaySecretGetModelByName(pid uint64, name string) (*gate
 
 // GatewaySecretListActiveModels 查询活跃模型列表（TEE 内部，不脱敏）。
 func (app *TeeChain) GatewaySecretListActiveModels(offset uint64, limit uint32) ([]gateway.ModelInfo, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (app *TeeChain) GatewaySecretListActiveModels(offset uint64, limit uint32) 
 
 // GatewayGetProviderByName 按名称查询 Provider（走 string exact 索引，O(1) 查询）。
 func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.ProviderInfoWithID, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -138,9 +138,20 @@ func (app *TeeChain) GatewayGetProviderByName(name string) (*gateway.ProviderInf
 	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetProviderByName(name)
 }
 
+// GatewayGetCredit 查询用户剩余积分（credits - credit_useds）
+func (app *TeeChain) GatewayGetCredit(user model.UniAddr) (int64, error) {
+	runtime, err := app.contractRuntime()
+	if err != nil {
+		return 0, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return gateway.GatewayQuery{Gateway: *gateway.NewGateway(runtime)}.GetCredit(user)
+}
+
 // GatewayGetRechargeHistory 查询用户充值历史。
 func (app *TeeChain) GatewayGetRechargeHistory(user model.UniAddr, offset uint64, limit uint32) ([]gateway.RechargeRecord, error) {
-	runtime, err := app.gatewayRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -151,21 +162,9 @@ func (app *TeeChain) GatewayGetRechargeHistory(user model.UniAddr, offset uint64
 
 // ── Auth 合约桥接 ──────────────────────────────────────────
 
-func (app *TeeChain) authRuntime() (*contracts.Runtime, error) {
-	if model.DBINS == nil {
-		return nil, fmt.Errorf("DBINS is nil")
-	}
-	txn := model.DBINS.NewTransaction()
-	var sudo model.UniAddr
-	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
-		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
-	}
-	return contracts.NewRuntime(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo), nil
-}
-
 // AuthGetAuthUser 查询 Web3Auth 用户信息。
 func (app *TeeChain) AuthGetAuthUser(ref string) (*auth.AuthUserRecord, error) {
-	runtime, err := app.authRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +175,7 @@ func (app *TeeChain) AuthGetAuthUser(ref string) (*auth.AuthUserRecord, error) {
 
 // AuthGetPrivateKey 查询用户私钥。
 func (app *TeeChain) AuthGetPrivateKey(ref string) (*auth.PrivateKeyRecord, error) {
-	runtime, err := app.authRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +194,7 @@ func (app *TeeChain) AuthStoreAuthUser(ref string, ciphertext []byte) error {
 
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）
 func (app *TeeChain) AuthGetConfig() (*auth.AuthConfig, error) {
-	runtime, err := app.authRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +205,7 @@ func (app *TeeChain) AuthGetConfig() (*auth.AuthConfig, error) {
 
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）
 func (app *TeeChain) AuthGetPubConfig() (*auth.AuthConfig, error) {
-	runtime, err := app.authRuntime()
+	runtime, err := app.contractRuntime()
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +256,7 @@ func (app *TeeChain) AuthStorePrivateKey(ref string, ciphertext []byte) error {
 	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
-func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, t time.Time, height int64, call *model.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -277,7 +276,8 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *mod
 	if pub == nil {
 		return fmt.Errorf("dkg pubkey is nil")
 	}
-	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
+
+	runtime := contracts.NewRuntime(height, t, txn, address, model.UniAddr{
 		V: pub.ToBytes(),
 	})
 

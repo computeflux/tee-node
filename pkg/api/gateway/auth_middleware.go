@@ -109,6 +109,19 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// 4. 按用户 hash 选 endpoint（sticky）
 		token := GetTokenFromContext(r)
+
+		// 5. 检查用户积分
+		if bridge := getBridge(); bridge != nil {
+			credit, err := bridge.GatewayGetCredit(token.Addr)
+			if err != nil {
+				GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
+			} else if credit <= 0 {
+				GATEWAYLOG().Printf("[AUTH] insufficient credit for owner=%s, credit=%d", token.Owner, credit)
+				writeError(w, http.StatusPaymentRequired, "insufficient credit", "insufficient_credit")
+				return
+			}
+		}
+
 		userKey := token.Owner
 		if userKey == "" {
 			userKey = r.RemoteAddr

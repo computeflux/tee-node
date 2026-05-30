@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/edgelesssys/ego/attestation"
 	"github.com/edgelesssys/ego/attestation/tcbstatus"
 	"github.com/edgelesssys/ego/enclave"
@@ -76,10 +77,11 @@ func SgxVerify(reportData *TeeCall) (*TeeVerifyResult, error) {
 		return nil, errors.New("invalid report sign")
 	}
 
-	// TODO
-	// if report.Debug {
-	// 	return nil, errors.New("debug mode is not allowed")
-	// }
+	// TODO TODO TODO TODO TODO must open
+	if report.Debug {
+		util.LogError("TEE", "debug model")
+		// 	return nil, errors.New("debug mode is not allowed")
+	}
 
 	return &TeeVerifyResult{
 		TeeType:       reportData.TeeType,

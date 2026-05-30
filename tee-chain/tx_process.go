@@ -13,7 +13,7 @@ import (
 // ProcessTx 验证节点在 ProcessProposal 阶段验证区块中的交易。
 // 对 Contract 类型交易进行 nonce 预校验，确保区块中不包含 nonce 无效的交易，
 // 避免浪费区块空间（FinalizeBlock 中 nonce 无效会标记失败但仍占用空间）。
-func (app *TeeChain) ProcessTx(txs [][]byte, height int64, _time time.Time) abci.ResponseProcessProposal_ProposalStatus {
+func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.ResponseProcessProposal_ProposalStatus {
 	txn := model.DBINS.NewTransaction()
 	defer txn.Rollback()
 
@@ -57,7 +57,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, _time time.Time) abci
 			}
 
 			// 额外：合约 DryRun 预执行，确保合约逻辑不会失败，避免浪费区块空间
-			err = app.ContractMutation(caller, callerType, txn, height, p.Contract)
+			err = app.ContractMutation(caller, callerType, txn, time, height, p.Contract)
 			if err != nil {
 				fmt.Println("ProcessTx ContractMutation err:", err.Error())
 				return abci.ResponseProcessProposal_REJECT

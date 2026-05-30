@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
+func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
 	hubCalls := make([]*model.HubCall, 0, len(txs))
 	var txIndex int64 = 0
@@ -118,7 +118,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time
 				)
 			}
 
-			err = app.ContractMutation(caller, callerType, txn, height, p.Contract)
+			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
 			if err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
 				res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
@@ -135,11 +135,12 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, time
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
 				pub, _ := app.GetDkgPubkey()
-				runtime := contracts.NewRuntime(height, time, txn, model.UniAddr{
+				runtime := contracts.NewRuntime(height, ts, txn, model.UniAddr{
 					V: pub.ToBytes(),
 				}, model.UniAddr{
 					V: pub.ToBytes(),
 				})
+
 				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
 					res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
