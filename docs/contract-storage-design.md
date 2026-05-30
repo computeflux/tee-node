@@ -396,7 +396,6 @@ func (g GatewayQuery) GetProviderByName(name string) ([]ProviderInfo, error) {
 | `gateway` | Gateway 合约 |
 | `gov` | Gov 治理合约 |
 | `auth` | Auth 认证合约 |
-| `TEEKMS` | TEE KMS 本地密钥存储 |
 
 ## 7. 类型约束汇总
 

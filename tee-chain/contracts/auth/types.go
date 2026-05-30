@@ -47,8 +47,8 @@ type AuthConfig struct {
 	SMTPFrom            string `json:"smtp_from"`
 	SMTPFromName        string `json:"smtp_from_name"`
 	MockEmail           bool   `json:"mock_email"`
-	OTPLength           int    `json:"otp_length"`
-	OTPTTLMins          int    `json:"otp_ttl_mins"`
+	OTPLength           uint32 `json:"otp_length"`
+	OTPTTLMins          uint32 `json:"otp_ttl_mins"`
 	GoogleClientID      string `json:"google_client_id"`
 	GoogleClientSecret  string `json:"google_client_secret"`
 	GoogleRedirectURL   string `json:"google_redirect_url"`

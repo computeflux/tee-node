@@ -434,6 +434,33 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 	}, nil
 }
 
+// SetAuthConfig is the resolver for the setAuthConfig field.
+func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error) {
+	err := r.TeeChain.AuthSetConfig(
+		cfg.CorsOrigins,
+		cfg.SMTPHost,
+		uint32(cfg.SMTPPort),
+		cfg.SMTPUser,
+		cfg.SMTPPassword,
+		cfg.SMTPFrom,
+		cfg.SMTPFromName,
+		cfg.MockEmail,
+		cfg.GoogleClientID,
+		cfg.GoogleClientSecret,
+		cfg.GoogleRedirectURL,
+		cfg.GithubClientID,
+		cfg.GithubClientSecret,
+		cfg.GithubRedirectURL,
+		cfg.TwitterClientID,
+		cfg.TwitterClientSecret,
+		cfg.TwitterRedirectURL,
+	)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // OauthURL is the resolver for the oauthURL field.
 func (r *queryResolver) OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error) {
 	switch provider {
@@ -498,6 +525,39 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 		Challenge: &challenge,
 		Salt:      &user.Salt,
 		ExpiresAt: &expiresAt,
+	}, nil
+}
+
+// AuthConfig is the resolver for the authConfig field.
+func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, error) {
+	cfg, err := r.TeeChain.AuthGetPubConfig()
+	if err != nil {
+		return nil, err
+	}
+	if cfg == nil {
+		return nil, nil
+	}
+	// 链上 GetConfig 已脱敏，直接转换到 GraphQL 模型
+	return &model.AuthConfig{
+		CorsOrigins:         cfg.CORSOrigins,
+		SMTPHost:            cfg.SMTPHost,
+		SMTPPort:            int(cfg.SMTPPort),
+		SMTPUser:            cfg.SMTPUser,
+		SMTPPassword:        cfg.SMTPPassword,
+		SMTPFrom:            cfg.SMTPFrom,
+		SMTPFromName:        cfg.SMTPFromName,
+		MockEmail:           cfg.MockEmail,
+		OtpLength:           int(cfg.OTPLength),
+		OtpTTLMins:          int(cfg.OTPTTLMins),
+		GoogleClientID:      cfg.GoogleClientID,
+		GoogleClientSecret:  cfg.GoogleClientSecret,
+		GoogleRedirectURL:   cfg.GoogleRedirectURL,
+		GithubClientID:      cfg.GitHubClientID,
+		GithubClientSecret:  cfg.GitHubClientSecret,
+		GithubRedirectURL:   cfg.GitHubRedirectURL,
+		TwitterClientID:     cfg.TwitterClientID,
+		TwitterClientSecret: cfg.TwitterClientSecret,
+		TwitterRedirectURL:  cfg.TwitterRedirectURL,
 	}, nil
 }
 

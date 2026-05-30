@@ -56,6 +56,26 @@ type ChallengeResult {
 
 # ── 输入类型 ────────────────────────────────────────────
 
+input AuthConfigInput {
+  corsOrigins: String!
+  smtpHost: String!
+  smtpPort: Int!
+  smtpUser: String!
+  smtpPassword: String!
+  smtpFrom: String!
+  smtpFromName: String!
+  mockEmail: Boolean!
+  googleClientID: String!
+  googleClientSecret: String!
+  googleRedirectURL: String!
+  githubClientID: String!
+  githubClientSecret: String!
+  githubRedirectURL: String!
+  twitterClientID: String!
+  twitterClientSecret: String!
+  twitterRedirectURL: String!
+}
+
 input TxInput {
   from: String!
   to: String!
@@ -114,6 +134,33 @@ extend type Mutation {
 
   """外部钱包登录（MetaMask 等），通过签名验证身份后返回 API Token"""
   loginWithWallet(address: String!, signature: String!, message: String!): AuthResponse!
+
+  """设置 Auth 合约配置（节点管理员调用）"""
+  setAuthConfig(cfg: AuthConfigInput!): Boolean!
+}
+
+# ── 类型定义（对外公开，脱敏） ────────────────────────────
+
+type AuthConfig {
+  corsOrigins: String!
+  smtpHost: String!
+  smtpPort: Int!
+  smtpUser: String!
+  smtpPassword: String!
+  smtpFrom: String!
+  smtpFromName: String!
+  mockEmail: Boolean!
+  otpLength: Int!
+  otpTtlMins: Int!
+  googleClientID: String!
+  googleClientSecret: String!
+  googleRedirectURL: String!
+  githubClientID: String!
+  githubClientSecret: String!
+  githubRedirectURL: String!
+  twitterClientID: String!
+  twitterClientSecret: String!
+  twitterRedirectURL: String!
 }
 
 # ── Query ───────────────────────────────────────────────
@@ -127,4 +174,7 @@ extend type Query {
 
   """获取签名挑战（用于 challenge-response 密码验证）"""
   getChallenge(token: String!): ChallengeResult!
+
+  """获取 Auth 配置（对外公开，已脱敏）"""
+  authConfig: AuthConfig
 }

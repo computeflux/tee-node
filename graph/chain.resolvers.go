@@ -6,12 +6,30 @@ package graph
 
 import (
 	"context"
+	"time"
 
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
+
+// 使用 DKG Signer 签名交易并提交空块，触发新区块生成
+func (r *mutationResolver) StartEpoch(ctx context.Context) (bool, error) {
+	// 创建空块交易
+	call := &model.SysCall{
+		Payload: &model.SysCall_Empty{
+			Empty: time.Now().Unix(),
+		},
+	}
+
+	// 提交交易
+	if err := r.TeeChain.SubmitCallFromNode(call); err != nil {
+		return false, gqlerror.Errorf("SubmitTx: %v", err)
+	}
+
+	return true, nil
+}
 
 // ChainInfo is the resolver for the chain_info field.
 func (r *queryResolver) ChainInfo(ctx context.Context) ([]*model.ChainInfo, error) {

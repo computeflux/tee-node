@@ -142,37 +142,28 @@ export SIDE_CHAIN_PORT=30116
 export SIDE_CHAIN_RPC_PORT=30117
 export GQL_PORT=30118
 export CHAIN_ENV=test
-export TEE_GENESIS_NODE=true
 
-export JWT_SECRET="${JWT_SECRET:-dev-jwt-secret-change-in-production}"
-export SEED_SECRET="${SEED_SECRET:-dev-seed-secret-change-in-production}"
-export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:5173,http://xiaobai.asyou.me:5174}"
-
-# ---- Google OAuth ----
-export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-560483017331-cjvd4d7ed90ddibspo72fmdmc87nb91v.apps.googleusercontent.com}"
-export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-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}"
-export GOOGLE_REDIRECT_URL="${GOOGLE_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
-
-# ---- GitHub OAuth (optional) ----
-export GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-Ov23lioDBYC59lwL07p6}"
-export GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-efd1ff9c815b4353d4f57ed85847c17c2f498df5}"
-export GITHUB_REDIRECT_URL="${GITHUB_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
-
-# ---- X/Twitter OAuth (optional) ----
-export TWITTER_CLIENT_ID="${TWITTER_CLIENT_ID:-MFEzY1J1SWsyQlZyVXAxeTF1TDM6MTpjaQ}"
-export TWITTER_CLIENT_SECRET="${TWITTER_CLIENT_SECRET:-M74QGQdYEq-8Uyl3TTUVbWOqvYWEYHVLz5uibXbv_R9ARJbptE}"
-export TWITTER_REDIRECT_URL="${TWITTER_REDIRECT_URL:-http://xiaobai.asyou.me:5174/oauth/callback.html}"
-
-# ---- SMTP (email OTP) ----
-export MOCK_EMAIL="${MOCK_EMAIL:-false}"
-export SMTP_HOST="${SMTP_HOST:-smtp.feishu.cn}"
-export SMTP_PORT="${SMTP_PORT:-465}"
-export SMTP_USER="${SMTP_USER:-bai@asyou.me}"
-export SMTP_PASSWORD="${SMTP_PASSWORD:-lgMoryDJQuM88BoL}"
-export SMTP_FROM="${SMTP_FROM:-bai@asyou.me}"
-export SMTP_FROM_NAME="${SMTP_FROM_NAME:-compute flux}"
-
-
+# mutation{
+#   setAuthConfig(cfg:{
+#     corsOrigins: "*",
+#     smtpHost: "smtp.feishu.cn",
+#     smtpPort: 465,
+#     smtpUser: "bai@asyou.me",
+#     smtpPassword: "lgMoryDJQuM88BoL",
+#     smtpFrom: "bai@asyou.me",
+#     smtpFromName: "compute flux",
+#     mockEmail: true,
+#     googleClientID: "560483017331-cjvd4d7ed90ddibspo72fmdmc87nb91v.apps.googleusercontent.com",
+#     googleClientSecret: "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",
+#     googleRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
+#     githubClientID: "Ov23lioDBYC59lwL07p6",
+#     githubClientSecret: "efd1ff9c815b4353d4f57ed85847c17c2f498df5",
+#     githubRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
+#     twitterClientID: "MFEzY1J1SWsyQlZyVXAxeTF1TDM6MTpjaQ",
+#     twitterClientSecret: "M74QGQdYEq-8Uyl3TTUVbWOqvYWEYHVLz5uibXbv_R9ARJbptE",
+#     twitterRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
+#   })
+# }
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd / 

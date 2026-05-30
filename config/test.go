@@ -7,8 +7,8 @@ var TestChainConfig = model.ChainConfigType{
 	ChainType:     "substrate",
 	Cipher:        model.SuiteEd25519,
 	Urls:          []string{"wss://asset-hub-paseo.ibp.network", "wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://asset-hub-paseo.dotters.network"},
-	SubnetAddress: "0xd521e67f086bde744531e4f94eaaa1304c0fd0c2",
-	TokenAddress:  "0xdd74b788be939843568cf0882840615416eede98",
+	SubnetAddress: "0xc8b906a60fba4e36685214645a1a944ff749e34c",
+	TokenAddress:  "0x546689e0275ac5403a8b9670fb8094ed80946162",
 	NetworkLabel:  "Paseo (Asset Hub)",
 }
 

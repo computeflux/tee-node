@@ -2,6 +2,48 @@
 
 package model
 
+type AuthConfig struct {
+	CorsOrigins         string `json:"corsOrigins"`
+	SMTPHost            string `json:"smtpHost"`
+	SMTPPort            int    `json:"smtpPort"`
+	SMTPUser            string `json:"smtpUser"`
+	SMTPPassword        string `json:"smtpPassword"`
+	SMTPFrom            string `json:"smtpFrom"`
+	SMTPFromName        string `json:"smtpFromName"`
+	MockEmail           bool   `json:"mockEmail"`
+	OtpLength           int    `json:"otpLength"`
+	OtpTTLMins          int    `json:"otpTtlMins"`
+	GoogleClientID      string `json:"googleClientID"`
+	GoogleClientSecret  string `json:"googleClientSecret"`
+	GoogleRedirectURL   string `json:"googleRedirectURL"`
+	GithubClientID      string `json:"githubClientID"`
+	GithubClientSecret  string `json:"githubClientSecret"`
+	GithubRedirectURL   string `json:"githubRedirectURL"`
+	TwitterClientID     string `json:"twitterClientID"`
+	TwitterClientSecret string `json:"twitterClientSecret"`
+	TwitterRedirectURL  string `json:"twitterRedirectURL"`
+}
+
+type AuthConfigInput struct {
+	CorsOrigins         string `json:"corsOrigins"`
+	SMTPHost            string `json:"smtpHost"`
+	SMTPPort            int    `json:"smtpPort"`
+	SMTPUser            string `json:"smtpUser"`
+	SMTPPassword        string `json:"smtpPassword"`
+	SMTPFrom            string `json:"smtpFrom"`
+	SMTPFromName        string `json:"smtpFromName"`
+	MockEmail           bool   `json:"mockEmail"`
+	GoogleClientID      string `json:"googleClientID"`
+	GoogleClientSecret  string `json:"googleClientSecret"`
+	GoogleRedirectURL   string `json:"googleRedirectURL"`
+	GithubClientID      string `json:"githubClientID"`
+	GithubClientSecret  string `json:"githubClientSecret"`
+	GithubRedirectURL   string `json:"githubRedirectURL"`
+	TwitterClientID     string `json:"twitterClientID"`
+	TwitterClientSecret string `json:"twitterClientSecret"`
+	TwitterRedirectURL  string `json:"twitterRedirectURL"`
+}
+
 type ChainInfo struct {
 	IsMain         bool   `json:"is_main"`
 	SubnetContract string `json:"subnet_contract"`

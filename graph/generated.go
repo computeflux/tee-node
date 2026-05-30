@@ -49,6 +49,28 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AuthConfig struct {
+		CorsOrigins         func(childComplexity int) int
+		GithubClientID      func(childComplexity int) int
+		GithubClientSecret  func(childComplexity int) int
+		GithubRedirectURL   func(childComplexity int) int
+		GoogleClientID      func(childComplexity int) int
+		GoogleClientSecret  func(childComplexity int) int
+		GoogleRedirectURL   func(childComplexity int) int
+		MockEmail           func(childComplexity int) int
+		OtpLength           func(childComplexity int) int
+		OtpTTLMins          func(childComplexity int) int
+		SMTPFrom            func(childComplexity int) int
+		SMTPFromName        func(childComplexity int) int
+		SMTPHost            func(childComplexity int) int
+		SMTPPassword        func(childComplexity int) int
+		SMTPPort            func(childComplexity int) int
+		SMTPUser            func(childComplexity int) int
+		TwitterClientID     func(childComplexity int) int
+		TwitterClientSecret func(childComplexity int) int
+		TwitterRedirectURL  func(childComplexity int) int
+	}
+
 	AuthResponse struct {
 		Address  func(childComplexity int) int
 		Error    func(childComplexity int) int
@@ -87,10 +109,12 @@ type ComplexityRoot struct {
 		LoginWithWallet    func(childComplexity int, address string, signature string, message string) int
 		RequestOtp         func(childComplexity int, email string, clientID string) int
 		RequestRecovery    func(childComplexity int, recoveryEmail string) int
+		SetAuthConfig      func(childComplexity int, cfg model.AuthConfigInput) int
 		SetPassword        func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
 		SignMessage        func(childComplexity int, token string, message string, from string, passwordHash *string) int
 		SignTransaction    func(childComplexity int, token string, tx auth.TxInput) int
 		SocialLogin        func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string) int
+		StartEpoch         func(childComplexity int) int
 		SystemContractInit func(childComplexity int, contract string) int
 		UploadSecret       func(childComplexity int, index string, secret string, hash string, user string) int
 		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
@@ -104,6 +128,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AuthConfig     func(childComplexity int) int
 		AuthHealth     func(childComplexity int) int
 		ChainInfo      func(childComplexity int) int
 		ContractDryRun func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
@@ -174,6 +199,8 @@ type MutationResolver interface {
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
 	ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error)
 	LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error)
+	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
+	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
 	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (bool, error)
@@ -184,6 +211,7 @@ type QueryResolver interface {
 	OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error)
 	AuthHealth(ctx context.Context) (string, error)
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
+	AuthConfig(ctx context.Context) (*model.AuthConfig, error)
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
@@ -210,6 +238,139 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AuthConfig.corsOrigins":
+		if e.complexity.AuthConfig.CorsOrigins == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.CorsOrigins(childComplexity), true
+
+	case "AuthConfig.githubClientID":
+		if e.complexity.AuthConfig.GithubClientID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GithubClientID(childComplexity), true
+
+	case "AuthConfig.githubClientSecret":
+		if e.complexity.AuthConfig.GithubClientSecret == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GithubClientSecret(childComplexity), true
+
+	case "AuthConfig.githubRedirectURL":
+		if e.complexity.AuthConfig.GithubRedirectURL == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GithubRedirectURL(childComplexity), true
+
+	case "AuthConfig.googleClientID":
+		if e.complexity.AuthConfig.GoogleClientID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GoogleClientID(childComplexity), true
+
+	case "AuthConfig.googleClientSecret":
+		if e.complexity.AuthConfig.GoogleClientSecret == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GoogleClientSecret(childComplexity), true
+
+	case "AuthConfig.googleRedirectURL":
+		if e.complexity.AuthConfig.GoogleRedirectURL == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.GoogleRedirectURL(childComplexity), true
+
+	case "AuthConfig.mockEmail":
+		if e.complexity.AuthConfig.MockEmail == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.MockEmail(childComplexity), true
+
+	case "AuthConfig.otpLength":
+		if e.complexity.AuthConfig.OtpLength == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.OtpLength(childComplexity), true
+
+	case "AuthConfig.otpTtlMins":
+		if e.complexity.AuthConfig.OtpTTLMins == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.OtpTTLMins(childComplexity), true
+
+	case "AuthConfig.smtpFrom":
+		if e.complexity.AuthConfig.SMTPFrom == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPFrom(childComplexity), true
+
+	case "AuthConfig.smtpFromName":
+		if e.complexity.AuthConfig.SMTPFromName == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPFromName(childComplexity), true
+
+	case "AuthConfig.smtpHost":
+		if e.complexity.AuthConfig.SMTPHost == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPHost(childComplexity), true
+
+	case "AuthConfig.smtpPassword":
+		if e.complexity.AuthConfig.SMTPPassword == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPPassword(childComplexity), true
+
+	case "AuthConfig.smtpPort":
+		if e.complexity.AuthConfig.SMTPPort == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPPort(childComplexity), true
+
+	case "AuthConfig.smtpUser":
+		if e.complexity.AuthConfig.SMTPUser == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.SMTPUser(childComplexity), true
+
+	case "AuthConfig.twitterClientID":
+		if e.complexity.AuthConfig.TwitterClientID == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.TwitterClientID(childComplexity), true
+
+	case "AuthConfig.twitterClientSecret":
+		if e.complexity.AuthConfig.TwitterClientSecret == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.TwitterClientSecret(childComplexity), true
+
+	case "AuthConfig.twitterRedirectURL":
+		if e.complexity.AuthConfig.TwitterRedirectURL == nil {
+			break
+		}
+
+		return e.complexity.AuthConfig.TwitterRedirectURL(childComplexity), true
 
 	case "AuthResponse.address":
 		if e.complexity.AuthResponse.Address == nil {
@@ -426,6 +587,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.RequestRecovery(childComplexity, args["recoveryEmail"].(string)), true
 
+	case "Mutation.setAuthConfig":
+		if e.complexity.Mutation.SetAuthConfig == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setAuthConfig_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetAuthConfig(childComplexity, args["cfg"].(model.AuthConfigInput)), true
+
 	case "Mutation.setPassword":
 		if e.complexity.Mutation.SetPassword == nil {
 			break
@@ -473,6 +646,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SocialLogin(childComplexity, args["provider"].(string), args["idToken"].(*string), args["code"].(*string), args["codeVerifier"].(*string)), true
+
+	case "Mutation.start_epoch":
+		if e.complexity.Mutation.StartEpoch == nil {
+			break
+		}
+
+		return e.complexity.Mutation.StartEpoch(childComplexity), true
 
 	case "Mutation.systemContractInit":
 		if e.complexity.Mutation.SystemContractInit == nil {
@@ -552,6 +732,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.OAuthURL.AuthUrl(childComplexity), true
+
+	case "Query.authConfig":
+		if e.complexity.Query.AuthConfig == nil {
+			break
+		}
+
+		return e.complexity.Query.AuthConfig(childComplexity), true
 
 	case "Query.authHealth":
 		if e.complexity.Query.AuthHealth == nil {
@@ -831,6 +1018,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputAuthConfigInput,
 		ec.unmarshalInputKvalue,
 		ec.unmarshalInputTxInput,
 	)
@@ -1522,6 +1710,34 @@ func (ec *executionContext) field_Mutation_requestRecovery_argsRecoveryEmail(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_setAuthConfig_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_setAuthConfig_argsCfg(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["cfg"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_setAuthConfig_argsCfg(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (model.AuthConfigInput, error) {
+	if _, ok := rawArgs["cfg"]; !ok {
+		var zeroVal model.AuthConfigInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("cfg"))
+	if tmp, ok := rawArgs["cfg"]; ok {
+		return ec.unmarshalNAuthConfigInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAuthConfigInput(ctx, tmp)
+	}
+
+	var zeroVal model.AuthConfigInput
 	return zeroVal, nil
 }
 
@@ -2721,6 +2937,842 @@ func (ec *executionContext) _mutationMiddleware(ctx context.Context, obj *ast.Op
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AuthConfig_corsOrigins(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_corsOrigins(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CorsOrigins, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_corsOrigins(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpHost(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpHost(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPHost, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpHost(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpPort(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpPort(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPPort, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpPort(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpUser(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPUser, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpPassword(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpPassword(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPPassword, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpPassword(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpFrom(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpFrom(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPFrom, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpFrom(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_smtpFromName(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_smtpFromName(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SMTPFromName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_smtpFromName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_mockEmail(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_mockEmail(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MockEmail, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_mockEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_otpLength(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_otpLength(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OtpLength, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_otpLength(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_otpTtlMins(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_otpTtlMins(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OtpTTLMins, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_otpTtlMins(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_googleClientID(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_googleClientID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GoogleClientID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_googleClientID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_googleClientSecret(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_googleClientSecret(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GoogleClientSecret, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_googleClientSecret(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_googleRedirectURL(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_googleRedirectURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GoogleRedirectURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_googleRedirectURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_githubClientID(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_githubClientID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GithubClientID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_githubClientID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_githubClientSecret(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_githubClientSecret(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GithubClientSecret, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_githubClientSecret(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_githubRedirectURL(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_githubRedirectURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GithubRedirectURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_githubRedirectURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_twitterClientID(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_twitterClientID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TwitterClientID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_twitterClientID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_twitterClientSecret(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_twitterClientSecret(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TwitterClientSecret, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_twitterClientSecret(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AuthConfig_twitterRedirectURL(ctx context.Context, field graphql.CollectedField, obj *model.AuthConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthConfig_twitterRedirectURL(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TwitterRedirectURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthConfig_twitterRedirectURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _AuthResponse_success(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_success(ctx, field)
@@ -4327,6 +5379,105 @@ func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_setAuthConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_setAuthConfig(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SetAuthConfig(rctx, fc.Args["cfg"].(model.AuthConfigInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_setAuthConfig(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setAuthConfig_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_start_epoch(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_start_epoch(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().StartEpoch(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_start_epoch(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_systemContractInit(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_systemContractInit(ctx, field)
 	if err != nil {
@@ -4878,6 +6029,87 @@ func (ec *executionContext) fieldContext_Query_getChallenge(ctx context.Context,
 	if fc.Args, err = ec.field_Query_getChallenge_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_authConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_authConfig(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().AuthConfig(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.AuthConfig)
+	fc.Result = res
+	return ec.marshalOAuthConfig2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAuthConfig(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_authConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "corsOrigins":
+				return ec.fieldContext_AuthConfig_corsOrigins(ctx, field)
+			case "smtpHost":
+				return ec.fieldContext_AuthConfig_smtpHost(ctx, field)
+			case "smtpPort":
+				return ec.fieldContext_AuthConfig_smtpPort(ctx, field)
+			case "smtpUser":
+				return ec.fieldContext_AuthConfig_smtpUser(ctx, field)
+			case "smtpPassword":
+				return ec.fieldContext_AuthConfig_smtpPassword(ctx, field)
+			case "smtpFrom":
+				return ec.fieldContext_AuthConfig_smtpFrom(ctx, field)
+			case "smtpFromName":
+				return ec.fieldContext_AuthConfig_smtpFromName(ctx, field)
+			case "mockEmail":
+				return ec.fieldContext_AuthConfig_mockEmail(ctx, field)
+			case "otpLength":
+				return ec.fieldContext_AuthConfig_otpLength(ctx, field)
+			case "otpTtlMins":
+				return ec.fieldContext_AuthConfig_otpTtlMins(ctx, field)
+			case "googleClientID":
+				return ec.fieldContext_AuthConfig_googleClientID(ctx, field)
+			case "googleClientSecret":
+				return ec.fieldContext_AuthConfig_googleClientSecret(ctx, field)
+			case "googleRedirectURL":
+				return ec.fieldContext_AuthConfig_googleRedirectURL(ctx, field)
+			case "githubClientID":
+				return ec.fieldContext_AuthConfig_githubClientID(ctx, field)
+			case "githubClientSecret":
+				return ec.fieldContext_AuthConfig_githubClientSecret(ctx, field)
+			case "githubRedirectURL":
+				return ec.fieldContext_AuthConfig_githubRedirectURL(ctx, field)
+			case "twitterClientID":
+				return ec.fieldContext_AuthConfig_twitterClientID(ctx, field)
+			case "twitterClientSecret":
+				return ec.fieldContext_AuthConfig_twitterClientSecret(ctx, field)
+			case "twitterRedirectURL":
+				return ec.fieldContext_AuthConfig_twitterRedirectURL(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthConfig", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -8381,6 +9613,145 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputAuthConfigInput(ctx context.Context, obj any) (model.AuthConfigInput, error) {
+	var it model.AuthConfigInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"corsOrigins", "smtpHost", "smtpPort", "smtpUser", "smtpPassword", "smtpFrom", "smtpFromName", "mockEmail", "googleClientID", "googleClientSecret", "googleRedirectURL", "githubClientID", "githubClientSecret", "githubRedirectURL", "twitterClientID", "twitterClientSecret", "twitterRedirectURL"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "corsOrigins":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("corsOrigins"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CorsOrigins = data
+		case "smtpHost":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpHost"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPHost = data
+		case "smtpPort":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpPort"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPPort = data
+		case "smtpUser":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpUser"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPUser = data
+		case "smtpPassword":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpPassword"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPPassword = data
+		case "smtpFrom":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpFrom"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPFrom = data
+		case "smtpFromName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpFromName"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SMTPFromName = data
+		case "mockEmail":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mockEmail"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MockEmail = data
+		case "googleClientID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("googleClientID"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GoogleClientID = data
+		case "googleClientSecret":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("googleClientSecret"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GoogleClientSecret = data
+		case "googleRedirectURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("googleRedirectURL"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GoogleRedirectURL = data
+		case "githubClientID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("githubClientID"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GithubClientID = data
+		case "githubClientSecret":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("githubClientSecret"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GithubClientSecret = data
+		case "githubRedirectURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("githubRedirectURL"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GithubRedirectURL = data
+		case "twitterClientID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("twitterClientID"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TwitterClientID = data
+		case "twitterClientSecret":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("twitterClientSecret"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TwitterClientSecret = data
+		case "twitterRedirectURL":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("twitterRedirectURL"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TwitterRedirectURL = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputKvalue(ctx context.Context, obj any) (model.Kvalue, error) {
 	var it model.Kvalue
 	asMap := map[string]any{}
@@ -8505,6 +9876,135 @@ func (ec *executionContext) unmarshalInputTxInput(ctx context.Context, obj any) 
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var authConfigImplementors = []string{"AuthConfig"}
+
+func (ec *executionContext) _AuthConfig(ctx context.Context, sel ast.SelectionSet, obj *model.AuthConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, authConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AuthConfig")
+		case "corsOrigins":
+			out.Values[i] = ec._AuthConfig_corsOrigins(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpHost":
+			out.Values[i] = ec._AuthConfig_smtpHost(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpPort":
+			out.Values[i] = ec._AuthConfig_smtpPort(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpUser":
+			out.Values[i] = ec._AuthConfig_smtpUser(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpPassword":
+			out.Values[i] = ec._AuthConfig_smtpPassword(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpFrom":
+			out.Values[i] = ec._AuthConfig_smtpFrom(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "smtpFromName":
+			out.Values[i] = ec._AuthConfig_smtpFromName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "mockEmail":
+			out.Values[i] = ec._AuthConfig_mockEmail(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "otpLength":
+			out.Values[i] = ec._AuthConfig_otpLength(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "otpTtlMins":
+			out.Values[i] = ec._AuthConfig_otpTtlMins(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "googleClientID":
+			out.Values[i] = ec._AuthConfig_googleClientID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "googleClientSecret":
+			out.Values[i] = ec._AuthConfig_googleClientSecret(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "googleRedirectURL":
+			out.Values[i] = ec._AuthConfig_googleRedirectURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "githubClientID":
+			out.Values[i] = ec._AuthConfig_githubClientID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "githubClientSecret":
+			out.Values[i] = ec._AuthConfig_githubClientSecret(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "githubRedirectURL":
+			out.Values[i] = ec._AuthConfig_githubRedirectURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "twitterClientID":
+			out.Values[i] = ec._AuthConfig_twitterClientID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "twitterClientSecret":
+			out.Values[i] = ec._AuthConfig_twitterClientSecret(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "twitterRedirectURL":
+			out.Values[i] = ec._AuthConfig_twitterRedirectURL(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var authResponseImplementors = []string{"AuthResponse"}
 
@@ -8813,6 +10313,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "setAuthConfig":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setAuthConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "start_epoch":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_start_epoch(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "systemContractInit":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_systemContractInit(ctx, field)
@@ -8986,6 +10500,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "authConfig":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_authConfig(ctx, field)
 				return res
 			}
 
@@ -9773,6 +11306,11 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) unmarshalNAuthConfigInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAuthConfigInput(ctx context.Context, v any) (model.AuthConfigInput, error) {
+	res, err := ec.unmarshalInputAuthConfigInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNAuthResponse2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx context.Context, sel ast.SelectionSet, v auth.AuthResponse) graphql.Marshaler {
 	return ec._AuthResponse(ctx, sel, &v)
 }
@@ -10309,6 +11847,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalOAuthConfig2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAuthConfig(ctx context.Context, sel ast.SelectionSet, v *model.AuthConfig) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AuthConfig(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {

@@ -190,7 +190,7 @@ func (app *TeeChain) AuthStoreAuthUser(ref string, ciphertext []byte) error {
 	refBytes, _ := codec.Encode(ref)
 	cipherBytes, _ := codec.Encode(ciphertext)
 	nonceBytes, _ := codec.Encode([]byte{})
-	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_encrypted_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
+	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）
@@ -203,11 +203,58 @@ func (app *TeeChain) AuthGetConfig() (*auth.AuthConfig, error) {
 
 	return auth.AuthSecret{Auth: *auth.NewAuth(runtime)}.GetConfig()
 }
+
+// AuthGetConfig 查询认证服务配置（TEE 内部，不对外）
+func (app *TeeChain) AuthGetPubConfig() (*auth.AuthConfig, error) {
+	runtime, err := app.authRuntime()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return auth.AuthQuery{Auth: *auth.NewAuth(runtime)}.GetConfig()
+}
+
+// AuthSetConfig 设置认证服务配置（链上存储）。
+func (app *TeeChain) AuthSetConfig(
+	corsOrigins, smtpHost string, smtpPort uint32,
+	smtpUser, smtpPwd, smtpFrom, smtpFromName string, mockEmail bool,
+	googleID, googleSecret, googleRedirect string,
+	githubID, githubSecret, githubRedirect string,
+	twitterID, twitterSecret, twitterRedirect string,
+) error {
+	corsBytes, _ := codec.Encode(corsOrigins)
+	hostBytes, _ := codec.Encode(smtpHost)
+	portBytes, _ := codec.Encode(smtpPort)
+	userBytes, _ := codec.Encode(smtpUser)
+	pwdBytes, _ := codec.Encode(smtpPwd)
+	fromBytes, _ := codec.Encode(smtpFrom)
+	fromNameBytes, _ := codec.Encode(smtpFromName)
+	mockBytes, _ := codec.Encode(mockEmail)
+	gIDBytes, _ := codec.Encode(googleID)
+	gSecBytes, _ := codec.Encode(googleSecret)
+	gRedBytes, _ := codec.Encode(googleRedirect)
+	ghIDBytes, _ := codec.Encode(githubID)
+	ghSecBytes, _ := codec.Encode(githubSecret)
+	ghRedBytes, _ := codec.Encode(githubRedirect)
+	twIDBytes, _ := codec.Encode(twitterID)
+	twSecBytes, _ := codec.Encode(twitterSecret)
+	twRedBytes, _ := codec.Encode(twitterRedirect)
+
+	return app.SubmitContract("auth", model.MethodToSelectorBytes("set_config"), [][]byte{
+		corsBytes, hostBytes, portBytes, userBytes, pwdBytes,
+		fromBytes, fromNameBytes, mockBytes,
+		gIDBytes, gSecBytes, gRedBytes,
+		ghIDBytes, ghSecBytes, ghRedBytes,
+		twIDBytes, twSecBytes, twRedBytes,
+	})
+}
+
 func (app *TeeChain) AuthStorePrivateKey(ref string, ciphertext []byte) error {
 	refBytes, _ := codec.Encode(ref)
 	cipherBytes, _ := codec.Encode(ciphertext)
 	nonceBytes, _ := codec.Encode([]byte{})
-	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_encrypted_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
+	return app.SubmitContract("auth", model.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, height int64, call *model.ContractCall) error {

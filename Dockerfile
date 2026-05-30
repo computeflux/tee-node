@@ -5,4 +5,4 @@ ADD hack/build/dsecret  /
 
 RUN mkdir -p /token_chain_data
 
-CMD ["/bin/sh", "-c" ,"ego run dsecret"]
+CMD ["/bin/sh", "-c" ,"OE_SIMULATION=1 ego run dsecret"]

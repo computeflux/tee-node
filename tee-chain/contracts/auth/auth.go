@@ -123,8 +123,37 @@ func (a AuthMutation) SetConfig(
 	githubID, githubSecret, githubRedirect string,
 	twitterID, twitterSecret, twitterRedirect string,
 ) error {
-	if _, err := a.config.Get(a.api.GetTxn()); err == nil {
-		return errors.New("auth config already set")
+	existing, err := a.config.Get(a.api.GetTxn())
+	if err == nil && existing != nil {
+		// config 已存在，仅允许系统调用修改
+		if !a.api.CallbySystem() {
+			return errors.New("auth config already set, only system can update")
+		}
+		// system 调用：保留原有的 JWTSecret 和 SeedSecret，更新其他字段
+		cfg := AuthConfig{
+			JWTSecret:           existing.JWTSecret,
+			SeedSecret:          existing.SeedSecret,
+			CORSOrigins:         corsOrigins,
+			SMTPHost:            smtpHost,
+			SMTPPort:            smtpPort,
+			SMTPUser:            smtpUser,
+			SMTPPassword:        smtpPwd,
+			SMTPFrom:            smtpFrom,
+			SMTPFromName:        smtpFromName,
+			MockEmail:           mockEmail,
+			OTPLength:           existing.OTPLength,
+			OTPTTLMins:          existing.OTPTTLMins,
+			GoogleClientID:      googleID,
+			GoogleClientSecret:  googleSecret,
+			GoogleRedirectURL:   googleRedirect,
+			GitHubClientID:      githubID,
+			GitHubClientSecret:  githubSecret,
+			GitHubRedirectURL:   githubRedirect,
+			TwitterClientID:     twitterID,
+			TwitterClientSecret: twitterSecret,
+			TwitterRedirectURL:  twitterRedirect,
+		}
+		return a.config.Set(a.api.GetTxn(), cfg)
 	}
 
 	jwtSecret := make([]byte, 32)
@@ -160,6 +189,52 @@ func (a AuthMutation) SetConfig(
 		TwitterRedirectURL:  twitterRedirect,
 	}
 	return a.config.Set(a.api.GetTxn(), cfg)
+}
+
+func (a AuthQuery) GetConfig() (*AuthConfig, error) {
+	cfg, err := a.config.Get(a.api.GetTxn())
+	if err != nil {
+		return nil, err
+	}
+	if cfg == nil {
+		return nil, nil
+	}
+
+	// 脱敏：隐藏敏感字段
+	masked := &AuthConfig{
+		JWTSecret:           maskIfNonEmpty(cfg.JWTSecret),
+		SeedSecret:          maskIfNonEmpty(cfg.SeedSecret),
+		CORSOrigins:         cfg.CORSOrigins,
+		SMTPHost:            cfg.SMTPHost,
+		SMTPPort:            cfg.SMTPPort,
+		SMTPUser:            maskIfNonEmpty(cfg.SMTPUser),
+		SMTPPassword:        maskIfNonEmpty(cfg.SMTPPassword),
+		SMTPFrom:            cfg.SMTPFrom,
+		SMTPFromName:        cfg.SMTPFromName,
+		MockEmail:           cfg.MockEmail,
+		OTPLength:           cfg.OTPLength,
+		OTPTTLMins:          cfg.OTPTTLMins,
+		GoogleClientID:      cfg.GoogleClientID,
+		GoogleClientSecret:  maskIfNonEmpty(cfg.GoogleClientSecret),
+		GoogleRedirectURL:   cfg.GoogleRedirectURL,
+		GitHubClientID:      cfg.GitHubClientID,
+		GitHubClientSecret:  maskIfNonEmpty(cfg.GitHubClientSecret),
+		GitHubRedirectURL:   cfg.GitHubRedirectURL,
+		TwitterClientID:     cfg.TwitterClientID,
+		TwitterClientSecret: maskIfNonEmpty(cfg.TwitterClientSecret),
+		TwitterRedirectURL:  cfg.TwitterRedirectURL,
+	}
+	return masked, nil
+}
+
+func maskIfNonEmpty(s string) string {
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:2] + "****" + s[len(s)-2:]
 }
 
 func (a AuthSecret) GetConfig() (*AuthConfig, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 func (app *TeeChain) checkTx(txbt []byte) uint32 {
@@ -30,10 +31,15 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 		if contract := call.GetContract(); contract != nil {
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
-			if txNonce < expectedNonce {
-				fmt.Printf("CheckTx invalid nonce: expected >= %d, got %d (caller %x, type %d)\n",
+			if txNonce != expectedNonce {
+				util.LogWithYellow("CHECK TX", "invalid nonce: expected %d, got %d (caller %x, type %d)\n",
 					expectedNonce, txNonce, txbox.GetCaller(), txbox.GetCallerType())
-				return CodeTypeInvalidNonce
+				return CodeInvalidNode
+			}
+
+			err := app.ContractDryRun(txbox.Caller, txbox.CallerType, contract)
+			if err != nil {
+				return CodeInvalidNode
 			}
 		}
 	}

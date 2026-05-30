@@ -141,11 +141,11 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: uri: %w", err)
 		}
-		encryptedKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
 		if err != nil {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
-		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, encryptedKeys)
+		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
 		if err := model.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
@@ -703,5 +703,4 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
-	[4]byte{0xc3, 0x97, 0xc4, 0x04}: "update_model_api_key_ref",
 }

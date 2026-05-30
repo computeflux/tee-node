@@ -585,5 +585,52 @@ Authorization: Bearer tee_<64 hex chars>
 
 ---
 
-*文档生成/更新：2026-05-26*
-*基于代码版本：`tee-node` 项目当前仓库状态*
+## 2026-05-29 KMS 移除 + API Key 明文存储 + Auth 配置合约化
+
+### 变更 1：全面移除 TEE KMS 系统
+- **背景**：KMS（Global Key）在所有 TEE 节点间共享，无法提供真正的安全隔离
+- **删除**：
+  - `pkg/model/tee_kms.go` — GK 生成、加密、解密、密封等全部逻辑
+  - `pkg/model/tee_config.go` — 配置密封存储
+  - `pkg/dkg/kms_sync.go` — GK 跨节点同步
+  - `main.go` 中 GK 初始化/生成/导出代码块
+- **影响**：`GetGlobalKey()`、`EncryptWithGK()`、`DecryptWithGK()` 等函数全部移除
+
+### 变更 2：API Key 明文存储
+- **`ModelInfo.APIKeyRefs []string` → `ModelInfo.APIKeys []string`**：API Key 直接明文存储于合约
+- **移除 `EncryptedAPIKey` 类型**：不再有 ref → ciphertext/nonce 的间接引用
+- **移除 `encryptedKeys` store**：Gateway 合约不再维护加密 key 存储
+- **移除方法**：`RegisterEncryptedAPIKey()`、`GetEncryptedAPIKey()`
+- **合约方法变更**：
+  - `RegisterModel(..., apiKeys []string)` — 直接传明文
+  - `AddModelAPIKeyRef(modelID, apiKey string)` — 直接传明文
+  - `UpdateModelAPIKeyRef(modelID, index int, newApiKey string)` — 按索引更新
+  - `DeleteModelAPIKeyRef(modelID, index int)` — 按索引删除
+
+### 变更 3：API Key 查询脱敏
+- **GatewayQuery**（外部查询）所有返回的 `APIKeys` 自动脱敏：前 1/3 明文，后 2/3 替换为 `*`
+- **GatewaySecret**（TEE 内部）返回完整明文，用于路由转发
+- 路由层 `findGatewayModelByName()` 切换为 `GatewaySecretGetModelByName()`
+
+### 变更 4：Auth 合约清理
+- **类型重命名**：`EncryptedAuthUser` → `AuthUserRecord`，`EncryptedPrivateKey` → `PrivateKeyRecord`（移除无用 Nonce 字段）
+- **方法重命名**：
+  - `StoreEncryptedAuthUser(ref, ct, nonce)` → `StoreAuthUser(ref, ct)`
+  - `GetEncryptedAuthUser(ref)` → `GetAuthUser(ref)`
+  - 同理 `StorePrivateKey` / `GetPrivateKey`
+- **新增 `AuthSecret`**：TEE 内部查询，不对外暴露
+
+### 变更 5：Auth 配置合约化
+- **新增合约方法**：`SetConfig(...)` — 节点启动时调用一次，合约随机生成 JWT_SECRET / SEED_SECRET
+- **新增 `AuthConfig` 类型** — 包含 SMTP、OAuth、JWT 等全部配置
+- **AuthSecret.GetConfig()** — 仅 TEE 内部可查询完整配置
+- **LoadConfig(tc)** — 优先从合约读取，回退环境变量；首次成功读取后内存缓存
+- **WalletService / EmailService / OAuthService** — 改为接受 `*TeeChain`，运行时动态加载配置
+
+### 变更 6：GraphQL 清理
+- 删除 `teeEncrypt` query（与 KMS 一起移除）
+- 删除 `tee_encrypt.graphqls` 和 `tee_encrypt.resolvers.go`
+
+---
+
+*文档生成/更新：2026-05-29*

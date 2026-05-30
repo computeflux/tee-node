@@ -11,6 +11,8 @@ import (
 // 按顺序依次调用，任一失败则整体回滚。
 type Batch struct {
 	api model.ContractApi
+
+	status *model.StoreMapping[uint64, uint16]
 }
 
 type BatchQuery struct{ Batch }
@@ -37,5 +39,10 @@ func (b BatchMutation) ExecuteBatch(calls []BatchCall) error {
 			return fmt.Errorf("batch call %d (%s): %w", i, string(call.Name), err)
 		}
 	}
+
 	return nil
+}
+
+func (b BatchQuery) Status(index uint64) (string, error) {
+	return "ok", nil
 }

@@ -188,8 +188,7 @@
 3. **零知识证明**：重加密过程使用 NIZK 证明，确保正确性
 4. **TEE 验证**：生成 TEE 报告，证明代码在可信环境中运行
 5. **端到端加密**：从用户上传到 Pod 解密全程加密
-6. **Hash 不可逆**：API Key 链上仅存 blake2b 哈希
-7. **TEE KMS**：Provider API Key 通过全局对称密钥加密，链上只存引用标识
+6. **Hash 不可逆**：API Key 链上仅存 blake2b 哈希（用户认证 key）；Provider 模型 API Key 明文存储于合约，通过 GatewayQuery 脱敏返回
 
 ---
 
@@ -204,7 +203,6 @@
 | `contract-storage-design.md` | 合约存储分层设计（IndexedList / StoreList2D） |
 | `contract-security-analysis.md` | 合约安全审计与 Nonce 设计方案 |
 | `settlement-dual-storage-design.md` | 结算记录双存储设计说明 |
-| `tee-kms-design.md` | TEE 全局 KMS 设计方案 |
 | `relay-design.md` | 主链→侧链 Relay 同步架构 |
 | `tee-chain-design.md` | 侧链整体架构（DKG / 秘密管理 / 交易处理） |
 | `tee-tx-retry-design.md` | 交易失败重试机制 |
