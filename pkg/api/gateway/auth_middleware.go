@@ -35,6 +35,7 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
+
 		if !token.IsActive {
 			GATEWAYLOG().Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")

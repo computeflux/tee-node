@@ -1442,6 +1442,33 @@
         "args": [
           {
             "docs": [],
+            "label": "model_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "active_model",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xd41eabfd"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "offset",
             "type": {
               "displayName": [

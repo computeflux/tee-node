@@ -17,6 +17,15 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 	methodSel := [4]byte(call.Method[:4])
 	args := call.Args
 	switch methodSel {
+	case [4]byte{0xd4, 0x1e, 0xab, 0xfd}:
+		if err := model.RequireArgLen(args, 1, "active_model"); err != nil {
+			return err
+		}
+		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("active_model: modelID: %w", err)
+		}
+		return m.ActiveModel(modelID)
 	case [4]byte{0xe2, 0x1a, 0x50, 0x89}:
 		if err := model.RequireArgLen(args, 2, "add_model_a_p_i_key_ref"); err != nil {
 			return err

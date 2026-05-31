@@ -143,6 +143,7 @@ func (app *TeeChain) ApplyToChain() {
 	// 5) 提交成功，清空池中的所有相关 pending calls
 	for _, k := range validKeys {
 		err = model.DeleteByteKey(k)
+		fmt.Println("TX-POOL delete key", string(k))
 		if err != nil {
 			util.LogWithRed("TX-POOL", "delete key failed:", err)
 		}

@@ -8,15 +8,25 @@ import (
 // 1. 优先查询合约（链上注册的 API Key）
 // 2. 回退到本地 PebbleDB 直接查询（通过 key 索引 O(1)）
 func FindTokenByKey(key string) *model.GatewayTokenInfo {
-	// 优先走合约查询
+	// 优先走合约查询 api_tee_xxxxxx
 	if tk := lookupAPIKeyViaContract(key); tk != nil {
 		return tk
 	}
+
 	// Fallback: 本地 PebbleDB 通过 key 索引直接查询
-	tk, _ := model.GetGatewayTokenByKey(key)
-	if tk != nil && tk.IsActive {
+	tk, err := model.GetGatewayTokenByKey(key)
+	if err != nil {
+		GATEWAYLOG().Printf("[AUTH] local DB lookup error for %s: %v", key[:min(16, len(key))], err)
+	}
+
+	if tk == nil {
+		GATEWAYLOG().Printf("[AUTH] local DB not found for %s", key[:min(16, len(key))])
+	} else if !tk.IsActive {
+		GATEWAYLOG().Printf("[AUTH] token inactive for %s", key[:min(16, len(key))])
+	} else {
 		return tk
 	}
+
 	return nil
 }
 
@@ -24,9 +34,3 @@ func FindTokenByKey(key string) *model.GatewayTokenInfo {
 func findTokenCached(key string) *model.GatewayTokenInfo {
 	return FindTokenByKey(key)
 }
-
-// RefreshTokenCache 已废弃，本地 token 不再使用内存缓存。
-func RefreshTokenCache() {}
-
-// InvalidateCache 已废弃，本地 token 不再使用内存缓存。
-func InvalidateCache() {}

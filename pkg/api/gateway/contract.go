@@ -46,14 +46,17 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 	if bridge == nil {
 		return nil
 	}
+
 	info, err := bridge.GatewayLookupAPIKey(hash)
 	if err != nil {
 		return nil
 	}
+
 	if info == nil {
 		GATEWAYLOG().Printf("[GATEWAY] contract lookup returned nil for hexHash=%s", hexHash)
 		return nil
 	}
+
 	return &model.GatewayTokenInfo{
 		Owner:     fmt.Sprintf("%x", info.Owner.V),
 		Addr:      info.Owner,

@@ -116,22 +116,6 @@ func uintToStr(n uint64) string {
 	return string(buf[i:])
 }
 
-// ── Cache background refresh ─────────────────────────────
-
-var cacheRefreshOnce sync.Once
-
-func initCacheRefresh() {
-	cacheRefreshOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			for range ticker.C {
-				RefreshTokenCache()
-			}
-		}()
-	})
-}
-
 // ── Rate limiter cleanup ─────────────────────────────────
 
 var cleanupOnce sync.Once
@@ -316,8 +300,7 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 
 func InitOptimizations() {
 	initUsageWriter()
-	initCacheRefresh()
 	initRateLimiterCleanup()
 	initUsageSettler()
-	GATEWAYLOG().Printf("[OPT] async usage writer + cache refresh + rate limiter cleanup + usage settler started")
+	GATEWAYLOG().Printf("[OPT] async usage writer + rate limiter cleanup + usage settler started")
 }

@@ -41,17 +41,6 @@ type GatewayDailyUsage struct {
 	CachedToken uint64  `json:"cachedToken"`
 }
 
-// ── Token ────────────────────────────────────────────────
-
-func SetGatewayToken(id uint64, t *GatewayTokenInfo) error {
-	t.ID = id
-	return SetJson("GATEWAY", fmt.Sprintf("token:%d", id), t)
-}
-
-func GetGatewayToken(id uint64) (*GatewayTokenInfo, error) {
-	return GetJson[GatewayTokenInfo]("GATEWAY", fmt.Sprintf("token:%d", id))
-}
-
 // SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。
 func SetGatewayTokenByKey(t *GatewayTokenInfo) error {
 	return SetJson("GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t)
@@ -79,7 +68,7 @@ func ListUserGatewayTokens(user string, startKey uint64, size int) ([]*GatewayTo
 	return nil, nil
 }
 
-// ── ID Counter ───────────────────────────────────────────
+// ── NextID ───────────────────────────────────────────────
 
 func GetNextID(key string) uint64 {
 	val, err := GetJson[uint64]("GATEWAY", "next:"+key)

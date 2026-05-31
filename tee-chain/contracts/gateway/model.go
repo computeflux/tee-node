@@ -7,28 +7,6 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
-// maskAPIKey 保留前 1/3 明文，后 2/3 替换为 *
-func maskAPIKey(key string) string {
-	if len(key) <= 3 {
-		return strings.Repeat("*", len(key))
-	}
-	show := len(key) / 3
-	if show == 0 {
-		show = 1
-	}
-	maskLen := len(key) - show
-	return key[:show] + strings.Repeat("*", maskLen)
-}
-
-// maskAPIKeys 对所有 API Key 做脱敏处理
-func maskAPIKeys(keys []string) []string {
-	masked := make([]string, len(keys))
-	for i, k := range keys {
-		masked[i] = maskAPIKey(k)
-	}
-	return masked
-}
-
 // ── Model ────────────────────────────────────────────────
 
 // RegisterModel 注册模型
@@ -165,6 +143,12 @@ func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, index int, newApiK
 func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
 		m.IsActive = false
+	})
+}
+
+func (g GatewayMutation) ActiveModel(modelID uint64) error {
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.IsActive = true
 	})
 }
 
@@ -460,4 +444,26 @@ func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInf
 		out = append(out, *m)
 	}
 	return out, nil
+}
+
+// maskAPIKey 保留前 1/3 明文，后 2/3 替换为 *
+func maskAPIKey(key string) string {
+	if len(key) <= 3 {
+		return strings.Repeat("*", len(key))
+	}
+	show := len(key) / 3
+	if show == 0 {
+		show = 1
+	}
+	maskLen := len(key) - show
+	return key[:show] + strings.Repeat("*", maskLen)
+}
+
+// maskAPIKeys 对所有 API Key 做脱敏处理
+func maskAPIKeys(keys []string) []string {
+	masked := make([]string, len(keys))
+	for i, k := range keys {
+		masked[i] = maskAPIKey(k)
+	}
+	return masked
 }

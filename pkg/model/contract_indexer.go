@@ -157,15 +157,15 @@ func (r *idxRegistry[ID, V]) query(txn *Txn, expr QueryExpr) ([]ID, error) {
 	case QueryCond:
 		return r.queryCond(txn, e)
 	case QueryAND:
-		var candidates []ID
+		var candidates [][]ID
 		for _, child := range e {
 			ids, err := r.query(txn, child)
 			if err != nil {
 				return nil, err
 			}
-			candidates = mergeIDs(candidates, ids)
+			candidates = append(candidates, ids)
 		}
-		return candidates, nil
+		return mergeIDs(candidates...), nil
 	case QueryOR:
 		var all []ID
 		seen := make(map[string]bool)
@@ -228,12 +228,20 @@ func (r *idxRegistry[ID, V]) queryCond(txn *Txn, cond QueryCond) ([]ID, error) {
 	}
 }
 
-// mergeIDs 将 ids 与 candidates 取交集（若 candidates 为 nil 则直接返回 ids）。
-func mergeIDs[ID IdxID](candidates, ids []ID) []ID {
-	if candidates == nil {
-		return ids
+// mergeIDs 取多个 ID 列表的交集（AND）。
+// 任意一个集合为空则整体为空。
+func mergeIDs[ID IdxID](sets ...[]ID) []ID {
+	if len(sets) == 0 {
+		return nil
 	}
-	return IntersectIDs(candidates, ids)
+	result := sets[0]
+	for _, set := range sets[1:] {
+		result = IntersectIDs(result, set)
+		if len(result) == 0 {
+			break
+		}
+	}
+	return result
 }
 
 // ── IndexedStore (free-key) ──────────────────────────────
@@ -346,8 +354,18 @@ func (l *IndexedList[K, V]) UpdateFn(txn *Txn, key K, fn func(cur *V)) error {
 	return nil
 }
 
-// Clear 清除记录并清理索引。
+// Clear 删除记录，同时清理索引。
 func (l *IndexedList[K, V]) Clear(txn *Txn, key K) error {
+	cur, err := l.StoreList.Get(txn, key)
+	if err != nil || cur == nil {
+		return err
+	}
+	l.idx.indexRemove(txn, key, *cur)
+	return l.StoreList.Clear(txn, key)
+}
+
+// Delete 删除记录，同时清理索引。
+func (l *IndexedList[K, V]) Delete(txn *Txn, key K) error {
 	cur, err := l.StoreList.Get(txn, key)
 	if err != nil || cur == nil {
 		return err

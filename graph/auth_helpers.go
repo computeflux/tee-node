@@ -40,6 +40,7 @@ func createUserAPIKey(owner string, addrHex string) string {
 	}
 
 	token := &model.GatewayTokenInfo{
+		ID:        nextID,
 		Owner:     owner,
 		Addr:      addr,
 		Key:       apiKey,
@@ -48,10 +49,9 @@ func createUserAPIKey(owner string, addrHex string) string {
 		CreatedAt: uint64(time.Now().Unix()),
 		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()), // 默认1天过期
 	}
-	model.SetGatewayToken(nextID, token)
-	model.SetGatewayTokenByKey(token) // 同时写入 key 索引，供 O(1) 查询
+	model.SetGatewayTokenByKey(token) // 写入 key 索引，供 O(1) 查询
 	model.SetNextID("gateway_token", nextID+1)
-	gateway.InvalidateCache()
+
 	return apiKey
 }
 

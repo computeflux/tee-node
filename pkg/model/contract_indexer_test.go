@@ -12,7 +12,7 @@ import (
 // =============================================================================
 
 type testProduct struct {
-	Name     string `json:"name"`
+	Name     string `json:"name" idx:"exact"`
 	Category uint8  `idx:"exact"`                 // 精确索引
 	Price    uint64 `idx:"range"`                 // 范围索引
 	Stock    uint64 `idx:"range"`                 // 范围索引
@@ -521,6 +521,35 @@ func TestIndexedList_Query(t *testing.T) {
 	require.ElementsMatch(t, []uint64{0}, ids)
 }
 
+// TestIndexedList_QueryStringAndUint 验证 string 索引 + uint64 索引的 AND 查询返回交集
+func TestIndexedList_QueryStringAndUint(t *testing.T) {
+	txn, cleanup := setupIndexerTest(t)
+	defer cleanup()
+
+	list := NewIndexedList[uint64, testProduct]("test", "next_id", "item_")
+
+	// 插入数据：Category=1 有 A 和 MiniMax-M2.7; Category=2 也有 MiniMax-M2.7
+	_, _ = list.Insert(txn, testProduct{Name: "A", Category: 1})
+	_, _ = list.Insert(txn, testProduct{Name: "MiniMax-M2.7", Category: 1})
+	_, _ = list.Insert(txn, testProduct{Name: "MiniMax-M2.7", Category: 2})
+
+	// 查询 Category=1 AND Name=MiniMax-M2.7 — 应该只返回 ID 1（交集）
+	ids, err := list.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(1)},
+		QueryCond{Field: "Name", Val: "MiniMax-M2.7"},
+	})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []uint64{1}, ids, "应返回交集而非并集")
+
+	// 第一个条件为空时，整体应为空（regression test）
+	ids, err = list.Query(txn, QueryAND{
+		QueryCond{Field: "Category", Val: uint64(99)}, // 不存在
+		QueryCond{Field: "Name", Val: "MiniMax-M2.7"}, // 存在 2 条
+	})
+	require.NoError(t, err)
+	require.Len(t, ids, 0, "第一个条件为空时，AND 应返回空")
+}
+
 // ── StoreList legacy methods ─────────────────────────────
 
 func TestIndexedList_StoreListMethods(t *testing.T) {
@@ -965,7 +994,7 @@ func BenchmarkIndexedStore_Query(b *testing.B) {
 		_, _ = store.Query(txn, QueryAND{
 			QueryCond{Field: "Category", Val: uint64(2)},
 			QueryCond{Field: "Price", Val: Range{Min: 0, Max: 50}},
-	})
+		})
 	}
 }
 

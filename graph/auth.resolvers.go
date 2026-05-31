@@ -426,7 +426,6 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 
 	// 以 address 作为 owner 标识生成 API Key
 	apiKey := createUserAPIKey(address, address)
-
 	return &auth.AuthResponse{
 		Success: true,
 		Token:   apiKey,
