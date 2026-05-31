@@ -437,7 +437,6 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 // SetAuthConfig is the resolver for the setAuthConfig field.
 func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error) {
 	err := r.TeeChain.AuthSetConfig(
-		cfg.CorsOrigins,
 		cfg.SMTPHost,
 		uint32(cfg.SMTPPort),
 		cfg.SMTPUser,
@@ -539,7 +538,6 @@ func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, erro
 	}
 	// 链上 GetConfig 已脱敏，直接转换到 GraphQL 模型
 	return &model.AuthConfig{
-		CorsOrigins:         cfg.CORSOrigins,
 		SMTPHost:            cfg.SMTPHost,
 		SMTPPort:            int(cfg.SMTPPort),
 		SMTPUser:            cfg.SMTPUser,

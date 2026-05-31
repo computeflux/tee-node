@@ -43,23 +43,6 @@ func (d AuthMutation) ExecCall(call *model.ContractCall) error {
 			return fmt.Errorf("complete_recovery: newShareRoot: %w", err)
 		}
 		return m.CompleteRecovery(emailHash, newShareRoot)
-	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
-		if err := model.RequireArgLen(args, 3, "init"); err != nil {
-			return err
-		}
-		dkgPubKey, err := model.DecodeScaleArgBytes[[]byte](args[0])
-		if err != nil {
-			return fmt.Errorf("init: dkgPubKey: %w", err)
-		}
-		threshold, err := model.DecodeScaleArgBytes[uint32](args[1])
-		if err != nil {
-			return fmt.Errorf("init: threshold: %w", err)
-		}
-		totalNodes, err := model.DecodeScaleArgBytes[uint32](args[2])
-		if err != nil {
-			return fmt.Errorf("init: totalNodes: %w", err)
-		}
-		return m.Init(dkgPubKey, threshold, totalNodes)
 	case [4]byte{0xd0, 0x26, 0x71, 0x9d}:
 		if err := model.RequireArgLen(args, 3, "register_user"); err != nil {
 			return err
@@ -91,78 +74,74 @@ func (d AuthMutation) ExecCall(call *model.ContractCall) error {
 		}
 		return m.RequestRecovery(emailHash, newRoot)
 	case [4]byte{0x01, 0x9c, 0x81, 0x86}:
-		if err := model.RequireArgLen(args, 17, "set_config"); err != nil {
+		if err := model.RequireArgLen(args, 16, "set_config"); err != nil {
 			return err
 		}
-		corsOrigins, err := model.DecodeScaleArgBytes[string](args[0])
-		if err != nil {
-			return fmt.Errorf("set_config: corsOrigins: %w", err)
-		}
-		smtpHost, err := model.DecodeScaleArgBytes[string](args[1])
+		smtpHost, err := model.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpHost: %w", err)
 		}
-		smtpPort, err := model.DecodeScaleArgBytes[uint32](args[2])
+		smtpPort, err := model.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpPort: %w", err)
 		}
-		smtpUser, err := model.DecodeScaleArgBytes[string](args[3])
+		smtpUser, err := model.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpUser: %w", err)
 		}
-		smtpPwd, err := model.DecodeScaleArgBytes[string](args[4])
+		smtpPwd, err := model.DecodeScaleArgBytes[string](args[3])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpPwd: %w", err)
 		}
-		smtpFrom, err := model.DecodeScaleArgBytes[string](args[5])
+		smtpFrom, err := model.DecodeScaleArgBytes[string](args[4])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpFrom: %w", err)
 		}
-		smtpFromName, err := model.DecodeScaleArgBytes[string](args[6])
+		smtpFromName, err := model.DecodeScaleArgBytes[string](args[5])
 		if err != nil {
 			return fmt.Errorf("set_config: smtpFromName: %w", err)
 		}
-		mockEmail, err := model.DecodeScaleArgBytes[bool](args[7])
+		mockEmail, err := model.DecodeScaleArgBytes[bool](args[6])
 		if err != nil {
 			return fmt.Errorf("set_config: mockEmail: %w", err)
 		}
-		googleID, err := model.DecodeScaleArgBytes[string](args[8])
+		googleID, err := model.DecodeScaleArgBytes[string](args[7])
 		if err != nil {
 			return fmt.Errorf("set_config: googleID: %w", err)
 		}
-		googleSecret, err := model.DecodeScaleArgBytes[string](args[9])
+		googleSecret, err := model.DecodeScaleArgBytes[string](args[8])
 		if err != nil {
 			return fmt.Errorf("set_config: googleSecret: %w", err)
 		}
-		googleRedirect, err := model.DecodeScaleArgBytes[string](args[10])
+		googleRedirect, err := model.DecodeScaleArgBytes[string](args[9])
 		if err != nil {
 			return fmt.Errorf("set_config: googleRedirect: %w", err)
 		}
-		githubID, err := model.DecodeScaleArgBytes[string](args[11])
+		githubID, err := model.DecodeScaleArgBytes[string](args[10])
 		if err != nil {
 			return fmt.Errorf("set_config: githubID: %w", err)
 		}
-		githubSecret, err := model.DecodeScaleArgBytes[string](args[12])
+		githubSecret, err := model.DecodeScaleArgBytes[string](args[11])
 		if err != nil {
 			return fmt.Errorf("set_config: githubSecret: %w", err)
 		}
-		githubRedirect, err := model.DecodeScaleArgBytes[string](args[13])
+		githubRedirect, err := model.DecodeScaleArgBytes[string](args[12])
 		if err != nil {
 			return fmt.Errorf("set_config: githubRedirect: %w", err)
 		}
-		twitterID, err := model.DecodeScaleArgBytes[string](args[14])
+		twitterID, err := model.DecodeScaleArgBytes[string](args[13])
 		if err != nil {
 			return fmt.Errorf("set_config: twitterID: %w", err)
 		}
-		twitterSecret, err := model.DecodeScaleArgBytes[string](args[15])
+		twitterSecret, err := model.DecodeScaleArgBytes[string](args[14])
 		if err != nil {
 			return fmt.Errorf("set_config: twitterSecret: %w", err)
 		}
-		twitterRedirect, err := model.DecodeScaleArgBytes[string](args[16])
+		twitterRedirect, err := model.DecodeScaleArgBytes[string](args[15])
 		if err != nil {
 			return fmt.Errorf("set_config: twitterRedirect: %w", err)
 		}
-		return m.SetConfig(corsOrigins, smtpHost, smtpPort, smtpUser, smtpPwd, smtpFrom, smtpFromName, mockEmail, googleID, googleSecret, googleRedirect, githubID, githubSecret, githubRedirect, twitterID, twitterSecret, twitterRedirect)
+		return m.SetConfig(smtpHost, smtpPort, smtpUser, smtpPwd, smtpFrom, smtpFromName, mockEmail, googleID, googleSecret, googleRedirect, githubID, githubSecret, githubRedirect, twitterID, twitterSecret, twitterRedirect)
 	case [4]byte{0x35, 0x5d, 0x07, 0x2a}:
 		if err := model.RequireArgLen(args, 2, "set_recovery"); err != nil {
 			return err
@@ -244,12 +223,6 @@ func (q AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return codec.Encode(out)
-	case [4]byte{0xca, 0x06, 0xe5, 0xad}:
-		out, err := q.GetDKGPublicKey()
-		if err != nil {
-			return nil, err
-		}
-		return codec.Encode(out)
 	case [4]byte{0x47, 0xa7, 0xfe, 0x67}:
 		if err := model.RequireArgLen(args, 1, "get_private_key"); err != nil {
 			return nil, err
@@ -310,23 +283,19 @@ func (q AuthQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 func NewAuth(api model.ContractApi) *Auth {
 	return &Auth{
 		api:           api,
+		config:        &model.StoreValue[AuthConfig]{Namespace: "auth", Key: "v1_config"},
 		users:         &model.StoreMapping[[]byte, UserInfo]{Namespace: "auth", KeyPrefix: "user_"},
 		shareRoots:    &model.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_root_"},
 		recoveries:    &model.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "recoverie_"},
 		recoveryReqs:  &model.StoreMapping[[]byte, RecoveryRequest]{Namespace: "auth", KeyPrefix: "recovery_req_"},
 		encryptedAuth: &model.StoreMapping[string, AuthUserRecord]{Namespace: "auth", KeyPrefix: "encrypted_auth_"},
 		encryptedKey:  &model.StoreMapping[string, PrivateKeyRecord]{Namespace: "auth", KeyPrefix: "encrypted_key_"},
-		dkgPubKey:     &model.StoreValue[[]byte]{Namespace: "auth", Key: "dkg_pub_key"},
-		threshold:     &model.StoreValue[uint32]{Namespace: "auth", Key: "threshold"},
-		totalNodes:    &model.StoreValue[uint32]{Namespace: "auth", Key: "total_nodes"},
-		config:        &model.StoreValue[AuthConfig]{Namespace: "auth", Key: "config"},
 	}
 }
 
 var MethodMap = map[[4]byte]string{
 	[4]byte{0x06, 0xc7, 0xb1, 0x2f}: "get_auth_user",
 	[4]byte{0x25, 0x0b, 0x0e, 0xc4}: "get_config",
-	[4]byte{0xca, 0x06, 0xe5, 0xad}: "get_d_k_g_public_key",
 	[4]byte{0x47, 0xa7, 0xfe, 0x67}: "get_private_key",
 	[4]byte{0x7d, 0x24, 0x4c, 0x3f}: "get_recovery",
 	[4]byte{0x62, 0x76, 0x14, 0x9a}: "get_user",

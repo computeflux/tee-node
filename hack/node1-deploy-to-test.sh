@@ -9,7 +9,7 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
 ROOT_DIR="$(pwd)"
-REMOTE_HOST="47.79.98.142"
+REMOTE_HOST="computefluxtest"
 REMOTE_NODE_DIR="/srv/token_node1"
 REMOTE_CHAIN_DIR="$REMOTE_NODE_DIR/token_chain_data"
 REMOTE_BUILD_DIR="$REMOTE_NODE_DIR/build"
@@ -19,7 +19,7 @@ REMOTE_BUILD_DIR="$REMOTE_NODE_DIR/build"
 # -------------------------------------------------
 echo "[remote] Preparing $REMOTE_CHAIN_DIR and /token_chain_data on $REMOTE_HOST..."
 
-ssh -p 22 "root@$REMOTE_HOST" 'bash -s' << 'EOF'
+ssh $REMOTE_HOST 'bash -s' << 'EOF'
 set -e
 REMOTE_CHAIN_DIR="/srv/token_node1/token_chain_data"
 
@@ -50,15 +50,15 @@ EOF
 # -------------------------------------------------
 # 2. Sync build artifacts to remote
 # -------------------------------------------------
-echo "[local] Syncing build artifacts to root@$REMOTE_HOST:$REMOTE_BUILD_DIR ..."
-rsync -avz -e "ssh -p 22" --delete "$ROOT_DIR/hack/build/" "root@$REMOTE_HOST:$REMOTE_BUILD_DIR/"
+echo "[local] Syncing build artifacts to $REMOTE_HOST:$REMOTE_BUILD_DIR ..."
+rsync -avz -e ssh --delete "$ROOT_DIR/hack/build/" "$REMOTE_HOST:$REMOTE_BUILD_DIR/"
 
 # -------------------------------------------------
 # 3. Run node on remote host (same style as node0-run.sh)
 # -------------------------------------------------
 echo "[remote] Starting node1 on $REMOTE_HOST..."
 
-ssh -tt -p 22 "root@$REMOTE_HOST" 'bash -s' << 'EOF'
+ssh -tt $REMOTE_HOST 'bash -s' << 'EOF'
 set -e
 REMOTE_BUILD_DIR="/srv/token_node1/build"
 

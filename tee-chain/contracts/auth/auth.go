@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 var (
@@ -18,30 +19,18 @@ var (
 type Auth struct {
 	api model.ContractApi
 
+	config        *model.StoreValue[AuthConfig] `store:"keyPfx:v1_config"`
 	users         *model.StoreMapping[[]byte, UserInfo]
 	shareRoots    *model.StoreMapping[[]byte, []byte]
 	recoveries    *model.StoreMapping[[]byte, RecoveryConfig]
 	recoveryReqs  *model.StoreMapping[[]byte, RecoveryRequest]
 	encryptedAuth *model.StoreMapping[string, AuthUserRecord]   // email → AuthUser（跨节点同步）
 	encryptedKey  *model.StoreMapping[string, PrivateKeyRecord] // email → 私钥（跨节点同步）
-
-	dkgPubKey  *model.StoreValue[[]byte]
-	threshold  *model.StoreValue[uint32]
-	totalNodes *model.StoreValue[uint32]
-	config     *model.StoreValue[AuthConfig]
 }
 
 type AuthQuery struct{ Auth }
 type AuthMutation struct{ Auth }
 type AuthSecret struct{ Auth }
-
-// ── Init ─────────────────────────────────────────────────
-
-func (a AuthMutation) Init(dkgPubKey []byte, threshold uint32, totalNodes uint32) error {
-	a.dkgPubKey.Set(a.api.GetTxn(), dkgPubKey)
-	a.threshold.Set(a.api.GetTxn(), threshold)
-	return a.totalNodes.Set(a.api.GetTxn(), totalNodes)
-}
 
 // ── RegisterUser ─────────────────────────────────────────
 
@@ -117,7 +106,7 @@ func (a AuthMutation) CompleteRecovery(emailHash []byte, newShareRoot []byte) er
 // ── Config ─────────────────────────────────────────────────
 
 func (a AuthMutation) SetConfig(
-	corsOrigins, smtpHost string, smtpPort uint32,
+	smtpHost string, smtpPort uint32,
 	smtpUser, smtpPwd, smtpFrom, smtpFromName string, mockEmail bool,
 	googleID, googleSecret, googleRedirect string,
 	githubID, githubSecret, githubRedirect string,
@@ -125,15 +114,17 @@ func (a AuthMutation) SetConfig(
 ) error {
 	existing, err := a.config.Get(a.api.GetTxn())
 	if err == nil && existing != nil {
-		// config 已存在，仅允许系统调用修改
 		if !a.api.CallbySystem() {
+			util.LogWithYellow("AUTH", "config already set, only system can update")
 			return errors.New("auth config already set, only system can update")
 		}
+
+		util.LogWithYellow("AUTH", "set config with system")
+
 		// system 调用：保留原有的 JWTSecret 和 SeedSecret，更新其他字段
 		cfg := AuthConfig{
 			JWTSecret:           existing.JWTSecret,
 			SeedSecret:          existing.SeedSecret,
-			CORSOrigins:         corsOrigins,
 			SMTPHost:            smtpHost,
 			SMTPPort:            smtpPort,
 			SMTPUser:            smtpUser,
@@ -156,6 +147,8 @@ func (a AuthMutation) SetConfig(
 		return a.config.Set(a.api.GetTxn(), cfg)
 	}
 
+	util.LogWithYellow("AUTH", "config init")
+
 	jwtSecret := make([]byte, 32)
 	seedSecret := make([]byte, 32)
 	if _, err := rand.Read(jwtSecret); err != nil {
@@ -168,7 +161,6 @@ func (a AuthMutation) SetConfig(
 	cfg := AuthConfig{
 		JWTSecret:           hex.EncodeToString(jwtSecret),
 		SeedSecret:          hex.EncodeToString(seedSecret),
-		CORSOrigins:         corsOrigins,
 		SMTPHost:            smtpHost,
 		SMTPPort:            smtpPort,
 		SMTPUser:            smtpUser,
@@ -204,7 +196,6 @@ func (a AuthQuery) GetConfig() (*AuthConfig, error) {
 	masked := &AuthConfig{
 		JWTSecret:           maskIfNonEmpty(cfg.JWTSecret),
 		SeedSecret:          maskIfNonEmpty(cfg.SeedSecret),
-		CORSOrigins:         cfg.CORSOrigins,
 		SMTPHost:            cfg.SMTPHost,
 		SMTPPort:            cfg.SMTPPort,
 		SMTPUser:            maskIfNonEmpty(cfg.SMTPUser),
@@ -278,14 +269,6 @@ func (a AuthQuery) HasKey(emailHash []byte) (bool, error) {
 
 func (a AuthQuery) GetRecovery(emailHash []byte) (*RecoveryConfig, error) {
 	return a.recoveries.Get(a.api.GetTxn(), emailHash)
-}
-
-func (a AuthQuery) GetDKGPublicKey() ([]byte, error) {
-	v, err := a.dkgPubKey.Get(a.api.GetTxn())
-	if err != nil {
-		return nil, err
-	}
-	return *v, nil
 }
 
 func bytesEq(a, b []byte) bool {

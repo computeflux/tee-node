@@ -57,7 +57,6 @@ type ChallengeResult {
 # ── 输入类型 ────────────────────────────────────────────
 
 input AuthConfigInput {
-  corsOrigins: String!
   smtpHost: String!
   smtpPort: Int!
   smtpUser: String!

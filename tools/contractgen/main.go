@@ -806,6 +806,11 @@ func parseStructFields(st *ast.StructType, fset *token.FileSet) []storeField {
 		if valType, ok := parseStoreValueType(typStr); ok {
 			key := extractKeyPrefix(field, "key")
 			if key == "" {
+				// keyPfx:xxx 也可用于 StoreValue（去掉自动追加的下划线后缀）
+				key = extractKeyPrefix(field, "keyPfx")
+				key = strings.TrimSuffix(key, "_")
+			}
+			if key == "" {
 				key = storeKey(fieldName)
 			}
 			fields = append(fields, storeField{

@@ -11,7 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/contracts/batch"
 )
 
-const contractPoolNS = "CONTRACT_TX"
+const contractPoolNS = "POOL_TX"
 
 // HasPendingContract 检查指定 dedupKey 是否已在交易池中有待处理的调用。
 func (app *TeeChain) HasPendingContract(dedupKey string) bool {
@@ -142,7 +142,10 @@ func (app *TeeChain) ApplyToChain() {
 
 	// 5) 提交成功，清空池中的所有相关 pending calls
 	for _, k := range validKeys {
-		_ = model.DeleteByteKey(k)
+		err = model.DeleteByteKey(k)
+		if err != nil {
+			util.LogWithRed("TX-POOL", "delete key failed:", err)
+		}
 	}
 
 	util.LogWithGreen("TX-POOL", "batch apply complete")

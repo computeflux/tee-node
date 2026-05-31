@@ -13,7 +13,6 @@ type AuthConfig struct {
 	OTPLength    int
 	OTPTTLMins   int
 	MockEmail    bool
-	CORSOrigins  string
 	SMTPHost     string
 	SMTPPort     int
 	SMTPUser     string
@@ -55,27 +54,30 @@ func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 		cfg, err := tc.AuthGetConfig()
 		if err == nil && cfg != nil {
 			c := &AuthConfig{
-				JWTSecret:           cfg.JWTSecret,
-				SeedSecret:          cfg.SeedSecret,
-				OTPLength:           6,
-				OTPTTLMins:          5,
-				CORSOrigins:         cfg.CORSOrigins,
-				SMTPHost:            cfg.SMTPHost,
-				SMTPPort:            int(cfg.SMTPPort),
-				SMTPUser:            cfg.SMTPUser,
-				SMTPPassword:        cfg.SMTPPassword,
-				SMTPFrom:            cfg.SMTPFrom,
-				SMTPFromName:        cfg.SMTPFromName,
-				MockEmail:           cfg.MockEmail,
-				GoogleClientID:      cfg.GoogleClientID,
-				GoogleClientSecret:  cfg.GoogleClientSecret,
-				GoogleRedirectURL:   cfg.GoogleRedirectURL,
+				JWTSecret:  cfg.JWTSecret,
+				SeedSecret: cfg.SeedSecret,
+				OTPLength:  6,
+				OTPTTLMins: 5,
+
+				SMTPHost:     cfg.SMTPHost,
+				SMTPPort:     int(cfg.SMTPPort),
+				SMTPUser:     cfg.SMTPUser,
+				SMTPPassword: cfg.SMTPPassword,
+				SMTPFrom:     cfg.SMTPFrom,
+				SMTPFromName: cfg.SMTPFromName,
+				MockEmail:    cfg.MockEmail,
+
+				GoogleClientID:     cfg.GoogleClientID,
+				GoogleClientSecret: cfg.GoogleClientSecret,
+				GoogleRedirectURL:  cfg.GoogleRedirectURL,
+
 				TwitterClientID:     cfg.TwitterClientID,
 				TwitterClientSecret: cfg.TwitterClientSecret,
 				TwitterRedirectURL:  cfg.TwitterRedirectURL,
-				GitHubClientID:      cfg.GitHubClientID,
-				GitHubClientSecret:  cfg.GitHubClientSecret,
-				GitHubRedirectURL:   cfg.GitHubRedirectURL,
+
+				GitHubClientID:     cfg.GitHubClientID,
+				GitHubClientSecret: cfg.GitHubClientSecret,
+				GitHubRedirectURL:  cfg.GitHubRedirectURL,
 			}
 
 			cacheMu.Lock()

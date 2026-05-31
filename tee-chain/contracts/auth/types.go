@@ -39,7 +39,6 @@ type RecoveryRequest struct {
 type AuthConfig struct {
 	JWTSecret           string `json:"jwt_secret"`
 	SeedSecret          string `json:"seed_secret"`
-	CORSOrigins         string `json:"cors_origins"`
 	SMTPHost            string `json:"smtp_host"`
 	SMTPPort            uint32 `json:"smtp_port"`
 	SMTPUser            string `json:"smtp_user"`

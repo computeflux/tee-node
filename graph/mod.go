@@ -5,11 +5,16 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -46,23 +51,38 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 	// gateway.InitSeedData()
 
 	router := chi.NewRouter()
-	router.Use(AuthMiddleware())
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	router.Use(AuthMiddleware())
 
 	// GraphQL playground
 	router.Handle("/", playground.Handler("TEE-CHAIN", "/gql"))
 
-	srv := handler.NewDefaultServer(NewExecutableSchema(Config{
+	es := NewExecutableSchema(Config{
 		Resolvers:  resolver,
 		Directives: NewDirectiveRoot(),
-	}))
+	})
+
+	// Start gql server
+	srv := handler.New(es)
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 10 * time.Second,
+	})
+	srv.AddTransport(transport.Options{})
+	srv.AddTransport(transport.GET{})
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.MultipartForm{})
+	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	srv.Use(extension.Introspection{})
+	srv.Use(extension.AutomaticPersistedQuery{
+		Cache: lru.New[string](100),
+	})
 	router.Handle("/gql", srv)
 
 	// Gateway REST routes (OpenAI SDK compatible)

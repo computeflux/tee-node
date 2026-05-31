@@ -216,13 +216,12 @@ func (app *TeeChain) AuthGetPubConfig() (*auth.AuthConfig, error) {
 
 // AuthSetConfig 设置认证服务配置（链上存储）。
 func (app *TeeChain) AuthSetConfig(
-	corsOrigins, smtpHost string, smtpPort uint32,
+	smtpHost string, smtpPort uint32,
 	smtpUser, smtpPwd, smtpFrom, smtpFromName string, mockEmail bool,
 	googleID, googleSecret, googleRedirect string,
 	githubID, githubSecret, githubRedirect string,
 	twitterID, twitterSecret, twitterRedirect string,
 ) error {
-	corsBytes, _ := codec.Encode(corsOrigins)
 	hostBytes, _ := codec.Encode(smtpHost)
 	portBytes, _ := codec.Encode(smtpPort)
 	userBytes, _ := codec.Encode(smtpUser)
@@ -241,7 +240,7 @@ func (app *TeeChain) AuthSetConfig(
 	twRedBytes, _ := codec.Encode(twitterRedirect)
 
 	return app.SubmitContract("auth", model.MethodToSelectorBytes("set_config"), [][]byte{
-		corsBytes, hostBytes, portBytes, userBytes, pwdBytes,
+		hostBytes, portBytes, userBytes, pwdBytes,
 		fromBytes, fromNameBytes, mockBytes,
 		gIDBytes, gSecBytes, gRedBytes,
 		ghIDBytes, ghSecBytes, ghRedBytes,

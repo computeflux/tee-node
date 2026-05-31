@@ -39,6 +39,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 
 			err := app.ContractDryRun(txbox.Caller, txbox.CallerType, contract)
 			if err != nil {
+				util.LogWithYellow("CHECK TX", "DryRun error", err.Error())
 				return CodeInvalidNode
 			}
 		}
@@ -47,7 +48,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	// 验证节点之间的数据交换需要验证彼此的节点ID
 	if txbox.CallerType == 0 {
 		if len(txbox.Caller) == 0 {
-			fmt.Println("invalid node1")
+			fmt.Println("invalid node caller is nil")
 			return CodeInvalidNode
 		}
 
@@ -66,7 +67,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 		}
 
 		if !isIn {
-			fmt.Println("invalid node2")
+			fmt.Println("invalid node is not validator")
 			return CodeInvalidNode
 		}
 	}

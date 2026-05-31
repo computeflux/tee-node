@@ -26,14 +26,17 @@ func signTx(call *model.SysCall, signer ink.SignerType) (*model.Tx, error) {
 	if err != nil {
 		return nil, fmt.Errorf("BytesForSig: %w", err)
 	}
+
 	signature, err := signer.Sign(sigBytes)
 	if err != nil {
 		return nil, fmt.Errorf("sign: %w", err)
 	}
+
 	buf := new(bytes.Buffer)
 	if err := protoio.WriteMessage(call, buf); err != nil {
 		return nil, fmt.Errorf("marshal syscall: %w", err)
 	}
+
 	return &model.Tx{
 		Caller:     signer.Public(),
 		CallerType: 0,
