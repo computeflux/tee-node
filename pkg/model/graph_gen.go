@@ -25,7 +25,6 @@ type AuthConfig struct {
 }
 
 type AuthConfigInput struct {
-	CorsOrigins         string `json:"corsOrigins"`
 	SMTPHost            string `json:"smtpHost"`
 	SMTPPort            int    `json:"smtpPort"`
 	SMTPUser            string `json:"smtpUser"`

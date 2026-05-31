@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -11,27 +12,16 @@ import (
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
-// DecodeCaller 支持以下格式的 caller：
-//   - 20 字节 hex（40 个 hex 字符，可带 0x 前缀）：以太坊地址
-//   - 32 字节 hex（64 个 hex 字符，可带 0x 前缀）：ed25519/sr25519 公钥
-//   - SS58 格式：Polkadot 地址
-func DecodeCaller(s string) ([]byte, error) {
-	s = strings.TrimPrefix(s, "0x")
-	if b, err := hex.DecodeString(s); err == nil {
-		switch len(b) {
-		case 20: // 以太坊地址（20 字节）
-			return b, nil
-		case 32: // ed25519/sr25519 公钥
-			return b, nil
-		}
+// DecodeCaller 解析调用方地址（32 字节 hex 或 SS58）
+func DecodeCaller(caller string) ([]byte, error) {
+	if strings.HasPrefix(caller, "0x") {
+		return hex.DecodeString(caller[2:])
 	}
-	pub, err := model.PubKeyFromSS58(s)
-	if err != nil {
-		return nil, fmt.Errorf("caller 需为 20/32 字节 hex 或 SS58: %w", err)
-	}
-	return pub.Byte(), nil
+	_, address, err := model.SS58Decode(caller)
+	return address, err
 }
 
+// decodeArgs 将 hex 字符串数组解码为字节数组
 func decodeArgs(args []string) ([][]byte, error) {
 	argsBytes := make([][]byte, len(args))
 	for i, arg := range args {
@@ -48,7 +38,8 @@ func decodeArgs(args []string) ([][]byte, error) {
 
 // SubmitContractCall 提交合约调用（用户自行管理 nonce）。
 // nonce 必须严格递增，且已包含在签名中。
-func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract string, method [4]byte, argsBytes [][]byte, signature []byte) error {
+// 成功时返回交易 hash，失败返回错误。
+func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract string, method [4]byte, argsBytes [][]byte, signature []byte) (string, error) {
 	c := &model.ContractCall{
 		Name:   []byte(contract),
 		Method: method[:],
@@ -63,7 +54,7 @@ func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract
 
 	err := model.SideSysCallVerify(caller, callerType, call, signature)
 	if err != nil {
-		return fmt.Errorf("SubmitContractCall: contract verify: %w", err)
+		return "", fmt.Errorf("SubmitContractCall: contract verify: %w", err)
 	}
 
 	buf := new(bytes.Buffer)
@@ -75,7 +66,11 @@ func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract
 		Signature:  signature,
 	}
 
-	return teechain.SubmitTx(tx)
+	txHash := teechain.TxHash(tx)
+	if err := teechain.SubmitTx(tx); err != nil {
+		return "", err
+	}
+	return txHash, nil
 }
 
 // ContractQuery 只读查询

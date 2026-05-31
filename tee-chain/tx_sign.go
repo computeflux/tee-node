@@ -10,14 +10,14 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/wetee-dao/ink.go"
-	"golang.org/x/crypto/blake2b"
+	"crypto/sha256"
 )
 
-// TxHash 计算交易唯一标识（blake2b）
+// TxHash 计算交易唯一标识（sha256，与 CometBFT 一致）
 func TxHash(tx *model.Tx) string {
 	bt := GetTxBytes(tx)
-	h := blake2b.Sum256(bt)
-	return fmt.Sprintf("%x", h)
+	h := sha256.Sum256(bt)
+	return fmt.Sprintf("%X", h)
 }
 
 // signTx 签名并构造 Tx

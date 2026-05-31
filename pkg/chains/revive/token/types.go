@@ -14,6 +14,9 @@ type Error struct { // Enum
 	InsufficientBalance         *bool // 3
 	TransferFailed              *bool // 4
 	ZeroAddress                 *bool // 5
+	ERC20NotSupported           *bool // 6
+	ERC20Inactive               *bool // 7
+	ERC20TransferFailed         *bool // 8
 }
 
 func (ty Error) Encode(encoder scale.Encoder) (err error) {
@@ -64,6 +67,30 @@ func (ty Error) Encode(encoder scale.Encoder) (err error) {
 		}
 		return nil
 	}
+
+	if ty.ERC20NotSupported != nil {
+		err = encoder.PushByte(6)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if ty.ERC20Inactive != nil {
+		err = encoder.PushByte(7)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if ty.ERC20TransferFailed != nil {
+		err = encoder.PushByte(8)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	return fmt.Errorf("unrecognized enum")
 }
 
@@ -97,6 +124,18 @@ func (ty *Error) Decode(decoder scale.Decoder) (err error) {
 		t := true
 		ty.ZeroAddress = &t
 		return
+	case 6: // Base
+		t := true
+		ty.ERC20NotSupported = &t
+		return
+	case 7: // Base
+		t := true
+		ty.ERC20Inactive = &t
+		return
+	case 8: // Base
+		t := true
+		ty.ERC20TransferFailed = &t
+		return
 	default:
 		return fmt.Errorf("unrecognized enum")
 	}
@@ -125,6 +164,18 @@ func (ty *Error) Error() string {
 	if ty.ZeroAddress != nil {
 		return "ZeroAddress"
 	}
+
+	if ty.ERC20NotSupported != nil {
+		return "ERC20NotSupported"
+	}
+
+	if ty.ERC20Inactive != nil {
+		return "ERC20Inactive"
+	}
+
+	if ty.ERC20TransferFailed != nil {
+		return "ERC20TransferFailed"
+	}
 	return "Unknown"
 }
 
@@ -133,9 +184,14 @@ type EventRecord struct { // Composite
 	EventType      []byte
 	EventData      [][]byte
 }
-type Tuple_22 struct { // Tuple
-	F0 types.U256
+type Tuple_24 struct { // Tuple
+	F0 bool
 	F1 types.U256
+	F2 types.U256
+}
+type Tuple_26 struct { // Tuple
+	F0 types.H160
+	F1 bool
 	F2 types.U256
 	F3 types.U256
 }

@@ -45,6 +45,7 @@ extend type Mutation {
   """
   执行指定合约调用 gov:method 为方法名 args 为字符串参数列表
   链上 Tx.contract 为 SCALE(Method string, Args []byte)，Args 为 json.Marshal(args)，args 每项为 hex(SCALE(单参))。
+  返回交易 hash，前端可用此 hash 通过 txStatus 查询执行结果。
   """
   contractCall(
     """ 调用方地址（32 字节 hex 或 SS58）"""
@@ -61,5 +62,5 @@ extend type Mutation {
     args: [String!]!
     """ 对 caller || caller_type || nonce || call 的签名"""
     signature: String!
-  ): Boolean!
+  ): String!
 }

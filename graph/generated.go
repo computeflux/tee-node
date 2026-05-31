@@ -203,7 +203,7 @@ type MutationResolver interface {
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
-	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (bool, error)
+	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (string, error)
 	UploadSecret(ctx context.Context, index string, secret string, hash string, user string) (bool, error)
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
 }
@@ -5636,9 +5636,9 @@ func (ec *executionContext) _Mutation_contractCall(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(bool)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_contractCall(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5648,7 +5648,7 @@ func (ec *executionContext) fieldContext_Mutation_contractCall(ctx context.Conte
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	defer func() {
@@ -9620,20 +9620,13 @@ func (ec *executionContext) unmarshalInputAuthConfigInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"corsOrigins", "smtpHost", "smtpPort", "smtpUser", "smtpPassword", "smtpFrom", "smtpFromName", "mockEmail", "googleClientID", "googleClientSecret", "googleRedirectURL", "githubClientID", "githubClientSecret", "githubRedirectURL", "twitterClientID", "twitterClientSecret", "twitterRedirectURL"}
+	fieldsInOrder := [...]string{"smtpHost", "smtpPort", "smtpUser", "smtpPassword", "smtpFrom", "smtpFromName", "mockEmail", "googleClientID", "googleClientSecret", "googleRedirectURL", "githubClientID", "githubClientSecret", "githubRedirectURL", "twitterClientID", "twitterClientSecret", "twitterRedirectURL"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "corsOrigins":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("corsOrigins"))
-			data, err := ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.CorsOrigins = data
 		case "smtpHost":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("smtpHost"))
 			data, err := ec.unmarshalNString2string(ctx, v)

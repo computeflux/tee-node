@@ -78,37 +78,39 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 }
 
 // ContractCall is the resolver for the contractCall field.
-func (r *mutationResolver) ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (bool, error) {
+// 返回交易 hash，前端可用此 hash 通过 txStatus 查询执行状态。
+func (r *mutationResolver) ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (string, error) {
 	if callerType == 0 {
-		return false, gqlerror.Errorf("ContractCall: only caller type >0 is supported")
+		return "", gqlerror.Errorf("ContractCall: only caller type >0 is supported")
 	}
 
 	callerBytes, err := DecodeCaller(caller)
 	if err != nil {
-		return false, gqlerror.Errorf("ContractCall DecodeCaller: %v", err)
+		return "", gqlerror.Errorf("ContractCall DecodeCaller: %v", err)
 	}
 
 	argBytes, err := decodeArgs(args)
 	if err != nil {
-		return false, gqlerror.Errorf("ContractCall: %v", err)
+		return "", gqlerror.Errorf("ContractCall: %v", err)
 	}
 
 	sig, err := hex.DecodeString(signature)
 	if err != nil {
-		return false, gqlerror.Errorf("ContractCall DecodeString sign: %v", err)
+		return "", gqlerror.Errorf("ContractCall DecodeString sign: %v", err)
 	}
 
 	// 先 DryRun 验证合约执行逻辑，避免无效交易进入 mempool
 	_, err = ContractDryRun(callerBytes, callerType, contract, true, method, argBytes)
 	if err != nil {
-		return false, gqlerror.Errorf("ContractDryRun failed: %v", err)
+		return "", gqlerror.Errorf("ContractDryRun failed: %v", err)
 	}
 
 	// 用户交易走原始路径，不经 TxManager（TxManager 仅用于节点自身交易）
-	if err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, model.MethodToSelector(method), argBytes, sig); err != nil {
-		return false, gqlerror.Errorf("SubmitTx: %v", err)
+	txHash, err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, model.MethodToSelector(method), argBytes, sig)
+	if err != nil {
+		return "", gqlerror.Errorf("SubmitTx: %v", err)
 	}
-	return true, nil
+	return txHash, nil
 }
 
 // ContractQuery is the resolver for the contractDryRun field.

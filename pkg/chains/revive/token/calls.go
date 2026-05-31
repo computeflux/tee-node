@@ -317,6 +317,74 @@ func (c *Token) CallOfSetTokenUnit(
 	)
 }
 
+func (c *Token) DryRunSetErc20Token(
+	token types.H160, active bool, rate types.U256, unit types.U256, __ink_params chain.DryRunParams,
+) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "set_erc20_token")
+	}
+	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x593f9b60",
+			Args:     []any{token, active, rate, unit},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	if v != nil && v.IsErr {
+		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
+	}
+
+	return v, gas, nil
+}
+
+func (c *Token) ExecSetErc20Token(
+	token types.H160, active bool, rate types.U256, unit types.U256, __ink_params chain.ExecParams,
+) error {
+	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
+	_param.PayAmount = __ink_params.PayAmount
+	_, gas, err := c.DryRunSetErc20Token(token, active, rate, unit, _param)
+	if err != nil {
+		return err
+	}
+	return chain.CallInk(
+		c,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x593f9b60",
+			Args:     []any{token, active, rate, unit},
+		},
+		__ink_params,
+	)
+}
+
+func (c *Token) CallOfSetErc20Token(
+	token types.H160, active bool, rate types.U256, unit types.U256, __ink_params chain.DryRunParams,
+) (*types.Call, error) {
+	_, gas, err := c.DryRunSetErc20Token(token, active, rate, unit, __ink_params)
+	if err != nil {
+		return nil, err
+	}
+	return chain.CallOfTransaction(
+		c,
+		__ink_params.PayAmount,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x593f9b60",
+			Args:     []any{token, active, rate, unit},
+		},
+	)
+}
+
 func (c *Token) DryRunRecharge(
 	__ink_params chain.DryRunParams,
 ) (*util.Result[types.U256, Error], *chain.DryRunReturnGas, error) {
@@ -453,6 +521,74 @@ func (c *Token) CallOfWithdraw(
 	)
 }
 
+func (c *Token) DryRunWithdrawErc20(
+	token types.H160, user types.H160, points types.U256, __ink_params chain.DryRunParams,
+) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "withdraw_erc20")
+	}
+	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x5ab128ed",
+			Args:     []any{token, user, points},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	if v != nil && v.IsErr {
+		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
+	}
+
+	return v, gas, nil
+}
+
+func (c *Token) ExecWithdrawErc20(
+	token types.H160, user types.H160, points types.U256, __ink_params chain.ExecParams,
+) error {
+	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
+	_param.PayAmount = __ink_params.PayAmount
+	_, gas, err := c.DryRunWithdrawErc20(token, user, points, _param)
+	if err != nil {
+		return err
+	}
+	return chain.CallInk(
+		c,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x5ab128ed",
+			Args:     []any{token, user, points},
+		},
+		__ink_params,
+	)
+}
+
+func (c *Token) CallOfWithdrawErc20(
+	token types.H160, user types.H160, points types.U256, __ink_params chain.DryRunParams,
+) (*types.Call, error) {
+	_, gas, err := c.DryRunWithdrawErc20(token, user, points, __ink_params)
+	if err != nil {
+		return nil, err
+	}
+	return chain.CallOfTransaction(
+		c,
+		__ink_params.PayAmount,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x5ab128ed",
+			Args:     []any{token, user, points},
+		},
+	)
+}
+
 func (c *Token) DryRunRechargeSol(
 	__ink_params chain.DryRunParams,
 ) (*util.Result[types.U256, Error], *chain.DryRunReturnGas, error) {
@@ -521,22 +657,22 @@ func (c *Token) CallOfRechargeSol(
 	)
 }
 
-func (c *Token) DryRunWithdrawSol(
-	user types.H160, points types.U256, __ink_params chain.DryRunParams,
-) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
+func (c *Token) DryRunRechargeErc20(
+	token types.H160, amount types.U256, __ink_params chain.DryRunParams,
+) (*util.Result[types.U256, Error], *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "withdraw_sol")
+		util.LogWithPurple("[ DryRun   method ]", "recharge_erc20")
 	}
-	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
+	v, gas, err := chain.DryRunInk[util.Result[types.U256, Error]](
 		c,
 		__ink_params.Origin,
 		__ink_params.PayAmount,
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0xafde79c9",
-			Args:     []any{user, points},
+			Selector: "0xbed17916",
+			Args:     []any{token, amount},
 		},
 	)
 	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
@@ -549,12 +685,12 @@ func (c *Token) DryRunWithdrawSol(
 	return v, gas, nil
 }
 
-func (c *Token) ExecWithdrawSol(
-	user types.H160, points types.U256, __ink_params chain.ExecParams,
+func (c *Token) ExecRechargeErc20(
+	token types.H160, amount types.U256, __ink_params chain.ExecParams,
 ) error {
 	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
 	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunWithdrawSol(user, points, _param)
+	_, gas, err := c.DryRunRechargeErc20(token, amount, _param)
 	if err != nil {
 		return err
 	}
@@ -563,17 +699,17 @@ func (c *Token) ExecWithdrawSol(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0xafde79c9",
-			Args:     []any{user, points},
+			Selector: "0xbed17916",
+			Args:     []any{token, amount},
 		},
 		__ink_params,
 	)
 }
 
-func (c *Token) CallOfWithdrawSol(
-	user types.H160, points types.U256, __ink_params chain.DryRunParams,
+func (c *Token) CallOfRechargeErc20(
+	token types.H160, amount types.U256, __ink_params chain.DryRunParams,
 ) (*types.Call, error) {
-	_, gas, err := c.DryRunWithdrawSol(user, points, __ink_params)
+	_, gas, err := c.DryRunRechargeErc20(token, amount, __ink_params)
 	if err != nil {
 		return nil, err
 	}
@@ -583,8 +719,8 @@ func (c *Token) CallOfWithdrawSol(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0xafde79c9",
-			Args:     []any{user, points},
+			Selector: "0xbed17916",
+			Args:     []any{token, amount},
 		},
 	)
 }
@@ -661,30 +797,6 @@ func (c *Token) QueryGetEvent(
 	return v, gas, nil
 }
 
-func (c *Token) QueryGetBalance(
-	user types.H160, __ink_params chain.DryRunParams,
-) (*types.U256, *chain.DryRunReturnGas, error) {
-	if c.ChainClient.Debug {
-		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "get_balance")
-	}
-	v, gas, err := chain.DryRunInk[types.U256](
-		c,
-		__ink_params.Origin,
-		__ink_params.PayAmount,
-		__ink_params.GasLimit,
-		__ink_params.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0x3b9e11d4",
-			Args:     []any{user},
-		},
-	)
-	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
-		return nil, nil, err
-	}
-	return v, gas, nil
-}
-
 func (c *Token) QueryToPoints(
 	dot_amount types.U256, __ink_params chain.DryRunParams,
 ) (*types.U256, *chain.DryRunReturnGas, error) {
@@ -700,30 +812,6 @@ func (c *Token) QueryToPoints(
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
 			Selector: "0x223dff39",
-			Args:     []any{dot_amount},
-		},
-	)
-	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
-		return nil, nil, err
-	}
-	return v, gas, nil
-}
-
-func (c *Token) QueryToPointsDebug(
-	dot_amount types.U256, __ink_params chain.DryRunParams,
-) (*Tuple_22, *chain.DryRunReturnGas, error) {
-	if c.ChainClient.Debug {
-		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "to_points_debug")
-	}
-	v, gas, err := chain.DryRunInk[Tuple_22](
-		c,
-		__ink_params.Origin,
-		__ink_params.PayAmount,
-		__ink_params.GasLimit,
-		__ink_params.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0x2ccac9fb",
 			Args:     []any{dot_amount},
 		},
 	)
@@ -829,30 +917,6 @@ func (c *Token) QueryOwner(
 	return v, gas, nil
 }
 
-func (c *Token) QueryGetBalanceSol(
-	user types.H160, __ink_params chain.DryRunParams,
-) (*types.U256, *chain.DryRunReturnGas, error) {
-	if c.ChainClient.Debug {
-		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "get_balance_sol")
-	}
-	v, gas, err := chain.DryRunInk[types.U256](
-		c,
-		__ink_params.Origin,
-		__ink_params.PayAmount,
-		__ink_params.GasLimit,
-		__ink_params.StorageDepositLimit,
-		util.InkContractInput{
-			Selector: "0x33097d86",
-			Args:     []any{user},
-		},
-	)
-	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
-		return nil, nil, err
-	}
-	return v, gas, nil
-}
-
 func (c *Token) QueryToPointsSol(
 	dot_amount types.U256, __ink_params chain.DryRunParams,
 ) (*types.U256, *chain.DryRunReturnGas, error) {
@@ -925,70 +989,50 @@ func (c *Token) QueryOwnerSol(
 	return v, gas, nil
 }
 
-func (c *Token) DryRunEmergencyWithdraw(
-	__ink_params chain.DryRunParams,
-) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
+func (c *Token) QueryGetErc20Config(
+	token types.H160, __ink_params chain.DryRunParams,
+) (*Tuple_24, *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "emergency_withdraw")
+		util.LogWithPurple("[ DryRun   method ]", "get_erc20_config")
 	}
-	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
+	v, gas, err := chain.DryRunInk[Tuple_24](
 		c,
 		__ink_params.Origin,
 		__ink_params.PayAmount,
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0xfb6f2407",
+			Selector: "0x03f97b40",
+			Args:     []any{token},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
+func (c *Token) QueryGetErc20List(
+	__ink_params chain.DryRunParams,
+) (*[]Tuple_26, *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "get_erc20_list")
+	}
+	v, gas, err := chain.DryRunInk[[]Tuple_26](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x2be96b3b",
 			Args:     []any{},
 		},
 	)
 	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
 		return nil, nil, err
 	}
-	if v != nil && v.IsErr {
-		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
-	}
-
 	return v, gas, nil
-}
-
-func (c *Token) ExecEmergencyWithdraw(
-	__ink_params chain.ExecParams,
-) error {
-	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
-	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunEmergencyWithdraw(_param)
-	if err != nil {
-		return err
-	}
-	return chain.CallInk(
-		c,
-		gas.GasRequired,
-		gas.StorageDeposit,
-		util.InkContractInput{
-			Selector: "0xfb6f2407",
-			Args:     []any{},
-		},
-		__ink_params,
-	)
-}
-
-func (c *Token) CallOfEmergencyWithdraw(
-	__ink_params chain.DryRunParams,
-) (*types.Call, error) {
-	_, gas, err := c.DryRunEmergencyWithdraw(__ink_params)
-	if err != nil {
-		return nil, err
-	}
-	return chain.CallOfTransaction(
-		c,
-		__ink_params.PayAmount,
-		gas.GasRequired,
-		gas.StorageDeposit,
-		util.InkContractInput{
-			Selector: "0xfb6f2407",
-			Args:     []any{},
-		},
-	)
 }
