@@ -53,7 +53,7 @@ func (app *TeeChain) CheckEpochFromValidator() []byte {
 				EpochEnd: &model.EpochEnd{
 					Epoch:      epoch,
 					Validators: sideValidators,
-					DkgPub:     app.dkg.SystemPubKey().PublicKey,
+					DkgPub:     app.dkg.SystemPubKey().Byte(),
 					DkgCommits: commits,
 				},
 			},

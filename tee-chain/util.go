@@ -51,10 +51,6 @@ func (s *TeeChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, err
 func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
 	key, err := model.GetKey(GLOABL_STATE, DKG_PUB_KEY)
 	if err != nil {
-		if s.dkg.SystemPubKey() != nil {
-			a := s.dkg.SystemPubKey().AccountID()
-			return &a, nil
-		}
 		return nil, errors.New("get G-dkg_pub_key error")
 	}
 
