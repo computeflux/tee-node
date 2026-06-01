@@ -166,7 +166,6 @@ func PutBuffer(buf []byte) {
 }
 
 // ── Usage settlement to sidechain ────────────────────────
-
 var (
 	settleOnce   sync.Once
 	settleTicker *time.Ticker
@@ -175,7 +174,7 @@ var (
 )
 
 // SettleInterval 结算周期（5分钟），可通过测试修改
-var SettleInterval = 1 * time.Minute
+var SettleInterval = 5 * time.Minute
 
 func initUsageSettler() {
 	settleOnce.Do(func() {
@@ -208,6 +207,20 @@ func StopUsageSettler() {
 func settlePendingUsage() error {
 	settleMu.Lock()
 	defer settleMu.Unlock()
+
+	GATEWAYLOG().Printf("[SETTLE] tick enter at %s", time.Now().Format("15:04:05"))
+
+	bridge := getBridge()
+
+	// 如果池中还有未消费的 settle_usage，说明上一批还在排队等待上链。
+	// 跳过本次 tick，让 usage 继续累积，等待上一批被 ApplyToChain 消费。
+	// 这样确保同一时间只有一个 settle_usage 批次在流转。
+	if bridge != nil && bridge.HasPendingContract("settle_usage") {
+		GATEWAYLOG().Printf("[SETTLE] SKIP: pool has pending settle_usage")
+		return nil
+	}
+
+	GATEWAYLOG().Printf("[SETTLE] SUBMIT: pool empty, collecting usage records")
 
 	// 1. 扫描本地 usage: 前缀的所有记录
 	records, keys, err := model.GetJsonList[model.GatewayDailyUsage]("GATEWAY", "usage:")
@@ -252,7 +265,9 @@ func settlePendingUsage() error {
 	}
 	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(settlements), len(records))
 
-	// 4. 成功后再删除本地记录（任一删除失败即返回 error，避免重复提交）
+	// 4. 删除已提交的 usage 记录。
+	//    此时 pool 中已有 settle_usage（刚提交），下次 tick 会因 HasPendingContract 跳过，
+	//    等到 ApplyToChain 消费 pool 后，下次成功 tick 才会提交新一轮 usage。
 	deleted := 0
 	for _, k := range keys {
 		if err := model.DeleteByteKey(k); err != nil {
@@ -293,6 +308,9 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 
 	// 使用固定 dedupKey，确保交易池中最多只有一个 settle_usage 调用。
 	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage")
+	if err == nil {
+		GATEWAYLOG().Printf("[SETTLE] submitSettleUsage OK, %d records pushed to tx pool", len(records))
+	}
 	return err
 }
 

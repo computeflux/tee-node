@@ -166,5 +166,14 @@ export CHAIN_ENV=test
 # }
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
-cd / 
-OE_SIMULATION=1 ego run "$ROOT_DIR/hack/build/dsecret"
+cd /
+
+LOG_FILE="$ROOT_DIR/hack/node0.log"
+echo "Starting node0 with nohup, logs will be written to: $LOG_FILE"
+
+nohup sh -c 'OE_SIMULATION=1 ego run '"$ROOT_DIR"'/hack/build/dsecret' > "$LOG_FILE" 2>&1 &
+
+sleep 1
+echo "Node0 is running in background (PID: $!). You can close this terminal safely."
+echo "Tailing logs now (Ctrl+C to stop watching, node will keep running):"
+tail -f "$LOG_FILE"

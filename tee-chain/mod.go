@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	cfg "github.com/cometbft/cometbft/config"
 	cmtflags "github.com/cometbft/cometbft/libs/cli/flags"
@@ -54,7 +55,8 @@ func InitTeeChain(
 	p2pConf.Seeds = ""
 
 	consensusConf := cfg.DefaultConsensusConfig()
-	consensusConf.CreateEmptyBlocks = false
+	consensusConf.CreateEmptyBlocks = true
+	consensusConf.CreateEmptyBlocksInterval = time.Minute * 10
 
 	rpcConf := cfg.DefaultRPCConfig()
 	rpcConf.CORSAllowedOrigins = []string{"*"}

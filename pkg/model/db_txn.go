@@ -60,10 +60,8 @@ func (txn *Txn) ListByPrefix(prefix []byte) ([][]byte, [][]byte, error) {
 	var keys [][]byte
 	var list [][]byte
 	for iter.First(); iter.Valid(); iter.Next() {
-		// 复制 key（iter.Key() 返回的 slice 指向内部缓冲区）
-		key := iter.Key()
-		keyCopy := make([]byte, len(key))
-		copy(keyCopy, key)
+		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
+		keyCopy := copyIterKey(iter.Key())
 
 		// 解密数据
 		v := iter.Value()
@@ -104,9 +102,8 @@ func (txn *Txn) ListByPrefixLimit(prefix []byte, offset, limit uint64) ([][]byte
 		if limit > 0 && uint64(len(keys)) >= limit {
 			break
 		}
-		key := iter.Key()
-		keyCopy := make([]byte, len(key))
-		copy(keyCopy, key)
+		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
+		keyCopy := copyIterKey(iter.Key())
 
 		v := iter.Value()
 		decrypted, err := util.Unseal(v, nil)

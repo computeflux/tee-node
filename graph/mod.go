@@ -32,11 +32,6 @@ func init() {
 	}
 }
 
-// StartServer starts the GraphQL server with an empty resolver (legacy).
-func StartServer(s *teechain.TeeChain, port int) {
-	StartServerWithResolver(s, port, &Resolver{})
-}
-
 // StartServerWithResolver starts the GraphQL + Auth REST + Gateway REST server.
 func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver) {
 	teeChain = s

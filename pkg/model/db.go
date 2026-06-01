@@ -177,7 +177,8 @@ func GetJsonList[T any](namespace, key string) ([]*T, [][]byte, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("unmarshal db entry: %w", err)
 		}
-		keys = append(keys, iter.Key())
+		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
+		keys = append(keys, copyIterKey(iter.Key()))
 		list = append(list, val)
 	}
 
@@ -197,6 +198,15 @@ func keyUpperBound(b []byte) []byte {
 	return append(b, 0x00)
 }
 
+// copyIterKey 复制迭代器返回的 key。
+// Pebble 的 iter.Key() 返回的 slice 指向迭代器内部缓冲区，调用 Next() 后会被覆盖。
+// 若需要将 key 保存到循环外部，必须通过此函数深拷贝。
+func copyIterKey(k []byte) []byte {
+	ck := make([]byte, len(k))
+	copy(ck, k)
+	return ck
+}
+
 func GetProtoMessageList[T any](namespace, key string) ([]*T, [][]byte, error) {
 	rkey := []byte(comboKey(namespace, key))
 	iter, err := DBINS.NewIter(&pebble.IterOptions{
@@ -212,7 +222,8 @@ func GetProtoMessageList[T any](namespace, key string) ([]*T, [][]byte, error) {
 	list := make([]*T, 0, 100)
 	for iter.First(); iter.Valid(); iter.Next() {
 		v := iter.Value()
-		keys = append(keys, *util.DeepCopy(iter.Key()))
+		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
+		keys = append(keys, copyIterKey(iter.Key()))
 		value, err := util.Unseal(v, nil)
 		if err != nil {
 			return nil, nil, err

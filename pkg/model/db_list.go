@@ -71,9 +71,8 @@ func GetList(namespace string, subkey string, cursor []byte, size int) ([][]byte
 			return nil, nil, err
 		}
 		list = append(list, value)
-		k := iter.Key()
-		lastKey = make([]byte, len(k))
-		copy(lastKey, k)
+		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
+		lastKey = copyIterKey(iter.Key())
 	}
 
 	// 若取满 size 条且循环后 iter 仍有效，说明还有下一条，返回当前页最后一条的键作游标
