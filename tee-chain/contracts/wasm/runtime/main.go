@@ -13,7 +13,7 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
-var buf [65536]byte
+var buf [8192]byte
 
 func bufPtr() uint32 { return uint32(uintptr(unsafe.Pointer(&buf[0]))) }
 
@@ -26,27 +26,30 @@ func setResult(ptr, len int32)
 //go:wasmimport runtime get_height
 func hostGetHeight() int64
 
-//go:wasmimport runtime get_caller
-func hostGetCaller(outPtr, outLen int32) int32
-
-//go:wasmimport runtime is_system
-func hostIsSystem() int32
-
 //go:wasmexport ping
 func ping() int32 { return 1 }
 
-func main() { select {} }
+func main() {
+	// Go wasip1 仅支持 command 模式（_start → 执行 → exit）。
+	// main() 中直接调用 execute()，让合约执行发生在 _start 期间。
+	// execute() 通过 runtime.set_result 将结果写回宿主，
+	// 之后 Go runtime 调用 proc_exit 关闭模块（每次查询独立实例化）。
+	execute()
+}
 
 //go:wasmexport execute
 func execute() {
 	bp := bufPtr()
 	n := getCallData(int32(bp), int32(len(buf)))
-	if n <= 0 {
+	if n <= 1 {
 		return
 	}
 	data := buf[:n]
 
-	off := 0
+	// 第一个字节: 0x00=Query, 0x01=Mutation
+	isQuery := data[0] == 0x00
+	off := 1
+
 	nameLen := binary.LittleEndian.Uint32(data[off:])
 	off += 4
 	name := string(data[off : off+int(nameLen)])
@@ -66,14 +69,20 @@ func execute() {
 	rt := &wasmRuntime{txn: &WasmTxn{}, height: hostGetHeight()}
 	call := &store.InContractCall{Name: []byte(name), Method: method, Args: args}
 
-	result, err := dispatch(name, method, args, rt, call)
+	var result []byte
+	var err error
+	if isQuery {
+		result, err = dispatchQuery(name, method, args, rt, call)
+	} else {
+		err = dispatchMutation(name, call, rt)
+	}
 	if err != nil {
 		result = []byte(err.Error())
 	}
 	setResult(int32(bp), int32(copy(buf[:], result)))
 }
 
-func dispatch(name string, method []byte, args [][]byte, rt *wasmRuntime, call store.ContractCall) ([]byte, error) {
+func dispatchQuery(name string, method []byte, args [][]byte, rt *wasmRuntime, call store.ContractCall) ([]byte, error) {
 	switch name {
 	case "gov":
 		ins := gov.NewGov(rt)
@@ -89,6 +98,24 @@ func dispatch(name string, method []byte, args [][]byte, rt *wasmRuntime, call s
 		return batch.BatchQuery{Batch: *ins}.ExecQuery(call)
 	}
 	return nil, nil
+}
+
+func dispatchMutation(name string, call store.ContractCall, rt *wasmRuntime) error {
+	switch name {
+	case "gov":
+		ins := gov.NewGov(rt)
+		return gov.GovMutation{Gov: *ins}.ExecCall(call)
+	case "auth":
+		ins := auth.NewAuth(rt)
+		return auth.AuthMutation{Auth: *ins}.ExecCall(call)
+	case "gateway":
+		ins := gateway.NewGateway(rt)
+		return gateway.GatewayMutation{Gateway: *ins}.ExecCall(call)
+	case "batch":
+		ins := batch.NewBatch(rt)
+		return batch.BatchMutation{Batch: *ins}.ExecCall(call)
+	}
+	return nil
 }
 
 type wasmRuntime struct {

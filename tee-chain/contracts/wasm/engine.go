@@ -5,7 +5,12 @@
 //
 //	Engine 将 ContractCall 序列化为 call data，注入 host functions。
 //	WASM 合约通过 runtime.get_call_data 获取输入，执行后通过 runtime.set_result 返回结果。
-//	Engine 调用 WASM 的 execute() 导出函数触发执行。
+//
+// 执行模式（Command）：
+//
+//	Go wasip1 模块导出 _start，InstantiateModule 时自动执行。
+//	main() 内部调用 execute()，execute() 通过 set_result 写回结果。
+//	main() 返回后 Go runtime 调用 proc_exit 关闭模块（每次调用独立实例化）。
 package wasm
 
 import (
@@ -21,11 +26,20 @@ import (
 
 const NativeVersion = uint32(0)
 
+// hostState 在每次 WASM 调用前更新，host functions 通过指针读取/写入。
+type hostState struct {
+	api      store.ContractApi
+	callData []byte
+	result   []byte
+}
+
 type Engine struct {
 	rt        wazero.Runtime
 	cachedVer uint32
 	cachedMod wazero.CompiledModule
 	wasiOnce  sync.Once
+	hostOnce  sync.Once
+	hostState hostState
 }
 
 func NewEngine() *Engine {
@@ -34,6 +48,12 @@ func NewEngine() *Engine {
 
 func (e *Engine) ensureWASI(ctx context.Context) {
 	e.wasiOnce.Do(func() { wasi_snapshot_preview1.MustInstantiate(ctx, e.rt) })
+}
+
+func (e *Engine) ensureHost(ctx context.Context) {
+	e.hostOnce.Do(func() {
+		instantiateHostModule(ctx, e.rt, &e.hostState)
+	})
 }
 
 func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
@@ -61,48 +81,42 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 }
 
 func (e *Engine) ExecuteQuery(version uint32, call store.ContractCall, api store.ContractApi) ([]byte, error) {
-	return e.executeWasmCall(version, call, api)
+	return e.executeWasmCall(version, call, api, true)
 }
 
 func (e *Engine) ExecuteMutation(version uint32, call store.ContractCall, api store.ContractApi) error {
-	_, err := e.executeWasmCall(version, call, api)
-	return err
+	result, err := e.executeWasmCall(version, call, api, false)
+	if err != nil {
+		return err
+	}
+	if len(result) > 0 {
+		return fmt.Errorf("wasm v%d mutation: %s", version, string(result))
+	}
+	return nil
 }
 
-func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api store.ContractApi) ([]byte, error) {
+func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api store.ContractApi, isQuery bool) ([]byte, error) {
 	mod, err := e.LoadModule(version)
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := context.Background()
-	callData := serializeCallData(call)
-	var result []byte
 
-	hostMod, err := instantiateHostModule(ctx, e.rt, api, callData, &result)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate host module: %w", err)
-	}
-	defer hostMod.Close(ctx)
+	// 更新共享状态（host functions 通过指针读写）
+	e.hostState.api = api
+	e.hostState.callData = serializeCallData(call, isQuery)
+	e.hostState.result = nil
 
+	// 注册 host module 和 WASI（均为 singleton）
+	e.ensureHost(ctx)
 	e.ensureWASI(ctx)
 
+	// Command 模式：_start 自动执行 → main() → execute() → set_result → exit(0) → proc_exit 关闭模块
 	config := wazero.NewModuleConfig()
-	instance, err := e.rt.InstantiateModule(ctx, mod, config)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate wasm v%d: %w", version, err)
+	instance, _ := e.rt.InstantiateModule(ctx, mod, config)
+	if instance != nil {
+		instance.Close(ctx)
 	}
-	defer instance.Close(ctx)
-
-	execFn := instance.ExportedFunction("execute")
-	if execFn == nil {
-		return nil, fmt.Errorf("wasm v%d: missing 'execute' export", version)
-	}
-
-	_, err = execFn.Call(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("wasm v%d execute: %w", version, err)
-	}
-
-	return result, nil
+	return e.hostState.result, nil
 }

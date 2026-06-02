@@ -45,21 +45,24 @@ func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi) error {
+	selector := [4]byte(call.GetMethod()[:4])
+	if selector == store.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.GetName())) {
+		return nil
+	}
+
 	if version == wasm.NativeVersion {
-		selector := [4]byte(call.GetMethod()[:4])
-		if selector == store.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.GetName())) {
-			return nil
-		}
-
 		err := nativeMutation(call, runtime)
-
 		if selector == store.MethodToSelector("Init") && err == nil {
 			return SetContractInited(runtime.GetTxn(), string(call.GetName()))
 		}
-
 		return err
 	}
-	return getWasmEngine().ExecuteMutation(version, call, runtime)
+
+	err := getWasmEngine().ExecuteMutation(version, call, runtime)
+	if selector == store.MethodToSelector("Init") && err == nil {
+		return SetContractInited(runtime.GetTxn(), string(call.GetName()))
+	}
+	return err
 }
 
 // nativeQuery 原生 Go 合约查询路由。
@@ -85,7 +88,7 @@ func nativeQuery(call store.ContractCall, runtime store.ContractApi) (data []byt
 // nativeMutation 原生 Go 合约状态变更路由。
 func nativeMutation(call store.ContractCall, runtime store.ContractApi) error {
 	var err error
-	switch string(call.GetMethod()) {
+	switch string(call.GetName()) {
 	case "gov":
 		ins := gov.NewGov(runtime)
 		mutation := gov.GovMutation{Gov: *ins}

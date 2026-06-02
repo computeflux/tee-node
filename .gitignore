@@ -46,3 +46,4 @@ node0.log
 
 ink-abi-ts-gen
 scale-codec-gen
+**/runtime.wasm
