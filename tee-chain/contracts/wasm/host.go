@@ -309,9 +309,11 @@ func registerCallIO(b wazero.HostModuleBuilder, s *hostState) {
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			mem := mod.Memory()
 			name, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
-			method, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
-			argsCount := int32(stack[4])
-			argsPtr := uint32(stack[5])
+			// method 作为 i32 传递（4 字节 LE selector）
+			methodInt := int32(stack[2])
+			method := []byte{byte(methodInt), byte(methodInt >> 8), byte(methodInt >> 16), byte(methodInt >> 24)}
+			argsCount := int32(stack[3])
+			argsPtr := uint32(stack[4])
 			var args [][]byte
 			off := argsPtr
 			for i := int32(0); i < argsCount; i++ {
@@ -321,14 +323,14 @@ func registerCallIO(b wazero.HostModuleBuilder, s *hostState) {
 				off += argLen
 				args = append(args, arg)
 			}
-			scall := &store.InContractCall{Name: name, Method: method, Args: args}
+			scall := &store.InContractCall{Name: copyBytes(name), Method: method, Args: args}
 			data, err := s.api.Query(store.UniAddr{}, scall)
 			if err != nil {
 				stack[0] = uint64(0xFFFFFFFF)
 				return
 			}
-			outPtr := uint32(stack[6])
-			outLen := uint32(stack[7])
+			outPtr := uint32(stack[5])
+			outLen := uint32(stack[6])
 			if outLen < uint32(len(data)) {
 				stack[0] = uint64(0xFFFFFFFD)
 				return
@@ -336,7 +338,7 @@ func registerCallIO(b wazero.HostModuleBuilder, s *hostState) {
 			mem.Write(outPtr, data)
 			stack[0] = uint64(len(data))
 		}),
-		[]wazapi.ValueType{i32, i32, i32, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
+		[]wazapi.ValueType{i32, i32, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
 	).Export("cross_contract_query")
 
 	// cross_contract_call: 跨合约调用（可变更状态）

@@ -5,23 +5,22 @@ import (
 	"math/big"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 // Vote 获取单个投票
-func (d GovQuery) Vote(proposalID uint32, index uint32) (util.Option[Vote], error) {
+func (d GovQuery) Vote(proposalID uint32, index uint32) (store.Option[Vote], error) {
 	v, err := d.votes.Get(d.api.GetTxn(), proposalID, index)
 	if err != nil {
-		return util.NewNone[Vote](), err
+		return store.NewNone[Vote](), err
 	}
 	if v == nil {
-		return util.NewNone[Vote](), ErrInvalidVote
+		return store.NewNone[Vote](), ErrInvalidVote
 	}
-	return util.NewSome(*v), nil
+	return store.NewSome(*v), nil
 }
 
 // VotesOfUser 获取用户的所有投票引用（分页）
-func (d GovQuery) VotesOfUser(user store.UniAddr, startKey util.Option[uint32], size uint32) ([]Vote, error) {
+func (d GovQuery) VotesOfUser(user store.UniAddr, startKey store.Option[uint32], size uint32) ([]Vote, error) {
 	var startKeyPtr *uint32
 	if startKey.IsSome() {
 		startKeyPtr = &startKey.V
@@ -45,7 +44,7 @@ func (d GovQuery) VotesOfUser(user store.UniAddr, startKey util.Option[uint32], 
 }
 
 // Votes 获取提案的所有投票（分页）
-func (d GovQuery) Votes(proposalID uint32, startKey util.Option[uint32], size uint32) ([]Vote, error) {
+func (d GovQuery) Votes(proposalID uint32, startKey store.Option[uint32], size uint32) ([]Vote, error) {
 	var startKeyPtr *uint32
 	if startKey.IsSome() {
 		startKeyPtr = &startKey.V

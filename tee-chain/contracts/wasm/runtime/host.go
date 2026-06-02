@@ -155,14 +155,12 @@ func readU32At(off uint32) uint32 {
 
 // ── 上下文辅助 ──────────────────────────────────────────────
 
-// hostReadUniAddr 从 host function 读取 UniAddr 到 addr。
-// hostFn 签名: func(outPtr, outLen int32) int32，返回 0=成功。
-func hostReadUniAddr(addr *store.UniAddr, hostFn func(int32, int32) int32) {
+// readUniAddrFrom 从 host function 读取 UniAddr 到 addr。
+func readUniAddrFrom(addr *store.UniAddr, fn func(int32, int32) int32) {
 	bp := txnBufPtr()
-	if hostFn(bp, 40) != 0 {
+	if fn(bp, 40) != 0 {
 		return
 	}
-	// 格式: [type: u32 LE][data_len: u32 LE][data...]
 	addr.T = readU32At(uint32(bp))
 	dLen := readU32At(uint32(bp) + 4)
 	if dLen > 0 && dLen <= 32 {
@@ -171,12 +169,33 @@ func hostReadUniAddr(addr *store.UniAddr, hostFn func(int32, int32) int32) {
 	}
 }
 
+// TinyGo 不允许 wasmimport 函数作为值传递，所以提供包装。
+func readCaller() store.UniAddr {
+	var addr store.UniAddr
+	readUniAddrFrom(&addr, func(p, l int32) int32 { return getCaller(p, l) })
+	return addr
+}
+
+func readSystemAccount() store.UniAddr {
+	var addr store.UniAddr
+	readUniAddrFrom(&addr, func(p, l int32) int32 { return getSystemAccount(p, l) })
+	return addr
+}
+
 // ── 跨合约调用辅助 ──────────────────────────────────────────
 
-type crossContractFunc func(namePtr, nameLen int32, method int32, argsCount, argsPtr, outPtr, outLen int32) int32
+// doCrossContractQuery 通过 host function 发起跨合约查询。
+func doCrossContractQuery(call store.ContractCall) ([]byte, error) {
+	return marshalAndCall(call, true)
+}
 
-// hostCrossContract 序列化 call 并通过 host function 发起到宿主的跨合约调用。
-func hostCrossContract(call store.ContractCall, hostFn crossContractFunc) ([]byte, error) {
+// doCrossContractCall 通过 host function 发起跨合约调用。
+func doCrossContractCall(call store.ContractCall) ([]byte, error) {
+	return marshalAndCall(call, false)
+}
+
+// marshalAndCall 序列化 call 并调用 host function。
+func marshalAndCall(call store.ContractCall, isQuery bool) ([]byte, error) {
 	bp := txnBufPtr()
 
 	// 写入 name
@@ -192,34 +211,34 @@ func hostCrossContract(call store.ContractCall, hostFn crossContractFunc) ([]byt
 		method = int32(uint32(m[0]) | uint32(m[1])<<8 | uint32(m[2])<<16 | uint32(m[3])<<24)
 	}
 
-	// 写入 args 指针数组: [arg1_ptr: u32][arg1_len: u32][arg2_ptr: u32][arg2_len: u32]...
+	// 写入 args 指针数组
 	args := call.GetArgs()
 	argsPtr := bp + int32(len(name)) + 16
 	argsOff := uint32(argsPtr)
-	// args 数据紧跟在指针数组后面
 	dataOff := argsOff + uint32(len(args))*8
 	for i, arg := range args {
-		// 写入 arg 指针
 		txnBuf[uint32(argsPtr)+uint32(i)*8-bpOff()] = byte(dataOff)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+1-bpOff()] = byte(dataOff >> 8)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+2-bpOff()] = byte(dataOff >> 16)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+3-bpOff()] = byte(dataOff >> 24)
-		// 写入 arg 长度
 		argLen := uint32(len(arg))
 		txnBuf[uint32(argsPtr)+uint32(i)*8+4-bpOff()] = byte(argLen)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+5-bpOff()] = byte(argLen >> 8)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+6-bpOff()] = byte(argLen >> 16)
 		txnBuf[uint32(argsPtr)+uint32(i)*8+7-bpOff()] = byte(argLen >> 24)
-		// 写入 arg 数据
 		copy(txnBuf[dataOff-bpOff():], arg)
 		dataOff += uint32(len(arg))
 	}
 
-	// 输出缓冲
 	outPtr := argsPtr + int32(len(args))*8 + int32(len(name)) + 32
 	outLen := int32(65536 - (outPtr - bp))
 
-	ret := hostFn(namePtr, nameLen, method, int32(len(args)), argsPtr, outPtr, outLen)
+	var ret int32
+	if isQuery {
+		ret = crossContractQuery(namePtr, nameLen, method, int32(len(args)), argsPtr, outPtr, outLen)
+	} else {
+		ret = crossContractCall(namePtr, nameLen, method, int32(len(args)), argsPtr, outPtr, outLen)
+	}
 	if ret < 0 {
 		return nil, nil
 	}

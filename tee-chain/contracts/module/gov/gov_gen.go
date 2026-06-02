@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 // ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。
@@ -279,7 +278,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err := store.RequireArgLen(args, 2, "proposals"); err != nil {
 			return nil, err
 		}
-		startKey, err := store.DecodeScaleArgBytes[util.Option[uint32]](args[0])
+		startKey, err := store.DecodeScaleArgBytes[store.Option[uint32]](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("proposals: startKey: %w", err)
 		}
@@ -342,7 +341,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("votes: proposalID: %w", err)
 		}
-		startKey, err := store.DecodeScaleArgBytes[util.Option[uint32]](args[1])
+		startKey, err := store.DecodeScaleArgBytes[store.Option[uint32]](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("votes: startKey: %w", err)
 		}
@@ -363,7 +362,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("votes_of_user: user: %w", err)
 		}
-		startKey, err := store.DecodeScaleArgBytes[util.Option[uint32]](args[1])
+		startKey, err := store.DecodeScaleArgBytes[store.Option[uint32]](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("votes_of_user: startKey: %w", err)
 		}

@@ -2,11 +2,11 @@ package wasm
 
 import (
 	"context"
+	"encoding/binary"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/require"
 )
@@ -94,18 +94,14 @@ func loadCachedWasm(t *testing.T, e *Engine) {
 
 func decodeBool(t *testing.T, b []byte) bool {
 	t.Helper()
-	var out bool
-	err := codec.Decode(b, &out)
-	require.NoError(t, err)
-	return out
+	require.NotEmpty(t, b, "decodeBool: empty input")
+	return b[0] != 0
 }
 
 func decodeUint32(t *testing.T, b []byte) uint32 {
 	t.Helper()
-	var out uint32
-	err := codec.Decode(b, &out)
-	require.NoError(t, err)
-	return out
+	require.True(t, len(b) >= 4, "decodeUint32: need 4 bytes, got %d", len(b))
+	return binary.LittleEndian.Uint32(b)
 }
 
 // queryMethod 返回查询方法的 selector（mutates=false，与生成代码中 ExecQuery 一致）。

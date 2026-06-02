@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 // ── Provider / Provider ───────────────────────────────────
@@ -114,13 +113,13 @@ func (g GatewayQuery) GetProvider(providerID uint64) (*ProviderInfo, error) {
 }
 
 // GetProviderByOwner 查询当前用户的 provider
-func (g GatewayQuery) GetProviderByOwner() (util.Option[uint64], error) {
+func (g GatewayQuery) GetProviderByOwner() (store.Option[uint64], error) {
 	owner := g.api.GetCaller()
 	id, err := g.providerByOwner.Get(g.api.GetTxn(), owner)
 	if err != nil || id == nil {
-		return util.NewNone[uint64](), nil
+		return store.NewNone[uint64](), nil
 	}
-	return util.NewSome(*id), nil
+	return store.NewSome(*id), nil
 }
 
 func (g GatewayQuery) GetProviderCount() (uint64, error) {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -105,7 +104,7 @@ type GovMutation struct {
 
 // Init 初始化治理合约，设置默认值和初始轨道
 func (d GovMutation) Init() error {
-	total := types.NewU256(*big.NewInt(0))
+	total := store.NewU256(big.NewInt(0))
 	publicJoin := true
 	defaultTrack := TrackData{
 		Name:               "default",

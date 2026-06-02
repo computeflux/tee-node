@@ -2,7 +2,6 @@ package gov
 
 import (
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 var (
@@ -75,7 +74,7 @@ type ProposalDeposit struct {
 
 // Proposal 提案数据
 type Proposal struct {
-	Call        util.Option[CallContent] // 提案调用内容
+	Call        store.Option[CallContent] // 提案调用内容
 	TrackID     uint32                   // 所属轨道ID
 	Caller      store.UniAddr            // 提案发起人
 	Status      ProposalStatus           // 提案状态
@@ -91,8 +90,8 @@ type ProposalWithID struct {
 
 // ProposalResult 提案执行结果
 type ProposalResult struct {
-	Result    util.Option[[]byte] // 执行返回值
-	ExecError util.Option[[]byte] // 执行错误信息
+	Result    store.Option[[]byte] // 执行返回值
+	ExecError store.Option[[]byte] // 执行错误信息
 }
 
 // Vote 投票记录

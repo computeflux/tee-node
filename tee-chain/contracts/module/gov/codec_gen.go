@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
 // Encode SCALE 编码 CallContent。
@@ -255,7 +254,7 @@ func (v *Proposal) Decode(data []byte) (int, error) {
 	}
 	if data[off] == 0 {
 		off++
-		v.Call = util.NewNone[CallContent]()
+		v.Call = store.NewNone[CallContent]()
 	} else {
 		off++
 		var inner CallContent
@@ -266,7 +265,7 @@ func (v *Proposal) Decode(data []byte) (int, error) {
 			}
 			off += n
 		}
-		v.Call = util.NewSome(inner)
+		v.Call = store.NewSome(inner)
 	}
 	if off+4 > len(data) {
 		return 0, fmt.Errorf("EOF reading TrackID")
@@ -389,7 +388,7 @@ func (v *ProposalResult) Decode(data []byte) (int, error) {
 	}
 	if data[off] == 0 {
 		off++
-		v.Result = util.NewNone[[]byte]()
+		v.Result = store.NewNone[[]byte]()
 	} else {
 		off++
 		var inner []byte
@@ -403,14 +402,14 @@ func (v *ProposalResult) Decode(data []byte) (int, error) {
 			copy(inner, data[off:off+int(n)])
 			off += int(n)
 		}
-		v.Result = util.NewSome(inner)
+		v.Result = store.NewSome(inner)
 	}
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading ExecError")
 	}
 	if data[off] == 0 {
 		off++
-		v.ExecError = util.NewNone[[]byte]()
+		v.ExecError = store.NewNone[[]byte]()
 	} else {
 		off++
 		var inner []byte
@@ -424,7 +423,7 @@ func (v *ProposalResult) Decode(data []byte) (int, error) {
 			copy(inner, data[off:off+int(n)])
 			off += int(n)
 		}
-		v.ExecError = util.NewSome(inner)
+		v.ExecError = store.NewSome(inner)
 	}
 	return off, nil
 }

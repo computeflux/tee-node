@@ -4,16 +4,15 @@ import (
 	"bytes"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/wetee-dao/ink.go/util"
 )
 
-func (d GovQuery) Proposal(id uint32) (util.Option[ProposalWithID], error) {
+func (d GovQuery) Proposal(id uint32) (store.Option[ProposalWithID], error) {
 	prop, err := d.proposals.Get(d.api.GetTxn(), id)
 	if err != nil {
-		return util.NewNone[ProposalWithID](), err
+		return store.NewNone[ProposalWithID](), err
 	}
 	if prop == nil {
-		return util.NewNone[ProposalWithID](), ErrInvalidProposal
+		return store.NewNone[ProposalWithID](), ErrInvalidProposal
 	}
 
 	// 填充 ID（StoreList 不自动存储 key）
@@ -22,10 +21,10 @@ func (d GovQuery) Proposal(id uint32) (util.Option[ProposalWithID], error) {
 		Proposal: *prop,
 	}
 
-	return util.NewSome(p), nil
+	return store.NewSome(p), nil
 }
 
-func (d GovQuery) Proposals(startKey util.Option[uint32], size uint32) ([]ProposalWithID, error) {
+func (d GovQuery) Proposals(startKey store.Option[uint32], size uint32) ([]ProposalWithID, error) {
 	var startKeyPtr *uint32
 	if startKey.IsSome() {
 		startKeyPtr = &startKey.V
@@ -48,13 +47,13 @@ func (d GovQuery) Proposals(startKey util.Option[uint32], size uint32) ([]Propos
 	return ps, nil
 }
 
-func (d GovQuery) ProposalStatus(id uint32) (util.Option[ProposalStatusQuery], error) {
+func (d GovQuery) ProposalStatus(id uint32) (store.Option[ProposalStatusQuery], error) {
 	prop, err := d.proposal(id)
 	if err != nil {
-		return util.NewNone[ProposalStatusQuery](), err
+		return store.NewNone[ProposalStatusQuery](), err
 	}
 	if prop.Status.State != ProposalStatusOngoing {
-		return util.NewSome(ProposalStatusQuery{
+		return store.NewSome(ProposalStatusQuery{
 			State:              prop.Status.State,
 			BlockHeight:        prop.Status.Block,
 			ConfirmedNumber:    0,
@@ -63,7 +62,7 @@ func (d GovQuery) ProposalStatus(id uint32) (util.Option[ProposalStatusQuery], e
 	}
 
 	status, _ := d.calculateProposalStatus(id, prop)
-	return util.NewSome(status), nil
+	return store.NewSome(status), nil
 }
 
 func (d GovMutation) SubmitProposal(call CallContent, trackID uint32) error {
@@ -88,13 +87,13 @@ func (d GovMutation) SubmitProposal(call CallContent, trackID uint32) error {
 
 	amountInt := call.Amount
 	maxBalanceInt := track.MaxBalance
-	if amountInt.Cmp(maxBalanceInt.Int) > 0 {
+	if amountInt.Cmp(maxBalanceInt) > 0 {
 		return ErrLowBalance
 	}
 
 	// 使用 StoreList.Insert 自动分配 ID
 	p := Proposal{
-		Call:        util.NewSome(call),
+		Call:        store.NewSome(call),
 		TrackID:     trackID,
 		Caller:      caller,
 		Status:      ProposalStatus{State: ProposalStatusPending},
@@ -215,9 +214,9 @@ func (d GovMutation) ExecProposal(proposalID uint32) error {
 		})
 		if err != nil {
 			// 记录错误但不返回，提案仍标记为已批准
-			result.ExecError = util.NewSome([]byte(err.Error()))
+			result.ExecError = store.NewSome([]byte(err.Error()))
 		} else {
-			result.Result = util.NewSome(res)
+			result.Result = store.NewSome(res)
 		}
 
 		// 保存执行结果

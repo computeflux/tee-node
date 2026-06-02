@@ -1,5 +1,7 @@
 package store
 
+import "fmt"
+
 // StoreTx 抽象化存储操作接口。Native (*model.Txn) 和 WASM 均满足。
 type StoreTx interface {
 	Get(key []byte) ([]byte, error)
@@ -27,4 +29,29 @@ func keyUpperBound(b []byte) []byte {
 		}
 	}
 	return append(b, 0x00)
+}
+
+// Option 类似 Rust Option，用于可空字段的 SCALE 编解码。
+type Option[T any] struct {
+	isSome bool
+	V      T
+}
+
+func NewNone[T any]() Option[T] {
+	return Option[T]{isSome: false}
+}
+
+func NewSome[T any](v T) Option[T] {
+	return Option[T]{isSome: true, V: v}
+}
+
+func (o Option[T]) IsSome() bool { return o.isSome }
+func (o Option[T]) IsNone() bool { return !o.isSome }
+
+func (o Option[T]) UnWrap() (T, error) {
+	if !o.isSome {
+		var zero T
+		return zero, fmt.Errorf("unwrap error: Option is None")
+	}
+	return o.V, nil
 }

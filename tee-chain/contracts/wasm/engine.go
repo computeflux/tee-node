@@ -16,6 +16,9 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"bytes"
+	"compress/gzip"
+	"io"
 	"sync"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -71,7 +74,8 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 		return nil, fmt.Errorf("runtime version %d has no wasm bytes", version)
 	}
 	ctx := context.Background()
-	mod, err := e.rt.CompileModule(ctx, info.WasmBytes)
+	wasmBytes := decompressIfGzip(info.WasmBytes)
+	mod, err := e.rt.CompileModule(ctx, wasmBytes)
 	if err != nil {
 		return nil, fmt.Errorf("compile wasm module v%d: %w", version, err)
 	}
@@ -112,11 +116,49 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 	e.ensureHost(ctx)
 	e.ensureWASI(ctx)
 
-	// Command 模式：_start 自动执行 → main() → execute() → set_result → exit(0) → proc_exit 关闭模块
+	// Command 模式：_start 自动执行 → main() → execute() → set_result
 	config := wazero.NewModuleConfig()
-	instance, _ := e.rt.InstantiateModule(ctx, mod, config)
+	instance, err := e.rt.InstantiateModule(ctx, mod, config)
+	if err != nil {
+		return nil, fmt.Errorf("instantiate wasm v%d: %w", version, err)
+	}
 	if instance != nil {
 		instance.Close(ctx)
 	}
 	return e.hostState.result, nil
+}
+
+// ── gzip 透明解压 ─────────────────────────────────────────
+
+// gzipMagic gzip 文件头标识。
+var gzipMagic = []byte{0x1f, 0x8b}
+
+// decompressIfGzip 若 data 为 gzip 格式则解压，否则原样返回。
+func decompressIfGzip(data []byte) []byte {
+	if len(data) < 2 || data[0] != gzipMagic[0] || data[1] != gzipMagic[1] {
+		return data
+	}
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return data // 损坏的 gzip，直接尝试原文
+	}
+	defer r.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		return data
+	}
+	return out
+}
+
+// CompressGzip 将数据 gzip 压缩，用于存储前压缩。
+func CompressGzip(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	if _, err := w.Write(data); err != nil {
+		return nil, err
+	}
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

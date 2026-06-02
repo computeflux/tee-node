@@ -129,27 +129,23 @@ func (r *wasmRuntime) GetVersion() uint32    { return uint32(getVersion()) }
 func (r *wasmRuntime) GetTxn() store.StoreTx { return r.txn }
 
 func (r *wasmRuntime) GetCaller() store.UniAddr {
-	var addr store.UniAddr
-	hostReadUniAddr(&addr, getCaller)
-	return addr
+	return readCaller()
 }
 
 func (r *wasmRuntime) GetSystemAccount() store.UniAddr {
-	var addr store.UniAddr
-	hostReadUniAddr(&addr, getSystemAccount)
-	return addr
+	return readSystemAccount()
 }
 
 func (r *wasmRuntime) CallbySystem() bool { return isSystem() != 0 }
 
 func (r *wasmRuntime) Query(target store.UniAddr, call store.ContractCall) ([]byte, error) {
-	return hostCrossContract(call, crossContractQuery)
+	return doCrossContractQuery(call)
 }
 
 func (r *wasmRuntime) Call(target store.UniAddr, call store.ContractCall) ([]byte, error) {
-	return hostCrossContract(call, crossContractCall)
+	return doCrossContractCall(call)
 }
 
 func (r *wasmRuntime) QueryNative(call store.ContractCall) ([]byte, error) {
-	return hostCrossContract(call, crossContractQuery)
+	return doCrossContractQuery(call)
 }

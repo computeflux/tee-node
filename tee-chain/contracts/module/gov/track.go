@@ -1,7 +1,7 @@
 package gov
 
 import (
-	"github.com/wetee-dao/ink.go/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 func (d GovQuery) Tracks() ([]TrackWithID, error) {
@@ -18,15 +18,15 @@ func (d GovQuery) Tracks() ([]TrackWithID, error) {
 	return ts, nil
 }
 
-func (d GovQuery) Track(id uint32) (util.Option[TrackData], error) {
+func (d GovQuery) Track(id uint32) (store.Option[TrackData], error) {
 	track, err := d.tracks.Get(d.api.GetTxn(), id)
 	if err != nil {
-		return util.NewNone[TrackData](), err
+		return store.NewNone[TrackData](), err
 	}
 	if track == nil {
-		return util.NewNone[TrackData](), ErrNoTrack
+		return store.NewNone[TrackData](), ErrNoTrack
 	}
-	return util.NewSome(*track), nil
+	return store.NewSome(*track), nil
 }
 
 func (d GovQuery) DefaultTrack() (uint32, error) {

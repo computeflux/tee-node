@@ -90,6 +90,13 @@ func encodeAny(v any) ([]byte, error) {
 		return b, nil
 	case UniAddr:
 		return addrEncode(val), nil
+	case U256:
+		b := val.Int.Bytes()
+		buf := make([]byte, 32)
+		for i := 0; i < len(b); i++ {
+			buf[i] = b[len(b)-1-i]
+		}
+		return buf, nil
 	default:
 		return nil, fmt.Errorf("storeEncode: unsupported type %T", v)
 	}
@@ -157,6 +164,12 @@ func decodeAny(v any, data []byte) error {
 		copy(*val, data[sz:sz+int(n)])
 	case *UniAddr:
 		return addrDecode(data, val)
+	case *U256:
+		if len(data) < 32 {
+			return fmt.Errorf("decode U256: need 32 bytes, got %d", len(data))
+		}
+		val.Int.SetBytes(ReverseBytes(data[:32]))
+		return nil
 	default:
 		return fmt.Errorf("storeDecode: unsupported type %T", v)
 	}

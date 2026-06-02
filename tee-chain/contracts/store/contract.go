@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -25,28 +24,37 @@ func (a UniAddr) String() string {
 	return fmt.Sprint(a.T) + ":" + hex.EncodeToString(a.V)
 }
 
-type Amount = types.U256
+// U256 256 位无符号整数，内部使用 big.Int。
+type U256 struct {
+	Int *big.Int
+}
 
-var ZeroAmount = types.NewU256(*big.NewInt(0))
+// Amount 链上金额类型。
+type Amount = U256
+
+var ZeroAmount = NewU256(big.NewInt(0))
+
+func NewU256(i *big.Int) U256 {
+	return U256{Int: new(big.Int).Set(i)}
+}
+
+func (a U256) Cmp(b U256) int { return a.Int.Cmp(b.Int) }
+func (a U256) String() string { return a.Int.String() }
 
 func AmountAdd(a, b Amount) Amount {
-	bigInt := new(big.Int).Add(a.Int, b.Int)
-	return types.NewU256(*bigInt)
+	return NewU256(new(big.Int).Add(a.Int, b.Int))
 }
 
 func AmountSub(a, b Amount) Amount {
-	bigInt := new(big.Int).Sub(a.Int, b.Int)
-	return types.NewU256(*bigInt)
+	return NewU256(new(big.Int).Sub(a.Int, b.Int))
 }
 
 func AmountMul(a, b Amount) Amount {
-	bigInt := new(big.Int).Mul(a.Int, b.Int)
-	return types.NewU256(*bigInt)
+	return NewU256(new(big.Int).Mul(a.Int, b.Int))
 }
 
 func AmountDiv(a, b Amount) Amount {
-	bigInt := new(big.Int).Div(a.Int, b.Int)
-	return types.NewU256(*bigInt)
+	return NewU256(new(big.Int).Div(a.Int, b.Int))
 }
 
 // BlockNumber 区块高度（与 Rust BlockNumber = u32 一致）。
