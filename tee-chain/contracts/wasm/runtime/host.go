@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
@@ -25,9 +26,6 @@ func storageScanPrefix(prefixPtr, prefixLen, keysPtr, valsPtr int32) int32
 //go:wasmimport runtime storage_delete_prefix
 func storageDeletePrefix(prefixPtr, prefixLen int32) int32
 
-//go:wasmimport runtime get_height
-func getHeight() int64
-
 //go:wasmimport runtime get_block_time
 func getBlockTime() int64
 
@@ -49,10 +47,17 @@ func crossContractQuery(namePtr, nameLen int32, method int32, argsCount, argsPtr
 //go:wasmimport runtime cross_contract_call
 func crossContractCall(namePtr, nameLen int32, method int32, argsCount, argsPtr, outPtr, outLen int32) int32
 
-//go:wasmimport runtime log
-func runtimeLog(msgPtr, msgLen int32)
+var txnBuf [8192]byte
 
-var txnBuf [65536]byte
+// storageError 表示 storage host function 返回的错误码。
+type storageError struct {
+	code int32
+	fn   string
+}
+
+func (e *storageError) Error() string {
+	return fmt.Sprintf("%s returned error code %d", e.fn, e.code)
+}
 
 func txnBufPtr() int32 {
 	return int32(uintptr(unsafe.Pointer(&txnBuf[0])))
@@ -61,39 +66,46 @@ func txnBufPtr() int32 {
 type WasmTxn struct{}
 
 func (txn *WasmTxn) Get(key []byte) ([]byte, error) {
-	kp := txnBufPtr()
+	// 使用 txnBuf 的前 4KB 作为 key，后 4KB 作为 value 输出区
+	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
-	vp := kp + int32(len(key)) + 16
-	ret := storageGet(kp, int32(len(key)), vp, 8192)
+	vp := kp + 4096
+	ret := storageGet(kp, int32(len(key)), vp, int32(len(txnBuf)-4096))
 	if ret <= 0 {
 		return nil, nil
 	}
 	val := make([]byte, ret)
-	copy(val, txnBuf[vp-txnBufPtr():vp-txnBufPtr()+ret])
+	copy(val, txnBuf[vp-kp:vp-kp+ret])
 	return val, nil
 }
 
 func (txn *WasmTxn) Set(key, value []byte) error {
-	kp := txnBufPtr()
+	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
 	vp := kp + int32(len(key)) + 16
-	copy(txnBuf[vp-txnBufPtr():], value)
-	storageSet(kp, int32(len(key)), vp, int32(len(value)))
+	copy(txnBuf[vp-kp:], value)
+	ret := storageSet(kp, int32(len(key)), vp, int32(len(value)))
+	if ret < 0 {
+		return &storageError{ret, "storage_set"}
+	}
 	return nil
 }
 
 func (txn *WasmTxn) Delete(key []byte) error {
-	kp := txnBufPtr()
+	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
-	storageDelete(kp, int32(len(key)))
+	ret := storageDelete(kp, int32(len(key)))
+	if ret < 0 {
+		return &storageError{ret, "storage_delete"}
+	}
 	return nil
 }
 
 func (txn *WasmTxn) ListByPrefix(prefix []byte) (keys, vals [][]byte, err error) {
-	pp := txnBufPtr()
+	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], prefix)
-	kp := pp + int32(len(prefix)) + 16
-	vp := kp + 8192
+	pp := kp
+	vp := kp + 4096 // 前 4KB 存放 key 列表，后 4KB 存放 val 列表
 	n := storageScanPrefix(pp, int32(len(prefix)), kp, vp)
 	if n <= 0 {
 		return nil, nil, nil
@@ -127,7 +139,10 @@ func (txn *WasmTxn) ListByPrefix(prefix []byte) (keys, vals [][]byte, err error)
 func (txn *WasmTxn) DeletekeysByPrefix(prefix []byte) error {
 	pp := txnBufPtr()
 	copy(txnBuf[:], prefix)
-	storageDeletePrefix(pp, int32(len(prefix)))
+	ret := storageDeletePrefix(pp, int32(len(prefix)))
+	if ret < 0 {
+		return &storageError{ret, "storage_delete_prefix"}
+	}
 	return nil
 }
 
