@@ -242,6 +242,10 @@ func TxnGetCodec[T any](txn *Txn, namespace, key string) (*T, error) {
 	return val, err
 }
 
+func (txn *Txn) NewIter(opts *pebble.IterOptions) (*pebble.Iterator, error) {
+	return txn.in.NewIter(opts)
+}
+
 func (txn *Txn) Rollback() error {
 	return txn.in.Close()
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func TestTxnDelete(t *testing.T) {
-	os.RemoveAll(dbPath)
+	os.RemoveAll(DBPath)
 	NewDB()
 	defer DBINS.Close()
 

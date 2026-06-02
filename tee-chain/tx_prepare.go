@@ -73,6 +73,9 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 				continue
 			}
 			*finaltx = append(*finaltx, txbt)
+		case *model.SysCall_RuntimeUpgrade:
+			// RuntimeUpgrade 不需要 nonce 校验，直接包含在区块中
+			*finaltx = append(*finaltx, txbt)
 		default:
 			break
 		}

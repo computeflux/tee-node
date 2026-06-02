@@ -12,7 +12,7 @@ import (
 )
 
 func TestSetGet(t *testing.T) {
-	os.RemoveAll(dbPath)
+	os.RemoveAll(DBPath)
 	NewDB()
 	defer DBINS.Close()
 
@@ -32,7 +32,7 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestSetGetKey(t *testing.T) {
-	os.RemoveAll(dbPath)
+	os.RemoveAll(DBPath)
 	NewDB()
 	defer DBINS.Close()
 
@@ -53,7 +53,7 @@ func TestSetGetKey(t *testing.T) {
 }
 
 func TestGetProtoMessage(t *testing.T) {
-	os.RemoveAll(dbPath)
+	os.RemoveAll(DBPath)
 	NewDB()
 	defer DBINS.Close()
 

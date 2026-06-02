@@ -13,6 +13,13 @@ message Tx{
   bytes signature = 11; // 对 Tx 的签名（签名为空时签名字段不参与序列化，即对 payload+caller+nonce 的序列化结果签名）
 }
 
+message RuntimeUpgrade {
+  uint32 version = 1;
+  bytes code_hash = 2;
+  bytes wasm_bytes = 3;
+  string description = 4;
+}
+
 message SysCall{
   oneof payload {
     int64 empty = 99;
@@ -24,6 +31,7 @@ message SysCall{
     int64 sync_tx_retry = 6;
     ContractCall contract = 7;
     RelaySync relay_sync = 8;
+    RuntimeUpgrade runtime_upgrade = 9;
   }
 }
 

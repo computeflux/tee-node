@@ -9,8 +9,9 @@ import (
 )
 
 type AppState struct {
-	Size   int64
-	Height int64
+	Size           int64
+	Height         int64
+	RuntimeVersion uint32
 }
 
 var stateKey = "appstate"

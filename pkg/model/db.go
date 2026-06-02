@@ -16,7 +16,7 @@ import (
 var DBINS *DB
 
 const (
-	dbPath = "./token_chain_data/wetee"
+	DBPath = "./token_chain_data/wetee"
 )
 
 type DB struct {
@@ -25,7 +25,7 @@ type DB struct {
 
 func NewDB() (*DB, error) {
 	// Open DB
-	db, err := pebble.Open(dbPath, &pebble.Options{})
+	db, err := pebble.Open(DBPath, &pebble.Options{})
 	if err != nil {
 		return nil, err
 	}

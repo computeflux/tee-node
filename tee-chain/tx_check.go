@@ -28,7 +28,9 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	// 验证合约交易 nonce（预校验，减少无效交易进入 mempool）
 	call := new(model.SysCall)
 	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err == nil {
-		if contract := call.GetContract(); contract != nil {
+		switch p := call.Payload.(type) {
+		case *model.SysCall_Contract:
+			contract := p.Contract
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
 			if txNonce != expectedNonce {
@@ -42,6 +44,8 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 				util.LogWithYellow("CHECK TX", "DryRun error", err.Error())
 				return CodeInvalidNode
 			}
+		case *model.SysCall_RuntimeUpgrade:
+			// RuntimeUpgrade 不需要 nonce 和 DryRun 预校验
 		}
 	}
 

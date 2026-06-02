@@ -100,6 +100,12 @@ func (app *TeeChain) Query(ctx context.Context, query *abci.RequestQuery) (*abci
 func (app *TeeChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
 	util.LogWithGreen("InitChain")
 	app.initValidators(req.Validators)
+
+	// 初始化运行时版本系统
+	if err := InitRuntimeVersion(); err != nil {
+		return nil, fmt.Errorf("init runtime version: %w", err)
+	}
+
 	appHash := app.state.Hash()
 
 	// This parameter can also be set in the genesis file

@@ -66,6 +66,7 @@ type Bytes []byte
 type ContractApi interface {
 	GetHeight() int64
 	GetBlockTime() int64
+	GetVersion() uint32
 	GetTxn() *Txn
 	GetCaller() UniAddr
 	GetSystemAccount() UniAddr

@@ -135,11 +135,12 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
 				pub, _ := app.GetDkgPubkey()
-				runtime := contracts.NewRuntime(height, ts, txn, model.UniAddr{
+				version, _ := GetRuntimeVersionAtHeight(height)
+				runtime := contracts.NewRuntimeWithVersion(height, ts, txn, model.UniAddr{
 					V: pub.ToBytes(),
 				}, model.UniAddr{
 					V: pub.ToBytes(),
-				})
+				}, version)
 
 				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
@@ -147,6 +148,57 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 					continue
 				}
 			}
+		case *model.SysCall_RuntimeUpgrade:
+			upgrade := p.RuntimeUpgrade
+			if upgrade == nil {
+				return nil, errors.New("runtime upgrade is nil")
+			}
+
+			// 权限校验：仅 system account 可提交 runtime upgrade
+			caller := tx.GetCaller()
+			callerType := tx.GetCallerType()
+			address := model.UniAddr{T: callerType, V: caller}
+
+			pub, err := app.GetDkgPubkey()
+			if err != nil {
+				return nil, errors.Wrap(err, "get dkg pubkey for runtime upgrade")
+			}
+			sudo := model.UniAddr{V: pub.ToBytes()}
+			if !bytes.Equal(address.V, sudo.V) || address.T != sudo.T {
+				return nil, errors.New("runtime upgrade: caller is not system account")
+			}
+
+			currentVersion, err := GetCurrentRuntimeVersion()
+			if err != nil {
+				return nil, errors.Wrap(err, "get current runtime version")
+			}
+
+			// 所有版本升级必须严格递增（包括 v0 也不能通过 RuntimeUpgrade 补充）
+			expectedVersion := currentVersion + 1
+			if upgrade.Version != expectedVersion {
+				return nil, errors.Errorf(
+					"runtime upgrade version invalid: expected %d, got %d",
+					expectedVersion, upgrade.Version,
+				)
+			}
+			if len(upgrade.WasmBytes) == 0 {
+				return nil, errors.New("runtime upgrade: wasm_bytes is empty")
+			}
+
+			info := &model.RuntimeVersionInfo{
+				Version:          upgrade.Version,
+				ActivationHeight: height,
+				CodeHash:         upgrade.CodeHash,
+				WasmBytes:        upgrade.WasmBytes,
+				Description:      upgrade.Description,
+			}
+			if err := ApplyRuntimeUpgrade(txn, info, height); err != nil {
+				return nil, errors.Wrap(err, "apply runtime upgrade")
+			}
+
+			// 更新内存中的当前版本
+			app.state.RuntimeVersion = upgrade.Version
+
 		default:
 			return nil, errors.New("invalid tx type")
 		}

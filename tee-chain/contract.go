@@ -25,7 +25,14 @@ func (app *TeeChain) contractRuntime() (*contracts.Runtime, error) {
 	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
 		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
 	}
-	return contracts.NewRuntime(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo), nil
+
+	version, err := GetRuntimeVersionAtHeight(app.state.Height)
+	if err != nil {
+		txn.Rollback()
+		return nil, fmt.Errorf("get runtime version: %w", err)
+	}
+
+	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo, version), nil
 }
 
 // GatewayLookupAPIKey 根据 keyHash 查询链上 API Key 信息。
@@ -276,11 +283,16 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *mod
 		return fmt.Errorf("dkg pubkey is nil")
 	}
 
-	runtime := contracts.NewRuntime(height, t, txn, address, model.UniAddr{
-		V: pub.ToBytes(),
-	})
+	version, err := GetRuntimeVersionAtHeight(height)
+	if err != nil {
+		return fmt.Errorf("get runtime version: %w", err)
+	}
 
-	err = contracts.Mutation(call, runtime)
+	runtime := contracts.NewRuntimeWithVersion(height, t, txn, address, model.UniAddr{
+		V: pub.ToBytes(),
+	}, version)
+
+	err = contracts.Mutation(version, call, runtime)
 	return err
 }
 
@@ -302,11 +314,16 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 		V: caller,
 	}
 
-	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
-		V: app.dkg.SystemPubKey().Byte(),
-	})
+	version, err := GetRuntimeVersionAtHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("get runtime version: %w", err)
+	}
 
-	data, err = contracts.Query(&model.ContractCall{
+	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, model.UniAddr{
+		V: app.dkg.SystemPubKey().Byte(),
+	}, version)
+
+	data, err = contracts.Query(version, &model.ContractCall{
 		Name:   []byte(contract),
 		Method: model.MethodToSelectorBytes(method),
 		Args:   args,
@@ -332,10 +349,15 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call *mode
 		V: caller,
 	}
 
-	runtime := contracts.NewRuntime(height, time.Now(), txn, address, model.UniAddr{
-		V: app.dkg.SystemPubKey().Byte(),
-	})
+	version, err := GetRuntimeVersionAtHeight(height)
+	if err != nil {
+		return fmt.Errorf("get runtime version: %w", err)
+	}
 
-	err = contracts.Mutation(call, runtime)
+	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, model.UniAddr{
+		V: app.dkg.SystemPubKey().Byte(),
+	}, version)
+
+	err = contracts.Mutation(version, call, runtime)
 	return err
 }

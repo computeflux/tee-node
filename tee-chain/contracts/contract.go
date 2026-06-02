@@ -1,19 +1,69 @@
-// Package contracts 提供侧链合约的标准调用接口和路由分发机制。
-// 支持 Query（查询）和 Mutation（状态变更）。
+// Package contracts 提供侧链合约的版本化调用接口和路由分发机制。
+// 支持两种执行路径：
+//  1. 原生 Go 快速路径：版本号与当前二进制一致时，直接调用编译进二进制的 Go 函数
+//  2. WASM 兼容路径：版本号与当前二进制不一致时，从数据库加载对应版本的 WASM 字节码执行
 package contracts
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/auth"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/batch"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/gov"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gov"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/wasm"
 )
 
+var (
+	wasmEngine     *wasm.Engine
+	wasmEngineOnce sync.Once
+)
+
+// getWasmEngine 获取全局 WASM 执行引擎（懒加载）。
+func getWasmEngine() *wasm.Engine {
+	wasmEngineOnce.Do(func() {
+		wasmEngine = wasm.NewEngine()
+	})
+	return wasmEngine
+}
+
 // Query 执行合约的查询操作（只读操作）。
-func Query(call *model.ContractCall, runtime model.ContractApi) (data []byte, err error) {
+// 根据 version 选择执行路径：
+//   - version == wasm.NativeVersion：使用原生 Go 快速路径
+//   - version != wasm.NativeVersion：使用 WASM 兼容路径
+func Query(version uint32, call *model.ContractCall, runtime model.ContractApi) (data []byte, err error) {
+	if version == wasm.NativeVersion {
+		return nativeQuery(call, runtime)
+	}
+	return getWasmEngine().ExecuteQuery(version, call, runtime)
+}
+
+// Mutation 执行合约的状态变更操作（写操作）。
+// 根据 version 选择执行路径：
+//   - version == wasm.NativeVersion：使用原生 Go 快速路径
+//   - version != wasm.NativeVersion：使用 WASM 兼容路径
+func Mutation(version uint32, call *model.ContractCall, runtime model.ContractApi) error {
+	if version == wasm.NativeVersion {
+		selector := [4]byte(call.Method[:4])
+		if selector == model.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.Name)) {
+			return nil
+		}
+
+		err := nativeMutation(call, runtime)
+
+		if selector == model.MethodToSelector("Init") && err == nil {
+			return SetContractInited(runtime.GetTxn(), string(call.Name))
+		}
+
+		return err
+	}
+	return getWasmEngine().ExecuteMutation(version, call, runtime)
+}
+
+// nativeQuery 原生 Go 合约查询路由。
+func nativeQuery(call *model.ContractCall, runtime model.ContractApi) (data []byte, err error) {
 	switch string(call.Name) {
 	case "gov":
 		ins := gov.NewGov(runtime)
@@ -32,13 +82,8 @@ func Query(call *model.ContractCall, runtime model.ContractApi) (data []byte, er
 	}
 }
 
-// Mutation 执行合约的状态变更操作（写操作）。
-func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
-	selector := [4]byte(call.Method[:4])
-	if selector == model.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.Name)) {
-		return nil
-	}
-
+// nativeMutation 原生 Go 合约状态变更路由。
+func nativeMutation(call *model.ContractCall, runtime model.ContractApi) error {
 	var err error
 	switch string(call.Name) {
 	case "gov":
@@ -60,11 +105,5 @@ func Mutation(call *model.ContractCall, runtime model.ContractApi) error {
 	default:
 		return fmt.Errorf("unsupported contract: %s", string(call.Name))
 	}
-
-	if selector == model.MethodToSelector("Init") && err == nil {
-		return SetContractInited(runtime.GetTxn(), string(call.Name))
-	}
-
-	// util.LogOk("Contract Call "+string(call.Name)+" -> err", err)
 	return err
 }

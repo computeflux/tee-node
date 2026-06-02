@@ -69,6 +69,8 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 				return abci.ResponseProcessProposal_REJECT
 			}
 		case *model.SysCall_RelaySync:
+		case *model.SysCall_RuntimeUpgrade:
+			// RuntimeUpgrade 在 FinalizeTx 中进行权限校验，此处直接放行
 		default:
 			fmt.Println("Payload is not set or unknown")
 			return abci.ResponseProcessProposal_REJECT

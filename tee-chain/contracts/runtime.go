@@ -14,11 +14,12 @@ import (
 // 它实现了 model.ContractApi 接口，在 FinalizeTx / Query 等路径中传入区块高度、交易和调用方信息。
 // 每次合约调用都会创建一个新的 Runtime 实例，确保执行上下文的隔离性。
 type Runtime struct {
-	unix   int64         // 当前区块时间戳，用于时间相关的业务逻辑判断
-	height int64         // 当前区块高度，用于时间相关的业务逻辑判断
-	txn    *model.Txn    // 当前交易对象，包含交易的签名和原始数据
-	caller model.UniAddr // 调用者地址，标识合约方法的调用发起方
-	sudo   model.UniAddr // 超级管理员账户地址，用于执行特权操作
+	unix    int64         // 当前区块时间戳，用于时间相关的业务逻辑判断
+	height  int64         // 当前区块高度，用于时间相关的业务逻辑判断
+	version uint32        // 当前执行的运行时版本号
+	txn     *model.Txn    // 当前交易对象，包含交易的签名和原始数据
+	caller  model.UniAddr // 调用者地址，标识合约方法的调用发起方
+	sudo    model.UniAddr // 超级管理员账户地址，用于执行特权操作
 }
 
 // NewRuntime 创建一个新的合约运行时实例。
@@ -31,7 +32,12 @@ type Runtime struct {
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
 func NewRuntime(height int64, ts time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr) *Runtime {
-	return &Runtime{unix: ts.Unix(), height: height, txn: txn, caller: caller, sudo: sudo}
+	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo}
+}
+
+// NewRuntimeWithVersion 创建带指定版本的合约运行时实例。
+func NewRuntimeWithVersion(height int64, ts time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr, version uint32) *Runtime {
+	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo}
 }
 
 // GetHeight 获取当前区块高度。
@@ -48,6 +54,13 @@ func (r *Runtime) GetHeight() int64 {
 //   - int64: 当前区块时间戳（单位：秒）
 func (r *Runtime) GetBlockTime() int64 {
 	return r.unix
+}
+
+// GetVersion 获取当前执行的运行时版本号。
+// 返回:
+//   - uint32: 运行时版本号
+func (r *Runtime) GetVersion() uint32 {
+	return r.version
 }
 
 // GetTxn 获取当前交易对象。
@@ -136,13 +149,14 @@ func SetContractInited(txn *model.Txn, contract string) error {
 func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
-		unix:   r.unix,
-		height: r.height,
-		txn:    r.txn,
-		caller: r.caller, // 保持原始调用者
-		sudo:   r.sudo,
+		unix:    r.unix,
+		height:  r.height,
+		version: r.version,
+		txn:     r.txn,
+		caller:  r.caller, // 保持原始调用者
+		sudo:    r.sudo,
 	}
-	return Query(&call, newRuntime)
+	return Query(r.version, &call, newRuntime)
 }
 
 // Call 调用其他合约（状态变更操作）。
@@ -159,12 +173,13 @@ func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, 
 func (r *Runtime) Call(target model.UniAddr, call model.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
-		unix:   r.unix,
-		height: r.height,
-		txn:    r.txn,
-		caller: r.caller, // 保持原始调用者
-		sudo:   r.sudo,
+		unix:    r.unix,
+		height:  r.height,
+		version: r.version,
+		txn:     r.txn,
+		caller:  r.caller, // 保持原始调用者
+		sudo:    r.sudo,
 	}
-	err := Mutation(&call, newRuntime)
+	err := Mutation(r.version, &call, newRuntime)
 	return nil, err
 }

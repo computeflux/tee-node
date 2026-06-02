@@ -114,6 +114,7 @@ type mockAPI struct {
 func (m *mockAPI) GetTxn() *model.Txn              { return m.txn }
 func (m *mockAPI) GetHeight() int64                { return 0 }
 func (m *mockAPI) GetBlockTime() int64             { return 0 }
+func (m *mockAPI) GetVersion() uint32              { return 0 }
 func (m *mockAPI) GetCaller() model.UniAddr        { return model.UniAddr{} }
 func (m *mockAPI) GetSystemAccount() model.UniAddr { return model.UniAddr{} }
 func (m *mockAPI) CallbySystem() bool              { return false }
