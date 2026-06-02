@@ -45,3 +45,4 @@ ext/experimental/dss
 node0.log
 
 ink-abi-ts-gen
+scale-codec-gen

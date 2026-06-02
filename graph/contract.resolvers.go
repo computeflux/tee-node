@@ -12,7 +12,6 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -61,9 +60,9 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 		V: callerBytes,
 		T: uint32(callerType),
 	}
-	tobt, _ := codec.Encode(to)
+	tobt, _ := store.ScaleEncode(to)
 	var value store.Amount = types.NewU256(*big.NewInt(100000000))
-	valuebt, _ := codec.Encode(value)
+	valuebt, _ := store.ScaleEncode(value)
 
 	// 创建合同调用
 	argBytes := [][]byte{tobt, valuebt}

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
@@ -301,7 +300,7 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 	}
 
 	// SCALE 编码 Settlement 数组
-	argBytes, err := codec.Encode(records)
+	argBytes, err := store.ScaleEncode(records)
 	if err != nil {
 		return fmt.Errorf("encode settlements: %w", err)
 	}

@@ -5,8 +5,6 @@ package store
 
 import (
 	"strconv"
-
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 // List2DKey1 约束二维列表的外层 key 类型。
@@ -415,4 +413,3 @@ func (e *hexErr) Error() string { return e.s }
 
 // compile-time check
 var _ = strconv.Itoa
-var _ = codec.Encode

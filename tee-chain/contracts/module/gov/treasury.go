@@ -1,7 +1,6 @@
 package gov
 
 import (
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -46,7 +45,7 @@ func (d GovMutation) Spend(to store.UniAddr, amount store.Amount, trackID uint32
 		return err
 	}
 
-	idbt, err := codec.Encode(id)
+	idbt, err := store.ScaleEncode(id)
 	if err != nil {
 		return err
 	}

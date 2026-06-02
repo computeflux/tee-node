@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -221,7 +220,7 @@ func TxnSetProtoMessage[T proto.Message](txn *Txn, key []byte, value T) error {
 }
 
 func TxnSetCodec[T any](txn store.StoreTx, namespace, key string, val T) error {
-	bt, err := codec.Encode(val)
+	bt, err := store.ScaleEncode(val)
 	if err != nil {
 		return err
 	}
@@ -239,7 +238,7 @@ func TxnGetCodec[T any](txn store.StoreTx, namespace, key string) (*T, error) {
 	}
 
 	val := new(T)
-	err = codec.Decode(bt, val)
+	err = store.ScaleDecode(val, bt)
 	return val, err
 }
 

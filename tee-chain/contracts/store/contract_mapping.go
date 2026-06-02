@@ -5,8 +5,6 @@ package store
 import (
 	"encoding/hex"
 	"strconv"
-
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 // MappingKey 约束 mapping 的 key 类型：string、[]byte、uint64、uint32、uint16、uint8。
@@ -41,7 +39,7 @@ func (m *StoreMapping[K, V]) keySuffix(key K) string {
 	case uint8:
 		return strconv.FormatUint(uint64(v), 10)
 	case UniAddr:
-		k, _ := codec.EncodeToHex(v)
+		k := uniAddrEncodeToHex(v)
 		return k
 	default:
 		panic("unsupported MappingKey type")
@@ -70,8 +68,7 @@ func parseKeySuffix[K MappingKey](suffix string) K {
 		v, _ := strconv.ParseUint(suffix, 10, 8)
 		return any(uint8(v)).(K)
 	case UniAddr:
-		var addr UniAddr
-		codec.DecodeFromHex(suffix, &addr)
+		addr, _ := uniAddrDecodeFromHex(suffix)
 		return any(addr).(K)
 	default:
 		panic("unsupported MappingKey type")
@@ -135,7 +132,7 @@ func (m *StoreMapping[K, V]) Get(txn StoreTx, key K) (*V, error) {
 	}
 
 	val := new(V)
-	if err := codec.Decode(bt, val); err != nil {
+	if err := ScaleDecode(val, bt); err != nil {
 		return nil, err
 	}
 	return val, nil
@@ -156,7 +153,7 @@ func (m *StoreMapping[K, V]) GetOrDefault(txn StoreTx, key K, defaultVal V) (V, 
 
 // SetCodec 使用 codec.Encode 序列化 v 并按 key 写入。
 func (m *StoreMapping[K, V]) Set(txn StoreTx, key K, v V) error {
-	bt, err := codec.Encode(v)
+	bt, err := ScaleEncode(v)
 	if err != nil {
 		return err
 	}
@@ -175,7 +172,7 @@ func (m *StoreMapping[K, V]) List(txn StoreTx) ([]K, []V, error) {
 	out := make([]V, 0, len(list))
 	for i, bt := range list {
 		val := new(V)
-		if err := codec.Decode(bt, val); err != nil {
+		if err := ScaleDecode(val, bt); err != nil {
 			return nil, nil, err
 		}
 		out = append(out, *val)

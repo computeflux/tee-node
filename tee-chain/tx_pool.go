@@ -1,16 +1,14 @@
 package teechain
 
 import (
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-
 	"crypto/rand"
 	"fmt"
 	"time"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 const contractPoolNS = "POOL_TX"
@@ -110,7 +108,7 @@ func (app *TeeChain) ApplyToChain() {
 	}
 
 	// 2) 编码参数：SCALE([]BatchCall)
-	argsBytes, err := codec.Encode(batchCalls)
+	argsBytes, err := store.ScaleEncode(batchCalls)
 	if err != nil {
 		util.LogWithRed("TX-POOL", "encode batch calls failed:", err)
 		return

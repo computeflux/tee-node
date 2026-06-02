@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	cauth "github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
@@ -39,9 +38,9 @@ func AuthGetPrivateKey(chain *teechain.TeeChain, ref string) (*cauth.PrivateKeyR
 
 // AuthStoreAuthUser 将 Web3Auth 用户信息提交到链上合约。
 func AuthStoreAuthUser(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
-	refBytes, _ := codec.Encode(ref)
-	cipherBytes, _ := codec.Encode(ciphertext)
-	nonceBytes, _ := codec.Encode([]byte{})
+	refBytes, _ := store.ScaleEncode(ref)
+	cipherBytes, _ := store.ScaleEncode(ciphertext)
+	nonceBytes, _ := store.ScaleEncode([]byte{})
 	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
@@ -76,22 +75,22 @@ func AuthSetConfig(
 	githubID, githubSecret, githubRedirect string,
 	twitterID, twitterSecret, twitterRedirect string,
 ) error {
-	hostBytes, _ := codec.Encode(smtpHost)
-	portBytes, _ := codec.Encode(smtpPort)
-	userBytes, _ := codec.Encode(smtpUser)
-	pwdBytes, _ := codec.Encode(smtpPwd)
-	fromBytes, _ := codec.Encode(smtpFrom)
-	fromNameBytes, _ := codec.Encode(smtpFromName)
-	mockBytes, _ := codec.Encode(mockEmail)
-	gIDBytes, _ := codec.Encode(googleID)
-	gSecBytes, _ := codec.Encode(googleSecret)
-	gRedBytes, _ := codec.Encode(googleRedirect)
-	ghIDBytes, _ := codec.Encode(githubID)
-	ghSecBytes, _ := codec.Encode(githubSecret)
-	ghRedBytes, _ := codec.Encode(githubRedirect)
-	twIDBytes, _ := codec.Encode(twitterID)
-	twSecBytes, _ := codec.Encode(twitterSecret)
-	twRedBytes, _ := codec.Encode(twitterRedirect)
+	hostBytes, _ := store.ScaleEncode(smtpHost)
+	portBytes, _ := store.ScaleEncode(smtpPort)
+	userBytes, _ := store.ScaleEncode(smtpUser)
+	pwdBytes, _ := store.ScaleEncode(smtpPwd)
+	fromBytes, _ := store.ScaleEncode(smtpFrom)
+	fromNameBytes, _ := store.ScaleEncode(smtpFromName)
+	mockBytes, _ := store.ScaleEncode(mockEmail)
+	gIDBytes, _ := store.ScaleEncode(googleID)
+	gSecBytes, _ := store.ScaleEncode(googleSecret)
+	gRedBytes, _ := store.ScaleEncode(googleRedirect)
+	ghIDBytes, _ := store.ScaleEncode(githubID)
+	ghSecBytes, _ := store.ScaleEncode(githubSecret)
+	ghRedBytes, _ := store.ScaleEncode(githubRedirect)
+	twIDBytes, _ := store.ScaleEncode(twitterID)
+	twSecBytes, _ := store.ScaleEncode(twitterSecret)
+	twRedBytes, _ := store.ScaleEncode(twitterRedirect)
 
 	return chain.SubmitContract("auth", store.MethodToSelectorBytes("set_config"), [][]byte{
 		hostBytes, portBytes, userBytes, pwdBytes,
@@ -104,8 +103,8 @@ func AuthSetConfig(
 
 // AuthStorePrivateKey 存储用户私钥到链上合约。
 func AuthStorePrivateKey(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
-	refBytes, _ := codec.Encode(ref)
-	cipherBytes, _ := codec.Encode(ciphertext)
-	nonceBytes, _ := codec.Encode([]byte{})
+	refBytes, _ := store.ScaleEncode(ref)
+	cipherBytes, _ := store.ScaleEncode(ciphertext)
+	nonceBytes, _ := store.ScaleEncode([]byte{})
 	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }

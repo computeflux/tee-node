@@ -5,7 +5,6 @@ package batch
 import (
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -50,7 +49,7 @@ func (q BatchQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("batch: unknown query method %q", methodSel)
 	}

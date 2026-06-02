@@ -4,7 +4,6 @@
 package store
 
 import (
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 )
 
 // ListIndex 约束列表索引类型：支持自增/自减。
@@ -280,4 +279,3 @@ func compareListIndex[K ListIndex](a, b K) int {
 }
 
 // compile-time check
-var _ = codec.Encode

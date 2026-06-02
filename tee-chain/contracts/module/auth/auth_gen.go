@@ -5,7 +5,6 @@ package auth
 import (
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -216,13 +215,13 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x25, 0x0b, 0x0e, 0xc4}:
 		out, err := q.GetConfig()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x47, 0xa7, 0xfe, 0x67}:
 		if err := store.RequireArgLen(args, 1, "get_private_key"); err != nil {
 			return nil, err
@@ -235,7 +234,7 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x7d, 0x24, 0x4c, 0x3f}:
 		if err := store.RequireArgLen(args, 1, "get_recovery"); err != nil {
 			return nil, err
@@ -248,7 +247,7 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x62, 0x76, 0x14, 0x9a}:
 		if err := store.RequireArgLen(args, 1, "get_user"); err != nil {
 			return nil, err
@@ -261,7 +260,7 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x03, 0x2c, 0x9f, 0x3b}:
 		if err := store.RequireArgLen(args, 1, "has_key"); err != nil {
 			return nil, err
@@ -274,7 +273,7 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("auth: unknown query method %q", methodSel)
 	}

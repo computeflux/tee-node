@@ -5,7 +5,6 @@ package gov
 import (
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/wetee-dao/ink.go/util"
 )
@@ -231,25 +230,25 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x36, 0x26, 0xe9, 0xbf}:
 		out, err := q.DefaultTrack()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x76, 0xf2, 0x07, 0x24}:
 		out, err := q.GetPublicJoin()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x53, 0x55, 0x0f, 0x05}:
 		out, err := q.Members()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x79, 0x9f, 0xe2, 0xdd}:
 		if err := store.RequireArgLen(args, 1, "proposal"); err != nil {
 			return nil, err
@@ -262,7 +261,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xfd, 0x88, 0x90, 0x7b}:
 		if err := store.RequireArgLen(args, 1, "proposal_status"); err != nil {
 			return nil, err
@@ -275,7 +274,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xfe, 0x26, 0xfd, 0x17}:
 		if err := store.RequireArgLen(args, 2, "proposals"); err != nil {
 			return nil, err
@@ -292,13 +291,13 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x77, 0x17, 0x71, 0xf7}:
 		out, err := q.TotalSupply()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xb9, 0xfd, 0x54, 0xc4}:
 		if err := store.RequireArgLen(args, 1, "track"); err != nil {
 			return nil, err
@@ -311,13 +310,13 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x3c, 0x05, 0xbe, 0x89}:
 		out, err := q.Tracks()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x4d, 0x15, 0x1c, 0xf1}:
 		if err := store.RequireArgLen(args, 2, "vote"); err != nil {
 			return nil, err
@@ -334,7 +333,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x34, 0x0f, 0x2c, 0xf4}:
 		if err := store.RequireArgLen(args, 3, "votes"); err != nil {
 			return nil, err
@@ -355,7 +354,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xfe, 0xad, 0xee, 0x12}:
 		if err := store.RequireArgLen(args, 3, "votes_of_user"); err != nil {
 			return nil, err
@@ -376,7 +375,7 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("gov: unknown query method %q", methodSel)
 	}

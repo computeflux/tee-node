@@ -5,7 +5,6 @@ package gateway
 import (
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -316,7 +315,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x04, 0x60, 0x1f, 0xca}:
 		if err := store.RequireArgLen(args, 1, "get_credit"); err != nil {
 			return nil, err
@@ -329,7 +328,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xd3, 0xff, 0x81, 0xe9}:
 		if err := store.RequireArgLen(args, 1, "get_model"); err != nil {
 			return nil, err
@@ -342,7 +341,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xb5, 0x1e, 0x55, 0x6b}:
 		if err := store.RequireArgLen(args, 2, "get_model_by_name"); err != nil {
 			return nil, err
@@ -359,13 +358,13 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x05, 0xed, 0xba, 0xf5}:
 		out, err := q.GetModelCount()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xa1, 0x11, 0x9c, 0x12}:
 		if err := store.RequireArgLen(args, 1, "get_models"); err != nil {
 			return nil, err
@@ -378,7 +377,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x59, 0xd9, 0x42, 0x4a}:
 		if err := store.RequireArgLen(args, 1, "get_models_by_provider"); err != nil {
 			return nil, err
@@ -391,7 +390,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xb3, 0x4c, 0x16, 0xd8}:
 		if err := store.RequireArgLen(args, 1, "get_provider"); err != nil {
 			return nil, err
@@ -404,7 +403,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xe2, 0xa8, 0xc1, 0xe4}:
 		if err := store.RequireArgLen(args, 1, "get_provider_by_name"); err != nil {
 			return nil, err
@@ -417,19 +416,19 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x55, 0xc0, 0x48, 0x47}:
 		out, err := q.GetProviderByOwner()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x46, 0x7c, 0x95, 0xd9}:
 		out, err := q.GetProviderCount()
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xad, 0x4c, 0x38, 0xcd}:
 		if err := store.RequireArgLen(args, 1, "get_provider_credit"); err != nil {
 			return nil, err
@@ -442,7 +441,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xc8, 0x9f, 0x2f, 0x8f}:
 		if err := store.RequireArgLen(args, 3, "get_recharge_history"); err != nil {
 			return nil, err
@@ -463,7 +462,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x74, 0xd5, 0x99, 0xfb}:
 		if err := store.RequireArgLen(args, 3, "get_settlement_history"); err != nil {
 			return nil, err
@@ -484,7 +483,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x56, 0xb9, 0x06, 0xc0}:
 		if err := store.RequireArgLen(args, 3, "get_user_settlement_history"); err != nil {
 			return nil, err
@@ -505,7 +504,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xda, 0xa1, 0xc2, 0xd5}:
 		if err := store.RequireArgLen(args, 2, "list_active_models"); err != nil {
 			return nil, err
@@ -522,7 +521,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xc3, 0xef, 0x49, 0x0c}:
 		if err := store.RequireArgLen(args, 6, "list_active_models_within_provider"); err != nil {
 			return nil, err
@@ -555,7 +554,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xbd, 0x24, 0x20, 0x9b}:
 		if err := store.RequireArgLen(args, 2, "list_active_providers"); err != nil {
 			return nil, err
@@ -572,7 +571,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xc1, 0x51, 0x1f, 0xbf}:
 		if err := store.RequireArgLen(args, 2, "list_models"); err != nil {
 			return nil, err
@@ -589,7 +588,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xcd, 0x2e, 0xf8, 0x8d}:
 		if err := store.RequireArgLen(args, 1, "list_provider_models"); err != nil {
 			return nil, err
@@ -602,7 +601,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x36, 0xe0, 0x90, 0x37}:
 		if err := store.RequireArgLen(args, 2, "list_providers"); err != nil {
 			return nil, err
@@ -619,7 +618,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0xc5, 0x33, 0xa8, 0x4f}:
 		if err := store.RequireArgLen(args, 1, "lookup_a_p_i_key"); err != nil {
 			return nil, err
@@ -632,7 +631,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	case [4]byte{0x60, 0xd0, 0x0c, 0x96}:
 		if err := store.RequireArgLen(args, 6, "query_models"); err != nil {
 			return nil, err
@@ -665,7 +664,7 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return codec.Encode(out)
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("gateway: unknown query method %q", methodSel)
 	}

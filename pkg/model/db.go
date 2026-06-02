@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/cosmos/gogoproto/proto"
 )
 
@@ -75,7 +75,7 @@ func SetJson[T any](namespace, key string, val *T) error {
 }
 
 func SetCodec[T any](namespace, key string, val T) error {
-	bt, err := codec.Encode(val)
+	bt, err := store.ScaleEncode(val)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func GetCodec[T any](namespace, key string) (*T, error) {
 	}
 
 	val := new(T)
-	err = codec.Decode(bt, val)
+	err = store.ScaleDecode(val, bt)
 	return val, err
 }
 

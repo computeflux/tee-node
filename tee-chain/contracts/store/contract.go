@@ -8,7 +8,6 @@ import (
 	"unicode"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -125,7 +124,7 @@ func DecodeScaleArg[T any](s string) (T, error) {
 
 func DecodeScaleArgBytes[T any](s []byte) (T, error) {
 	var z T
-	if err := codec.Decode(s, &z); err != nil {
+	if err := ScaleDecode(&z, s); err != nil {
 		return z, fmt.Errorf("scale: %w", err)
 	}
 	return z, nil

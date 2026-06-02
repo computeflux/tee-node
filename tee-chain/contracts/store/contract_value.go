@@ -2,10 +2,6 @@
 // 用于存储不依赖 key 的单一值（如配置、状态标记等）。
 package store
 
-import (
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-)
-
 // StoreValue 类似 Solidity 中的单值存储（如状态变量）。
 type StoreValue[V any] struct {
 	Namespace string
@@ -55,7 +51,7 @@ func (s *StoreValue[V]) Get(txn StoreTx) (*V, error) {
 	}
 
 	val := new(V)
-	if err := codec.Decode(bt, val); err != nil {
+	if err := ScaleDecode(val, bt); err != nil {
 		return nil, err
 	}
 	return val, nil
@@ -76,7 +72,7 @@ func (s *StoreValue[V]) GetOrDefault(txn StoreTx, defaultVal V) (V, error) {
 
 // Set 使用 codec.Encode 序列化并写入。
 func (s *StoreValue[V]) Set(txn StoreTx, v V) error {
-	bt, err := codec.Encode(v)
+	bt, err := ScaleEncode(v)
 	if err != nil {
 		return err
 	}
