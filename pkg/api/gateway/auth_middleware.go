@@ -8,7 +8,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	modelpkg "github.com/computeflux/tee-provider/pkg/model"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
 type contextKey string
@@ -113,7 +113,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// 5. 检查用户积分
 		if bridge := getBridge(); bridge != nil {
-			credit, err := bridge.GatewayGetCredit(token.Addr)
+			credit, err := GatewayGetCredit(bridge, token.Addr)
 			if err != nil {
 				GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
 			} else if credit <= 0 {

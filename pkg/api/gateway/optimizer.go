@@ -9,7 +9,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/pkg/model"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
 // ── Async usage writer ───────────────────────────────────

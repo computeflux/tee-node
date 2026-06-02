@@ -12,6 +12,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
+	authpkg "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/model"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -129,7 +130,7 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*model.AuthUser, error) {
 	if tc != nil {
 		ref := "auth_user:" + email
-		rec, err := tc.AuthGetAuthUser(ref)
+		rec, err := authpkg.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var u model.AuthUser
 			if json.Unmarshal(rec.Ciphertext, &u) == nil {

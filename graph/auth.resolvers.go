@@ -145,7 +145,7 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	// 异步上链：同步 AuthUser 到合约，支持跨节点登录
 	go func(u *model.AuthUser) {
 		plain, _ := json.Marshal(u)
-		_ = r.TeeChain.AuthStoreAuthUser("auth_user:"+u.Email, plain)
+		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
 	}(user)
 
 	return &auth.WalletResult{Status: "ok"}, nil
@@ -435,7 +435,8 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 
 // SetAuthConfig is the resolver for the setAuthConfig field.
 func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error) {
-	err := r.TeeChain.AuthSetConfig(
+	err := auth.AuthSetConfig(
+		r.TeeChain,
 		cfg.SMTPHost,
 		uint32(cfg.SMTPPort),
 		cfg.SMTPUser,
@@ -528,7 +529,7 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 
 // AuthConfig is the resolver for the authConfig field.
 func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, error) {
-	cfg, err := r.TeeChain.AuthGetPubConfig()
+	cfg, err := auth.AuthGetPubConfig(r.TeeChain)
 	if err != nil {
 		return nil, err
 	}

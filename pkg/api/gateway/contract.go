@@ -8,7 +8,8 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -47,7 +48,7 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 		return nil
 	}
 
-	info, err := bridge.GatewayLookupAPIKey(hash)
+	info, err := GatewayLookupAPIKey(bridge, hash)
 	if err != nil {
 		return nil
 	}
@@ -101,11 +102,13 @@ func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway
 	if bridge == nil {
 		return nil, nil
 	}
-	models, err := bridge.GatewayListActiveModels(0, 1000)
+
+	models, err := GatewayListActiveModels(bridge, 0, 1000)
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] contract list models error: %v", err)
 		return nil, nil
 	}
+
 	out := make([]cgateway.ModelInfo, len(models))
 	copy(out, models)
 
@@ -144,7 +147,7 @@ func findGatewayModelByName(pid uint64, name string) *cgateway.ModelInfoWithID {
 	if bridge == nil {
 		return nil
 	}
-	model, err := bridge.GatewaySecretGetModelByName(pid, name)
+	model, err := GatewaySecretGetModelByName(bridge, pid, name)
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] SecretGetModelByName name=%s err=%v", name, err)
 		return nil
@@ -158,7 +161,7 @@ func findProviderName(name string) *cgateway.ProviderInfoWithID {
 	if bridge == nil {
 		return nil
 	}
-	provider, err := bridge.GatewayGetProviderByName(name)
+	provider, err := GatewayGetProviderByName(bridge, name)
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] GetProviderByName name=%s err=%v", name, err)
 		return nil
@@ -192,4 +195,143 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
 		})
 	}
 	return eps
+}
+
+// ── Gateway 合约查询（从 tee-chain/contract.go 拆分出来）──────
+
+// contractRuntime 构造合约运行时上下文（本包内部使用）。
+func contractRuntime(chain *teechain.TeeChain) (*contracts.Runtime, error) {
+	return chain.ContractRuntime()
+}
+
+// GatewayLookupAPIKey 根据 keyHash 查询链上 API Key 信息。
+func GatewayLookupAPIKey(chain *teechain.TeeChain, keyHash []byte) (*cgateway.APIKeyInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.LookupAPIKey(keyHash)
+}
+
+// GatewayListActiveModels 查询链上活跃模型列表。
+func GatewayListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ModelInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
+}
+
+// GatewayListActiveProviders 查询链上活跃 Provider 列表。
+func GatewayListActiveProviders(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ProviderInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveProviders(offset, limit)
+}
+
+// GatewayGetProvider 查询单个 Provider。
+func GatewayGetProvider(chain *teechain.TeeChain, id uint64) (*cgateway.ProviderInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetProvider(id)
+}
+
+// GatewayGetModel 查询单个 Model。
+func GatewayGetModel(chain *teechain.TeeChain, id uint64) (*cgateway.ModelInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetModel(id)
+}
+
+// GatewayGetModelByName 按名称查询活跃模型（走 string exact 索引，O(1) 查询）。
+func GatewayGetModelByName(chain *teechain.TeeChain, pid uint64, name string) (*cgateway.ModelInfoWithID, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetModelByName(pid, name)
+}
+
+// GatewaySecretGetModel 查询单个 Model（TEE 内部，不脱敏）。
+func GatewaySecretGetModel(chain *teechain.TeeChain, id uint64) (*cgateway.ModelInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewaySecret{Gateway: *cgateway.NewGateway(runtime)}.GetModel(id)
+}
+
+// GatewaySecretGetModelByName 按名称查询模型（TEE 内部，不脱敏）。
+func GatewaySecretGetModelByName(chain *teechain.TeeChain, pid uint64, name string) (*cgateway.ModelInfoWithID, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewaySecret{Gateway: *cgateway.NewGateway(runtime)}.GetModelByName(pid, name)
+}
+
+// GatewaySecretListActiveModels 查询活跃模型列表（TEE 内部，不脱敏）。
+func GatewaySecretListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ModelInfo, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewaySecret{Gateway: *cgateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
+}
+
+// GatewayGetProviderByName 按名称查询 Provider（走 string exact 索引，O(1) 查询）。
+func GatewayGetProviderByName(chain *teechain.TeeChain, name string) (*cgateway.ProviderInfoWithID, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetProviderByName(name)
+}
+
+// GatewayGetCredit 查询用户剩余积分（credits - credit_useds）。
+func GatewayGetCredit(chain *teechain.TeeChain, user model.UniAddr) (int64, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return 0, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetCredit(user)
+}
+
+// GatewayGetRechargeHistory 查询用户充值历史。
+func GatewayGetRechargeHistory(chain *teechain.TeeChain, user model.UniAddr, offset uint64, limit uint32) ([]cgateway.RechargeRecord, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetRechargeHistory(user, offset, limit)
 }

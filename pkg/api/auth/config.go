@@ -51,7 +51,7 @@ func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 
 	// 1. 从链上合约读取
 	if tc != nil {
-		cfg, err := tc.AuthGetConfig()
+		cfg, err := AuthGetConfig(tc)
 		if err == nil && cfg != nil {
 			c := &AuthConfig{
 				JWTSecret:  cfg.JWTSecret,
