@@ -8,16 +8,16 @@
 //
 // 执行模式（Command）：
 //
-//	Go wasip1 模块导出 _start，InstantiateModule 时自动执行。
+//	模块导出 _start，InstantiateModule 时自动执行。
 //	main() 内部调用 execute()，execute() 通过 set_result 写回结果。
-//	main() 返回后 Go runtime 调用 proc_exit 关闭模块（每次调用独立实例化）。
+//	main() 返回后 runtime 调用 proc_exit 关闭模块（每次调用独立实例化）。
 package wasm
 
 import (
-	"context"
-	"fmt"
 	"bytes"
 	"compress/gzip"
+	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -43,6 +43,7 @@ type Engine struct {
 	wasiOnce  sync.Once
 	hostOnce  sync.Once
 	hostState hostState
+	mu        sync.Mutex // 保护 hostState 和 InstantiateModule 的并发访问
 }
 
 func NewEngine() *Engine {
@@ -59,22 +60,31 @@ func (e *Engine) ensureHost(ctx context.Context) {
 	})
 }
 
+// LoadModule 加载并编译 WASM 模块。先从 DB 读取 RAW 字节，检测是否 gzip 压缩，自动解压后编译为 wazero CompiledModule 并缓存。
 func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 	if e.cachedMod != nil && e.cachedVer == version {
 		return e.cachedMod, nil
 	}
-	info, err := model.GetJson[model.RuntimeVersionInfo]("", "RUNTIME_META_"+fmt.Sprint(version))
+
+	key := "RUNTIME_META_" + fmt.Sprint(version)
+	raw, err := model.Get(key)
 	if err != nil {
-		return nil, fmt.Errorf("get runtime meta: %w", err)
+		return nil, fmt.Errorf("get runtime meta %s: %w", key, err)
 	}
-	if info == nil {
+	if len(raw) == 0 {
 		return nil, fmt.Errorf("runtime version %d not found", version)
 	}
-	if len(info.WasmBytes) == 0 {
+
+	// 自动检测 gzip 压缩并解压
+	wasmBytes, err := decompressWasm(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decompress wasm v%d: %w", version, err)
+	}
+	if len(wasmBytes) == 0 {
 		return nil, fmt.Errorf("runtime version %d has no wasm bytes", version)
 	}
+
 	ctx := context.Background()
-	wasmBytes := decompressIfGzip(info.WasmBytes)
 	mod, err := e.rt.CompileModule(ctx, wasmBytes)
 	if err != nil {
 		return nil, fmt.Errorf("compile wasm module v%d: %w", version, err)
@@ -82,6 +92,23 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 	e.cachedVer = version
 	e.cachedMod = mod
 	return mod, nil
+}
+
+// decompressWasm 自动检测 gzip magic bytes 并解压；非 gzip 数据原样返回。
+func decompressWasm(data []byte) ([]byte, error) {
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		r, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("gzip reader: %w", err)
+		}
+		defer r.Close()
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("gzip read: %w", err)
+		}
+		return b, nil
+	}
+	return data, nil
 }
 
 func (e *Engine) ExecuteQuery(version uint32, call store.ContractCall, api store.ContractApi) ([]byte, error) {
@@ -107,6 +134,9 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 
 	ctx := context.Background()
 
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	// 更新共享状态（host functions 通过指针读写）
 	e.hostState.api = api
 	e.hostState.callData = serializeCallData(call, isQuery)
@@ -116,49 +146,11 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 	e.ensureHost(ctx)
 	e.ensureWASI(ctx)
 
-	// Command 模式：_start 自动执行 → main() → execute() → set_result
+	// Command 模式：_start 自动执行 → main() → execute() → set_result → exit(0) → proc_exit 关闭模块
 	config := wazero.NewModuleConfig()
-	instance, err := e.rt.InstantiateModule(ctx, mod, config)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate wasm v%d: %w", version, err)
-	}
+	instance, _ := e.rt.InstantiateModule(ctx, mod, config)
 	if instance != nil {
 		instance.Close(ctx)
 	}
 	return e.hostState.result, nil
-}
-
-// ── gzip 透明解压 ─────────────────────────────────────────
-
-// gzipMagic gzip 文件头标识。
-var gzipMagic = []byte{0x1f, 0x8b}
-
-// decompressIfGzip 若 data 为 gzip 格式则解压，否则原样返回。
-func decompressIfGzip(data []byte) []byte {
-	if len(data) < 2 || data[0] != gzipMagic[0] || data[1] != gzipMagic[1] {
-		return data
-	}
-	r, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return data // 损坏的 gzip，直接尝试原文
-	}
-	defer r.Close()
-	out, err := io.ReadAll(r)
-	if err != nil {
-		return data
-	}
-	return out
-}
-
-// CompressGzip 将数据 gzip 压缩，用于存储前压缩。
-func CompressGzip(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	w := gzip.NewWriter(&buf)
-	if _, err := w.Write(data); err != nil {
-		return nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }

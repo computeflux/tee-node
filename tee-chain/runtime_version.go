@@ -1,7 +1,9 @@
 package teechain
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -21,18 +23,15 @@ func InitRuntimeVersion() error {
 	if err != nil {
 		return err
 	}
-	// 如果已经初始化过，跳过
 	if current > 0 {
 		return nil
 	}
 
-	// 从文件系统读取 v0 的 WASM
-	wasmBytes, err := os.ReadFile("./token_chain_data/runtime_v0.wasm")
+	wasmBytes, err := loadWasmFile("./token_chain_data/runtime_v0.wasm")
 	if err != nil {
 		return fmt.Errorf("read v0 wasm file: %w", err)
 	}
 
-	// 初始化版本 0
 	info := &model.RuntimeVersionInfo{
 		Version:          RuntimeDefaultVersion,
 		ActivationHeight: 0,
@@ -52,6 +51,56 @@ func InitRuntimeVersion() error {
 	return nil
 }
 
+// loadWasmFile 加载 WASM 文件，支持 .wasm 和 .wasm.gz 两种格式。
+func loadWasmFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		// 尝试 .gz 后缀
+		if os.IsNotExist(err) {
+			return loadWasmGz(path + ".gz")
+		}
+		return nil, err
+	}
+	defer f.Close()
+
+	// 检测 gzip magic bytes (0x1f 0x8b)
+	var magic [2]byte
+	if _, err := io.ReadFull(f, magic[:]); err != nil {
+		return nil, fmt.Errorf("read magic: %w", err)
+	}
+	if magic[0] == 0x1f && magic[1] == 0x8b {
+		// 已经是 gzip 格式，回退到文件开头
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		return readGzip(f)
+	}
+
+	// 普通文件，回退并读取全部
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(f)
+}
+
+func loadWasmGz(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return readGzip(f)
+}
+
+func readGzip(r io.Reader) ([]byte, error) {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gz.Close()
+	return io.ReadAll(gz)
+}
+
 // GetCurrentRuntimeVersion 获取当前激活的运行时版本
 func GetCurrentRuntimeVersion() (uint32, error) {
 	v, err := model.GetCodecOrDefault("", RuntimeVersionKey, RuntimeDefaultVersion)
@@ -62,7 +111,6 @@ func GetCurrentRuntimeVersion() (uint32, error) {
 }
 
 // GetRuntimeVersionAtHeightTxn 从当前交易中优先读取版本（支持同区块内 RuntimeUpgrade 立即生效）。
-// 若 txn 中无记录，回退到 DB 查询。
 func GetRuntimeVersionAtHeightTxn(txn *model.Txn, height int64) (uint32, error) {
 	v, err := model.TxnGetCodec[uint32](txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
 	if err != nil {
@@ -76,7 +124,6 @@ func GetRuntimeVersionAtHeightTxn(txn *model.Txn, height int64) (uint32, error) 
 
 // GetRuntimeVersionAtHeight 获取指定区块高度使用的运行时版本
 func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
-	// 直接查询该高度记录
 	v, err := model.GetCodec[uint32]("", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
 	if err != nil {
 		return RuntimeDefaultVersion, err
@@ -85,14 +132,11 @@ func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
 		return *v, nil
 	}
 
-	// 若无精确记录，扫描所有升级记录找到适用的版本
-	// 由于升级频率极低，线性扫描是可接受的
 	current, err := GetCurrentRuntimeVersion()
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
 
-	// 从高版本向低版本扫描
 	for ver := current; ver > 0; ver-- {
 		info, err := GetRuntimeVersionInfo(ver)
 		if err != nil || info == nil {
@@ -122,17 +166,14 @@ func ApplyRuntimeUpgrade(txn *model.Txn, info *model.RuntimeVersionInfo, height 
 		return fmt.Errorf("runtime upgrade info is nil")
 	}
 
-	// 保存版本元数据
 	if err := UpdateRuntimeMeta(txn, info); err != nil {
 		return err
 	}
 
-	// 更新当前版本
 	if err := model.TxnSetCodec(txn, "", RuntimeVersionKey, info.Version); err != nil {
 		return fmt.Errorf("update runtime version: %w", err)
 	}
 
-	// 记录该高度使用的版本
 	if err := model.TxnSetCodec(txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10), info.Version); err != nil {
 		return fmt.Errorf("record runtime at height: %w", err)
 	}
@@ -141,7 +182,6 @@ func ApplyRuntimeUpgrade(txn *model.Txn, info *model.RuntimeVersionInfo, height 
 }
 
 // UpdateRuntimeMeta 仅更新版本元数据（不修改当前版本号和高度映射）
-// 用于 v0 补充 wasm_bytes，或更新已有版本的元数据
 func UpdateRuntimeMeta(txn *model.Txn, info *model.RuntimeVersionInfo) error {
 	if info == nil {
 		return fmt.Errorf("runtime upgrade info is nil")

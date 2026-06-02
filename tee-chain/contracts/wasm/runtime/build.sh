@@ -15,7 +15,9 @@ wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int \
     runtime.wasm -o runtime.wasm.tmp 2>&1
 mv runtime.wasm.tmp runtime.wasm
 
-echo ">>> 完成: $(ls -lh runtime.wasm | awk '{print $5}') (gzip: $(gzip -9 -c runtime.wasm | wc -c | awk '{printf "%dK", $1/1024}'))"
+echo ">>> 完成: $(ls -lh runtime.wasm | awk '{print $5}')"
+gzip -9 -k -f runtime.wasm
+echo ">>> gzip: $(ls -lh runtime.wasm.gz | awk '{print $5}')"
 echo ">>> 导出: $(strings runtime.wasm | grep -E '^(ping|execute|memory|_start)$' | sort -u | tr '\n' ' ')"
 
 # ── 开发构建（保留 panic 信息，便于调试）──

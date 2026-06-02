@@ -168,12 +168,23 @@ export CHAIN_ENV=test
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
 
-LOG_FILE="$ROOT_DIR/hack/node0.log"
-echo "Starting node0 with nohup, logs will be written to: $LOG_FILE"
+# ── 检查并终止已有进程 ──
+if systemctl is-active --quiet tee-node0.service 2>/dev/null; then
+    echo "Stopping existing tee-node0.service ..."
+    sudo systemctl stop tee-node0.service
+    echo "Service stopped."
+fi
 
-nohup sh -c 'OE_SIMULATION=1 ego run '"$ROOT_DIR"'/hack/build/dsecret' > "$LOG_FILE" 2>&1 &
+echo "Starting tee-node0.service ..."
+sudo systemctl start tee-node0.service
 
-sleep 1
-echo "Node0 is running in background (PID: $!). You can close this terminal safely."
-echo "Tailing logs now (Ctrl+C to stop watching, node will keep running):"
-tail -f "$LOG_FILE"
+sleep 2
+if systemctl is-active --quiet tee-node0.service; then
+    echo "Service started successfully."
+    echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
+    journalctl -u tee-node0.service -f
+else
+    echo "ERROR: service failed to start. Check status:"
+    systemctl status tee-node0.service
+    exit 1
+fi
