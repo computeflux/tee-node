@@ -2,6 +2,7 @@ package model
 
 import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/ethereum/go-ethereum/ethclient"
 	chain "github.com/wetee-dao/ink.go"
 )
@@ -51,25 +52,25 @@ type RelayEvent struct {
 }
 
 type RechargeEvent struct {
-	User   UniAddr `json:"user"`
-	Amount uint64  `json:"amount"`
-	TxHash []byte  `json:"txHash"`
-	Block  uint64  `json:"block"`
-	Chain  string  `json:"chain"`
+	User   store.UniAddr `json:"user"`
+	Amount uint64        `json:"amount"`
+	TxHash []byte        `json:"txHash"`
+	Block  uint64        `json:"block"`
+	Chain  string        `json:"chain"`
 }
 
 type WithdrawEvent struct {
-	User   UniAddr `json:"user"`
-	Amount uint64  `json:"amount"`
-	TxHash []byte  `json:"txHash"`
-	Block  uint64  `json:"block"`
-	Chain  string  `json:"chain"`
+	User   store.UniAddr `json:"user"`
+	Amount uint64        `json:"amount"`
+	TxHash []byte        `json:"txHash"`
+	Block  uint64        `json:"block"`
+	Chain  string        `json:"chain"`
 }
 
 type PointsAccount struct {
-	User           UniAddr `json:"user"`
-	TotalRecharged uint64  `json:"totalRecharged"`
-	TotalSpent     uint64  `json:"totalSpent"`
+	User           store.UniAddr `json:"user"`
+	TotalRecharged uint64        `json:"totalRecharged"`
+	TotalSpent     uint64        `json:"totalSpent"`
 }
 
 func (p PointsAccount) Balance() uint64 {

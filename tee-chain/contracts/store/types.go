@@ -1,19 +1,22 @@
 package store
 
-import "github.com/computeflux/tee-provider/pkg/model"
+// StoreTx 抽象化存储操作接口。Native (*model.Txn) 和 WASM 均满足。
+type StoreTx interface {
+	Get(key []byte) ([]byte, error)
+	Set(key, value []byte) error
+	Delete(key []byte) error
+	ListByPrefix(prefix []byte) ([][]byte, [][]byte, error)
+	DeletekeysByPrefix(prefix []byte) error
+	Commit() error
+	Rollback() error
+}
 
-// Txn 是 pkg/model.Txn 的本地别名，供 store 包直接使用。
-type Txn = model.Txn
+// 不提供 Txn 别名 — 新代码使用 StoreTx 接口，测试文件自行 import model.Txn。
 
-// UniAddr 是 pkg/model.UniAddr 的本地别名，供 store 包直接使用。
-type UniAddr = model.UniAddr
-
-// ComboNamespaceKey 拼接 namespace 与 key，返回存储用的字节切片。
 func ComboNamespaceKey(namespace, key string) []byte {
 	return []byte(namespace + "_" + key)
 }
 
-// keyUpperBound 返回覆盖给定前缀所有可能后缀的上界 key。
 func keyUpperBound(b []byte) []byte {
 	end := make([]byte, len(b))
 	copy(end, b)
@@ -23,6 +26,5 @@ func keyUpperBound(b []byte) []byte {
 			return end[:i+1]
 		}
 	}
-	// all bytes are 0xFF; return a byte slice that is larger than any prefix
 	return append(b, 0x00)
 }

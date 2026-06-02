@@ -3,7 +3,6 @@ package batch
 import (
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -11,7 +10,7 @@ import (
 // 提供 execute_batch 方法：接收一组 ContractCall，在当前 caller 上下文中
 // 按顺序依次调用，任一失败则整体回滚。
 type Batch struct {
-	api model.ContractApi
+	api store.ContractApi
 
 	status *store.StoreMapping[uint64, uint16]
 }

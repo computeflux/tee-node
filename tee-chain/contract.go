@@ -6,6 +6,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ContractRuntime 构造一个新的合约运行时上下文，供外部包（gateway、graph 等）使用。
@@ -33,7 +34,7 @@ func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
 }
 
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。
-func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, t time.Time, height int64, call *model.ContractCall) error {
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, t time.Time, height int64, call store.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -96,7 +97,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 
 	data, err = contracts.Query(version, &model.ContractCall{
 		Name:   []byte(contract),
-		Method: model.MethodToSelectorBytes(method),
+		Method: store.MethodToSelectorBytes(method),
 		Args:   args,
 	}, runtime)
 
@@ -104,7 +105,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 }
 
 // ContractDryRun 干跑合约执行（不提交）。
-func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call *model.ContractCall) error {
+func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {

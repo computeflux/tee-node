@@ -3,7 +3,7 @@ package gov
 import (
 	"bytes"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/wetee-dao/ink.go/util"
 )
 
@@ -70,7 +70,7 @@ func (d GovMutation) SubmitProposal(call CallContent, trackID uint32) error {
 	height := d.api.GetHeight()
 	caller := d.api.GetCaller()
 
-	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, model.ZeroAmount)
+	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (d GovMutation) SubmitProposal(call CallContent, trackID uint32) error {
 		SubmitBlock: height,
 		Deposit: ProposalDeposit{
 			Depositor: caller,
-			Amount:    model.ZeroAmount,
+			Amount:    store.ZeroAmount,
 			Block:     height,
 		},
 	}
@@ -129,7 +129,7 @@ func (d GovMutation) CancelProposal(proposalID uint32) error {
 	return d.proposals.Update(d.api.GetTxn(), proposalID, prop)
 }
 
-func (d GovMutation) DepositProposal(proposalID uint32, amount model.Amount) error {
+func (d GovMutation) DepositProposal(proposalID uint32, amount store.Amount) error {
 	height := d.api.GetHeight()
 	caller := d.api.GetCaller()
 
@@ -154,14 +154,14 @@ func (d GovMutation) DepositProposal(proposalID uint32, amount model.Amount) err
 	}
 
 	// Deduct deposit from caller balance
-	callerBalance, err := d.members.GetOrDefault(d.api.GetTxn(), caller, model.ZeroAmount)
+	callerBalance, err := d.members.GetOrDefault(d.api.GetTxn(), caller, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
 	if callerBalance.Int.Cmp(amount.Int) < 0 {
 		return ErrLowBalance
 	}
-	callerBalance = model.AmountSub(callerBalance, amount)
+	callerBalance = store.AmountSub(callerBalance, amount)
 	if err := d.members.Set(d.api.GetTxn(), caller, callerBalance); err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func (d GovMutation) ExecProposal(proposalID uint32) error {
 	result := ProposalResult{}
 	if prop.Call.IsSome() {
 		call, _ := prop.Call.UnWrap()
-		res, err := d.api.Call(model.UniAddr{}, model.ContractCall{
+		res, err := d.api.Call(store.UniAddr{}, &store.InContractCall{
 			Name:   call.Contract,
 			Method: call.Selector[:],
 			Args:   call.Args,

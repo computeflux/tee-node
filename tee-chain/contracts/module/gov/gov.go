@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -61,15 +60,15 @@ var (
 // Gov 治理合约结构体，包含所有存储状态
 type Gov struct {
 	// api 合约API接口
-	api model.ContractApi
+	api store.ContractApi
 	// members 成员账户映射 (keyPfx: member_)
-	members *store.StoreMapping[model.UniAddr, model.Amount]
+	members *store.StoreMapping[store.UniAddr, store.Amount]
 	// publicJoin 是否允许公开加入 (key: public_join)
 	publicJoin *store.StoreValue[bool]
 	// transferEnabled 转账是否启用 (key: transfer)
 	transferEnabled *store.StoreValue[bool]
 	// totalIssuance 总发行量 (key: issuance)
-	totalIssuance *store.StoreValue[model.Amount]
+	totalIssuance *store.StoreValue[store.Amount]
 	// defaultTrack 默认轨道ID (key: default_track)
 	defaultTrack *store.StoreValue[uint32]
 	// nextSpendIDStore 下一个支出ID (key: next_spend)
@@ -77,14 +76,14 @@ type Gov struct {
 	// nextTrackIDStore 下一个轨道ID (key: next_track)
 	nextTrackIDStore *store.StoreValue[uint32]
 	// allowances 授权额度映射 (keyPfx: allowance_)
-	allowances *store.StoreMapping[model.UniAddr, model.Amount]
+	allowances *store.StoreMapping[store.UniAddr, store.Amount]
 	// tracks 轨道数据映射 (keyPfx: track_)
 	tracks *store.StoreMapping[uint32, TrackData] `store:"keyPfx:tracks_v2"`
 	// proposals 提案列表 (自增ID管理)
 	proposals *store.StoreList[uint32, Proposal] `store:"keyPfx:proposals_v6"`
 	// votesOfUser 用户投票列表映射 (keyPfx: votes_of_user_v1)
 	// K1 = 用户地址，Ix = 投票索引，可按用户查询其所有投票
-	votesOfUser *store.StoreList2D[model.UniAddr, uint32, VoteRef] `store:"keyPfx:votes_of_user_v1"`
+	votesOfUser *store.StoreList2D[store.UniAddr, uint32, VoteRef] `store:"keyPfx:votes_of_user_v1"`
 	// votes 投票数据二维列表 (keyPfx: votes_v2)
 	// K1 = proposalID, Ix = 内层索引，可按提案获取所有投票
 	votes *store.StoreList2D[uint32, uint32, Vote] `store:"keyPfx:votes_v4"`
@@ -115,8 +114,8 @@ func (d GovMutation) Init() error {
 		ConfirmPeriod:      100,
 		DecisionPeriod:     100,
 		MinEnactmentPeriod: 0,
-		DecisionDeposit:    model.Amount{Int: big.NewInt(100)},
-		MaxBalance:         model.Amount{Int: big.NewInt(1_000_000)},
+		DecisionDeposit:    store.Amount{Int: big.NewInt(100)},
+		MaxBalance:         store.Amount{Int: big.NewInt(1_000_000)},
 		MinApproval:        NewLinearDecreasingCurve(10000, 50, 100), // 从 100% 递减到 0.5%，长度 100 区块
 		MinSupport:         NewLinearDecreasingCurve(10000, 50, 100), // 从 100% 递减到 0.5%，长度 100 区块
 	}

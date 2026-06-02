@@ -1,35 +1,26 @@
 #!/bin/bash
-# build_runtime_wasm.sh - 构建运行时 WASM 文件
+# build_runtime_wasm.sh - 使用 TinyGo 构建运行时 WASM 文件
 #
-# 由于当前 Go 合约依赖 PebbleDB(CGO)，无法直接用 GOOS=wasip1 GOARCH=wasm 编译。
-# 此脚本使用 tools/buildwasm 生成一个包含版本元数据的有效 WASM 模块：
-#   - 导出函数 version() -> i32（可被 wasmtime 加载执行）
-#   - custom section "runtime_meta"（源码 hash、ABI hash、描述等）
+#   - 导出 execute() + version()
+#   - 无 _start 依赖，可被引擎多次实例化
+#
+# 需要安装 tinygo: https://tinygo.org/getting-started/install/
 #
 # 用法:
-#   ./hack/build_runtime_wasm.sh [version] [output_path]
-#   默认: version=0, output=./token_chain_data/runtime_v0.wasm
+#   ./hack/build_runtime_wasm.sh [output_path]
+#   默认: output=./tee-chain/contracts/wasm/runtime/runtime.wasm
 
 set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$DIR/.."
 
-VERSION="${1:-0}"
-OUTPUT="${2:-./token_chain_data/runtime_v${VERSION}.wasm}"
-DESCRIPTION="runtime v${VERSION}"
+OUTPUT="${1:-./tee-chain/contracts/wasm/runtime/runtime.wasm}"
 
-echo "Building runtime WASM..."
-echo "  Version:     $VERSION"
-echo "  Contracts:   ./tee-chain/contracts"
-echo "  ABIs:        ./tee-chain/abis"
-echo "  Output:      $OUTPUT"
+echo "Building runtime WASM with TinyGo..."
+echo "  Source: ./tee-chain/contracts/wasm/runtime/"
+echo "  Output: $OUTPUT"
 
-go run tools/buildwasm/main.go \
-    -version "$VERSION" \
-    -contracts ./tee-chain/contracts \
-    -abis ./tee-chain/abis \
-    -out "$OUTPUT" \
-    -description "$DESCRIPTION"
+tinygo build -target wasm -o "$OUTPUT" ./tee-chain/contracts/wasm/runtime/
 
-echo "Done."
+echo "Done: $(wc -c < "$OUTPUT") bytes"

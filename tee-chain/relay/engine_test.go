@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,18 +112,18 @@ type mockAPI struct {
 	txn *model.Txn
 }
 
-func (m *mockAPI) GetTxn() *model.Txn              { return m.txn }
+func (m *mockAPI) GetTxn() store.StoreTx           { return m.txn }
 func (m *mockAPI) GetHeight() int64                { return 0 }
 func (m *mockAPI) GetBlockTime() int64             { return 0 }
 func (m *mockAPI) GetVersion() uint32              { return 0 }
-func (m *mockAPI) GetCaller() model.UniAddr        { return model.UniAddr{} }
-func (m *mockAPI) GetSystemAccount() model.UniAddr { return model.UniAddr{} }
+func (m *mockAPI) GetCaller() store.UniAddr        { return store.UniAddr{} }
+func (m *mockAPI) GetSystemAccount() store.UniAddr { return store.UniAddr{} }
 func (m *mockAPI) CallbySystem() bool              { return false }
 
-func (m *mockAPI) Call(_ model.UniAddr, _ model.ContractCall) ([]byte, error) {
+func (m *mockAPI) Call(_ store.UniAddr, _ store.ContractCall) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockAPI) Query(_ model.UniAddr, _ model.ContractCall) ([]byte, error) {
+func (m *mockAPI) Query(_ store.UniAddr, _ store.ContractCall) ([]byte, error) {
 	return nil, nil
 }
 

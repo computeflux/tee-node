@@ -12,6 +12,8 @@
 package relay
 
 import (
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -64,7 +66,7 @@ func (e *Engine) CheckRelayEvent(ev SyncEvent) error {
 }
 
 // ApplyRelayEvent 执行 relay 事件并更新 nonce (FinalizeTx 阶段) | Execute relay event and update nonce (FinalizeTx phase)
-func (e *Engine) ApplyRelayEvent(ev SyncEvent, api model.ContractApi) error {
+func (e *Engine) ApplyRelayEvent(ev SyncEvent, api store.ContractApi) error {
 	txn := api.GetTxn()
 	// 二次校验 (区块内可能有多个 relay tx) | double-check (block may contain multiple relay txs)
 	last, err := getLastNonce(txn, ev.ChainID)
@@ -146,16 +148,16 @@ func BuildSyncEvent(chainID uint32, nonce, blockNum uint64, target []byte, typ [
 }
 
 // dispatch 调用目标合约 | call target contract
-func dispatch(ev SyncEvent, api model.ContractApi) error {
+func dispatch(ev SyncEvent, api store.ContractApi) error {
 	target := string(ev.TargetContract) + "." + string(ev.EventType)
 	if target != "gateway.Recharge" && target != "gateway.Withdraw" {
 		util.LogWithGray(RELAY_KEY, fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
 	}
 
 	// return nil
-	_, err := api.Call(api.GetSystemAccount(), model.ContractCall{
+	_, err := api.Call(api.GetSystemAccount(), &model.ContractCall{
 		Name:   ev.TargetContract,
-		Method: model.MethodToSelectorBytes(string(ev.EventType)),
+		Method: store.MethodToSelectorBytes(string(ev.EventType)),
 		Args:   ev.EventData,
 	})
 
@@ -170,7 +172,7 @@ func dispatch(ev SyncEvent, api model.ContractApi) error {
 // ── nonce 存储 | nonce storage ──────────────────────────
 
 // getLastNonce 读取 nonce (txn 内, FinalizeTx 用) | Read nonce (within txn, for FinalizeTx)
-func getLastNonce(txn *model.Txn, chainID uint32) (uint64, error) {
+func getLastNonce(txn store.StoreTx, chainID uint32) (uint64, error) {
 	n, err := model.TxnGetCodec[uint64](txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
@@ -183,7 +185,7 @@ func getLastNonce(txn *model.Txn, chainID uint32) (uint64, error) {
 }
 
 // setLastNonce 写入 nonce (txn 内, 原子提交) | Write nonce (within txn, atomic commit)
-func setLastNonce(txn *model.Txn, chainID uint32, v uint64) error {
+func setLastNonce(txn store.StoreTx, chainID uint32, v uint64) error {
 	return model.TxnSetCodec(txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID), v)
 }
 

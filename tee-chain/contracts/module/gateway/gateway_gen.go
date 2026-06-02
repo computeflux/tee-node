@@ -6,83 +6,82 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。
-func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
+func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 	gateway := NewGateway(d.api)
 	m := GatewayMutation{Gateway: *gateway}
 
-	methodSel := [4]byte(call.Method[:4])
-	args := call.Args
+	methodSel := [4]byte(call.GetMethod()[:4])
+	args := call.GetArgs()
 	switch methodSel {
 	case [4]byte{0xd4, 0x1e, 0xab, 0xfd}:
-		if err := model.RequireArgLen(args, 1, "active_model"); err != nil {
+		if err := store.RequireArgLen(args, 1, "active_model"); err != nil {
 			return err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("active_model: modelID: %w", err)
 		}
 		return m.ActiveModel(modelID)
 	case [4]byte{0xe2, 0x1a, 0x50, 0x89}:
-		if err := model.RequireArgLen(args, 2, "add_model_a_p_i_key_ref"); err != nil {
+		if err := store.RequireArgLen(args, 2, "add_model_a_p_i_key_ref"); err != nil {
 			return err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("add_model_a_p_i_key_ref: modelID: %w", err)
 		}
-		apiKey, err := model.DecodeScaleArgBytes[string](args[1])
+		apiKey, err := store.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return fmt.Errorf("add_model_a_p_i_key_ref: apiKey: %w", err)
 		}
 		return m.AddModelAPIKeyRef(modelID, apiKey)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
-		if err := model.RequireArgLen(args, 5, "create_provider"); err != nil {
+		if err := store.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[0])
+		name, err := store.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("create_provider: name: %w", err)
 		}
-		logoURL, err := model.DecodeScaleArgBytes[string](args[1])
+		logoURL, err := store.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return fmt.Errorf("create_provider: logoURL: %w", err)
 		}
-		description, err := model.DecodeScaleArgBytes[string](args[2])
+		description, err := store.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("create_provider: description: %w", err)
 		}
-		region, err := model.DecodeScaleArgBytes[uint8](args[3])
+		region, err := store.DecodeScaleArgBytes[uint8](args[3])
 		if err != nil {
 			return fmt.Errorf("create_provider: region: %w", err)
 		}
-		deposit, err := model.DecodeScaleArgBytes[uint64](args[4])
+		deposit, err := store.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("create_provider: deposit: %w", err)
 		}
 		return m.CreateProvider(name, logoURL, description, region, deposit)
 	case [4]byte{0x5c, 0xf2, 0xae, 0x3a}:
-		if err := model.RequireArgLen(args, 1, "deactivate_model"); err != nil {
+		if err := store.RequireArgLen(args, 1, "deactivate_model"); err != nil {
 			return err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("deactivate_model: modelID: %w", err)
 		}
 		return m.DeactivateModel(modelID)
 	case [4]byte{0x31, 0xdf, 0x1b, 0xb3}:
-		if err := model.RequireArgLen(args, 2, "delete_model_a_p_i_key_ref"); err != nil {
+		if err := store.RequireArgLen(args, 2, "delete_model_a_p_i_key_ref"); err != nil {
 			return err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("delete_model_a_p_i_key_ref: modelID: %w", err)
 		}
-		index, err := model.DecodeScaleArgBytes[int](args[1])
+		index, err := store.DecodeScaleArgBytes[int](args[1])
 		if err != nil {
 			return fmt.Errorf("delete_model_a_p_i_key_ref: index: %w", err)
 		}
@@ -90,207 +89,207 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
-		if err := model.RequireArgLen(args, 2, "recharge"); err != nil {
+		if err := store.RequireArgLen(args, 2, "recharge"); err != nil {
 			return err
 		}
-		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return fmt.Errorf("recharge: user: %w", err)
 		}
-		amount, err := model.DecodeScaleArgBytes[uint64](args[1])
+		amount, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return fmt.Errorf("recharge: amount: %w", err)
 		}
 		return m.Recharge(user, amount)
 	case [4]byte{0xf8, 0xea, 0x1a, 0x7b}:
-		if err := model.RequireArgLen(args, 2, "register_a_p_i_key"); err != nil {
+		if err := store.RequireArgLen(args, 2, "register_a_p_i_key"); err != nil {
 			return err
 		}
-		keyHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		keyHash, err := store.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
 			return fmt.Errorf("register_a_p_i_key: keyHash: %w", err)
 		}
-		rateLimit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		rateLimit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return fmt.Errorf("register_a_p_i_key: rateLimit: %w", err)
 		}
 		return m.RegisterAPIKey(keyHash, rateLimit)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := model.RequireArgLen(args, 9, "register_model"); err != nil {
+		if err := store.RequireArgLen(args, 9, "register_model"); err != nil {
 			return err
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[0])
+		name, err := store.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return fmt.Errorf("register_model: name: %w", err)
 		}
-		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[1])
+		inputModalities, err := store.DecodeScaleArgBytes[uint8](args[1])
 		if err != nil {
 			return fmt.Errorf("register_model: inputModalities: %w", err)
 		}
-		contextLength, err := model.DecodeScaleArgBytes[uint64](args[2])
+		contextLength, err := store.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return fmt.Errorf("register_model: contextLength: %w", err)
 		}
-		inPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
+		inPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return fmt.Errorf("register_model: inPrice: %w", err)
 		}
-		cachedPrice, err := model.DecodeScaleArgBytes[uint64](args[4])
+		cachedPrice, err := store.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("register_model: cachedPrice: %w", err)
 		}
-		outPrice, err := model.DecodeScaleArgBytes[uint64](args[5])
+		outPrice, err := store.DecodeScaleArgBytes[uint64](args[5])
 		if err != nil {
 			return fmt.Errorf("register_model: outPrice: %w", err)
 		}
-		providerType, err := model.DecodeScaleArgBytes[uint16](args[6])
+		providerType, err := store.DecodeScaleArgBytes[uint16](args[6])
 		if err != nil {
 			return fmt.Errorf("register_model: providerType: %w", err)
 		}
-		uri, err := model.DecodeScaleArgBytes[string](args[7])
+		uri, err := store.DecodeScaleArgBytes[string](args[7])
 		if err != nil {
 			return fmt.Errorf("register_model: uri: %w", err)
 		}
-		apiKeys, err := model.DecodeScaleArgBytes[[]string](args[8])
+		apiKeys, err := store.DecodeScaleArgBytes[[]string](args[8])
 		if err != nil {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
 		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
-		if err := model.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
+		if err := store.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
 		}
-		keyHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		keyHash, err := store.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
 			return fmt.Errorf("revoke_a_p_i_key: keyHash: %w", err)
 		}
 		return m.RevokeAPIKey(keyHash)
 	case [4]byte{0x28, 0x08, 0x83, 0x1a}:
-		if err := model.RequireArgLen(args, 1, "settle_usage"); err != nil {
+		if err := store.RequireArgLen(args, 1, "settle_usage"); err != nil {
 			return err
 		}
-		records, err := model.DecodeScaleArgBytes[[]Settlement](args[0])
+		records, err := store.DecodeScaleArgBytes[[]Settlement](args[0])
 		if err != nil {
 			return fmt.Errorf("settle_usage: records: %w", err)
 		}
 		return m.SettleUsage(records)
 	case [4]byte{0x36, 0x6e, 0x82, 0x1a}:
-		if err := model.RequireArgLen(args, 2, "update_a_p_i_key"); err != nil {
+		if err := store.RequireArgLen(args, 2, "update_a_p_i_key"); err != nil {
 			return err
 		}
-		keyHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		keyHash, err := store.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
 			return fmt.Errorf("update_a_p_i_key: keyHash: %w", err)
 		}
-		rateLimit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		rateLimit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return fmt.Errorf("update_a_p_i_key: rateLimit: %w", err)
 		}
 		return m.UpdateAPIKey(keyHash, rateLimit)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := model.RequireArgLen(args, 8, "update_model"); err != nil {
+		if err := store.RequireArgLen(args, 8, "update_model"); err != nil {
 			return err
 		}
-		ID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		ID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("update_model: ID: %w", err)
 		}
-		inputModalities, err := model.DecodeScaleArgBytes[uint8](args[1])
+		inputModalities, err := store.DecodeScaleArgBytes[uint8](args[1])
 		if err != nil {
 			return fmt.Errorf("update_model: inputModalities: %w", err)
 		}
-		contextLength, err := model.DecodeScaleArgBytes[uint64](args[2])
+		contextLength, err := store.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return fmt.Errorf("update_model: contextLength: %w", err)
 		}
-		inPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
+		inPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return fmt.Errorf("update_model: inPrice: %w", err)
 		}
-		cachedPrice, err := model.DecodeScaleArgBytes[uint64](args[4])
+		cachedPrice, err := store.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("update_model: cachedPrice: %w", err)
 		}
-		outPrice, err := model.DecodeScaleArgBytes[uint64](args[5])
+		outPrice, err := store.DecodeScaleArgBytes[uint64](args[5])
 		if err != nil {
 			return fmt.Errorf("update_model: outPrice: %w", err)
 		}
-		providerType, err := model.DecodeScaleArgBytes[uint16](args[6])
+		providerType, err := store.DecodeScaleArgBytes[uint16](args[6])
 		if err != nil {
 			return fmt.Errorf("update_model: providerType: %w", err)
 		}
-		uri, err := model.DecodeScaleArgBytes[string](args[7])
+		uri, err := store.DecodeScaleArgBytes[string](args[7])
 		if err != nil {
 			return fmt.Errorf("update_model: uri: %w", err)
 		}
 		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri)
 	case [4]byte{0x09, 0xb8, 0x76, 0x88}:
-		if err := model.RequireArgLen(args, 3, "update_model_a_p_i_key_ref"); err != nil {
+		if err := store.RequireArgLen(args, 3, "update_model_a_p_i_key_ref"); err != nil {
 			return err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("update_model_a_p_i_key_ref: modelID: %w", err)
 		}
-		index, err := model.DecodeScaleArgBytes[int](args[1])
+		index, err := store.DecodeScaleArgBytes[int](args[1])
 		if err != nil {
 			return fmt.Errorf("update_model_a_p_i_key_ref: index: %w", err)
 		}
-		newApiKey, err := model.DecodeScaleArgBytes[string](args[2])
+		newApiKey, err := store.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("update_model_a_p_i_key_ref: newApiKey: %w", err)
 		}
 		return m.UpdateModelAPIKeyRef(modelID, index, newApiKey)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
-		if err := model.RequireArgLen(args, 9, "update_provider"); err != nil {
+		if err := store.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("update_provider: providerID: %w", err)
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[1])
+		name, err := store.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return fmt.Errorf("update_provider: name: %w", err)
 		}
-		logoURL, err := model.DecodeScaleArgBytes[string](args[2])
+		logoURL, err := store.DecodeScaleArgBytes[string](args[2])
 		if err != nil {
 			return fmt.Errorf("update_provider: logoURL: %w", err)
 		}
-		description, err := model.DecodeScaleArgBytes[string](args[3])
+		description, err := store.DecodeScaleArgBytes[string](args[3])
 		if err != nil {
 			return fmt.Errorf("update_provider: description: %w", err)
 		}
-		modelIds, err := model.DecodeScaleArgBytes[[]uint64](args[4])
+		modelIds, err := store.DecodeScaleArgBytes[[]uint64](args[4])
 		if err != nil {
 			return fmt.Errorf("update_provider: modelIds: %w", err)
 		}
-		region, err := model.DecodeScaleArgBytes[uint8](args[5])
+		region, err := store.DecodeScaleArgBytes[uint8](args[5])
 		if err != nil {
 			return fmt.Errorf("update_provider: region: %w", err)
 		}
-		feeRate, err := model.DecodeScaleArgBytes[uint32](args[6])
+		feeRate, err := store.DecodeScaleArgBytes[uint32](args[6])
 		if err != nil {
 			return fmt.Errorf("update_provider: feeRate: %w", err)
 		}
-		priority, err := model.DecodeScaleArgBytes[uint32](args[7])
+		priority, err := store.DecodeScaleArgBytes[uint32](args[7])
 		if err != nil {
 			return fmt.Errorf("update_provider: priority: %w", err)
 		}
-		uptimeSLA, err := model.DecodeScaleArgBytes[uint32](args[8])
+		uptimeSLA, err := store.DecodeScaleArgBytes[uint32](args[8])
 		if err != nil {
 			return fmt.Errorf("update_provider: uptimeSLA: %w", err)
 		}
 		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)
 	case [4]byte{0x11, 0xb2, 0xf8, 0x54}:
-		if err := model.RequireArgLen(args, 2, "withdraw"); err != nil {
+		if err := store.RequireArgLen(args, 2, "withdraw"); err != nil {
 			return err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("withdraw: providerID: %w", err)
 		}
-		amount, err := model.DecodeScaleArgBytes[uint64](args[1])
+		amount, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return fmt.Errorf("withdraw: amount: %w", err)
 		}
@@ -301,15 +300,15 @@ func (d GatewayMutation) ExecCall(call *model.ContractCall) error {
 }
 
 // ExecuteQuery 按 method 将字符串参数解析为合约查询实参，返回 SCALE 编码结果。
-func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
-	args := call.Args
-	methodSel := [4]byte(call.Method[:4])
+func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
+	args := call.GetArgs()
+	methodSel := [4]byte(call.GetMethod()[:4])
 	switch methodSel {
 	case [4]byte{0x42, 0xcc, 0x03, 0xe6}:
-		if err := model.RequireArgLen(args, 1, "get_a_p_i_keys_by_owner"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_a_p_i_keys_by_owner"); err != nil {
 			return nil, err
 		}
-		owner, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		owner, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_a_p_i_keys_by_owner: owner: %w", err)
 		}
@@ -319,10 +318,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x04, 0x60, 0x1f, 0xca}:
-		if err := model.RequireArgLen(args, 1, "get_credit"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_credit"); err != nil {
 			return nil, err
 		}
-		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_credit: user: %w", err)
 		}
@@ -332,10 +331,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xd3, 0xff, 0x81, 0xe9}:
-		if err := model.RequireArgLen(args, 1, "get_model"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_model"); err != nil {
 			return nil, err
 		}
-		modelID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_model: modelID: %w", err)
 		}
@@ -345,14 +344,14 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xb5, 0x1e, 0x55, 0x6b}:
-		if err := model.RequireArgLen(args, 2, "get_model_by_name"); err != nil {
+		if err := store.RequireArgLen(args, 2, "get_model_by_name"); err != nil {
 			return nil, err
 		}
-		pid, err := model.DecodeScaleArgBytes[uint64](args[0])
+		pid, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_model_by_name: pid: %w", err)
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[1])
+		name, err := store.DecodeScaleArgBytes[string](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("get_model_by_name: name: %w", err)
 		}
@@ -368,10 +367,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xa1, 0x11, 0x9c, 0x12}:
-		if err := model.RequireArgLen(args, 1, "get_models"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_models"); err != nil {
 			return nil, err
 		}
-		IDs, err := model.DecodeScaleArgBytes[[]uint64](args[0])
+		IDs, err := store.DecodeScaleArgBytes[[]uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_models: IDs: %w", err)
 		}
@@ -381,10 +380,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x59, 0xd9, 0x42, 0x4a}:
-		if err := model.RequireArgLen(args, 1, "get_models_by_provider"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_models_by_provider"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_models_by_provider: providerID: %w", err)
 		}
@@ -394,10 +393,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xb3, 0x4c, 0x16, 0xd8}:
-		if err := model.RequireArgLen(args, 1, "get_provider"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_provider"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_provider: providerID: %w", err)
 		}
@@ -407,10 +406,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xe2, 0xa8, 0xc1, 0xe4}:
-		if err := model.RequireArgLen(args, 1, "get_provider_by_name"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_provider_by_name"); err != nil {
 			return nil, err
 		}
-		name, err := model.DecodeScaleArgBytes[string](args[0])
+		name, err := store.DecodeScaleArgBytes[string](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_provider_by_name: name: %w", err)
 		}
@@ -432,10 +431,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xad, 0x4c, 0x38, 0xcd}:
-		if err := model.RequireArgLen(args, 1, "get_provider_credit"); err != nil {
+		if err := store.RequireArgLen(args, 1, "get_provider_credit"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_provider_credit: providerID: %w", err)
 		}
@@ -445,18 +444,18 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc8, 0x9f, 0x2f, 0x8f}:
-		if err := model.RequireArgLen(args, 3, "get_recharge_history"); err != nil {
+		if err := store.RequireArgLen(args, 3, "get_recharge_history"); err != nil {
 			return nil, err
 		}
-		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_recharge_history: user: %w", err)
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("get_recharge_history: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
 		if err != nil {
 			return nil, fmt.Errorf("get_recharge_history: limit: %w", err)
 		}
@@ -466,18 +465,18 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x74, 0xd5, 0x99, 0xfb}:
-		if err := model.RequireArgLen(args, 3, "get_settlement_history"); err != nil {
+		if err := store.RequireArgLen(args, 3, "get_settlement_history"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_settlement_history: providerID: %w", err)
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("get_settlement_history: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
 		if err != nil {
 			return nil, fmt.Errorf("get_settlement_history: limit: %w", err)
 		}
@@ -487,18 +486,18 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x56, 0xb9, 0x06, 0xc0}:
-		if err := model.RequireArgLen(args, 3, "get_user_settlement_history"); err != nil {
+		if err := store.RequireArgLen(args, 3, "get_user_settlement_history"); err != nil {
 			return nil, err
 		}
-		user, err := model.DecodeScaleArgBytes[model.UniAddr](args[0])
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("get_user_settlement_history: user: %w", err)
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[1])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("get_user_settlement_history: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[2])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
 		if err != nil {
 			return nil, fmt.Errorf("get_user_settlement_history: limit: %w", err)
 		}
@@ -508,14 +507,14 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xda, 0xa1, 0xc2, 0xd5}:
-		if err := model.RequireArgLen(args, 2, "list_active_models"); err != nil {
+		if err := store.RequireArgLen(args, 2, "list_active_models"); err != nil {
 			return nil, err
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models: limit: %w", err)
 		}
@@ -525,30 +524,30 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc3, 0xef, 0x49, 0x0c}:
-		if err := model.RequireArgLen(args, 6, "list_active_models_within_provider"); err != nil {
+		if err := store.RequireArgLen(args, 6, "list_active_models_within_provider"); err != nil {
 			return nil, err
 		}
-		minContext, err := model.DecodeScaleArgBytes[uint64](args[0])
+		minContext, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: minContext: %w", err)
 		}
-		maxContext, err := model.DecodeScaleArgBytes[uint64](args[1])
+		maxContext, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: maxContext: %w", err)
 		}
-		minPrice, err := model.DecodeScaleArgBytes[uint64](args[2])
+		minPrice, err := store.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: minPrice: %w", err)
 		}
-		maxPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
+		maxPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: maxPrice: %w", err)
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[4])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[5])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[5])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_models_within_provider: limit: %w", err)
 		}
@@ -558,14 +557,14 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xbd, 0x24, 0x20, 0x9b}:
-		if err := model.RequireArgLen(args, 2, "list_active_providers"); err != nil {
+		if err := store.RequireArgLen(args, 2, "list_active_providers"); err != nil {
 			return nil, err
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_providers: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_active_providers: limit: %w", err)
 		}
@@ -575,14 +574,14 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc1, 0x51, 0x1f, 0xbf}:
-		if err := model.RequireArgLen(args, 2, "list_models"); err != nil {
+		if err := store.RequireArgLen(args, 2, "list_models"); err != nil {
 			return nil, err
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_models: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_models: limit: %w", err)
 		}
@@ -592,10 +591,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xcd, 0x2e, 0xf8, 0x8d}:
-		if err := model.RequireArgLen(args, 1, "list_provider_models"); err != nil {
+		if err := store.RequireArgLen(args, 1, "list_provider_models"); err != nil {
 			return nil, err
 		}
-		providerID, err := model.DecodeScaleArgBytes[uint64](args[0])
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_provider_models: providerID: %w", err)
 		}
@@ -605,14 +604,14 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x36, 0xe0, 0x90, 0x37}:
-		if err := model.RequireArgLen(args, 2, "list_providers"); err != nil {
+		if err := store.RequireArgLen(args, 2, "list_providers"); err != nil {
 			return nil, err
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[0])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("list_providers: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[1])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("list_providers: limit: %w", err)
 		}
@@ -622,10 +621,10 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0xc5, 0x33, 0xa8, 0x4f}:
-		if err := model.RequireArgLen(args, 1, "lookup_a_p_i_key"); err != nil {
+		if err := store.RequireArgLen(args, 1, "lookup_a_p_i_key"); err != nil {
 			return nil, err
 		}
-		keyHash, err := model.DecodeScaleArgBytes[[]byte](args[0])
+		keyHash, err := store.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("lookup_a_p_i_key: keyHash: %w", err)
 		}
@@ -635,30 +634,30 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 		}
 		return codec.Encode(out)
 	case [4]byte{0x60, 0xd0, 0x0c, 0x96}:
-		if err := model.RequireArgLen(args, 6, "query_models"); err != nil {
+		if err := store.RequireArgLen(args, 6, "query_models"); err != nil {
 			return nil, err
 		}
-		modalities, err := model.DecodeScaleArgBytes[uint8](args[0])
+		modalities, err := store.DecodeScaleArgBytes[uint8](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: modalities: %w", err)
 		}
-		minContext, err := model.DecodeScaleArgBytes[uint64](args[1])
+		minContext, err := store.DecodeScaleArgBytes[uint64](args[1])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: minContext: %w", err)
 		}
-		maxContext, err := model.DecodeScaleArgBytes[uint64](args[2])
+		maxContext, err := store.DecodeScaleArgBytes[uint64](args[2])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: maxContext: %w", err)
 		}
-		maxPrice, err := model.DecodeScaleArgBytes[uint64](args[3])
+		maxPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: maxPrice: %w", err)
 		}
-		offset, err := model.DecodeScaleArgBytes[uint64](args[4])
+		offset, err := store.DecodeScaleArgBytes[uint64](args[4])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: offset: %w", err)
 		}
-		limit, err := model.DecodeScaleArgBytes[uint32](args[5])
+		limit, err := store.DecodeScaleArgBytes[uint32](args[5])
 		if err != nil {
 			return nil, fmt.Errorf("query_models: limit: %w", err)
 		}
@@ -672,19 +671,19 @@ func (q GatewayQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 	}
 }
 
-func NewGateway(api model.ContractApi) *Gateway {
+func NewGateway(api store.ContractApi) *Gateway {
 	return &Gateway{
 		api:                   api,
-		credits:               &store.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credits_"},
-		credit_useds:          &store.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credit_useds_"},
+		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credits_"},
+		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credit_useds_"},
 		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "v2_models_next_id", "v2_models_"),
 		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "v2_providers_next_id", "v2_providers_"),
-		providerByOwner:       &store.StoreMapping[model.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_by_owner_"},
+		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_by_owner_"},
 		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_credit_"},
 		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "v2_api_key_"),
-		rechargeHistory:       store.NewStoreList2D[model.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
+		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
 		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v4_settlement_history_k1_to_id_", "v4_settlement_history_k1_length_", "v4_settlement_history_k2_next_", "v4_settlement_history_store_"),
-		userSettlementHistory: store.NewStoreList2D[model.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
+		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
 		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v5_settled_nonces_"},
 	}
 }

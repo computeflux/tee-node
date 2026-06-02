@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -18,7 +16,7 @@ var (
 
 // Auth 认证合约 — 使用 []byte 作为 key
 type Auth struct {
-	api model.ContractApi
+	api store.ContractApi
 
 	config        *store.StoreValue[AuthConfig] `store:"keyPfx:v1_config"`
 	users         *store.StoreMapping[[]byte, UserInfo]
@@ -116,11 +114,8 @@ func (a AuthMutation) SetConfig(
 	existing, err := a.config.Get(a.api.GetTxn())
 	if err == nil && existing != nil {
 		if !a.api.CallbySystem() {
-			util.LogWithYellow("AUTH", "config already set, only system can update")
 			return errors.New("auth config already set, only system can update")
 		}
-
-		util.LogWithYellow("AUTH", "set config with system")
 
 		// system 调用：保留原有的 JWTSecret 和 SeedSecret，更新其他字段
 		cfg := AuthConfig{
@@ -147,8 +142,6 @@ func (a AuthMutation) SetConfig(
 		}
 		return a.config.Set(a.api.GetTxn(), cfg)
 	}
-
-	util.LogWithYellow("AUTH", "config init")
 
 	jwtSecret := make([]byte, 32)
 	seedSecret := make([]byte, 32)

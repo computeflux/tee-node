@@ -8,18 +8,19 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // Runtime 合约运行时上下文，封装了合约执行所需的环境信息。
-// 它实现了 model.ContractApi 接口，在 FinalizeTx / Query 等路径中传入区块高度、交易和调用方信息。
+// 它实现了 store.ContractApi 接口，在 FinalizeTx / Query 等路径中传入区块高度、交易和调用方信息。
 // 每次合约调用都会创建一个新的 Runtime 实例，确保执行上下文的隔离性。
 type Runtime struct {
 	unix    int64         // 当前区块时间戳，用于时间相关的业务逻辑判断
 	height  int64         // 当前区块高度，用于时间相关的业务逻辑判断
 	version uint32        // 当前执行的运行时版本号
-	txn     *model.Txn    // 当前交易对象，包含交易的签名和原始数据
-	caller  model.UniAddr // 调用者地址，标识合约方法的调用发起方
-	sudo    model.UniAddr // 超级管理员账户地址，用于执行特权操作
+	txn     store.StoreTx // 当前交易对象，包含交易的签名和原始数据
+	caller  store.UniAddr // 调用者地址，标识合约方法的调用发起方
+	sudo    store.UniAddr // 超级管理员账户地址，用于执行特权操作
 }
 
 // NewRuntime 创建一个新的合约运行时实例。
@@ -31,12 +32,12 @@ type Runtime struct {
 //
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
-func NewRuntime(height int64, ts time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr) *Runtime {
+func NewRuntime(height int64, ts time.Time, txn *model.Txn, caller store.UniAddr, sudo store.UniAddr) *Runtime {
 	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo}
 }
 
 // NewRuntimeWithVersion 创建带指定版本的合约运行时实例。
-func NewRuntimeWithVersion(height int64, ts time.Time, txn *model.Txn, caller model.UniAddr, sudo model.UniAddr, version uint32) *Runtime {
+func NewRuntimeWithVersion(height int64, ts time.Time, txn *model.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32) *Runtime {
 	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo}
 }
 
@@ -66,8 +67,8 @@ func (r *Runtime) GetVersion() uint32 {
 // GetTxn 获取当前交易对象。
 // 交易对象包含签名数据和原始交易数据，可用于验证交易有效性。
 // 返回:
-//   - *model.Txn: 当前交易对象的指针
-func (r *Runtime) GetTxn() *model.Txn {
+//   - *store.Txn: 当前交易对象的指针
+func (r *Runtime) GetTxn() store.StoreTx {
 	return r.txn
 }
 
@@ -75,7 +76,7 @@ func (r *Runtime) GetTxn() *model.Txn {
 // 该地址用于权限验证和身份识别，确保只有授权的调用者能执行特定操作。
 // 返回:
 //   - []byte: 调用者的区块链地址字节切片
-func (r *Runtime) GetCaller() model.UniAddr {
+func (r *Runtime) GetCaller() store.UniAddr {
 	return r.caller
 }
 
@@ -83,7 +84,7 @@ func (r *Runtime) GetCaller() model.UniAddr {
 // 超级管理员拥有执行特权操作的权限，如设置公共加入开关等。
 // 返回:
 //   - UniAddr: 系统账户地址
-func (r *Runtime) GetSystemAccount() model.UniAddr {
+func (r *Runtime) GetSystemAccount() store.UniAddr {
 	return r.sudo
 }
 
@@ -108,7 +109,7 @@ func (r *Runtime) CallbySystem() bool {
 //
 // 返回:
 //   - bool: true 表示已初始化，false 表示未初始化
-func IsContractIsInited(txn *model.Txn, contract string) bool {
+func IsContractIsInited(txn store.StoreTx, contract string) bool {
 	b, err := model.TxnGetCodec[bool](txn, "CONTRACT___INITED", contract)
 	if err != nil {
 		fmt.Println("contract init db error", err)
@@ -131,7 +132,7 @@ func IsContractIsInited(txn *model.Txn, contract string) bool {
 //
 // 返回:
 //   - error: 写入数据库时的错误信息
-func SetContractInited(txn *model.Txn, contract string) error {
+func SetContractInited(txn store.StoreTx, contract string) error {
 	return model.TxnSetCodec(txn, "CONTRACT___INITED", contract, true)
 }
 
@@ -146,7 +147,7 @@ func SetContractInited(txn *model.Txn, contract string) error {
 // 返回:
 //   - []byte: 查询结果的字节切片
 //   - error: 错误信息，当合约不存在或执行失败时返回
-func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, error) {
+func (r *Runtime) Query(target store.UniAddr, call store.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
 		unix:    r.unix,
@@ -156,7 +157,7 @@ func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, 
 		caller:  r.caller, // 保持原始调用者
 		sudo:    r.sudo,
 	}
-	return Query(r.version, &call, newRuntime)
+	return Query(r.version, call, newRuntime)
 }
 
 // Call 调用其他合约（状态变更操作）。
@@ -170,7 +171,7 @@ func (r *Runtime) Query(target model.UniAddr, call model.ContractCall) ([]byte, 
 // 返回:
 //   - []byte: 执行结果的字节切片（暂未使用）
 //   - error: 错误信息，当合约不存在或执行失败时返回
-func (r *Runtime) Call(target model.UniAddr, call model.ContractCall) ([]byte, error) {
+func (r *Runtime) Call(target store.UniAddr, call store.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
 		unix:    r.unix,
@@ -180,6 +181,6 @@ func (r *Runtime) Call(target model.UniAddr, call model.ContractCall) ([]byte, e
 		caller:  r.caller, // 保持原始调用者
 		sudo:    r.sudo,
 	}
-	err := Mutation(r.version, &call, newRuntime)
+	err := Mutation(r.version, call, newRuntime)
 	return nil, err
 }

@@ -91,7 +91,7 @@ func newIdxRegistry[ID IdxID, V any](namespace, prefix string) *idxRegistry[ID, 
 	return r
 }
 
-func (r *idxRegistry[ID, V]) indexAdd(txn *Txn, id ID, val V) {
+func (r *idxRegistry[ID, V]) indexAdd(txn StoreTx, id ID, val V) {
 	rv := reflect.ValueOf(val)
 	for name, idx := range r.exactIndexes {
 		v := fieldUint64(rv, name)
@@ -107,7 +107,7 @@ func (r *idxRegistry[ID, V]) indexAdd(txn *Txn, id ID, val V) {
 	}
 }
 
-func (r *idxRegistry[ID, V]) indexRemove(txn *Txn, id ID, val V) {
+func (r *idxRegistry[ID, V]) indexRemove(txn StoreTx, id ID, val V) {
 	rv := reflect.ValueOf(val)
 	for name, idx := range r.exactIndexes {
 		v := fieldUint64(rv, name)
@@ -123,7 +123,7 @@ func (r *idxRegistry[ID, V]) indexRemove(txn *Txn, id ID, val V) {
 	}
 }
 
-func (r *idxRegistry[ID, V]) indexUpdate(txn *Txn, id ID, old, new V) {
+func (r *idxRegistry[ID, V]) indexUpdate(txn StoreTx, id ID, old, new V) {
 	oldRV := reflect.ValueOf(old)
 	newRV := reflect.ValueOf(new)
 	for name, idx := range r.exactIndexes {
@@ -152,7 +152,7 @@ func (r *idxRegistry[ID, V]) indexUpdate(txn *Txn, id ID, old, new V) {
 	}
 }
 
-func (r *idxRegistry[ID, V]) query(txn *Txn, expr QueryExpr) ([]ID, error) {
+func (r *idxRegistry[ID, V]) query(txn StoreTx, expr QueryExpr) ([]ID, error) {
 	switch e := expr.(type) {
 	case QueryCond:
 		return r.queryCond(txn, e)
@@ -188,7 +188,7 @@ func (r *idxRegistry[ID, V]) query(txn *Txn, expr QueryExpr) ([]ID, error) {
 	}
 }
 
-func (r *idxRegistry[ID, V]) queryCond(txn *Txn, cond QueryCond) ([]ID, error) {
+func (r *idxRegistry[ID, V]) queryCond(txn StoreTx, cond QueryCond) ([]ID, error) {
 	field := cond.Field
 	val := cond.Val
 	switch v := val.(type) {
@@ -259,7 +259,7 @@ func NewIndexedStore[ID IdxID, V any](namespace, prefix string) *IndexedStore[ID
 	}
 }
 
-func (s *IndexedStore[ID, V]) Put(txn *Txn, id ID, val V) error {
+func (s *IndexedStore[ID, V]) Put(txn StoreTx, id ID, val V) error {
 	if err := s.Primary.Set(txn, id, val); err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (s *IndexedStore[ID, V]) Put(txn *Txn, id ID, val V) error {
 	return nil
 }
 
-func (s *IndexedStore[ID, V]) Update(txn *Txn, id ID, fn func(cur *V)) error {
+func (s *IndexedStore[ID, V]) Update(txn StoreTx, id ID, fn func(cur *V)) error {
 	cur, err := s.Primary.Get(txn, id)
 	if err != nil || cur == nil {
 		return fmt.Errorf("IndexedStore.Update: %w", err)
@@ -281,7 +281,7 @@ func (s *IndexedStore[ID, V]) Update(txn *Txn, id ID, fn func(cur *V)) error {
 	return nil
 }
 
-func (s *IndexedStore[ID, V]) Delete(txn *Txn, id ID) error {
+func (s *IndexedStore[ID, V]) Delete(txn StoreTx, id ID) error {
 	cur, err := s.Primary.Get(txn, id)
 	if err != nil || cur == nil {
 		return err
@@ -290,7 +290,7 @@ func (s *IndexedStore[ID, V]) Delete(txn *Txn, id ID) error {
 	return s.Primary.Delete(txn, id)
 }
 
-func (s *IndexedStore[ID, V]) Query(txn *Txn, expr QueryExpr) ([]ID, error) {
+func (s *IndexedStore[ID, V]) Query(txn StoreTx, expr QueryExpr) ([]ID, error) {
 	return s.idx.query(txn, expr)
 }
 
@@ -315,7 +315,7 @@ func NewIndexedList[K ListIndex, V any](namespace, prefixNextID, prefixItems str
 }
 
 // Insert 插入一条记录，自动分配 id 并维护索引。
-func (l *IndexedList[K, V]) Insert(txn *Txn, val V) (K, error) {
+func (l *IndexedList[K, V]) Insert(txn StoreTx, val V) (K, error) {
 	id, err := l.StoreList.Insert(txn, val)
 	if err != nil {
 		var zero K
@@ -326,7 +326,7 @@ func (l *IndexedList[K, V]) Insert(txn *Txn, val V) (K, error) {
 }
 
 // Update 直接更新值，并自动比对更新索引。
-func (l *IndexedList[K, V]) Update(txn *Txn, key K, val V) error {
+func (l *IndexedList[K, V]) Update(txn StoreTx, key K, val V) error {
 	cur, err := l.StoreList.Get(txn, key)
 	if err != nil || cur == nil {
 		return fmt.Errorf("IndexedList.Update: %w", err)
@@ -340,7 +340,7 @@ func (l *IndexedList[K, V]) Update(txn *Txn, key K, val V) error {
 }
 
 // UpdateFn 读取当前值，调用 fn 修改，写回并自动比对更新索引。
-func (l *IndexedList[K, V]) UpdateFn(txn *Txn, key K, fn func(cur *V)) error {
+func (l *IndexedList[K, V]) UpdateFn(txn StoreTx, key K, fn func(cur *V)) error {
 	cur, err := l.StoreList.Get(txn, key)
 	if err != nil || cur == nil {
 		return fmt.Errorf("IndexedList.UpdateFn: %w", err)
@@ -355,7 +355,7 @@ func (l *IndexedList[K, V]) UpdateFn(txn *Txn, key K, fn func(cur *V)) error {
 }
 
 // Clear 删除记录，同时清理索引。
-func (l *IndexedList[K, V]) Clear(txn *Txn, key K) error {
+func (l *IndexedList[K, V]) Clear(txn StoreTx, key K) error {
 	cur, err := l.StoreList.Get(txn, key)
 	if err != nil || cur == nil {
 		return err
@@ -365,7 +365,7 @@ func (l *IndexedList[K, V]) Clear(txn *Txn, key K) error {
 }
 
 // Delete 删除记录，同时清理索引。
-func (l *IndexedList[K, V]) Delete(txn *Txn, key K) error {
+func (l *IndexedList[K, V]) Delete(txn StoreTx, key K) error {
 	cur, err := l.StoreList.Get(txn, key)
 	if err != nil || cur == nil {
 		return err
@@ -375,7 +375,7 @@ func (l *IndexedList[K, V]) Delete(txn *Txn, key K) error {
 }
 
 // RebuildIndex 遍历所有已有数据并重建索引（用于新增 idx tag 后的历史数据补偿）。
-func (l *IndexedList[K, V]) RebuildIndex(txn *Txn) error {
+func (l *IndexedList[K, V]) RebuildIndex(txn StoreTx) error {
 	keys, vals, err := l.StoreList.ListAll(txn)
 	if err != nil {
 		return err
@@ -387,12 +387,12 @@ func (l *IndexedList[K, V]) RebuildIndex(txn *Txn) error {
 }
 
 // Query 组合索引查询，返回匹配的 key 列表。
-func (l *IndexedList[K, V]) Query(txn *Txn, expr QueryExpr) ([]K, error) {
+func (l *IndexedList[K, V]) Query(txn StoreTx, expr QueryExpr) ([]K, error) {
 	return l.idx.query(txn, expr)
 }
 
 // ListByQuery 分页列表（升序）：先用 QueryExpr 过滤出匹配的 id，再按 key 升序从 startKey 起取最多 size 条。
-func (l *IndexedList[K, V]) ListByQuery(txn *Txn, expr QueryExpr, startKey K, size uint32) ([]K, []V, error) {
+func (l *IndexedList[K, V]) ListByQuery(txn StoreTx, expr QueryExpr, startKey K, size uint32) ([]K, []V, error) {
 	if size == 0 {
 		return nil, nil, nil
 	}
@@ -426,7 +426,7 @@ func (l *IndexedList[K, V]) ListByQuery(txn *Txn, expr QueryExpr, startKey K, si
 
 // DescListByQuery 分页列表（降序）：先用 QueryExpr 过滤出匹配的 id，再按 key 降序从 startKey 向前取最多 size 条。
 // startKey 为 nil 时表示从最大 id 开始。
-func (l *IndexedList[K, V]) DescListByQuery(txn *Txn, expr QueryExpr, startKey *K, size uint32) ([]K, []V, error) {
+func (l *IndexedList[K, V]) DescListByQuery(txn StoreTx, expr QueryExpr, startKey *K, size uint32) ([]K, []V, error) {
 	if size == 0 {
 		return nil, nil, nil
 	}

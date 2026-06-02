@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/wetee-dao/ink.go/util"
 )
 
@@ -21,7 +21,7 @@ func (d GovQuery) Vote(proposalID uint32, index uint32) (util.Option[Vote], erro
 }
 
 // VotesOfUser 获取用户的所有投票引用（分页）
-func (d GovQuery) VotesOfUser(user model.UniAddr, startKey util.Option[uint32], size uint32) ([]Vote, error) {
+func (d GovQuery) VotesOfUser(user store.UniAddr, startKey util.Option[uint32], size uint32) ([]Vote, error) {
 	var startKeyPtr *uint32
 	if startKey.IsSome() {
 		startKeyPtr = &startKey.V
@@ -58,26 +58,26 @@ func (d GovQuery) Votes(proposalID uint32, startKey util.Option[uint32], size ui
 }
 
 // burnVoteForProposal 投票：从账户销毁 VOTE，并同步减少 totalIssuance（与 Mint 对称）。
-func (d GovMutation) burnVoteForProposal(account model.UniAddr, amount model.Amount) error {
+func (d GovMutation) burnVoteForProposal(account store.UniAddr, amount store.Amount) error {
 	if amount.Int.Sign() <= 0 {
 		return ErrLowBalance
 	}
-	member, err := d.members.GetOrDefault(d.api.GetTxn(), account, model.ZeroAmount)
+	member, err := d.members.GetOrDefault(d.api.GetTxn(), account, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
 	if member.Int.Cmp(amount.Int) < 0 {
 		return ErrLowBalance
 	}
-	member = model.AmountSub(member, amount)
-	total, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), model.ZeroAmount)
+	member = store.AmountSub(member, amount)
+	total, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), store.ZeroAmount)
 	if err != nil {
 		return err
 	}
 	if total.Int.Cmp(amount.Int) < 0 {
 		return ErrLowBalance
 	}
-	total = model.AmountSub(total, amount)
+	total = store.AmountSub(total, amount)
 	if err := d.members.Set(d.api.GetTxn(), account, member); err != nil {
 		return err
 	}
@@ -85,20 +85,20 @@ func (d GovMutation) burnVoteForProposal(account model.UniAddr, amount model.Amo
 }
 
 // refundVoteForCancel 取消投票：向账户退回本票对应的 VOTE，并恢复 totalIssuance（冲销投票时的销毁）。
-func (d GovMutation) refundVoteForCancel(account model.UniAddr, amount model.Amount) error {
+func (d GovMutation) refundVoteForCancel(account store.UniAddr, amount store.Amount) error {
 	if amount.Int.Sign() <= 0 {
 		return nil
 	}
-	member, err := d.members.GetOrDefault(d.api.GetTxn(), account, model.ZeroAmount)
+	member, err := d.members.GetOrDefault(d.api.GetTxn(), account, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
-	member = model.AmountAdd(member, amount)
-	total, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), model.ZeroAmount)
+	member = store.AmountAdd(member, amount)
+	total, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), store.ZeroAmount)
 	if err != nil {
 		return err
 	}
-	total = model.AmountAdd(total, amount)
+	total = store.AmountAdd(total, amount)
 	if err := d.members.Set(d.api.GetTxn(), account, member); err != nil {
 		return err
 	}
@@ -106,11 +106,11 @@ func (d GovMutation) refundVoteForCancel(account model.UniAddr, amount model.Amo
 }
 
 // SubmitVote 提交投票：销毁 lockAmount 数量的治理代币作为本票权重（ABI 参数名保持 lockAmount）。
-func (d GovMutation) SubmitVote(proposalID uint32, opinionYes bool, lockAmount model.Amount) error {
+func (d GovMutation) SubmitVote(proposalID uint32, opinionYes bool, lockAmount store.Amount) error {
 	height := d.api.GetHeight()
 	caller := d.api.GetCaller()
 
-	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, model.ZeroAmount)
+	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (d GovMutation) SubmitVote(proposalID uint32, opinionYes bool, lockAmount m
 		Caller:     caller,
 		Pledge:     lockAmount,
 		OpinionYes: opinionYes,
-		VoteWeight: model.Amount{Int: one},
+		VoteWeight: store.Amount{Int: one},
 		VoteBlock:  height,
 	}
 
@@ -235,7 +235,7 @@ func (d Gov) calculateProposalStatus(id uint32, prop Proposal) (ProposalStatusQu
 		return ProposalStatusQuery{}, err
 	}
 
-	totalSupply, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), model.ZeroAmount)
+	totalSupply, err := d.totalIssuance.GetOrDefault(d.api.GetTxn(), store.ZeroAmount)
 	if err != nil {
 		return ProposalStatusQuery{}, err
 	}

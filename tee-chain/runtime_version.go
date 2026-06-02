@@ -9,13 +9,11 @@ import (
 )
 
 const (
-	RuntimeVersionKey       = "RUNTIME_VERSION"
-	RuntimeMetaKeyPrefix    = "RUNTIME_META_"
-	RuntimeAtHeightPrefix   = "RUNTIME_AT_HEIGHT_"
-	RuntimeDefaultVersion   = uint32(0)
+	RuntimeVersionKey     = "RUNTIME_VERSION"
+	RuntimeMetaKeyPrefix  = "RUNTIME_META_"
+	RuntimeAtHeightPrefix = "RUNTIME_AT_HEIGHT_"
+	RuntimeDefaultVersion = uint32(0)
 )
-
-
 
 // InitRuntimeVersion 初始化运行时版本系统（在 InitChain 或首次启动时调用）
 func InitRuntimeVersion() error {
@@ -61,6 +59,19 @@ func GetCurrentRuntimeVersion() (uint32, error) {
 		return RuntimeDefaultVersion, err
 	}
 	return v, nil
+}
+
+// GetRuntimeVersionAtHeightTxn 从当前交易中优先读取版本（支持同区块内 RuntimeUpgrade 立即生效）。
+// 若 txn 中无记录，回退到 DB 查询。
+func GetRuntimeVersionAtHeightTxn(txn *model.Txn, height int64) (uint32, error) {
+	v, err := model.TxnGetCodec[uint32](txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
+	if err != nil {
+		return RuntimeDefaultVersion, err
+	}
+	if v != nil {
+		return *v, nil
+	}
+	return GetRuntimeVersionAtHeight(height)
 }
 
 // GetRuntimeVersionAtHeight 获取指定区块高度使用的运行时版本

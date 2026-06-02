@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -83,7 +82,7 @@ func (g GatewayQuery) LookupAPIKey(keyHash []byte) (*APIKeyInfo, error) {
 }
 
 // GetAPIKeysByOwner 返回某个用户注册的所有 API Key（使用 OwnerKey exact 索引，O(1) 查询）
-func (g GatewayQuery) GetAPIKeysByOwner(owner model.UniAddr) ([]APIKeyInfo, error) {
+func (g GatewayQuery) GetAPIKeysByOwner(owner store.UniAddr) ([]APIKeyInfo, error) {
 	keys, err := g.apiKeys.Query(g.api.GetTxn(), store.QueryCond{Field: "OwnerKey", Val: uniAddrKey(owner)})
 	if err != nil {
 		return nil, err

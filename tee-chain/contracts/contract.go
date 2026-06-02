@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gov"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/wasm"
 )
 
@@ -33,7 +33,7 @@ func getWasmEngine() *wasm.Engine {
 // 根据 version 选择执行路径：
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
-func Query(version uint32, call *model.ContractCall, runtime model.ContractApi) (data []byte, err error) {
+func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
 	if version == wasm.NativeVersion {
 		return nativeQuery(call, runtime)
 	}
@@ -44,17 +44,17 @@ func Query(version uint32, call *model.ContractCall, runtime model.ContractApi) 
 // 根据 version 选择执行路径：
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
-func Mutation(version uint32, call *model.ContractCall, runtime model.ContractApi) error {
+func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi) error {
 	if version == wasm.NativeVersion {
-		selector := [4]byte(call.Method[:4])
-		if selector == model.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.Name)) {
+		selector := [4]byte(call.GetMethod()[:4])
+		if selector == store.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.GetName())) {
 			return nil
 		}
 
 		err := nativeMutation(call, runtime)
 
-		if selector == model.MethodToSelector("Init") && err == nil {
-			return SetContractInited(runtime.GetTxn(), string(call.Name))
+		if selector == store.MethodToSelector("Init") && err == nil {
+			return SetContractInited(runtime.GetTxn(), string(call.GetName()))
 		}
 
 		return err
@@ -63,8 +63,8 @@ func Mutation(version uint32, call *model.ContractCall, runtime model.ContractAp
 }
 
 // nativeQuery 原生 Go 合约查询路由。
-func nativeQuery(call *model.ContractCall, runtime model.ContractApi) (data []byte, err error) {
-	switch string(call.Name) {
+func nativeQuery(call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
+	switch string(call.GetName()) {
 	case "gov":
 		ins := gov.NewGov(runtime)
 		return gov.GovQuery{Gov: *ins}.ExecQuery(call)
@@ -78,14 +78,14 @@ func nativeQuery(call *model.ContractCall, runtime model.ContractApi) (data []by
 		ins := batch.NewBatch(runtime)
 		return batch.BatchQuery{Batch: *ins}.ExecQuery(call)
 	default:
-		return nil, fmt.Errorf("unsupported contract: %s", string(call.Name))
+		return nil, fmt.Errorf("unsupported contract: %s", string(call.GetName()))
 	}
 }
 
 // nativeMutation 原生 Go 合约状态变更路由。
-func nativeMutation(call *model.ContractCall, runtime model.ContractApi) error {
+func nativeMutation(call store.ContractCall, runtime store.ContractApi) error {
 	var err error
-	switch string(call.Name) {
+	switch string(call.GetMethod()) {
 	case "gov":
 		ins := gov.NewGov(runtime)
 		mutation := gov.GovMutation{Gov: *ins}
@@ -103,7 +103,7 @@ func nativeMutation(call *model.ContractCall, runtime model.ContractApi) error {
 		mutation := batch.BatchMutation{Batch: *ins}
 		err = mutation.ExecCall(call)
 	default:
-		return fmt.Errorf("unsupported contract: %s", string(call.Name))
+		return fmt.Errorf("unsupported contract: %s", string(call.GetName()))
 	}
 	return err
 }

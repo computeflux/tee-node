@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+
 	"bytes"
 	"encoding/hex"
 	"fmt"
@@ -85,7 +87,7 @@ func ContractDryRun(caller []byte, callerType int, contract string, mut bool, me
 	} else {
 		err = teeChain.ContractDryRun(caller, uint32(callerType), &model.ContractCall{
 			Name:   []byte(contract),
-			Method: model.MethodToSelectorBytes(method),
+			Method: store.MethodToSelectorBytes(method),
 			Args:   args,
 		})
 		if err != nil {

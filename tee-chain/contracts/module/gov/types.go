@@ -1,7 +1,7 @@
 package gov
 
 import (
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/wetee-dao/ink.go/util"
 )
 
@@ -17,8 +17,8 @@ var (
 
 // Member 成员账户与余额。
 type Member struct {
-	Account model.UniAddr // 成员账户地址
-	Balance model.Amount  // 成员余额
+	Account store.UniAddr // 成员账户地址
+	Balance store.Amount  // 成员余额
 }
 
 // TrackData 治理轨道参数。
@@ -29,8 +29,8 @@ type TrackData struct {
 	ConfirmPeriod      uint32       // 确认期（区块数），阈值满足后需要持续的时间才能通过
 	DecisionPeriod     uint32       // 决定期（区块数）
 	MinEnactmentPeriod uint32       // 最小执行期（区块数），提案通过后到执行的最短时间
-	DecisionDeposit    model.Amount // 决定押金金额，提案人需要质押的金额
-	MaxBalance         model.Amount // 最大能执行的金额，提案涉及金额的上限
+	DecisionDeposit    store.Amount // 决定押金金额，提案人需要质押的金额
+	MaxBalance         store.Amount // 最大能执行的金额，提案涉及金额的上限
 	MinApproval        Curve        // 投票通过阈值曲线，yes/(yes+no) 需达到的比例
 	MinSupport         Curve        // 投票参与率曲线，support/totalSupply 需达到的比例
 }
@@ -46,7 +46,7 @@ type CallContent struct {
 	Contract []byte       // 目标合约地址
 	Selector [4]byte      // 方法选择器
 	Args     [][]byte     // 调用参数
-	Amount   model.Amount // 转账金额
+	Amount   store.Amount // 转账金额
 }
 
 // ProposalStatus 提案状态
@@ -68,8 +68,8 @@ type ProposalStatusQuery struct {
 
 // ProposalDeposit 提案押金信息
 type ProposalDeposit struct {
-	Depositor model.UniAddr // 押金支付者地址
-	Amount    model.Amount  // 押金金额
+	Depositor store.UniAddr // 押金支付者地址
+	Amount    store.Amount  // 押金金额
 	Block     int64         // 支付押金的区块号
 }
 
@@ -77,7 +77,7 @@ type ProposalDeposit struct {
 type Proposal struct {
 	Call        util.Option[CallContent] // 提案调用内容
 	TrackID     uint32                   // 所属轨道ID
-	Caller      model.UniAddr            // 提案发起人
+	Caller      store.UniAddr            // 提案发起人
 	Status      ProposalStatus           // 提案状态
 	SubmitBlock int64                    // 提交区块
 	Deposit     ProposalDeposit          // 押金信息
@@ -99,10 +99,10 @@ type ProposalResult struct {
 type Vote struct {
 	Index      uint32        // 投票索引
 	ProposalID uint32        // 提案ID
-	Caller     model.UniAddr // 投票人地址
-	Pledge     model.Amount  // 本笔投入的 VOTE 数量：投票时销毁，取消时按此额退回并恢复 totalIssuance（计票权重）
+	Caller     store.UniAddr // 投票人地址
+	Pledge     store.Amount  // 本笔投入的 VOTE 数量：投票时销毁，取消时按此额退回并恢复 totalIssuance（计票权重）
 	OpinionYes bool          // 是否赞成
-	VoteWeight model.Amount  // 投票权重
+	VoteWeight store.Amount  // 投票权重
 	VoteBlock  int64         // 投票时的区块号
 	Deleted    bool          // 是否已删除；取消投票时先退还本笔 Pledge 对应 VOTE 并恢复 totalIssuance，再移出计票
 }
@@ -110,9 +110,9 @@ type Vote struct {
 // Spend 支出记录
 type Spend struct {
 	ID      uint64        // 支出ID
-	Caller  model.UniAddr // 发起人地址
-	To      model.UniAddr // 接收人地址
-	Amount  model.Amount  // 支出金额
+	Caller  store.UniAddr // 发起人地址
+	To      store.UniAddr // 接收人地址
+	Amount  store.Amount  // 支出金额
 	TrackID uint32        // 所属轨道ID
 	Payout  bool          // 是否已支付
 }

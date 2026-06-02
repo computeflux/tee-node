@@ -146,7 +146,7 @@ func bytesToU64(b []byte) uint64 {
 }
 
 // NextID 返回该 K1 下下一个将分配的 k2（即当前长度）。
-func (l *StoreList2D[K1, Ix, V]) NextID(txn *Txn, k1 K1) (Ix, error) {
+func (l *StoreList2D[K1, Ix, V]) NextID(txn StoreTx, k1 K1) (Ix, error) {
 	var zero Ix
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
@@ -166,13 +166,13 @@ func (l *StoreList2D[K1, Ix, V]) NextID(txn *Txn, k1 K1) (Ix, error) {
 }
 
 // Len 返回该 K1 下的条目数量（与 NextID 一致）。
-func (l *StoreList2D[K1, Ix, V]) Len(txn *Txn, k1 K1) (Ix, error) {
+func (l *StoreList2D[K1, Ix, V]) Len(txn StoreTx, k1 K1) (Ix, error) {
 	return l.NextID(txn, k1)
 }
 
 // Insert 在 k1 下插入一条记录，返回分配的 k2。
 // 如果内层索引会溢出，则返回零值和 nil。
-func (l *StoreList2D[K1, Ix, V]) Insert(txn *Txn, k1 K1, value V) (Ix, error) {
+func (l *StoreList2D[K1, Ix, V]) Insert(txn StoreTx, k1 K1, value V) (Ix, error) {
 	var zero Ix
 
 	// 获取或分配 id
@@ -223,7 +223,7 @@ func (l *StoreList2D[K1, Ix, V]) Insert(txn *Txn, k1 K1, value V) (Ix, error) {
 
 // Update 更新 (k1, k2) 对应的值。
 // 如果 k1 不存在或 k2 超出该 k1 的范围，则返回错误。
-func (l *StoreList2D[K1, Ix, V]) Update(txn *Txn, k1 K1, k2 Ix, value V) error {
+func (l *StoreList2D[K1, Ix, V]) Update(txn StoreTx, k1 K1, k2 Ix, value V) error {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return err
@@ -236,7 +236,7 @@ func (l *StoreList2D[K1, Ix, V]) Update(txn *Txn, k1 K1, k2 Ix, value V) error {
 }
 
 // Clear 清除 (k1, k2) 对应的值（不改变该 k1 的 len/next_id）。
-func (l *StoreList2D[K1, Ix, V]) Clear(txn *Txn, k1 K1, k2 Ix) error {
+func (l *StoreList2D[K1, Ix, V]) Clear(txn StoreTx, k1 K1, k2 Ix) error {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return err
@@ -249,7 +249,7 @@ func (l *StoreList2D[K1, Ix, V]) Clear(txn *Txn, k1 K1, k2 Ix) error {
 }
 
 // Get 按 (k1, k2) 取值。
-func (l *StoreList2D[K1, Ix, V]) Get(txn *Txn, k1 K1, k2 Ix) (*V, error) {
+func (l *StoreList2D[K1, Ix, V]) Get(txn StoreTx, k1 K1, k2 Ix) (*V, error) {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return nil, err
@@ -262,7 +262,7 @@ func (l *StoreList2D[K1, Ix, V]) Get(txn *Txn, k1 K1, k2 Ix) (*V, error) {
 }
 
 // GetOrDefault 按 (k1, k2) 取值；不存在时返回 defaultVal。
-func (l *StoreList2D[K1, Ix, V]) GetOrDefault(txn *Txn, k1 K1, k2 Ix, defaultVal V) (V, error) {
+func (l *StoreList2D[K1, Ix, V]) GetOrDefault(txn StoreTx, k1 K1, k2 Ix, defaultVal V) (V, error) {
 	v, err := l.Get(txn, k1, k2)
 	if err != nil {
 		var zero V
@@ -275,7 +275,7 @@ func (l *StoreList2D[K1, Ix, V]) GetOrDefault(txn *Txn, k1 K1, k2 Ix, defaultVal
 }
 
 // List 分页列表（升序）：k1 下从 startKey 起取最多 size 条。
-func (l *StoreList2D[K1, Ix, V]) List(txn *Txn, k1 K1, startKey Ix, size uint32) ([]Ix, []V, error) {
+func (l *StoreList2D[K1, Ix, V]) List(txn StoreTx, k1 K1, startKey Ix, size uint32) ([]Ix, []V, error) {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return nil, nil, err
@@ -319,7 +319,7 @@ func (l *StoreList2D[K1, Ix, V]) List(txn *Txn, k1 K1, startKey Ix, size uint32)
 
 // DescList 分页列表（降序）：k1 下从 startKey 起向前取最多 size 条。
 // startKey 为 nil 时表示从末尾开始。
-func (l *StoreList2D[K1, Ix, V]) DescList(txn *Txn, k1 K1, startKey *Ix, size uint32) ([]Ix, []V, error) {
+func (l *StoreList2D[K1, Ix, V]) DescList(txn StoreTx, k1 K1, startKey *Ix, size uint32) ([]Ix, []V, error) {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return nil, nil, err
@@ -368,7 +368,7 @@ func (l *StoreList2D[K1, Ix, V]) DescList(txn *Txn, k1 K1, startKey *Ix, size ui
 }
 
 // ListAll 返回 k1 下全部 (k2, value)。
-func (l *StoreList2D[K1, Ix, V]) ListAll(txn *Txn, k1 K1) ([]Ix, []V, error) {
+func (l *StoreList2D[K1, Ix, V]) ListAll(txn StoreTx, k1 K1) ([]Ix, []V, error) {
 	id, err := l.k1ToIDMapping().Get(txn, k1)
 	if err != nil {
 		return nil, nil, err

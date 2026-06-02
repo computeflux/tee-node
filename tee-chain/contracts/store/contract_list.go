@@ -99,7 +99,7 @@ func (l *StoreList[K, V]) itemsMapping() *StoreMapping[K, V] {
 }
 
 // Len 当前长度（即下一个将分配的 id）。
-func (l *StoreList[K, V]) Len(txn *Txn) (K, error) {
+func (l *StoreList[K, V]) Len(txn StoreTx) (K, error) {
 	var zero K
 	val, err := l.nextIDStorage().Get(txn)
 	if err != nil {
@@ -113,7 +113,7 @@ func (l *StoreList[K, V]) Len(txn *Txn) (K, error) {
 
 // Insert 插入一条记录，返回分配的 id。
 // 如果索引溢出（如 uint8 达到 256），返回零值和 false。
-func (l *StoreList[K, V]) Insert(txn *Txn, value V) (K, error) {
+func (l *StoreList[K, V]) Insert(txn StoreTx, value V) (K, error) {
 	var zero K
 	k, err := l.Len(txn)
 	if err != nil {
@@ -133,22 +133,22 @@ func (l *StoreList[K, V]) Insert(txn *Txn, value V) (K, error) {
 }
 
 // Contains 是否存在该 key。
-func (l *StoreList[K, V]) Contains(txn *Txn, key K) (bool, error) {
+func (l *StoreList[K, V]) Contains(txn StoreTx, key K) (bool, error) {
 	return l.itemsMapping().Contains(txn, key)
 }
 
 // Get 按 key 取值。
-func (l *StoreList[K, V]) Get(txn *Txn, key K) (*V, error) {
+func (l *StoreList[K, V]) Get(txn StoreTx, key K) (*V, error) {
 	return l.itemsMapping().Get(txn, key)
 }
 
 // GetOrDefault 按 key 取值；不存在时返回 defaultVal。
-func (l *StoreList[K, V]) GetOrDefault(txn *Txn, key K, defaultVal V) (V, error) {
+func (l *StoreList[K, V]) GetOrDefault(txn StoreTx, key K, defaultVal V) (V, error) {
 	return l.itemsMapping().GetOrDefault(txn, key, defaultVal)
 }
 
 // Update 更新 key 对应的值。
-func (l *StoreList[K, V]) Update(txn *Txn, key K, value V) error {
+func (l *StoreList[K, V]) Update(txn StoreTx, key K, value V) error {
 	_, err := l.itemsMapping().Get(txn, key)
 	if err != nil {
 		return err
@@ -157,12 +157,12 @@ func (l *StoreList[K, V]) Update(txn *Txn, key K, value V) error {
 }
 
 // Clear 清除 key 对应的值（不改变 len/next_id）。
-func (l *StoreList[K, V]) Clear(txn *Txn, key K) error {
+func (l *StoreList[K, V]) Clear(txn StoreTx, key K) error {
 	return l.itemsMapping().Delete(txn, key)
 }
 
 // List 分页列表（升序）：从 startKey 起取最多 size 条。
-func (l *StoreList[K, V]) List(txn *Txn, startKey K, size uint32) ([]K, []V, error) {
+func (l *StoreList[K, V]) List(txn StoreTx, startKey K, size uint32) ([]K, []V, error) {
 	totalLen, err := l.Len(txn)
 	if err != nil {
 		return nil, nil, err
@@ -198,7 +198,7 @@ func (l *StoreList[K, V]) List(txn *Txn, startKey K, size uint32) ([]K, []V, err
 
 // DescList 分页列表（降序）：从 startKey 起向前取最多 size 条。
 // startKey 为 nil 时表示从末尾开始。
-func (l *StoreList[K, V]) DescList(txn *Txn, startKey *K, size uint32) ([]K, []V, error) {
+func (l *StoreList[K, V]) DescList(txn StoreTx, startKey *K, size uint32) ([]K, []V, error) {
 	totalLen, err := l.Len(txn)
 	if err != nil {
 		return nil, nil, err
@@ -239,7 +239,7 @@ func (l *StoreList[K, V]) DescList(txn *Txn, startKey *K, size uint32) ([]K, []V
 }
 
 // ListAll 返回所有 (key, value) 对。
-func (l *StoreList[K, V]) ListAll(txn *Txn) ([]K, []V, error) {
+func (l *StoreList[K, V]) ListAll(txn StoreTx) ([]K, []V, error) {
 	return l.List(txn, 0, ^uint32(0))
 }
 

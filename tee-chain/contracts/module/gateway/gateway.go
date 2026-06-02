@@ -4,13 +4,12 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"golang.org/x/crypto/blake2b"
 )
 
 // uniAddrKey 将 UniAddr 转为确定性 uint64，用于 exact 索引。
-func uniAddrKey(a model.UniAddr) uint64 {
+func uniAddrKey(a store.UniAddr) uint64 {
 	h, _ := blake2b.New256(nil)
 	h.Write(a.V)
 	var tBytes [4]byte
@@ -30,18 +29,18 @@ var (
 
 // Gateway API 网关合约
 type Gateway struct {
-	api model.ContractApi
+	api store.ContractApi
 
-	credits               *store.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credits"`
-	credit_useds          *store.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_credit_useds"`
+	credits               *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:v2_credits"`
+	credit_useds          *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:v2_credit_useds"`
 	models                *store.IndexedList[uint64, ModelInfo]                           `store:"keyPfx:v2_models"`
 	providers             *store.IndexedList[uint64, ProviderInfo]                        `store:"keyPfx:v2_providers"`
-	providerByOwner       *store.StoreMapping[model.UniAddr, uint64]                      `store:"keyPfx:v2_provider_by_owner"`       // owner → providerID（一人一 provider）
+	providerByOwner       *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:v2_provider_by_owner"`       // owner → providerID（一人一 provider）
 	providerCredits       *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:v2_provider_credit"`         // providerID → accumulated credits
 	apiKeys               *store.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:v2_api_key"`                 // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
-	rechargeHistory       *store.StoreList2D[model.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`        // user → []RechargeRecord
+	rechargeHistory       *store.StoreList2D[store.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:v2_recharge_history"`        // user → []RechargeRecord
 	settlementHistory     *store.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:v4_settlement_history"`      // providerID → []SettlementRecord
-	userSettlementHistory *store.StoreList2D[model.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"` // user → []SettlementRecord
+	userSettlementHistory *store.StoreList2D[store.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v4_user_settlement_history"` // user → []SettlementRecord
 	settledNonces         *store.StoreMapping[string, bool]                               `store:"keyPfx:v5_settled_nonces"`          // hex(nonce) → true，防重放
 }
 

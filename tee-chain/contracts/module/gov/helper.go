@@ -3,7 +3,7 @@ package gov
 import (
 	"bytes"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 func (d Gov) ensureGov() error {
@@ -49,10 +49,10 @@ func (d Gov) track(id uint32) (TrackData, error) {
 	return *t, nil
 }
 
-func allowanceKey(owner, spender model.UniAddr) model.UniAddr {
+func allowanceKey(owner, spender store.UniAddr) store.UniAddr {
 	// 组合 owner 和 spender 作为 allowance 的 key
 	key := make([]byte, len(owner.V)+len(spender.V))
 	copy(key, owner.V)
 	copy(key[len(owner.V):], spender.V)
-	return model.UniAddr{T: 0, V: key}
+	return store.UniAddr{T: 0, V: key}
 }

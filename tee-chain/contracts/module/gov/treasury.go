@@ -2,13 +2,13 @@ package gov
 
 import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
-func (d GovMutation) Spend(to model.UniAddr, amount model.Amount, trackID uint32) error {
+func (d GovMutation) Spend(to store.UniAddr, amount store.Amount, trackID uint32) error {
 	caller := d.api.GetCaller()
 
-	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, model.ZeroAmount)
+	member, err := d.members.GetOrDefault(d.api.GetTxn(), caller, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
@@ -20,7 +20,7 @@ func (d GovMutation) Spend(to model.UniAddr, amount model.Amount, trackID uint32
 	}
 
 	// Deduct amount from caller and escrow it
-	member = model.AmountSub(member, amount)
+	member = store.AmountSub(member, amount)
 	if err := d.members.Set(d.api.GetTxn(), caller, member); err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (d GovMutation) Spend(to model.UniAddr, amount model.Amount, trackID uint32
 	}
 	return d.SubmitProposal(CallContent{
 		Contract: []byte("gov"),
-		Selector: model.MethodToSelector("Payout"),
+		Selector: store.MethodToSelector("Payout"),
 		Args:     [][]byte{idbt},
 		Amount:   amount,
 	}, trackID)
@@ -75,11 +75,11 @@ func (d GovMutation) Payout(spendID uint64) error {
 	}
 
 	// Transfer escrowed amount to the recipient
-	recipient, err := d.members.GetOrDefault(d.api.GetTxn(), spend.To, model.ZeroAmount)
+	recipient, err := d.members.GetOrDefault(d.api.GetTxn(), spend.To, store.ZeroAmount)
 	if err != nil {
 		return err
 	}
-	recipient = model.AmountAdd(recipient, spend.Amount)
+	recipient = store.AmountAdd(recipient, spend.Amount)
 	if err := d.members.Set(d.api.GetTxn(), spend.To, recipient); err != nil {
 		return err
 	}

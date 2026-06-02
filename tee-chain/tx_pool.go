@@ -1,6 +1,8 @@
 package teechain
 
 import (
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+
 	"crypto/rand"
 	"fmt"
 	"time"
@@ -121,7 +123,7 @@ func (app *TeeChain) ApplyToChain() {
 		Payload: &model.SysCall_Contract{
 			Contract: &model.ContractCall{
 				Name:   []byte("batch"),
-				Method: model.MethodToSelectorBytes("execute_batch"),
+				Method: store.MethodToSelectorBytes("execute_batch"),
 				Args:   [][]byte{argsBytes},
 				Nonce:  nonce,
 			},

@@ -2,10 +2,10 @@ package auth
 
 import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/computeflux/tee-provider/pkg/model"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	cauth "github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ── Auth 合约桥接（从 tee-chain/contract.go 拆分出来）─────────
@@ -42,7 +42,7 @@ func AuthStoreAuthUser(chain *teechain.TeeChain, ref string, ciphertext []byte) 
 	refBytes, _ := codec.Encode(ref)
 	cipherBytes, _ := codec.Encode(ciphertext)
 	nonceBytes, _ := codec.Encode([]byte{})
-	return chain.SubmitContract("auth", model.MethodToSelectorBytes("store_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
+	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）。
@@ -93,7 +93,7 @@ func AuthSetConfig(
 	twSecBytes, _ := codec.Encode(twitterSecret)
 	twRedBytes, _ := codec.Encode(twitterRedirect)
 
-	return chain.SubmitContract("auth", model.MethodToSelectorBytes("set_config"), [][]byte{
+	return chain.SubmitContract("auth", store.MethodToSelectorBytes("set_config"), [][]byte{
 		hostBytes, portBytes, userBytes, pwdBytes,
 		fromBytes, fromNameBytes, mockBytes,
 		gIDBytes, gSecBytes, gRedBytes,
@@ -107,5 +107,5 @@ func AuthStorePrivateKey(chain *teechain.TeeChain, ref string, ciphertext []byte
 	refBytes, _ := codec.Encode(ref)
 	cipherBytes, _ := codec.Encode(ciphertext)
 	nonceBytes, _ := codec.Encode([]byte{})
-	return chain.SubmitContract("auth", model.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
+	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }

@@ -1,6 +1,6 @@
 package gateway
 
-import "github.com/computeflux/tee-provider/pkg/model"
+import "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 
 // ── Modality bitmask ────────────────────────────────────
 
@@ -43,7 +43,7 @@ const (
 // ModelInfo 独立注册的模型
 type ModelInfo struct {
 	Name            string        `json:"name" idx:"exact"`
-	Owner           model.UniAddr `json:"owner"`
+	Owner           store.UniAddr `json:"owner"`
 	ProviderID      uint64        `json:"providerId" idx:"exact"`
 	InputModalities uint8         `json:"inputModalities" idx:"exact"`
 	ContextLength   uint64        `json:"contextLength"   idx:"range"`
@@ -84,7 +84,7 @@ type ModelInfoWithProvider struct {
 // ProviderInfo 去中心化 AI 服务提供者
 type ProviderInfo struct {
 	// ── 身份 ──
-	Owner model.UniAddr `json:"owner"`
+	Owner store.UniAddr `json:"owner"`
 
 	// ── 品牌 ──
 	Name        string `json:"name" idx:"exact"` // 提供者名称
@@ -119,7 +119,7 @@ type ProviderInfo struct {
 // TEE 提供方收到明文 key 后 blake2b 哈希，再以此查询链上记录
 type APIKeyInfo struct {
 	OwnerKey  uint64        `json:"ownerKey" idx:"exact"` // blake2b(owner.V)[:8] 转 uint64，用于索引
-	Owner     model.UniAddr `json:"owner"`
+	Owner     store.UniAddr `json:"owner"`
 	KeyHash   []byte        `json:"keyHash"`   // blake2b(apiKey), 32 bytes
 	RateLimit uint32        `json:"rateLimit"` // 每分钟最大请求数, 0=无限制
 	IsActive  bool          `json:"isActive"`
@@ -128,7 +128,7 @@ type APIKeyInfo struct {
 
 // Settlement 单笔结算记录
 type Settlement struct {
-	User        model.UniAddr `json:"user"`
+	User        store.UniAddr `json:"user"`
 	ModelID     uint64        `json:"modelId"`
 	ProviderID  uint64        `json:"providerId"`
 	TokenIn     uint64        `json:"TokenIn"`
@@ -142,7 +142,7 @@ type Settlement struct {
 
 // DailyUsage 每日用量（已废弃，不再写入，保留类型用于兼容查询）
 type DailyUsage struct {
-	User        model.UniAddr `json:"user"`
+	User        store.UniAddr `json:"user"`
 	ProviderID  uint64        `json:"providerId"`
 	ModelID     uint64        `json:"modelId"`
 	Count       uint64        `json:"count"`
@@ -156,7 +156,7 @@ type DailyUsage struct {
 
 // RechargeRecord 单笔充值记录
 type RechargeRecord struct {
-	User   model.UniAddr `json:"user" idx:"exact"`
+	User   store.UniAddr `json:"user" idx:"exact"`
 	Amount uint64        `json:"amount"`
 	Time   int64         `json:"time"`
 }
@@ -177,7 +177,7 @@ type UserSettlementRecord struct {
 
 // SettlementRecord 单笔结算记录（Provider 视角）
 type ProviderSettlementRecord struct {
-	User        model.UniAddr `json:"user" idx:"exact"`
+	User        store.UniAddr `json:"user" idx:"exact"`
 	ModelID     uint64        `json:"modelId"`
 	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`

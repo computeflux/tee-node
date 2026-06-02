@@ -6,23 +6,22 @@ import (
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。
-func (d BatchMutation) ExecCall(call *model.ContractCall) error {
+func (d BatchMutation) ExecCall(call store.ContractCall) error {
 	batch := NewBatch(d.api)
 	m := BatchMutation{Batch: *batch}
 
-	methodSel := [4]byte(call.Method[:4])
-	args := call.Args
+	methodSel := [4]byte(call.GetMethod()[:4])
+	args := call.GetArgs()
 	switch methodSel {
 	case [4]byte{0xf9, 0x67, 0xdc, 0x1f}:
-		if err := model.RequireArgLen(args, 1, "execute_batch"); err != nil {
+		if err := store.RequireArgLen(args, 1, "execute_batch"); err != nil {
 			return err
 		}
-		calls, err := model.DecodeScaleArgBytes[[]BatchCall](args[0])
+		calls, err := store.DecodeScaleArgBytes[[]BatchCall](args[0])
 		if err != nil {
 			return fmt.Errorf("execute_batch: calls: %w", err)
 		}
@@ -35,15 +34,15 @@ func (d BatchMutation) ExecCall(call *model.ContractCall) error {
 }
 
 // ExecuteQuery 按 method 将字符串参数解析为合约查询实参，返回 SCALE 编码结果。
-func (q BatchQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
-	args := call.Args
-	methodSel := [4]byte(call.Method[:4])
+func (q BatchQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
+	args := call.GetArgs()
+	methodSel := [4]byte(call.GetMethod()[:4])
 	switch methodSel {
 	case [4]byte{0x4a, 0xa9, 0x02, 0xda}:
-		if err := model.RequireArgLen(args, 1, "status"); err != nil {
+		if err := store.RequireArgLen(args, 1, "status"); err != nil {
 			return nil, err
 		}
-		index, err := model.DecodeScaleArgBytes[uint64](args[0])
+		index, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return nil, fmt.Errorf("status: index: %w", err)
 		}
@@ -57,7 +56,7 @@ func (q BatchQuery) ExecQuery(call *model.ContractCall) ([]byte, error) {
 	}
 }
 
-func NewBatch(api model.ContractApi) *Batch {
+func NewBatch(api store.ContractApi) *Batch {
 	return &Batch{
 		api:    api,
 		status: &store.StoreMapping[uint64, uint16]{Namespace: "batch", KeyPrefix: "statu_"},

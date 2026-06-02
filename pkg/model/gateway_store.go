@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 	"time"
+
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ── Gateway 持久化类型 ───────────────────────────────────
@@ -13,14 +15,14 @@ type GatewayProviderInfo struct {
 }
 
 type GatewayTokenInfo struct {
-	ID        uint64  `json:"id"`
-	Owner     string  `json:"owner"`
-	Addr      UniAddr `json:"addr"` // 完整的链上地址（含 T+V），用于结算
-	Key       string  `json:"key"`  // bearer token value
-	RateLimit uint32  `json:"rateLimit"`
-	IsActive  bool    `json:"isActive"`
-	CreatedAt uint64  `json:"createdAt"`
-	ExpiresAt uint64  `json:"expiresAt"` // 过期时间（Unix 秒），0=永不过期
+	ID        uint64        `json:"id"`
+	Owner     string        `json:"owner"`
+	Addr      store.UniAddr `json:"addr"` // 完整的链上地址（含 T+V），用于结算
+	Key       string        `json:"key"`  // bearer token value
+	RateLimit uint32        `json:"rateLimit"`
+	IsActive  bool          `json:"isActive"`
+	CreatedAt uint64        `json:"createdAt"`
+	ExpiresAt uint64        `json:"expiresAt"` // 过期时间（Unix 秒），0=永不过期
 }
 
 // IsExpired 检查 token 是否已过期。
@@ -32,13 +34,13 @@ func (t *GatewayTokenInfo) IsExpired() bool {
 }
 
 type GatewayDailyUsage struct {
-	User        UniAddr `json:"user"`
-	ProviderID  uint64  `json:"providerId"`
-	ModelID     uint64  `json:"modelId"`
-	Count       uint16  `json:"count"`
-	TokenIn     uint64  `json:"TokenIn"`
-	TokenOut    uint64  `json:"tokensOut"`
-	CachedToken uint64  `json:"cachedToken"`
+	User        store.UniAddr `json:"user"`
+	ProviderID  uint64        `json:"providerId"`
+	ModelID     uint64        `json:"modelId"`
+	Count       uint16        `json:"count"`
+	TokenIn     uint64        `json:"TokenIn"`
+	TokenOut    uint64        `json:"tokensOut"`
+	CachedToken uint64        `json:"cachedToken"`
 }
 
 // SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。

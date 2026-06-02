@@ -1,194 +1,343 @@
 // Package wasm 提供 WASM 合约执行所需的 host functions。
-// Host functions 是 WASM 合约可以调用的系统 API，包括存储读写、区块信息获取等。
-//
-// 关键设计：linker 不能缓存。每次执行 WASM 合约时都需要创建新的 linker，
-// 因为 host functions 的闭包捕获了 api（包含当前区块的 txn、caller、height 等），
-// 而每个区块/每次调用的 api 都是不同的实例。
+// 使用 wazero (v1.12+) HostModuleBuilder，注册到独立 "runtime" 模块。
 package wasm
 
 import (
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+
+	"context"
+	"encoding/binary"
 	"fmt"
 
-	"github.com/bytecodealliance/wasmtime-go"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/tetratelabs/wazero"
+	wazapi "github.com/tetratelabs/wazero/api"
 )
 
-// newLinker 创建新的 linker 并注册 host functions。
-// 注意：每次调用 WASM 合约时都必须创建新的 linker，因为 api 实例每次不同。
-func newLinker(engine *wasmtime.Engine, api model.ContractApi) *wasmtime.Linker {
-	linker := wasmtime.NewLinker(engine)
-	registerHostFunctions(linker, api)
-	return linker
+var i32, i64 = wazapi.ValueTypeI32, wazapi.ValueTypeI64
+
+func readU32At(mem wazapi.Memory, off uint32) uint32 {
+	b, _ := mem.Read(off, 4)
+	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
 }
 
-// readWasmMemory 从 WASM 线性内存读取指定范围的数据。
-// WASM 合约调用 host function 时传入指针和长度，通过此函数读取。
-// Caller 实现了 wasmtime.Storelike 接口，可直接传给 Memory.UnsafeData。
-func readWasmMemory(caller *wasmtime.Caller, ptr, length int32) []byte {
-	if length <= 0 {
-		return nil
+const (
+	errOK          = uint64(0)
+	errMem         = uint64(0xFFFFFFFF)
+	errStorage     = uint64(0xFFFFFFFE)
+	errBufTooSmall = uint64(0xFFFFFFFD)
+	errKeyNotFound = uint64(0xFFFFFFFC)
+)
+
+// ── 序列化 ────────────────────────────────────────────────
+
+func serializeCallData(call store.ContractCall) []byte {
+	size := 4 + len(call.GetName()) + 4 + 4
+	for _, a := range call.GetArgs() {
+		size += 4 + len(a)
 	}
-	memExport := caller.GetExport("memory")
-	if memExport == nil || memExport.Memory() == nil {
-		return nil
+	buf := make([]byte, 0, size)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(call.GetName())))
+	buf = append(buf, call.GetName()...)
+	buf = append(buf, call.GetMethod()...)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(call.GetArgs())))
+	for _, a := range call.GetArgs() {
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(a)))
+		buf = append(buf, a...)
 	}
-	mem := memExport.Memory()
-	// Caller 实现 Storelike 接口（有 Context() 方法），可直接使用
-	data := mem.UnsafeData(caller)
-	if int(ptr)+int(length) > len(data) {
-		return nil
-	}
-	buf := make([]byte, length)
-	copy(buf, data[ptr:ptr+length])
 	return buf
 }
 
-// writeWasmMemory 向 WASM 线性内存写入数据。
-func writeWasmMemory(caller *wasmtime.Caller, ptr int32, data []byte) int32 {
-	memExport := caller.GetExport("memory")
-	if memExport == nil || memExport.Memory() == nil {
-		return -1
+func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]byte) uint32 {
+	buf := make([]byte, 0, 1024)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(keys)))
+	for _, k := range keys {
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(k)))
+		buf = append(buf, k...)
 	}
-	mem := memExport.Memory()
-	// Caller 实现 Storelike 接口，可直接使用
-	memData := mem.UnsafeData(caller)
-	if int(ptr)+len(data) > len(memData) {
-		return -1
+	mem.Write(keysPtr, buf)
+
+	buf = buf[:0]
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(vals)))
+	for _, v := range vals {
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(v)))
+		buf = append(buf, v...)
 	}
-	copy(memData[ptr:], data)
-	return 0
+	mem.Write(valsPtr, buf)
+
+	return uint32(len(keys))
 }
 
-// registerHostFunctions 向 linker 注册所有 host functions。
-// 这些函数供 WASM 合约调用，实现合约与链的交互。
-func registerHostFunctions(linker *wasmtime.Linker, api model.ContractApi) {
-	// ── 存储相关 ─────────────────────────────────────────────
-	// storage_get(key_ptr, key_len, val_ptr, val_len) -> i32
-	// 返回值: 0=成功, -1=内存错误, -2=存储错误, -3=值长度不足
-	linker.FuncNew("env", "storage_get",
-		wasmtime.NewFuncType([]*wasmtime.ValType{
-			wasmtime.NewValType(wasmtime.KindI32), // key_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // key_len
-			wasmtime.NewValType(wasmtime.KindI32), // val_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // val_len
-		}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI32)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			key := readWasmMemory(caller, args[0].I32(), args[1].I32())
+// ── Host Module ───────────────────────────────────────────
+
+func instantiateHostModule(ctx context.Context, rt wazero.Runtime, api store.ContractApi, callData []byte, result *[]byte) (wazapi.Module, error) {
+	b := rt.NewHostModuleBuilder("runtime")
+	txn := api.GetTxn()
+
+	if txn != nil {
+		registerStorage(b, txn)
+	}
+	registerContext(b, api)
+	registerIdentity(b, api)
+	registerCallIO(b, api, callData, result)
+	registerLog(b)
+
+	return b.Instantiate(ctx)
+}
+
+// ── 存储 ─────────────────────────────────────────────────
+
+func registerStorage(b wazero.HostModuleBuilder, txn store.StoreTx) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			key, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
 			if key == nil {
-				return []wasmtime.Val{wasmtime.ValI32(-1)}, nil
+				stack[0] = errMem
+				return
 			}
-
-			txn := api.GetTxn()
-			if txn == nil {
-				return []wasmtime.Val{wasmtime.ValI32(-2)}, nil
-			}
-
 			val, err := txn.Get(key)
-			if err != nil {
-				// 未找到视为空值
-				return []wasmtime.Val{wasmtime.ValI32(0)}, nil
+			if err != nil || len(val) == 0 {
+				stack[0] = errKeyNotFound
+				return
 			}
-
-			valLen := args[3].I32()
-			if valLen < int32(len(val)) {
-				return []wasmtime.Val{wasmtime.ValI32(-3)}, nil // 缓冲区太小
+			if uint32(stack[3]) < uint32(len(val)) {
+				stack[0] = errBufTooSmall
+				return
 			}
+			mem.Write(uint32(stack[2]), val)
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("storage_get")
 
-			if writeWasmMemory(caller, args[2].I32(), val) != 0 {
-				return []wasmtime.Val{wasmtime.ValI32(-1)}, nil
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			key, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			val, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
+			if key == nil || val == nil {
+				stack[0] = errMem
+				return
 			}
-			return []wasmtime.Val{wasmtime.ValI32(0)}, nil
-		},
-	)
-
-	// storage_set(key_ptr, key_len, val_ptr, val_len) -> i32
-	// 返回值: 0=成功, -1=内存错误, -2=存储错误
-	linker.FuncNew("env", "storage_set",
-		wasmtime.NewFuncType([]*wasmtime.ValType{
-			wasmtime.NewValType(wasmtime.KindI32), // key_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // key_len
-			wasmtime.NewValType(wasmtime.KindI32), // val_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // val_len
-		}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI32)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			key := readWasmMemory(caller, args[0].I32(), args[1].I32())
-			if key == nil {
-				return []wasmtime.Val{wasmtime.ValI32(-1)}, nil
-			}
-
-			val := readWasmMemory(caller, args[2].I32(), args[3].I32())
-			if val == nil {
-				return []wasmtime.Val{wasmtime.ValI32(-1)}, nil
-			}
-
-			txn := api.GetTxn()
-			if txn == nil {
-				return []wasmtime.Val{wasmtime.ValI32(-2)}, nil
-			}
-
 			if err := txn.Set(key, val); err != nil {
-				return []wasmtime.Val{wasmtime.ValI32(-2)}, nil
+				stack[0] = errStorage
+				return
 			}
-			return []wasmtime.Val{wasmtime.ValI32(0)}, nil
-		},
-	)
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("storage_set")
 
-	// ── 区块信息 ─────────────────────────────────────────────
-	linker.FuncNew("env", "get_height",
-		wasmtime.NewFuncType([]*wasmtime.ValType{}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI64)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			return []wasmtime.Val{wasmtime.ValI64(api.GetHeight())}, nil
-		},
-	)
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			key, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if key == nil {
+				stack[0] = errMem
+				return
+			}
+			if err := txn.Delete(key); err != nil {
+				stack[0] = errStorage
+				return
+			}
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("storage_delete")
 
-	linker.FuncNew("env", "get_block_time",
-		wasmtime.NewFuncType([]*wasmtime.ValType{}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI64)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			return []wasmtime.Val{wasmtime.ValI64(api.GetBlockTime())}, nil
-		},
-	)
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			prefix, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if prefix == nil {
+				stack[0] = errMem
+				return
+			}
+			keys, vals, err := txn.ListByPrefix(prefix)
+			if err != nil {
+				stack[0] = errStorage
+				return
+			}
+			n := encodeScanPairs(mem, uint32(stack[2]), uint32(stack[3]), keys, vals)
+			stack[0] = uint64(n)
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("storage_scan_prefix")
 
-	linker.FuncNew("env", "get_version",
-		wasmtime.NewFuncType([]*wasmtime.ValType{}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI32)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			return []wasmtime.Val{wasmtime.ValI32(int32(api.GetVersion()))}, nil
-		},
-	)
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			prefix, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if prefix == nil {
+				stack[0] = errMem
+				return
+			}
+			if err := txn.DeletekeysByPrefix(prefix); err != nil {
+				stack[0] = errStorage
+				return
+			}
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("storage_delete_prefix")
+}
 
-	// ── Caller 信息 ──────────────────────────────────────────
-	// get_caller(out_ptr, out_len) -> i32
-	linker.FuncNew("env", "get_caller",
-		wasmtime.NewFuncType([]*wasmtime.ValType{
-			wasmtime.NewValType(wasmtime.KindI32), // out_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // out_len
-		}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI32)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			// TODO: 将 caller 地址写入内存
-			return []wasmtime.Val{wasmtime.ValI32(-1)}, nil
-		},
-	)
+// ── 上下文 ───────────────────────────────────────────────
 
-	linker.FuncNew("env", "is_system",
-		wasmtime.NewFuncType([]*wasmtime.ValType{}, []*wasmtime.ValType{wasmtime.NewValType(wasmtime.KindI32)}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			var result int32 = 0
+func registerContext(b wazero.HostModuleBuilder, api store.ContractApi) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
+			stack[0] = uint64(api.GetHeight())
+		}),
+		nil, []wazapi.ValueType{i64},
+	).Export("get_height")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
+			stack[0] = uint64(api.GetBlockTime())
+		}),
+		nil, []wazapi.ValueType{i64},
+	).Export("get_block_time")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
+			stack[0] = uint64(api.GetVersion())
+		}),
+		nil, []wazapi.ValueType{i32},
+	).Export("get_version")
+}
+
+// ── 身份权限 ─────────────────────────────────────────────
+
+func registerIdentity(b wazero.HostModuleBuilder, api store.ContractApi) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			addr := api.GetCaller()
+			buf := make([]byte, 8+len(addr.V))
+			binary.LittleEndian.PutUint32(buf[0:4], addr.T)
+			binary.LittleEndian.PutUint32(buf[4:8], uint32(len(addr.V)))
+			copy(buf[8:], addr.V)
+			if uint32(stack[1]) < uint32(len(buf)) {
+				stack[0] = errBufTooSmall
+				return
+			}
+			mem.Write(uint32(stack[0]), buf)
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("get_caller")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			addr := api.GetSystemAccount()
+			buf := make([]byte, 8+len(addr.V))
+			binary.LittleEndian.PutUint32(buf[0:4], addr.T)
+			binary.LittleEndian.PutUint32(buf[4:8], uint32(len(addr.V)))
+			copy(buf[8:], addr.V)
+			if uint32(stack[1]) < uint32(len(buf)) {
+				stack[0] = errBufTooSmall
+				return
+			}
+			mem.Write(uint32(stack[0]), buf)
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("get_system_account")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
 			if api.CallbySystem() {
-				result = 1
+				stack[0] = 1
+			} else {
+				stack[0] = 0
 			}
-			return []wasmtime.Val{wasmtime.ValI32(result)}, nil
-		},
-	)
+		}),
+		nil, []wazapi.ValueType{i32},
+	).Export("is_system")
+}
 
-	// ── 日志 ────────────────────────────────────────────────
-	linker.FuncNew("env", "log",
-		wasmtime.NewFuncType([]*wasmtime.ValType{
-			wasmtime.NewValType(wasmtime.KindI32), // msg_ptr
-			wasmtime.NewValType(wasmtime.KindI32), // msg_len
-		}, []*wasmtime.ValType{}),
-		func(caller *wasmtime.Caller, args []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
-			// TODO: 读取内存中的日志消息并打印
-			fmt.Println("[WASM LOG] (not yet implemented)")
-			return nil, nil
-		},
-	)
+// ── 调用 IO ──────────────────────────────────────────────
+
+func registerCallIO(b wazero.HostModuleBuilder, api store.ContractApi, callData []byte, result *[]byte) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			if callData == nil {
+				stack[0] = 0
+				return
+			}
+			mem := mod.Memory()
+			outLen := uint32(stack[1])
+			if outLen < uint32(len(callData)) {
+				stack[0] = errBufTooSmall
+				return
+			}
+			mem.Write(uint32(stack[0]), callData)
+			stack[0] = uint64(len(callData))
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("get_call_data")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			if result == nil {
+				return
+			}
+			mem := mod.Memory()
+			data, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			*result = data
+		}),
+		[]wazapi.ValueType{i32, i32}, nil,
+	).Export("set_result")
+
+	// cross_contract_query: 委托引擎侧 native Go 合约执行（version=0），避免 WASM→host→WASM 循环
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			name, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			method, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
+			argsCount := int32(stack[4])
+			argsPtr := uint32(stack[5])
+			var args [][]byte
+			off := argsPtr
+			for i := int32(0); i < argsCount; i++ {
+				argLen := readU32At(mem, off)
+				off += 4
+				arg, _ := mem.Read(off, argLen)
+				off += argLen
+				args = append(args, arg)
+			}
+			call := &store.InContractCall{Name: name, Method: method, Args: args}
+			data, err := api.Query(store.UniAddr{}, call)
+			if err != nil {
+				stack[0] = uint64(0xFFFFFFFF)
+				return
+			}
+			outPtr := uint32(stack[6])
+			outLen := uint32(stack[7])
+			if outLen < uint32(len(data)) {
+				stack[0] = uint64(0xFFFFFFFD)
+				return
+			}
+			mem.Write(outPtr, data)
+			stack[0] = uint64(len(data))
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("cross_contract_query")
+}
+
+// ── 日志 ─────────────────────────────────────────────────
+
+func registerLog(b wazero.HostModuleBuilder) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			msg, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if msg != nil {
+				fmt.Printf("[WASM] %s\n", string(msg))
+			}
+		}),
+		[]wazapi.ValueType{i32, i32}, nil,
+	).Export("log")
 }

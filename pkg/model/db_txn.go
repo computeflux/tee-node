@@ -9,6 +9,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/cosmos/gogoproto/proto"
 )
 
@@ -219,7 +220,7 @@ func TxnSetProtoMessage[T proto.Message](txn *Txn, key []byte, value T) error {
 	return txn.Set(key, buf.Bytes())
 }
 
-func TxnSetCodec[T any](txn *Txn, namespace, key string, val T) error {
+func TxnSetCodec[T any](txn store.StoreTx, namespace, key string, val T) error {
 	bt, err := codec.Encode(val)
 	if err != nil {
 		return err
@@ -228,7 +229,7 @@ func TxnSetCodec[T any](txn *Txn, namespace, key string, val T) error {
 	return txn.Set([]byte(comboKey(namespace, key)), bt)
 }
 
-func TxnGetCodec[T any](txn *Txn, namespace, key string) (*T, error) {
+func TxnGetCodec[T any](txn store.StoreTx, namespace, key string) (*T, error) {
 	bt, err := txn.Get([]byte(comboKey(namespace, key)))
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {

@@ -4,11 +4,9 @@ package store
 
 import (
 	"encoding/hex"
-	"errors"
 	"strconv"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/cockroachdb/pebble"
 )
 
 // MappingKey 约束 mapping 的 key 类型：string、[]byte、uint64、uint32、uint16、uint8。
@@ -85,10 +83,10 @@ func (m *StoreMapping[K, V]) StorageKey(key K) []byte {
 	return m.fullKey(m.keySuffix(key))
 }
 
-func (m *StoreMapping[K, V]) getByFullKey(txn *Txn, fullKey []byte) ([]byte, error) {
+func (m *StoreMapping[K, V]) getByFullKey(txn StoreTx, fullKey []byte) ([]byte, error) {
 	v, err := txn.Get(fullKey)
 	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
+		if err.Error() == "pebble: not found" {
 			return nil, nil
 		}
 		return nil, err
@@ -97,22 +95,22 @@ func (m *StoreMapping[K, V]) getByFullKey(txn *Txn, fullKey []byte) ([]byte, err
 }
 
 // Get 按 key 读取 raw 值；不存在时返回 (nil, nil)。
-func (m *StoreMapping[K, V]) get(txn *Txn, key K) ([]byte, error) {
+func (m *StoreMapping[K, V]) get(txn StoreTx, key K) ([]byte, error) {
 	return m.getByFullKey(txn, m.StorageKey(key))
 }
 
 // Set 按 key 写入 raw 值。
-func (m *StoreMapping[K, V]) set(txn *Txn, key K, value []byte) error {
+func (m *StoreMapping[K, V]) set(txn StoreTx, key K, value []byte) error {
 	return txn.Set(m.StorageKey(key), value)
 }
 
 // Delete 按 key 删除。
-func (m *StoreMapping[K, V]) Delete(txn *Txn, key K) error {
+func (m *StoreMapping[K, V]) Delete(txn StoreTx, key K) error {
 	return txn.Delete(m.StorageKey(key))
 }
 
 // Contains 按 key 判断是否存在。
-func (m *StoreMapping[K, V]) Contains(txn *Txn, key K) (bool, error) {
+func (m *StoreMapping[K, V]) Contains(txn StoreTx, key K) (bool, error) {
 	v, err := m.get(txn, key)
 	if err != nil {
 		return false, err
@@ -122,12 +120,12 @@ func (m *StoreMapping[K, V]) Contains(txn *Txn, key K) (bool, error) {
 
 // DeleteByPrefix 删除该 mapping 下以 prefix 开头的所有 key（慎用，会扫前缀）。
 // prefix 为字符串后缀前缀，与 key 同编码方式，如 "0" 表示所有数字 key 中以 0 开头的。
-func (m *StoreMapping[K, V]) DeleteByPrefix(txn *Txn, prefix string) error {
+func (m *StoreMapping[K, V]) DeleteByPrefix(txn StoreTx, prefix string) error {
 	return txn.DeletekeysByPrefix(m.fullKey(prefix))
 }
 
 // GetCodec 按 key 读取并使用 codec.Decode 反序列化为 V；不存在时返回 (nil, nil)。
-func (m *StoreMapping[K, V]) Get(txn *Txn, key K) (*V, error) {
+func (m *StoreMapping[K, V]) Get(txn StoreTx, key K) (*V, error) {
 	bt, err := m.get(txn, key)
 	if err != nil {
 		return nil, err
@@ -144,7 +142,7 @@ func (m *StoreMapping[K, V]) Get(txn *Txn, key K) (*V, error) {
 }
 
 // GetOrDefault 按 key 读取；不存在时返回 defaultVal 的副本（非 nil）。
-func (m *StoreMapping[K, V]) GetOrDefault(txn *Txn, key K, defaultVal V) (V, error) {
+func (m *StoreMapping[K, V]) GetOrDefault(txn StoreTx, key K, defaultVal V) (V, error) {
 	val, err := m.Get(txn, key)
 	if err != nil {
 		var zero V
@@ -157,7 +155,7 @@ func (m *StoreMapping[K, V]) GetOrDefault(txn *Txn, key K, defaultVal V) (V, err
 }
 
 // SetCodec 使用 codec.Encode 序列化 v 并按 key 写入。
-func (m *StoreMapping[K, V]) Set(txn *Txn, key K, v V) error {
+func (m *StoreMapping[K, V]) Set(txn StoreTx, key K, v V) error {
 	bt, err := codec.Encode(v)
 	if err != nil {
 		return err
@@ -166,7 +164,7 @@ func (m *StoreMapping[K, V]) Set(txn *Txn, key K, v V) error {
 }
 
 // ListCodec 读取该 mapping 下所有值并使用 codec.Decode 反序列化为 V。
-func (m *StoreMapping[K, V]) List(txn *Txn) ([]K, []V, error) {
+func (m *StoreMapping[K, V]) List(txn StoreTx) ([]K, []V, error) {
 	keyPrefix := m.fullKey("")
 	keys, list, err := txn.ListByPrefix(keyPrefix)
 	if err != nil {

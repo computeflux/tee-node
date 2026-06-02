@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -304,7 +306,7 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 		return fmt.Errorf("encode settlements: %w", err)
 	}
 
-	method := model.MethodToSelector("SettleUsage")
+	method := store.MethodToSelector("SettleUsage")
 
 	// 使用固定 dedupKey，确保交易池中最多只有一个 settle_usage 调用。
 	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage")

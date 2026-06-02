@@ -13,11 +13,10 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/cockroachdb/pebble"
 )
 
 // ── Index key & ID type constraints ──────────────────────
@@ -44,25 +43,25 @@ func NewStoreIndex[ID IdxID](namespace, prefix string) *StoreIndex[ID] {
 }
 
 // Add 向索引中添加一条 (fieldValue → id) 记录。
-func (idx *StoreIndex[ID]) Add(txn *Txn, fieldValue string, id ID) error {
+func (idx *StoreIndex[ID]) Add(txn StoreTx, fieldValue string, id ID) error {
 	key := idx.makeKey(fieldValue, id)
 	return txn.Set([]byte(key), []byte{1})
 }
 
 // Remove 从索引中移除一条 (fieldValue → id) 记录。
-func (idx *StoreIndex[ID]) Remove(txn *Txn, fieldValue string, id ID) error {
+func (idx *StoreIndex[ID]) Remove(txn StoreTx, fieldValue string, id ID) error {
 	key := idx.makeKey(fieldValue, id)
 	return txn.Delete([]byte(key))
 }
 
 // GetIDs 查询单个 fieldValue 对应的所有 ID。
-func (idx *StoreIndex[ID]) GetIDs(txn *Txn, fieldValue string) ([]ID, error) {
+func (idx *StoreIndex[ID]) GetIDs(txn StoreTx, fieldValue string) ([]ID, error) {
 	prefix := idx.namespace + "_" + idx.prefix + fieldValue + "_"
 	return idx.scanPrefix(txn, prefix)
 }
 
 // GetIDsByKeys 查询多个 fieldValue 的并集（去重）。
-func (idx *StoreIndex[ID]) GetIDsByKeys(txn *Txn, fieldValues []string) ([]ID, error) {
+func (idx *StoreIndex[ID]) GetIDsByKeys(txn StoreTx, fieldValues []string) ([]ID, error) {
 	if len(fieldValues) == 0 {
 		return nil, nil
 	}
@@ -86,7 +85,7 @@ func (idx *StoreIndex[ID]) GetIDsByKeys(txn *Txn, fieldValues []string) ([]ID, e
 
 // GetIDsByRange 范围扫描查询：返回 [minStr, maxStr] 区间内所有 ID（包含边界）。
 // fieldValue 必须是固定宽度的字典序字符串（如左填充零的数值）。
-func (idx *StoreIndex[ID]) GetIDsByRange(txn *Txn, minStr, maxStr string) ([]ID, error) {
+func (idx *StoreIndex[ID]) GetIDsByRange(txn StoreTx, minStr, maxStr string) ([]ID, error) {
 	lower := idx.namespace + "_" + idx.prefix + minStr + "_"
 	upper := idx.namespace + "_" + idx.prefix + maxStr + "_"
 	// upper 的 keyUpperBound 保证覆盖 maxStr 的所有后缀
@@ -96,7 +95,7 @@ func (idx *StoreIndex[ID]) GetIDsByRange(txn *Txn, minStr, maxStr string) ([]ID,
 
 // GetAllIDs 返回索引中所有 ID（遍历所有键）。
 // 注意：这会在内部做前缀扫描，数据量大时谨慎使用。
-func (idx *StoreIndex[ID]) GetAllIDs(txn *Txn) ([]ID, error) {
+func (idx *StoreIndex[ID]) GetAllIDs(txn StoreTx) ([]ID, error) {
 	prefix := idx.namespace + "_" + idx.prefix
 	return idx.scanPrefix(txn, prefix)
 }
@@ -104,7 +103,7 @@ func (idx *StoreIndex[ID]) GetAllIDs(txn *Txn) ([]ID, error) {
 // scanPrefix 扫描指定 prefix 的所有 key，解析出 ID（自动去重）。
 // key 格式为 {namespace}_{prefix}{fieldValue}_{id}，suffix 可能是纯 id
 // 或 fieldValue_id；统一取最后一个 "_" 后的部分作为 ID。
-func (idx *StoreIndex[ID]) scanPrefix(txn *Txn, prefix string) ([]ID, error) {
+func (idx *StoreIndex[ID]) scanPrefix(txn StoreTx, prefix string) ([]ID, error) {
 	keys, _, err := txn.ListByPrefix([]byte(prefix))
 	if err != nil {
 		return nil, err
@@ -113,25 +112,28 @@ func (idx *StoreIndex[ID]) scanPrefix(txn *Txn, prefix string) ([]ID, error) {
 }
 
 // scanRange 扫描 [lower, upper) 范围内的所有 key，解析出 ID。
-func (idx *StoreIndex[ID]) scanRange(txn *Txn, lower, upper string) ([]ID, error) {
-	iter, err := txn.NewIter(&pebble.IterOptions{
-		LowerBound: []byte(lower),
-		UpperBound: []byte(upper),
-	})
+// 基于 ListByPrefix + 内存过滤，避免 pebble.Iterator 依赖，兼容 WASM 环境。
+func (idx *StoreIndex[ID]) scanRange(txn StoreTx, lower, upper string) ([]ID, error) {
+	// 使用公共前缀扫描，然后在内存中过滤范围
+	prefix := idx.namespace + "_" + idx.prefix
+	keys, _, err := txn.ListByPrefix([]byte(prefix))
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
 
-	prefixLen := len(lower) // lower = namespace + "_" + prefix + minStr + "_"
+	lowerB := []byte(lower)
+	upperB := []byte(upper)
 	var out []ID
 	seen := make(map[string]bool)
-	for iter.First(); iter.Valid(); iter.Next() {
-		k := iter.Key()
-		if len(k) <= prefixLen {
+	for _, k := range keys {
+		if bytes.Compare(k, lowerB) < 0 {
 			continue
 		}
-		suffix := string(k[prefixLen:])
+		if bytes.Compare(k, upperB) >= 0 {
+			continue
+		}
+		// 从 key 解析 ID：格式为 {namespace}_{prefix}{fieldValue}_{id}
+		suffix := string(k[len(prefix):])
 		lastIdx := strings.LastIndex(suffix, "_")
 		var idStr string
 		if lastIdx < 0 {

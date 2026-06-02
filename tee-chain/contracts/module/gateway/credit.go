@@ -4,12 +4,12 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ── Points ───────────────────────────────────────────────
 
-func (g GatewayMutation) Recharge(user model.UniAddr, amount uint64) error {
+func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64) error {
 	if !g.api.CallbySystem() {
 		return fmt.Errorf("Recharge: caller is not sudo account")
 	}
@@ -139,7 +139,7 @@ func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
 }
 
 // ── Query: Single ────────────────────────────────────────
-func (g GatewayQuery) GetCredit(user model.UniAddr) (int64, error) {
+func (g GatewayQuery) GetCredit(user store.UniAddr) (int64, error) {
 	c, err := g.credits.Get(g.api.GetTxn(), user)
 	if err != nil || c == nil {
 		return 0, nil
@@ -168,7 +168,7 @@ func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {
 // ── Query: History ───────────────────────────────────────
 
 // GetRechargeHistory 查询用户充值历史（按时间倒序）
-func (g GatewayQuery) GetRechargeHistory(user model.UniAddr, offset uint64, limit uint32) ([]RechargeRecord, error) {
+func (g GatewayQuery) GetRechargeHistory(user store.UniAddr, offset uint64, limit uint32) ([]RechargeRecord, error) {
 	_, records, err := g.rechargeHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, lim
 }
 
 // GetUserSettlementHistory 查询用户的结算历史（按时间倒序）
-func (g GatewayQuery) GetUserSettlementHistory(user model.UniAddr, offset uint64, limit uint32) ([]UserSettlementRecord, error) {
+func (g GatewayQuery) GetUserSettlementHistory(user store.UniAddr, offset uint64, limit uint32) ([]UserSettlementRecord, error) {
 	_, records, err := g.userSettlementHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
 	if err != nil {
 		return nil, err
