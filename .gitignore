@@ -33,7 +33,7 @@ Dockerfile.cross
 **/db/
 **/nohup.out
 **/dsecret
-contractgen
+/contractgen
 bin/
 hack/node0/
 hack/node1/
@@ -44,6 +44,6 @@ ext/experimental/dss
 
 node0.log
 
-ink-abi-ts-gen
-scale-codec-gen
+/ink-abi-ts-gen
+/scale-codec-gen
 **.wasm
