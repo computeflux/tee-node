@@ -404,8 +404,10 @@ func DecodeCompact(data []byte) (uint64, int) {
 }
 
 func ReverseBytes(b []byte) []byte {
-	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
-		b[i], b[j] = b[j], b[i]
+	out := make([]byte, len(b))
+	copy(out, b)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
 	}
-	return b
+	return out
 }
