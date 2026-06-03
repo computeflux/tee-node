@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
@@ -36,6 +37,52 @@ var ZeroAmount = NewU256(big.NewInt(0))
 
 func NewU256(i *big.Int) U256 {
 	return U256{Int: new(big.Int).Set(i)}
+}
+
+// Encode 实现 ScaleEncoder：SCALE U256 LE（256-bit 小端序）。
+func (u *U256) Encode() ([]byte, error) {
+	b := u.Int.Bytes()
+	buf := make([]byte, 32)
+	for i := 0; i < len(b); i++ {
+		buf[i] = b[len(b)-1-i]
+	}
+	return buf, nil
+}
+
+// Decode 实现 ScaleDecoder。
+func (u *U256) Decode(data []byte) (int, error) {
+	if len(data) < 32 {
+		return 0, fmt.Errorf("decode U256: need 32 bytes")
+	}
+	if u.Int == nil {
+		u.Int = new(big.Int)
+	}
+	u.Int.SetBytes(ReverseBytes(data[:32]))
+	return 32, nil
+}
+
+// Encode 实现 ScaleEncoder：SCALE UniAddr。
+func (a *UniAddr) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, a.T)
+	buf = EncodeCompact(buf, uint64(len(a.V)))
+	buf = append(buf, a.V...)
+	return buf, nil
+}
+
+// Decode 实现 ScaleDecoder。
+func (a *UniAddr) Decode(data []byte) (int, error) {
+	if len(data) < 4 {
+		return 0, fmt.Errorf("decode UniAddr.T: need 4 bytes")
+	}
+	a.T = binary.LittleEndian.Uint32(data[:4])
+	n, sz := DecodeCompact(data[4:])
+	if len(data) < 4+sz+int(n) {
+		return 0, fmt.Errorf("decode UniAddr.V: need %d bytes", 4+sz+int(n))
+	}
+	a.V = make([]byte, n)
+	copy(a.V, data[4+sz:4+sz+int(n)])
+	return 4 + sz + int(n), nil
 }
 
 func (a U256) Cmp(b U256) int { return a.Int.Cmp(b.Int) }

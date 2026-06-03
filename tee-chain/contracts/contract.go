@@ -34,9 +34,9 @@ func getWasmEngine() *wasm.Engine {
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
-	if version == wasm.NativeVersion {
-		return nativeQuery(call, runtime)
-	}
+	// if version == wasm.NativeVersion {
+	// 	return nativeQuery(call, runtime)
+	// }
 	return getWasmEngine().ExecuteQuery(version, call, runtime)
 }
 
@@ -50,13 +50,13 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 		return nil
 	}
 
-	if version == wasm.NativeVersion {
-		err := nativeMutation(call, runtime)
-		if selector == store.MethodToSelector("Init") && err == nil {
-			return SetContractInited(runtime.GetTxn(), string(call.GetName()))
-		}
-		return err
-	}
+	// if version == wasm.NativeVersion {
+	// 	err := nativeMutation(call, runtime)
+	// 	if selector == store.MethodToSelector("Init") && err == nil {
+	// 		return SetContractInited(runtime.GetTxn(), string(call.GetName()))
+	// 	}
+	// 	return err
+	// }
 
 	err := getWasmEngine().ExecuteMutation(version, call, runtime)
 	if selector == store.MethodToSelector("Init") && err == nil {

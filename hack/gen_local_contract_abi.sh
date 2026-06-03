@@ -9,8 +9,8 @@ GEN="$ROOT/tools/contractgen"
 # ── gov ────────────────────────────────────────────────────
 echo ">>> gov"
 go run "$GEN" \
-  -dir ./tee-chain/contracts/gov \
-  -out ./tee-chain/contracts/gov/gov_gen.go \
+  -dir ./tee-chain/contracts/module/gov \
+  -out ./tee-chain/contracts/module/gov/gov_gen.go \
   -mutation GovMutation \
   -query GovQuery \
   -struct Gov \
@@ -19,8 +19,8 @@ go run "$GEN" \
 # ── auth ───────────────────────────────────────────────────
 echo ">>> auth"
 go run "$GEN" \
-  -dir ./tee-chain/contracts/auth \
-  -out ./tee-chain/contracts/auth/auth_gen.go \
+  -dir ./tee-chain/contracts/module/auth \
+  -out ./tee-chain/contracts/module/auth/auth_gen.go \
   -mutation AuthMutation \
   -query AuthQuery \
   -struct Auth
@@ -28,8 +28,8 @@ go run "$GEN" \
 # ── gateway ────────────────────────────────────────────────
 echo ">>> gateway"
 go run "$GEN" \
-  -dir ./tee-chain/contracts/gateway \
-  -out ./tee-chain/contracts/gateway/gateway_gen.go \
+  -dir ./tee-chain/contracts/module/gateway \
+  -out ./tee-chain/contracts/module/gateway/gateway_gen.go \
   -mutation GatewayMutation \
   -query GatewayQuery \
   -struct Gateway
@@ -37,8 +37,8 @@ go run "$GEN" \
 # ── batch ──────────────────────────────────────────────────
 echo ">>> batch"
 go run "$GEN" \
-  -dir ./tee-chain/contracts/batch \
-  -out ./tee-chain/contracts/batch/batch_gen.go \
+  -dir ./tee-chain/contracts/module/batch \
+  -out ./tee-chain/contracts/module/batch/batch_gen.go \
   -mutation BatchMutation \
   -query BatchQuery \
   -struct Batch
@@ -47,9 +47,9 @@ go run "$GEN" \
 echo ">>> sync ABI to dapp"
 DAPP_CONTRACT_DIR="$ROOT/../dapp/public/contract"
 mkdir -p "$DAPP_CONTRACT_DIR"
-cp "$ROOT/tee-chain/abis/gateway.json" "$DAPP_CONTRACT_DIR/gateway.json"
-cp "$ROOT/tee-chain/abis/auth.json" "$DAPP_CONTRACT_DIR/auth.json"
-cp "$ROOT/tee-chain/abis/gov.json" "$DAPP_CONTRACT_DIR/gov.json"
+cp "$ROOT/tee-chain/contracts/abis/gateway.json" "$DAPP_CONTRACT_DIR/gateway.json"
+cp "$ROOT/tee-chain/contracts/abis/auth.json" "$DAPP_CONTRACT_DIR/auth.json"
+cp "$ROOT/tee-chain/contracts/abis/gov.json" "$DAPP_CONTRACT_DIR/gov.json"
 echo "Synced to $DAPP_CONTRACT_DIR"
 
 echo "Done."

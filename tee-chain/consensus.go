@@ -3,7 +3,9 @@ package teechain
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -64,6 +66,10 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 		state: state,
 	}
 
+	if err := ensureRuntimeV0(); err != nil {
+		return nil, err
+	}
+
 	if !light {
 		txCh, err := model.NewPersistChan[*model.BlockPartialSign]("back_tx", 1000)
 		if err != nil {
@@ -101,8 +107,32 @@ func (app *TeeChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*
 	util.LogWithGreen("InitChain")
 	app.initValidators(req.Validators)
 
-	// 初始化运行时版本系统
-	if err := InitRuntimeVersion(); err != nil {
+	// 从 genesis app_state 读取初始 WASM（若提供则直接使用，无需本地文件）
+	initRuntimeFromGenesis := func() []byte {
+		if len(req.AppStateBytes) == 0 {
+			return nil
+		}
+		var state struct {
+			Runtime struct {
+				Wasm string `json:"wasm"` // base64
+			} `json:"runtime"`
+		}
+		if err := json.Unmarshal(req.AppStateBytes, &state); err != nil {
+			util.LogError("InitChain parse app_state", err)
+			return nil
+		}
+		if state.Runtime.Wasm == "" {
+			return nil
+		}
+		b, err := base64.StdEncoding.DecodeString(state.Runtime.Wasm)
+		if err != nil {
+			util.LogError("InitChain decode wasm", err)
+			return nil
+		}
+		return b
+	}()
+
+	if err := InitRuntimeVersion(initRuntimeFromGenesis); err != nil {
 		return nil, fmt.Errorf("init runtime version: %w", err)
 	}
 

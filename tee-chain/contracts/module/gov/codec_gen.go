@@ -24,11 +24,11 @@ func (v *CallContent) Encode() ([]byte, error) {
 	{
 		b := v.Amount.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	return buf, nil
@@ -173,11 +173,11 @@ func (v *Member) Encode() ([]byte, error) {
 	{
 		b := v.Balance.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	return buf, nil
@@ -318,11 +318,11 @@ func (v *ProposalDeposit) Encode() ([]byte, error) {
 	{
 		b := v.Amount.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Block))
@@ -533,11 +533,11 @@ func (v *Spend) Encode() ([]byte, error) {
 	{
 		b := v.Amount.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	buf = binary.LittleEndian.AppendUint32(buf, v.TrackID)
@@ -618,21 +618,21 @@ func (v *TrackData) Encode() ([]byte, error) {
 	{
 		b := v.DecisionDeposit.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	{
 		b := v.MaxBalance.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	{
@@ -759,11 +759,11 @@ func (v *Vote) Encode() ([]byte, error) {
 	{
 		b := v.Pledge.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	if v.OpinionYes {
@@ -774,11 +774,11 @@ func (v *Vote) Encode() ([]byte, error) {
 	{
 		b := v.VoteWeight.Int.Bytes()
 		ln := len(b)
+		for i := 0; i < ln; i++ {
+			buf = append(buf, b[ln-1-i])
+		}
 		for i := 0; i < 32-ln; i++ {
 			buf = append(buf, 0)
-		}
-		for i := ln - 1; i >= 0; i-- {
-			buf = append(buf, b[i])
 		}
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.VoteBlock))

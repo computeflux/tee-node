@@ -39,8 +39,8 @@ func (m *StoreMapping[K, V]) keySuffix(key K) string {
 	case uint8:
 		return strconv.FormatUint(uint64(v), 10)
 	case UniAddr:
-		k := uniAddrEncodeToHex(v)
-		return k
+		b, _ := v.Encode()
+		return hex.EncodeToString(b)
 	default:
 		panic("unsupported MappingKey type")
 	}
@@ -68,7 +68,9 @@ func parseKeySuffix[K MappingKey](suffix string) K {
 		v, _ := strconv.ParseUint(suffix, 10, 8)
 		return any(uint8(v)).(K)
 	case UniAddr:
-		addr, _ := uniAddrDecodeFromHex(suffix)
+		b, _ := hex.DecodeString(suffix)
+		var addr UniAddr
+		addr.Decode(b)
 		return any(addr).(K)
 	default:
 		panic("unsupported MappingKey type")

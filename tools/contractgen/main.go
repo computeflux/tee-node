@@ -34,7 +34,7 @@ func main() {
 	// 构造函数生成相关参数
 	structName := flag.String("struct", "", "结构体名称，用于生成构造函数（如 DAO、Token等）")
 	ctorFunc := flag.String("ctor-func", "", "构造函数名，默认 New<Struct>")
-	ctorApiType := flag.String("ctor-api-type", "model.ContractApi", "构造函数的 API 参数类型")
+	ctorApiType := flag.String("ctor-api-type", "store.ContractApi", "构造函数的 API 参数类型")
 	ctorApiField := flag.String("ctor-api-field", "api", "结构体中 API 字段名")
 	ctorSkip := flag.Bool("ctor-skip", false, "不生成构造函数")
 	flag.Parse()
@@ -194,8 +194,7 @@ func main() {
 	fmt.Fprintf(&buf, "package %s\n\n", pkgName)
 	fmt.Fprintf(&buf, "import (\n")
 	fmt.Fprintf(&buf, "\t\"fmt\"\n\n")
-	fmt.Fprintf(&buf, "\t\"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec\"\n")
-	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/pkg/model\"\n")
+	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/tee-chain/contracts/store\"\n")
 	fmt.Fprintf(&buf, ")\n\n")
 
 	writeExecCall(&buf, *mutation, mutMethods, prefix, *structName)
@@ -460,7 +459,7 @@ func collectType(types map[string]bool, typ string) {
 	// 基础类型和自定义类型
 	switch typ {
 	case "bool", "uint32", "uint64", "[]byte",
-		"model.UniAddr", "model.Amount",
+		"model.UniAddr", "model.Amount", "store.UniAddr", "store.Amount",
 		"CallContent", "TrackData", "Member":
 		types[typ] = true
 	}
@@ -546,7 +545,7 @@ func snakeCase(s string) string {
 func writeExecCall(buf *bytes.Buffer, mutation string, methods []*methodSig, prefix string, structName string) {
 	shortName := strings.TrimPrefix(mutation, "*")
 	fmt.Fprintf(buf, "// ExecCall 解析 Tx.contract，再按 Method 与字符串参数列表调用对应变更。\n")
-	fmt.Fprintf(buf, "func (d %s) ExecCall(call *model.ContractCall) error {\n", shortName)
+	fmt.Fprintf(buf, "func (d %s) ExecCall(call store.ContractCall) error {\n", shortName)
 	if structName != "" {
 		fmt.Fprintf(buf, "\t%s := New%s(d.api)\n", strings.ToLower(structName), structName)
 		fmt.Fprintf(buf, "\tm := %s{%s: *%s}\n\n", shortName, structName, strings.ToLower(structName))
@@ -554,8 +553,8 @@ func writeExecCall(buf *bytes.Buffer, mutation string, methods []*methodSig, pre
 		fmt.Fprintf(buf, "\tdao := NewDAO(d.api)\n")
 		fmt.Fprintf(buf, "\tm := %s{gov: *dao}\n\n", shortName)
 	}
-	fmt.Fprintf(buf, "\tmethodSel := [4]byte(call.Method[:4])\n")
-	fmt.Fprintf(buf, "\targs := call.Args\n")
+	fmt.Fprintf(buf, "\tmethodSel := [4]byte(call.GetMethod()[:4])\n")
+	fmt.Fprintf(buf, "\targs := call.GetArgs()\n")
 	fmt.Fprintf(buf, "\tswitch methodSel {\n")
 	for _, m := range methods {
 		if m.isInit {
@@ -573,7 +572,7 @@ func writeExecCall(buf *bytes.Buffer, mutation string, methods []*methodSig, pre
 // Init：与 SCALE 约定一致——至少 3 个参数，第 4 个可选 defaultTrack（TrackData）。
 func writeInitCase(buf *bytes.Buffer, m *methodSig) {
 	fmt.Fprintf(buf, "\tcase [4]byte{0x%02x, 0x%02x, 0x%02x, 0x%02x}:\n", m.selector[0], m.selector[1], m.selector[2], m.selector[3])
-	fmt.Fprintf(buf, "\t\tif err := model.RequireArgLen(args, 3, %q); err != nil {\n", m.caseName)
+	fmt.Fprintf(buf, "\t\tif err := store.RequireArgLen(args, 3, %q); err != nil {\n", m.caseName)
 	fmt.Fprintf(buf, "\t\t\treturn err\n")
 	fmt.Fprintf(buf, "\t\t}\n")
 	p0 := m.params[0]
@@ -581,22 +580,22 @@ func writeInitCase(buf *bytes.Buffer, m *methodSig) {
 	p2 := m.params[2]
 	last := m.params[3]
 
-	fmt.Fprintf(buf, "\t\tmembers, err := model.DecodeScaleArgBytes[%s](args[0])\n", p0.underlying)
+	fmt.Fprintf(buf, "\t\tmembers, err := store.DecodeScaleArgBytes[%s](args[0])\n", p0.underlying)
 	fmt.Fprintf(buf, "\t\tif err != nil {\n")
 	fmt.Fprintf(buf, "\t\t\treturn fmt.Errorf(%q, err)\n", "init: members: %w")
 	fmt.Fprintf(buf, "\t\t}\n")
-	fmt.Fprintf(buf, "\t\tpub, err := model.DecodeScaleArgBytes[%s](args[1])\n", p1.underlying)
+	fmt.Fprintf(buf, "\t\tpub, err := store.DecodeScaleArgBytes[%s](args[1])\n", p1.underlying)
 	fmt.Fprintf(buf, "\t\tif err != nil {\n")
 	fmt.Fprintf(buf, "\t\t\treturn fmt.Errorf(%q, err)\n", "init: publicJoin: %w")
 	fmt.Fprintf(buf, "\t\t}\n")
-	fmt.Fprintf(buf, "\t\tsudo, err := model.DecodeScaleArgBytes[%s](args[2])\n", p2.underlying)
+	fmt.Fprintf(buf, "\t\tsudo, err := store.DecodeScaleArgBytes[%s](args[2])\n", p2.underlying)
 	fmt.Fprintf(buf, "\t\tif err != nil {\n")
 	fmt.Fprintf(buf, "\t\t\treturn fmt.Errorf(%q, err)\n", "init: sudoAccount: %w")
 	fmt.Fprintf(buf, "\t\t}\n")
 
 	fmt.Fprintf(buf, "\t\tvar dt *%s\n", last.underlying)
 	fmt.Fprintf(buf, "\t\tif len(args) >= 4 {\n")
-	fmt.Fprintf(buf, "\t\t\tt, err := model.DecodeScaleArgBytes[%s](args[3])\n", last.underlying)
+	fmt.Fprintf(buf, "\t\t\tt, err := store.DecodeScaleArgBytes[%s](args[3])\n", last.underlying)
 	fmt.Fprintf(buf, "\t\t\tif err != nil {\n")
 	fmt.Fprintf(buf, "\t\t\t\treturn fmt.Errorf(%q, err)\n", "init: defaultTrack: %w")
 	fmt.Fprintf(buf, "\t\t\t}\n")
@@ -612,7 +611,7 @@ func writeMutationCase(buf *bytes.Buffer, m *methodSig) {
 		return
 	}
 
-	fmt.Fprintf(buf, "\t\tif err := model.RequireArgLen(args, %d, %q); err != nil {\n", len(m.params), m.caseName)
+	fmt.Fprintf(buf, "\t\tif err := store.RequireArgLen(args, %d, %q); err != nil {\n", len(m.params), m.caseName)
 	fmt.Fprintf(buf, "\t\t\treturn err\n")
 	fmt.Fprintf(buf, "\t\t}\n")
 
@@ -620,7 +619,7 @@ func writeMutationCase(buf *bytes.Buffer, m *methodSig) {
 	for i := range m.params {
 		p := m.params[i]
 		dec := localName(p.name, i, "a")
-		fmt.Fprintf(buf, "\t\t%s, err := model.DecodeScaleArgBytes[%s](args[%d])\n", dec, p.underlying, i)
+		fmt.Fprintf(buf, "\t\t%s, err := store.DecodeScaleArgBytes[%s](args[%d])\n", dec, p.underlying, i)
 		errKey := errLabel(m, p, i)
 		if shortDecodeErr(m.goName, len(m.params)) {
 			fmt.Fprintf(buf, "\t\tif err != nil {\n")
@@ -668,9 +667,9 @@ func localName(paramName string, idx int, prefix string) string {
 func writeExecQuery(buf *bytes.Buffer, query string, methods []*methodSig, prefix string) {
 	shortName := strings.TrimPrefix(query, "*")
 	fmt.Fprintf(buf, "// ExecuteQuery 按 method 将字符串参数解析为合约查询实参，返回 SCALE 编码结果。\n")
-	fmt.Fprintf(buf, "func (q %s) ExecQuery(call *model.ContractCall) ([]byte, error) {\n", shortName)
-	fmt.Fprintf(buf, "\targs := call.Args\n")
-	fmt.Fprintf(buf, "\tmethodSel := [4]byte(call.Method[:4])\n")
+	fmt.Fprintf(buf, "func (q %s) ExecQuery(call store.ContractCall) ([]byte, error) {\n", shortName)
+	fmt.Fprintf(buf, "\targs := call.GetArgs()\n")
+	fmt.Fprintf(buf, "\tmethodSel := [4]byte(call.GetMethod()[:4])\n")
 	fmt.Fprintf(buf, "\tswitch methodSel {\n")
 
 	for _, m := range methods {
@@ -680,11 +679,11 @@ func writeExecQuery(buf *bytes.Buffer, query string, methods []*methodSig, prefi
 			fmt.Fprintf(buf, "\t\tif err != nil {\n")
 			fmt.Fprintf(buf, "\t\t\treturn nil, err\n")
 			fmt.Fprintf(buf, "\t\t}\n")
-			fmt.Fprintf(buf, "\t\treturn codec.Encode(out)\n")
+			fmt.Fprintf(buf, "\t\treturn store.ScaleEncode(out)\n")
 			continue
 		}
 
-		fmt.Fprintf(buf, "\t\tif err := model.RequireArgLen(args, %d, %q); err != nil {\n", len(m.params), m.caseName)
+		fmt.Fprintf(buf, "\t\tif err := store.RequireArgLen(args, %d, %q); err != nil {\n", len(m.params), m.caseName)
 		fmt.Fprintf(buf, "\t\t\treturn nil, err\n")
 		fmt.Fprintf(buf, "\t\t}\n")
 
@@ -692,7 +691,7 @@ func writeExecQuery(buf *bytes.Buffer, query string, methods []*methodSig, prefi
 		for i := range m.params {
 			p := m.params[i]
 			dec := localName(p.name, i, "a")
-			fmt.Fprintf(buf, "\t\t%s, err := model.DecodeScaleArgBytes[%s](args[%d])\n", dec, p.underlying, i)
+			fmt.Fprintf(buf, "\t\t%s, err := store.DecodeScaleArgBytes[%s](args[%d])\n", dec, p.underlying, i)
 			errKey := errLabel(m, p, i)
 			fmt.Fprintf(buf, "\t\tif err != nil {\n")
 			fmt.Fprintf(buf, "\t\t\treturn nil, fmt.Errorf(%q, err)\n", m.caseName+": "+errKey+": %w")
@@ -710,7 +709,7 @@ func writeExecQuery(buf *bytes.Buffer, query string, methods []*methodSig, prefi
 		fmt.Fprintf(buf, "\t\tif err != nil {\n")
 		fmt.Fprintf(buf, "\t\t\treturn nil, err\n")
 		fmt.Fprintf(buf, "\t\t}\n")
-		fmt.Fprintf(buf, "\t\treturn codec.Encode(out)\n")
+		fmt.Fprintf(buf, "\t\treturn store.ScaleEncode(out)\n")
 	}
 
 	fmt.Fprintf(buf, "\tdefault:\n")
@@ -924,15 +923,23 @@ func reflectParseStructTag(tag, key string) (map[string]string, bool) {
 	return result, true
 }
 
-// parseStoreMappingType 解析 *model.StoreMapping[K, V] 类型，返回 K, V 类型字符串
-func parseStoreMappingType(typ string) (key, val string, ok bool) {
-	// 匹配 *model.StoreMapping[K, V] 或 model.StoreMapping[K, V]
+// normalizeStoreType 剥离 store. 或 model. 包前缀，使解析器兼容两种前缀。
+func normalizeStoreType(typ string) string {
 	typ = strings.TrimSpace(typ)
 	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.StoreMapping[") || !strings.HasSuffix(typ, "]") {
+	for _, pkg := range []string{"model.", "store."} {
+		typ = strings.TrimPrefix(typ, pkg)
+	}
+	return typ
+}
+
+// parseStoreMappingType 解析 *model.StoreMapping[K, V] 类型，返回 K, V 类型字符串
+func parseStoreMappingType(typ string) (key, val string, ok bool) {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "StoreMapping[") || !strings.HasSuffix(typ, "]") {
 		return "", "", false
 	}
-	inner := typ[len("model.StoreMapping[") : len(typ)-1]
+	inner := typ[len("StoreMapping[") : len(typ)-1]
 	// 解析 [K, V] 中的 K 和 V，需要处理嵌套的 [] 和 ,
 	k, v, ok := parseTypePair(inner)
 	if !ok {
@@ -943,25 +950,21 @@ func parseStoreMappingType(typ string) (key, val string, ok bool) {
 
 // parseStoreValueType 解析 *model.StoreValue[T] 类型，返回 T 类型字符串
 func parseStoreValueType(typ string) (val string, ok bool) {
-	// 匹配 *model.StoreValue[T] 或 model.StoreValue[T]
-	typ = strings.TrimSpace(typ)
-	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.StoreValue[") || !strings.HasSuffix(typ, "]") {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "StoreValue[") || !strings.HasSuffix(typ, "]") {
 		return "", false
 	}
-	inner := typ[len("model.StoreValue[") : len(typ)-1]
+	inner := typ[len("StoreValue[") : len(typ)-1]
 	return strings.TrimSpace(inner), true
 }
 
 // parseStoreListType 解析 *model.StoreList[K, V] 类型，返回 K, V 类型字符串
 func parseStoreListType(typ string) (key, val string, ok bool) {
-	// 匹配 *model.StoreList[K, V] 或 model.StoreList[K, V]
-	typ = strings.TrimSpace(typ)
-	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.StoreList[") || !strings.HasSuffix(typ, "]") {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "StoreList[") || !strings.HasSuffix(typ, "]") {
 		return "", "", false
 	}
-	inner := typ[len("model.StoreList[") : len(typ)-1]
+	inner := typ[len("StoreList[") : len(typ)-1]
 	// 解析 [K, V] 中的 K 和 V
 	k, v, ok := parseTypePair(inner)
 	if !ok {
@@ -972,13 +975,11 @@ func parseStoreListType(typ string) (key, val string, ok bool) {
 
 // parseIndexedListType 解析 *model.IndexedList[K, V] 类型，返回 K, V 类型字符串
 func parseIndexedListType(typ string) (key, val string, ok bool) {
-	// 匹配 *model.IndexedList[K, V] 或 model.IndexedList[K, V]
-	typ = strings.TrimSpace(typ)
-	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.IndexedList[") || !strings.HasSuffix(typ, "]") {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "IndexedList[") || !strings.HasSuffix(typ, "]") {
 		return "", "", false
 	}
-	inner := typ[len("model.IndexedList[") : len(typ)-1]
+	inner := typ[len("IndexedList[") : len(typ)-1]
 	// 解析 [K, V] 中的 K 和 V
 	k, v, ok := parseTypePair(inner)
 	if !ok {
@@ -989,24 +990,21 @@ func parseIndexedListType(typ string) (key, val string, ok bool) {
 
 // parseIndexedStoreType 解析 *model.IndexedStore[ID, V] 或 model.IndexedStore[ID, V] 类型
 func parseIndexedStoreType(typ string) (idType, valType string, ok bool) {
-	typ = strings.TrimSpace(typ)
-	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.IndexedStore[") || !strings.HasSuffix(typ, "]") {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "IndexedStore[") || !strings.HasSuffix(typ, "]") {
 		return "", "", false
 	}
-	inner := typ[len("model.IndexedStore[") : len(typ)-1]
+	inner := typ[len("IndexedStore[") : len(typ)-1]
 	return parseTypePair(inner)
 }
 
 // parseStoreList2DType 解析 *model.StoreList2D[K1, Ix, V] 类型，返回 K1, Ix, V 类型字符串
 func parseStoreList2DType(typ string) (k1, ix, val string, ok bool) {
-	// 匹配 *model.StoreList2D[K1, Ix, V] 或 model.StoreList2D[K1, Ix, V]
-	typ = strings.TrimSpace(typ)
-	typ = strings.TrimPrefix(typ, "*")
-	if !strings.HasPrefix(typ, "model.StoreList2D[") || !strings.HasSuffix(typ, "]") {
+	typ = normalizeStoreType(typ)
+	if !strings.HasPrefix(typ, "StoreList2D[") || !strings.HasSuffix(typ, "]") {
 		return "", "", "", false
 	}
-	inner := typ[len("model.StoreList2D[") : len(typ)-1]
+	inner := typ[len("StoreList2D[") : len(typ)-1]
 	// 解析 [K1, Ix, V] 中的三个类型参数
 	// 先找到第一个逗号
 	depth := 0
@@ -1149,10 +1147,10 @@ func writeConstructor(buf *bytes.Buffer, structName, ctorName, pkgName string, f
 	fmt.Fprintf(buf, "\t\t%s: api,\n", apiField)
 	for _, f := range fields {
 		if f.isMapping {
-			fmt.Fprintf(buf, "\t\t%s: &model.StoreMapping[%s, %s]{Namespace: %q, KeyPrefix: %q},\n",
+			fmt.Fprintf(buf, "\t\t%s: &store.StoreMapping[%s, %s]{Namespace: %q, KeyPrefix: %q},\n",
 				f.mapping.name, f.mapping.keyType, f.mapping.valType, pkgName, f.mapping.keyPfx)
 		} else if f.isValue {
-			fmt.Fprintf(buf, "\t\t%s: &model.StoreValue[%s]{Namespace: %q, Key: %q},\n",
+			fmt.Fprintf(buf, "\t\t%s: &store.StoreValue[%s]{Namespace: %q, Key: %q},\n",
 				f.value.name, f.value.valType, pkgName, f.value.key)
 		} else if f.isList {
 			if f.list.isIndexed {
@@ -1161,14 +1159,14 @@ func writeConstructor(buf *bytes.Buffer, structName, ctorName, pkgName string, f
 				// keyPfx 已经以 _ 结尾，不需要再加
 				prefixNextID := f.list.keyPfx + "next_id"
 				prefixItems := f.list.keyPfx
-				fmt.Fprintf(buf, "\t\t%s: model.NewIndexedList[%s, %s](%q, %q, %q),\n",
+				fmt.Fprintf(buf, "\t\t%s: store.NewIndexedList[%s, %s](%q, %q, %q),\n",
 					f.list.name, f.list.keyType, f.list.valType, pkgName, prefixNextID, prefixItems)
 			} else {
 				// StoreList 使用 NewStoreList 构造函数
 				// prefixNextID: "{keyPfx}next_id", prefixItems: "{keyPfx}"
 				prefixNextID := f.list.keyPfx + "next_id"
 				prefixItems := f.list.keyPfx
-				fmt.Fprintf(buf, "\t\t%s: model.NewStoreList[%s, %s](%q, %q, %q),\n",
+				fmt.Fprintf(buf, "\t\t%s: store.NewStoreList[%s, %s](%q, %q, %q),\n",
 					f.list.name, f.list.keyType, f.list.valType, pkgName, prefixNextID, prefixItems)
 			}
 		} else if f.isList2D {
@@ -1179,12 +1177,12 @@ func writeConstructor(buf *bytes.Buffer, structName, ctorName, pkgName string, f
 			prefixK1Length := f.list2D.keyPfx + "k1_length_"
 			prefixK2NextID := f.list2D.keyPfx + "k2_next_"
 			prefixStore := f.list2D.keyPfx + "store_"
-			fmt.Fprintf(buf, "\t\t%s: model.NewStoreList2D[%s, %s, %s](%q, %q, %q, %q, %q),\n",
+			fmt.Fprintf(buf, "\t\t%s: store.NewStoreList2D[%s, %s, %s](%q, %q, %q, %q, %q),\n",
 				f.list2D.name, f.list2D.key1Type, f.list2D.indexType, f.list2D.valType,
 				pkgName, prefixK1ToID, prefixK1Length, prefixK2NextID, prefixStore)
 		} else if f.isIndexedStore {
 			// IndexedStore 使用 NewIndexedStore 构造函数
-			fmt.Fprintf(buf, "\t\t%s: model.NewIndexedStore[%s, %s](%q, %q),\n",
+			fmt.Fprintf(buf, "\t\t%s: store.NewIndexedStore[%s, %s](%q, %q),\n",
 				f.indexedStore.name, f.indexedStore.idType, f.indexedStore.valType,
 				pkgName, f.indexedStore.prefix)
 		}

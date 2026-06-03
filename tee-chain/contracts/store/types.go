@@ -55,3 +55,33 @@ func (o Option[T]) UnWrap() (T, error) {
 	}
 	return o.V, nil
 }
+
+// Encode 实现 ScaleEncoder（SCALE: None=0x00, Some(v)=0x01+v）。
+func (o *Option[T]) Encode() ([]byte, error) {
+	if !o.isSome {
+		return []byte{0x00}, nil
+	}
+	data, err := ScaleEncode(o.V)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte{0x01}, data...), nil
+}
+
+// Decode 实现 ScaleDecoder。
+func (o *Option[T]) Decode(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, fmt.Errorf("decode Option: empty")
+	}
+	if data[0] == 0x00 {
+		o.isSome = false
+		return 1, nil
+	}
+	o.isSome = true
+	if err := ScaleDecode(&o.V, data[1:]); err != nil {
+		return 0, err
+	}
+	// 无法精确计算消费字节数，ScaleDecode 不返回字节数
+	// 对于 SCALE，数据是紧凑的，消费全部剩余字节
+	return len(data), nil
+}
