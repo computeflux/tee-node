@@ -1,8 +1,8 @@
 // Package wasm 提供 WASM 合约执行引擎。
 // 使用 wazero（纯 Go WASM 运行时，零 CGO 依赖）执行 WASM 合约。
 //
-// 执行模式（Command）：模块导出 _start，InstantiateModule 时自动执行。
-// main() → execute() → set_result → exit(0) → 模块关闭（每次调用独立实例化）。
+// 执行模式（Reactor）：模块使用 -buildmode=c-shared 编译，导出 _initialize。
+// InstantiateModule 后宿主直接调用 execute(ptr, len)，无需 _start。
 package wasm
 
 import (
@@ -17,6 +17,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/tetratelabs/wazero"
+	wazapi "github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -33,9 +34,7 @@ type Engine struct {
 }
 
 type hostState struct {
-	api      store.ContractApi
-	callData []byte
-	result   []byte
+	api store.ContractApi
 }
 
 func NewEngine() *Engine {
@@ -124,16 +123,82 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 	defer e.mu.Unlock()
 
 	e.hostState.api = api
-	e.hostState.callData = serializeCallData(call, isQuery)
-	e.hostState.result = nil
+
+	// 构造 InContractCall 并 SCALE 编码
+	inCall := &store.InContractCall{
+		Name:   call.GetName(),
+		Method: call.GetMethod(),
+		Args:   call.GetArgs(),
+	}
+	callData, err := inCall.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("wasm encode call: %w", err)
+	}
 
 	e.ensureHost(ctx)
 	e.ensureWASI(ctx)
 
 	config := wazero.NewModuleConfig()
-	instance, _ := e.rt.InstantiateModule(ctx, mod, config)
-	if instance != nil {
-		instance.Close(ctx)
+	instance, err := e.rt.InstantiateModule(ctx, mod, config)
+	if err != nil {
+		return nil, fmt.Errorf("wasm instantiate: %w", err)
 	}
-	return e.hostState.result, nil
+	defer instance.Close(ctx)
+
+	// 显式调用 _initialize（reactor 模块必须初始化 Go runtime）
+	if initFn := instance.ExportedFunction("_initialize"); initFn != nil {
+		if _, err := initFn.Call(ctx); err != nil {
+			return nil, fmt.Errorf("wasm _initialize: %w", err)
+		}
+	}
+
+	// 获取 WASM 内存缓冲区地址
+	bufPtr, err := getWasmBuffer(ctx, instance)
+	if err != nil {
+		return nil, fmt.Errorf("wasm get_buffer: %w", err)
+	}
+
+	// 将 SCALE 编码的调用数据写入 WASM 线性内存
+	if !instance.Memory().Write(bufPtr, callData) {
+		return nil, fmt.Errorf("wasm: failed to write call data to memory")
+	}
+
+	// 直接调用导出的 execute(isQuery, ptr, len)，返回 (resultPtr << 32 | resultLen)
+	var isQueryFlag uint64
+	if isQuery {
+		isQueryFlag = 1
+	}
+	results, err := instance.ExportedFunction("execute").Call(ctx, isQueryFlag, uint64(bufPtr), uint64(len(callData)))
+	if err != nil {
+		return nil, fmt.Errorf("wasm execute: %w", err)
+	}
+
+	// 解析封装的结果: 高 32 位 = 指针, 低 32 位 = 长度
+	packed := results[0]
+	if packed == 0 {
+		return nil, nil
+	}
+	resultPtr := uint32(packed >> 32)
+	resultLen := uint32(packed & 0xFFFFFFFF)
+	result, ok := instance.Memory().Read(resultPtr, resultLen)
+	if !ok {
+		return nil, fmt.Errorf("wasm: failed to read result from memory")
+	}
+	return copyBytes(result), nil
+}
+
+// getWasmBuffer 调用 WASM 模块导出的 get_buffer 函数获取缓冲区地址。
+func getWasmBuffer(ctx context.Context, mod wazapi.Module) (uint32, error) {
+	fn := mod.ExportedFunction("get_buffer")
+	if fn == nil {
+		return 0, fmt.Errorf("get_buffer not exported")
+	}
+	results, err := fn.Call(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if len(results) == 0 {
+		return 0, fmt.Errorf("get_buffer returned no results")
+	}
+	return uint32(results[0]), nil
 }

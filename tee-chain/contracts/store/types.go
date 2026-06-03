@@ -1,38 +1,108 @@
 package store
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 )
 
-// StoreTx 抽象化存储操作接口。Native (*model.Txn) 和 WASM 均满足。
-type StoreTx interface {
-	Get(key []byte) ([]byte, error)
-	Set(key, value []byte) error
-	Delete(key []byte) error
-	ListByPrefix(prefix []byte) ([][]byte, [][]byte, error)
-	DeletekeysByPrefix(prefix []byte) error
-	Commit() error
-	Rollback() error
+// -----------------------------------------------------------------------------
+// 对齐的合约基础类型（SCALE 固定宽字节 / U256）。
+// -----------------------------------------------------------------------------
+
+// Address
+// scale-codec-gen:generate
+type UniAddr struct {
+	T uint32
+	V []byte
 }
 
-// 不提供 Txn 别名 — 新代码使用 StoreTx 接口，测试文件自行 import model.Txn。
-
-func ComboNamespaceKey(namespace, key string) []byte {
-	return []byte(namespace + "_" + key)
+func (a UniAddr) String() string {
+	return fmt.Sprint(a.T) + ":" + hex.EncodeToString(a.V)
 }
 
-func keyUpperBound(b []byte) []byte {
-	end := make([]byte, len(b))
-	copy(end, b)
-	for i := len(end) - 1; i >= 0; i-- {
-		end[i] = end[i] + 1
-		if end[i] != 0 {
-			return end[:i+1]
-		}
+// Amount 链上金额类型。
+type Amount = U256
+
+// U256 256 位无符号整数，内部使用 big.Int。
+type U256 struct {
+	Int *big.Int
+}
+
+var ZeroAmount = NewU256(big.NewInt(0))
+
+// NewU256 creates a new U256 type
+func NewU256(i *big.Int) U256 {
+	return U256{i}
+}
+
+// Decode implements ScaleDecoder: decodes 32 bytes (little-endian) into a U256.
+func (i *U256) Decode(data []byte) (int, error) {
+	if len(data) < 32 {
+		return 0, fmt.Errorf("decode U256: need 32 bytes, got %d", len(data))
 	}
-	return append(b, 0x00)
+	bs := make([]byte, 32)
+	copy(bs, data[:32])
+
+	// reverse bytes, scale uses little-endian encoding, big.int's bytes are expected in big-endian
+	Reverse(bs)
+
+	b, err := UintBytesToBigInt(bs)
+	if err != nil {
+		return 0, err
+	}
+
+	// deal with zero differently to get a nil representation (this is how big.Int deals with 0)
+	if b.Sign() == 0 {
+		*i = U256{big.NewInt(0)}
+		return 32, nil
+	}
+
+	*i = U256{b}
+	return 32, nil
 }
+
+// Encode implements ScaleEncoder: encodes U256 as 32 bytes (little-endian).
+func (i *U256) Encode() ([]byte, error) {
+	if i.Int == nil {
+		return make([]byte, 32), nil
+	}
+
+	b, err := BigIntToUintBytes(i.Int, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	// reverse bytes, scale uses little-endian encoding, big.int's bytes are expected in big-endian
+	Reverse(b)
+
+	return b, nil
+}
+
+func (a U256) Cmp(b U256) int { return a.Int.Cmp(b.Int) }
+func (a U256) String() string { return a.Int.String() }
+
+func AmountAdd(a, b Amount) Amount {
+	return NewU256(new(big.Int).Add(a.Int, b.Int))
+}
+
+func AmountSub(a, b Amount) Amount {
+	return NewU256(new(big.Int).Sub(a.Int, b.Int))
+}
+
+func AmountMul(a, b Amount) Amount {
+	return NewU256(new(big.Int).Mul(a.Int, b.Int))
+}
+
+func AmountDiv(a, b Amount) Amount {
+	return NewU256(new(big.Int).Div(a.Int, b.Int))
+}
+
+// BlockNumber 区块高度（与 Rust BlockNumber = u32 一致）。
+type BlockNumber uint32
+
+// Bytes 为存储/消息中的变长字节，SCALE 为 compact 长度前缀 + 负载；语义同 types.rs 的 Vec<u8>。
+type Bytes []byte
 
 // Option 类似 Rust Option，用于可空字段的 SCALE 编解码。
 type Option[T any] struct {
@@ -87,40 +157,4 @@ func (o *Option[T]) Decode(data []byte) (int, error) {
 	// 无法精确计算消费字节数，ScaleDecode 不返回字节数
 	// 对于 SCALE，数据是紧凑的，消费全部剩余字节
 	return len(data), nil
-}
-
-// BigIntToUintBytes encodes the given big.Int to a big endian encoded unsigned integer byte slice of the given byte
-// length, returning an error if the given big.Int would be bigger than the maximum number the byte slice of the given
-// length could hold
-func BigIntToUintBytes(i *big.Int, bytelen int) ([]byte, error) {
-	if i.Sign() < 0 {
-		return nil, fmt.Errorf("cannot encode a negative big.Int into an unsigned integer")
-	}
-
-	max := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(int64(bytelen*8)), nil)
-	if i.CmpAbs(max) > 0 {
-		return nil, fmt.Errorf("cannot encode big.Int to []byte: given big.Int exceeds highest number "+
-			"%v for an uint with %v bits", max, bytelen*8)
-	}
-
-	res := make([]byte, bytelen)
-
-	bs := i.Bytes()
-	copy(res[len(res)-len(bs):], bs)
-	return res, nil
-}
-
-// UintBytesToBigInt decodes the given byte slice containing a big endian encoded unsigned integer to a big.Int
-func UintBytesToBigInt(b []byte) (*big.Int, error) {
-	if len(b) == 0 {
-		return nil, fmt.Errorf("cannot decode an empty byte slice")
-	}
-
-	return big.NewInt(0).SetBytes(b), nil
-}
-
-func Reverse(b []byte) {
-	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
-		b[i], b[j] = b[j], b[i]
-	}
 }

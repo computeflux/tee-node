@@ -103,6 +103,11 @@ func main() {
 	// Set DKG to teeChain
 	teeChain.SetDKG(dkgIns)
 
+	if err := teechain.LoadRuntimeForDebug(); err != nil {
+		fmt.Println("LoadRuntimeForDebug:", err)
+		os.Exit(1)
+	}
+
 	// load chains
 	err = teeChain.LoadChains()
 	if err != nil {

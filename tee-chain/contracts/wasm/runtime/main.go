@@ -3,25 +3,17 @@
 package main
 
 import (
-	"encoding/binary"
 	"unsafe"
 
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gov"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
-var buf [8192]byte
+const bufSize = 128 * 1024 // 128KB
+
+var buf [bufSize]byte
 
 func bufPtr() uint32 { return uint32(uintptr(unsafe.Pointer(&buf[0]))) }
-
-//go:wasmimport runtime get_call_data
-func getCallData(outPtr, outLen int32) int32
-
-//go:wasmimport runtime set_result
-func setResult(ptr, len int32)
 
 //go:wasmimport runtime get_height
 func hostGetHeight() int64
@@ -29,94 +21,51 @@ func hostGetHeight() int64
 //go:wasmexport ping
 func ping() int32 { return 1 }
 
-func main() {
-	// Go wasip1 仅支持 command 模式（_start → 执行 → exit）。
-	// main() 中直接调用 execute()，让合约执行发生在 _start 期间。
-	// execute() 通过 runtime.set_result 将结果写回宿主，
-	// 之后 Go runtime 调用 proc_exit 关闭模块（每次查询独立实例化）。
-	execute()
-}
+//go:wasmexport get_buffer
+func get_buffer() uint32 { return bufPtr() }
 
+// 返回值: 高 32 位 = 结果指针, 低 32 位 = 结果长度; (0, 0) 表示无结果
+//
 //go:wasmexport execute
-func execute() {
-	bp := bufPtr()
-	n := getCallData(int32(bp), int32(len(buf)))
-	if n <= 1 {
-		return
+func execute(isQuery uint32, callDataPtr uint32, callDataLen uint32) uint64 {
+	if callDataLen == 0 {
+		return 0
 	}
-	data := buf[:n]
+	// 直接从 WASM 内存读取 SCALE 编码的 InContractCall
+	data := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(callDataPtr))), int(callDataLen))
 
-	// 第一个字节: 0x00=Query, 0x01=Mutation
-	isQuery := data[0] == 0x00
-	off := 1
-
-	nameLen := binary.LittleEndian.Uint32(data[off:])
-	off += 4
-	name := string(data[off : off+int(nameLen)])
-	off += int(nameLen)
-	method := data[off : off+4]
-	off += 4
-	argsCount := binary.LittleEndian.Uint32(data[off:])
-	off += 4
-	args := make([][]byte, argsCount)
-	for i := uint32(0); i < argsCount; i++ {
-		argLen := binary.LittleEndian.Uint32(data[off:])
-		off += 4
-		args[i] = data[off : off+int(argLen)]
-		off += int(argLen)
+	var call store.InContractCall
+	if _, err := call.Decode(data); err != nil {
+		bp := bufPtr()
+		n := copy(buf[:], err.Error())
+		return packResult(bp, uint32(n))
 	}
 
 	rt := &wasmRuntime{txn: &WasmTxn{}, height: hostGetHeight()}
-	call := &store.InContractCall{Name: []byte(name), Method: method, Args: args}
 
 	var result []byte
 	var err error
-	if isQuery {
-		result, err = dispatchQuery(name, method, args, rt, call)
+	if isQuery != 0 {
+		result, err = module.Query(&call, rt)
 	} else {
-		err = dispatchMutation(name, call, rt)
+		err = module.Mutation(&call, rt)
 	}
 	if err != nil {
 		result = []byte(err.Error())
 	}
-	setResult(int32(bp), int32(copy(buf[:], result)))
+	if len(result) == 0 {
+		return 0
+	}
+	bp := bufPtr()
+	return packResult(bp, uint32(copy(buf[:], result)))
 }
 
-func dispatchQuery(name string, method []byte, args [][]byte, rt *wasmRuntime, call store.ContractCall) ([]byte, error) {
-	switch name {
-	case "gov":
-		ins := gov.NewGov(rt)
-		return gov.GovQuery{Gov: *ins}.ExecQuery(call)
-	case "auth":
-		ins := auth.NewAuth(rt)
-		return auth.AuthQuery{Auth: *ins}.ExecQuery(call)
-	case "gateway":
-		ins := gateway.NewGateway(rt)
-		return gateway.GatewayQuery{Gateway: *ins}.ExecQuery(call)
-	case "batch":
-		ins := batch.NewBatch(rt)
-		return batch.BatchQuery{Batch: *ins}.ExecQuery(call)
-	}
-	return nil, nil
+// packResult 将 (ptr, len) 打包为 uint64: 高 32 位 ptr, 低 32 位 len
+func packResult(ptr, length uint32) uint64 {
+	return uint64(ptr)<<32 | uint64(length)
 }
 
-func dispatchMutation(name string, call store.ContractCall, rt *wasmRuntime) error {
-	switch name {
-	case "gov":
-		ins := gov.NewGov(rt)
-		return gov.GovMutation{Gov: *ins}.ExecCall(call)
-	case "auth":
-		ins := auth.NewAuth(rt)
-		return auth.AuthMutation{Auth: *ins}.ExecCall(call)
-	case "gateway":
-		ins := gateway.NewGateway(rt)
-		return gateway.GatewayMutation{Gateway: *ins}.ExecCall(call)
-	case "batch":
-		ins := batch.NewBatch(rt)
-		return batch.BatchMutation{Batch: *ins}.ExecCall(call)
-	}
-	return nil
-}
+// ── 运行时适配层 ──────────────────────────────────────────
 
 type wasmRuntime struct {
 	txn    store.StoreTx
@@ -139,13 +88,13 @@ func (r *wasmRuntime) GetSystemAccount() store.UniAddr {
 func (r *wasmRuntime) CallbySystem() bool { return isSystem() != 0 }
 
 func (r *wasmRuntime) Query(target store.UniAddr, call store.ContractCall) ([]byte, error) {
-	return doCrossContractQuery(call)
+	return module.Query(call, r)
 }
 
 func (r *wasmRuntime) Call(target store.UniAddr, call store.ContractCall) ([]byte, error) {
-	return doCrossContractCall(call)
+	return nil, module.Mutation(call, r)
 }
 
 func (r *wasmRuntime) QueryNative(call store.ContractCall) ([]byte, error) {
-	return doCrossContractQuery(call)
+	return module.Query(call, r)
 }

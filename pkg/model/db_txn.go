@@ -29,6 +29,7 @@ func (txn *Txn) GetKey(namespace, key string, value proto.Message) ([]byte, erro
 }
 
 func (txn *Txn) Set(key, value []byte) error {
+	// fmt.Println("----------------------txn set ==>  ", string(key))
 	val, err := util.SealWithProductKey(value, nil)
 	if err != nil {
 		return err
@@ -252,4 +253,8 @@ func (txn *Txn) Rollback() error {
 
 func (txn *Txn) Commit() error {
 	return txn.in.Commit(pebble.Sync)
+}
+
+func (txn *Txn) Count() uint32 {
+	return txn.in.Count()
 }

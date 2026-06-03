@@ -1,12 +1,14 @@
 package teechain
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 const (
@@ -16,12 +18,13 @@ const (
 	RuntimeDefaultVersion = uint32(0)
 )
 
-// ensureRuntimeV0 启动时校验 genesis.json 包含 app_state.runtime.wasm。
-func ensureRuntimeV0() error {
+// InitRuntimeV0 启动时校验 genesis.json 包含 app_state.runtime.wasm。
+func CheckRuntimeV0() error {
 	data, err := os.ReadFile("./token_chain_data/config/genesis.json")
 	if err != nil {
 		return fmt.Errorf("read genesis.json: %w", err)
 	}
+
 	var genesis struct {
 		AppState struct {
 			Runtime struct {
@@ -32,10 +35,42 @@ func ensureRuntimeV0() error {
 	if err := json.Unmarshal(data, &genesis); err != nil {
 		return fmt.Errorf("parse genesis.json: %w", err)
 	}
+
 	if genesis.AppState.Runtime.Wasm == "" {
 		return fmt.Errorf("genesis.json missing app_state.runtime.wasm")
 	}
+
 	return nil
+}
+
+func LoadRuntimeForDebug() error {
+	data, err := os.ReadFile("./token_chain_data/config/genesis.json")
+	if err != nil {
+		return fmt.Errorf("read genesis.json: %w", err)
+	}
+
+	var genesis struct {
+		AppState struct {
+			Runtime struct {
+				Wasm string `json:"wasm"`
+			} `json:"runtime"`
+		} `json:"app_state"`
+	}
+	if err := json.Unmarshal(data, &genesis); err != nil {
+		return fmt.Errorf("parse genesis.json: %w", err)
+	}
+
+	if genesis.AppState.Runtime.Wasm == "" {
+		return fmt.Errorf("genesis.json missing app_state.runtime.wasm")
+	}
+
+	b, err := base64.StdEncoding.DecodeString(genesis.AppState.Runtime.Wasm)
+	if err != nil {
+		util.LogError("InitChain decode wasm", err)
+		return err
+	}
+
+	return createRuntimeV0(b, "debug")
 }
 
 // InitRuntimeVersion 初始化运行时版本系统（在 InitChain 或首次启动时调用）。
@@ -55,12 +90,15 @@ func createRuntimeV0(wasmBytes []byte, desc string) error {
 		WasmBytes:        wasmBytes,
 		Description:      desc,
 	}
+
 	if err := SetRuntimeVersionInfo(info); err != nil {
 		return err
 	}
+
 	if err := model.SetCodec("", RuntimeVersionKey, RuntimeDefaultVersion); err != nil {
 		return err
 	}
+
 	if err := model.SetCodec("", RuntimeAtHeightPrefix+"0", RuntimeDefaultVersion); err != nil {
 		return err
 	}

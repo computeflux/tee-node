@@ -673,17 +673,17 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 func NewGateway(api store.ContractApi) *Gateway {
 	return &Gateway{
 		api:                   api,
-		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credits_"},
-		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_credit_useds_"},
-		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "v2_models_next_id", "v2_models_"),
-		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "v2_providers_next_id", "v2_providers_"),
-		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_by_owner_"},
-		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v2_provider_credit_"},
-		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "v2_api_key_"),
-		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "v2_recharge_history_k1_to_id_", "v2_recharge_history_k1_length_", "v2_recharge_history_k2_next_", "v2_recharge_history_store_"),
-		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v4_settlement_history_k1_to_id_", "v4_settlement_history_k1_length_", "v4_settlement_history_k2_next_", "v4_settlement_history_store_"),
-		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v4_user_settlement_history_k1_to_id_", "v4_user_settlement_history_k1_length_", "v4_user_settlement_history_k2_next_", "v4_user_settlement_history_store_"),
-		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v5_settled_nonces_"},
+		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_credits_"},
+		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_credit_useds_"},
+		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "v9_models_next_id", "v9_models_"),
+		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "v9_providers_next_id", "v9_providers_"),
+		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_provider_by_owner_"},
+		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v9_provider_credit_"},
+		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "v9_api_key_"),
+		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "v9_recharge_history_k1_to_id_", "v9_recharge_history_k1_length_", "v9_recharge_history_k2_next_", "v9_recharge_history_store_"),
+		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v9_settlement_history_k1_to_id_", "v9_settlement_history_k1_length_", "v9_settlement_history_k2_next_", "v9_settlement_history_store_"),
+		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v9_user_settlement_history_k1_to_id_", "v9_user_settlement_history_k1_length_", "v9_user_settlement_history_k2_next_", "v9_user_settlement_history_store_"),
+		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_settled_nonces_"},
 	}
 }
 

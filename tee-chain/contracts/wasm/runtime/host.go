@@ -41,13 +41,9 @@ func getSystemAccount(outPtr, outLen int32) int32
 //go:wasmimport runtime is_system
 func isSystem() int32
 
-//go:wasmimport runtime cross_contract_query
-func crossContractQuery(namePtr, nameLen int32, method int32, argsCount, argsPtr, outPtr, outLen int32) int32
+const txnBufSize = 128 * 1024 // 128KB
 
-//go:wasmimport runtime cross_contract_call
-func crossContractCall(namePtr, nameLen int32, method int32, argsCount, argsPtr, outPtr, outLen int32) int32
-
-var txnBuf [8192]byte
+var txnBuf [txnBufSize]byte
 
 // storageError 表示 storage host function 返回的错误码。
 type storageError struct {
@@ -66,11 +62,11 @@ func txnBufPtr() int32 {
 type WasmTxn struct{}
 
 func (txn *WasmTxn) Get(key []byte) ([]byte, error) {
-	// 使用 txnBuf 的前 4KB 作为 key，后 4KB 作为 value 输出区
+	// 使用 txnBuf 的前 64KB 作为 key，后 64KB 作为 value 输出区
 	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
-	vp := kp + 4096
-	ret := storageGet(kp, int32(len(key)), vp, int32(len(txnBuf)-4096))
+	vp := kp + 65536
+	ret := storageGet(kp, int32(len(key)), vp, int32(len(txnBuf)-65536))
 	if ret <= 0 {
 		return nil, nil
 	}
@@ -105,7 +101,7 @@ func (txn *WasmTxn) ListByPrefix(prefix []byte) (keys, vals [][]byte, err error)
 	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], prefix)
 	pp := kp
-	vp := kp + 4096 // 前 4KB 存放 key 列表，后 4KB 存放 val 列表
+	vp := kp + 65536 // 前 64KB 存放 key 列表，后 64KB 存放 val 列表
 	n := storageScanPrefix(pp, int32(len(prefix)), kp, vp)
 	if n <= 0 {
 		return nil, nil, nil
@@ -153,101 +149,26 @@ func readU32At(off uint32) uint32 {
 	return uint32(txnBuf[off]) | uint32(txnBuf[off+1])<<8 | uint32(txnBuf[off+2])<<16 | uint32(txnBuf[off+3])<<24
 }
 
-// ── 上下文辅助 ──────────────────────────────────────────────
+// ── 身份辅助 ──────────────────────────────────────────────
 
-// readUniAddrFrom 从 host function 读取 UniAddr 到 addr。
-func readUniAddrFrom(addr *store.UniAddr, fn func(int32, int32) int32) {
-	bp := txnBufPtr()
-	if fn(bp, 40) != 0 {
-		return
-	}
-	addr.T = readU32At(uint32(bp))
-	dLen := readU32At(uint32(bp) + 4)
-	if dLen > 0 && dLen <= 32 {
-		addr.V = make([]byte, dLen)
-		copy(addr.V, txnBuf[8:8+dLen])
-	}
-}
-
-// TinyGo 不允许 wasmimport 函数作为值传递，所以提供包装。
 func readCaller() store.UniAddr {
 	var addr store.UniAddr
-	readUniAddrFrom(&addr, func(p, l int32) int32 { return getCaller(p, l) })
+	bp := txnBufPtr()
+	n := getCaller(bp, int32(len(txnBuf)))
+	if n <= 0 {
+		return addr
+	}
+	addr.Decode(txnBuf[:n])
 	return addr
 }
 
 func readSystemAccount() store.UniAddr {
 	var addr store.UniAddr
-	readUniAddrFrom(&addr, func(p, l int32) int32 { return getSystemAccount(p, l) })
+	bp := txnBufPtr()
+	n := getSystemAccount(bp, int32(len(txnBuf)))
+	if n <= 0 {
+		return addr
+	}
+	addr.Decode(txnBuf[:n])
 	return addr
 }
-
-// ── 跨合约调用辅助 ──────────────────────────────────────────
-
-// doCrossContractQuery 通过 host function 发起跨合约查询。
-func doCrossContractQuery(call store.ContractCall) ([]byte, error) {
-	return marshalAndCall(call, true)
-}
-
-// doCrossContractCall 通过 host function 发起跨合约调用。
-func doCrossContractCall(call store.ContractCall) ([]byte, error) {
-	return marshalAndCall(call, false)
-}
-
-// marshalAndCall 序列化 call 并调用 host function。
-func marshalAndCall(call store.ContractCall, isQuery bool) ([]byte, error) {
-	bp := txnBufPtr()
-
-	// 写入 name
-	name := call.GetName()
-	copy(txnBuf[:], name)
-	namePtr := bp
-	nameLen := int32(len(name))
-
-	// 写入 method (4 bytes, 作为 i32)
-	m := call.GetMethod()
-	var method int32
-	if len(m) >= 4 {
-		method = int32(uint32(m[0]) | uint32(m[1])<<8 | uint32(m[2])<<16 | uint32(m[3])<<24)
-	}
-
-	// 写入 args 指针数组
-	args := call.GetArgs()
-	argsPtr := bp + int32(len(name)) + 16
-	argsOff := uint32(argsPtr)
-	dataOff := argsOff + uint32(len(args))*8
-	for i, arg := range args {
-		txnBuf[uint32(argsPtr)+uint32(i)*8-bpOff()] = byte(dataOff)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+1-bpOff()] = byte(dataOff >> 8)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+2-bpOff()] = byte(dataOff >> 16)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+3-bpOff()] = byte(dataOff >> 24)
-		argLen := uint32(len(arg))
-		txnBuf[uint32(argsPtr)+uint32(i)*8+4-bpOff()] = byte(argLen)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+5-bpOff()] = byte(argLen >> 8)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+6-bpOff()] = byte(argLen >> 16)
-		txnBuf[uint32(argsPtr)+uint32(i)*8+7-bpOff()] = byte(argLen >> 24)
-		copy(txnBuf[dataOff-bpOff():], arg)
-		dataOff += uint32(len(arg))
-	}
-
-	outPtr := argsPtr + int32(len(args))*8 + int32(len(name)) + 32
-	outLen := int32(65536 - (outPtr - bp))
-
-	var ret int32
-	if isQuery {
-		ret = crossContractQuery(namePtr, nameLen, method, int32(len(args)), argsPtr, outPtr, outLen)
-	} else {
-		ret = crossContractCall(namePtr, nameLen, method, int32(len(args)), argsPtr, outPtr, outLen)
-	}
-	if ret < 0 {
-		return nil, nil
-	}
-	if ret == 0 {
-		return nil, nil
-	}
-	result := make([]byte, ret)
-	copy(result, txnBuf[uint32(outPtr)-bpOff():uint32(outPtr)-bpOff()+uint32(ret)])
-	return result, nil
-}
-
-func bpOff() uint32 { return uint32(txnBufPtr()) }

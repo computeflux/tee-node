@@ -117,37 +117,37 @@ func (a AuthMutation) SetConfig(
 	githubID, githubSecret, githubRedirect string,
 	twitterID, twitterSecret, twitterRedirect string,
 ) error {
-	existing, err := a.config.Get(a.api.GetTxn())
-	if err == nil && existing != nil {
-		if !a.api.CallbySystem() {
-			return errors.New("auth config already set, only system can update")
-		}
+	// existing, err := a.config.Get(a.api.GetTxn())
+	// if err == nil && existing != nil {
+	// 	if !a.api.CallbySystem() {
+	// 		return errors.New("auth config already set, only system can update")
+	// 	}
 
-		// system 调用：保留原有的 JWTSecret 和 SeedSecret，更新其他字段
-		cfg := AuthConfig{
-			JWTSecret:           existing.JWTSecret,
-			SeedSecret:          existing.SeedSecret,
-			SMTPHost:            smtpHost,
-			SMTPPort:            smtpPort,
-			SMTPUser:            smtpUser,
-			SMTPPassword:        smtpPwd,
-			SMTPFrom:            smtpFrom,
-			SMTPFromName:        smtpFromName,
-			MockEmail:           mockEmail,
-			OTPLength:           existing.OTPLength,
-			OTPTTLMins:          existing.OTPTTLMins,
-			GoogleClientID:      googleID,
-			GoogleClientSecret:  googleSecret,
-			GoogleRedirectURL:   googleRedirect,
-			GitHubClientID:      githubID,
-			GitHubClientSecret:  githubSecret,
-			GitHubRedirectURL:   githubRedirect,
-			TwitterClientID:     twitterID,
-			TwitterClientSecret: twitterSecret,
-			TwitterRedirectURL:  twitterRedirect,
-		}
-		return a.config.Set(a.api.GetTxn(), cfg)
-	}
+	// 	// system 调用：保留原有的 JWTSecret 和 SeedSecret，更新其他字段
+	// 	cfg := AuthConfig{
+	// 		JWTSecret:           existing.JWTSecret,
+	// 		SeedSecret:          existing.SeedSecret,
+	// 		SMTPHost:            smtpHost,
+	// 		SMTPPort:            smtpPort,
+	// 		SMTPUser:            smtpUser,
+	// 		SMTPPassword:        smtpPwd,
+	// 		SMTPFrom:            smtpFrom,
+	// 		SMTPFromName:        smtpFromName,
+	// 		MockEmail:           mockEmail,
+	// 		OTPLength:           existing.OTPLength,
+	// 		OTPTTLMins:          existing.OTPTTLMins,
+	// 		GoogleClientID:      googleID,
+	// 		GoogleClientSecret:  googleSecret,
+	// 		GoogleRedirectURL:   googleRedirect,
+	// 		GitHubClientID:      githubID,
+	// 		GitHubClientSecret:  githubSecret,
+	// 		GitHubRedirectURL:   githubRedirect,
+	// 		TwitterClientID:     twitterID,
+	// 		TwitterClientSecret: twitterSecret,
+	// 		TwitterRedirectURL:  twitterRedirect,
+	// 	}
+	// 	return a.config.Set(a.api.GetTxn(), cfg)
+	// }
 
 	jwtSecret := make([]byte, 32)
 	seedSecret := make([]byte, 32)

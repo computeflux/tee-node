@@ -126,6 +126,8 @@ func NewTSGen(abi *InkABI) *TSGen {
 // ── Helpers ──────────────────────────────────────────────────
 
 func pascal(s string) string {
+	// 替换 TS 非法字符为 _
+	s = strings.NewReplacer(".", "_", "[", "_", "]", "_", "<", "_", ">", "_").Replace(s)
 	parts := strings.Split(s, "_")
 	var b strings.Builder
 	for _, p := range parts {

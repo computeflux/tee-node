@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/binary"
 
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/tetratelabs/wazero"
 	wazapi "github.com/tetratelabs/wazero/api"
 )
@@ -36,32 +35,7 @@ func copyBytes(b []byte) []byte {
 	return cp
 }
 
-// ── 序列化 ────────────────────────────────────────────────
-
-// serializeCallData 将合约调用序列化为 WASM 可读的字节格式。
-// 格式: [mode: 1 byte, 0x00=Query 0x01=Mutation][name_len: u32LE][name...][method: 4 bytes][args_count: u32LE][arg_len: u32LE][arg...]...
-func serializeCallData(call store.ContractCall, isQuery bool) []byte {
-	mode := byte(0x01)
-	if isQuery {
-		mode = 0x00
-	}
-	size := 1 + 4 + len(call.GetName()) + 4 + 4
-	for _, a := range call.GetArgs() {
-		size += 4 + len(a)
-	}
-	buf := make([]byte, 0, size)
-	buf = append(buf, mode)
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(call.GetName())))
-	buf = append(buf, call.GetName()...)
-	buf = append(buf, call.GetMethod()...)
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(call.GetArgs())))
-	for _, a := range call.GetArgs() {
-		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(a)))
-		buf = append(buf, a...)
-	}
-	return buf
-}
-
+// ── Host Module ───────────────────────────────────────────
 func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]byte) uint32 {
 	buf := make([]byte, 0, 1024)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(keys)))
@@ -81,8 +55,6 @@ func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]
 
 	return uint32(len(keys))
 }
-
-// ── Host Module ───────────────────────────────────────────
 
 // instantiateHostModule 创建并注册 "runtime" host module（singleton，只调用一次）。
 // s 是共享状态指针，host functions 通过 s 访问 callData/result/api。
@@ -228,36 +200,28 @@ func registerContext(b wazero.HostModuleBuilder, s *hostState) {
 func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			mem := mod.Memory()
 			addr := s.api.GetCaller()
-			buf := make([]byte, 8+len(addr.V))
-			binary.LittleEndian.PutUint32(buf[0:4], addr.T)
-			binary.LittleEndian.PutUint32(buf[4:8], uint32(len(addr.V)))
-			copy(buf[8:], addr.V)
+			buf, _ := addr.Encode()
 			if uint32(stack[1]) < uint32(len(buf)) {
 				stack[0] = errBufTooSmall
 				return
 			}
-			mem.Write(uint32(stack[0]), buf)
-			stack[0] = errOK
+			mod.Memory().Write(uint32(stack[0]), buf)
+			stack[0] = uint64(len(buf))
 		}),
 		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
 	).Export("get_caller")
 
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			mem := mod.Memory()
 			addr := s.api.GetSystemAccount()
-			buf := make([]byte, 8+len(addr.V))
-			binary.LittleEndian.PutUint32(buf[0:4], addr.T)
-			binary.LittleEndian.PutUint32(buf[4:8], uint32(len(addr.V)))
-			copy(buf[8:], addr.V)
+			buf, _ := addr.Encode()
 			if uint32(stack[1]) < uint32(len(buf)) {
 				stack[0] = errBufTooSmall
 				return
 			}
-			mem.Write(uint32(stack[0]), buf)
-			stack[0] = errOK
+			mod.Memory().Write(uint32(stack[0]), buf)
+			stack[0] = uint64(len(buf))
 		}),
 		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
 	).Export("get_system_account")
@@ -277,96 +241,4 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 // ── 调用 IO ──────────────────────────────────────────────
 
 func registerCallIO(b wazero.HostModuleBuilder, s *hostState) {
-	b.NewFunctionBuilder().WithGoModuleFunction(
-		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			if s.callData == nil {
-				stack[0] = 0
-				return
-			}
-			mem := mod.Memory()
-			outLen := uint32(stack[1])
-			if outLen < uint32(len(s.callData)) {
-				stack[0] = errBufTooSmall
-				return
-			}
-			mem.Write(uint32(stack[0]), s.callData)
-			stack[0] = uint64(len(s.callData))
-		}),
-		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
-	).Export("get_call_data")
-
-	b.NewFunctionBuilder().WithGoModuleFunction(
-		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			mem := mod.Memory()
-			data, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
-			s.result = append([]byte{}, data...)
-		}),
-		[]wazapi.ValueType{i32, i32}, nil,
-	).Export("set_result")
-
-	// cross_contract_query: 跨合约查询
-	b.NewFunctionBuilder().WithGoModuleFunction(
-		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			mem := mod.Memory()
-			name, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
-			// method 作为 i32 传递（4 字节 LE selector）
-			methodInt := int32(stack[2])
-			method := []byte{byte(methodInt), byte(methodInt >> 8), byte(methodInt >> 16), byte(methodInt >> 24)}
-			argsCount := int32(stack[3])
-			argsPtr := uint32(stack[4])
-			var args [][]byte
-			off := argsPtr
-			for i := int32(0); i < argsCount; i++ {
-				argLen := readU32At(mem, off)
-				off += 4
-				arg, _ := mem.Read(off, argLen)
-				off += argLen
-				args = append(args, arg)
-			}
-			scall := &store.InContractCall{Name: copyBytes(name), Method: method, Args: args}
-			data, err := s.api.Query(store.UniAddr{}, scall)
-			if err != nil {
-				stack[0] = uint64(0xFFFFFFFF)
-				return
-			}
-			outPtr := uint32(stack[5])
-			outLen := uint32(stack[6])
-			if outLen < uint32(len(data)) {
-				stack[0] = uint64(0xFFFFFFFD)
-				return
-			}
-			mem.Write(outPtr, data)
-			stack[0] = uint64(len(data))
-		}),
-		[]wazapi.ValueType{i32, i32, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
-	).Export("cross_contract_query")
-
-	// cross_contract_call: 跨合约调用（可变更状态）
-	b.NewFunctionBuilder().WithGoModuleFunction(
-		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
-			mem := mod.Memory()
-			name, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
-			methodInt := int32(stack[2])
-			method := []byte{byte(methodInt), byte(methodInt >> 8), byte(methodInt >> 16), byte(methodInt >> 24)}
-			argsCount := int32(stack[3])
-			argsPtr := uint32(stack[4])
-			var args [][]byte
-			off := argsPtr
-			for i := int32(0); i < argsCount; i++ {
-				argLen := readU32At(mem, off)
-				off += 4
-				arg, _ := mem.Read(off, argLen)
-				off += argLen
-				args = append(args, arg)
-			}
-			scall := &store.InContractCall{Name: name, Method: method, Args: args}
-			_, err := s.api.Call(store.UniAddr{}, scall)
-			if err != nil {
-				stack[0] = uint64(0xFFFFFFFF)
-				return
-			}
-			stack[0] = errOK
-		}),
-		[]wazapi.ValueType{i32, i32, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
-	).Export("cross_contract_call")
 }

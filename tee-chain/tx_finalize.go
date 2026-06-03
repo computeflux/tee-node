@@ -121,15 +121,13 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
 			if err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
-				res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
-				continue
+				return nil, errors.Wrap(err, "contract mutation error")
 			}
 
 			// 合约执行成功后，原子更新 nonce
 			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))
-				res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
-				continue
+				return nil, errors.Wrap(err, "contract mutation error")
 			}
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
@@ -144,8 +142,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 
 				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
-					res = append(res, &abci.ExecTxResult{Code: uint32(abci.CheckTxType_Recheck)})
-					continue
+					return nil, errors.Wrap(err, "contract mutation error")
 				}
 			}
 		case *model.SysCall_RuntimeUpgrade:

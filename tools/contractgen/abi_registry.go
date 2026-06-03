@@ -42,10 +42,11 @@ func newInkRegistry(errVariants []errorVariant, structTypes map[string]structTyp
 		r.goTypeToID[name] = id
 	}
 
-	// ID 7: U256（用于 model.Amount）- 包含 [u64; 4] 字段
+	// ID 7: U256（用于 Amount）
 	r.u256ID = r.appendType(r.buildU256Type())
 	r.goTypeToID["U256"] = r.u256ID
 	r.goTypeToID["model.Amount"] = r.u256ID
+	r.goTypeToID["store.Amount"] = r.u256ID
 
 	// ID 8: LangError（ink 框架错误）
 	r.langErrorID = r.appendType(typeDefs["LangError"])
@@ -56,9 +57,10 @@ func newInkRegistry(errVariants []errorVariant, structTypes map[string]structTyp
 	// ID 10: MessageResult（mutation 返回类型）
 	r.messageResID = r.appendType(r.buildMessageResultType())
 
-	// ID 11: Address（model.UniAddr）
+	// ID 11: Address（UniAddr）
 	r.addressID = r.appendType(r.buildUniAddrType())
 	r.goTypeToID["model.UniAddr"] = r.addressID
+	r.goTypeToID["store.UniAddr"] = r.addressID
 
 	// 注册更多类型将按需动态添加
 	return r
@@ -553,6 +555,9 @@ func parseGoTypeRoot(s string) (kind, inner string) {
 	if strings.HasPrefix(s, "util.Option[") && strings.HasSuffix(s, "]") {
 		return "option", s[len("util.Option[") : len(s)-1]
 	}
+	if strings.HasPrefix(s, "store.Option[") && strings.HasSuffix(s, "]") {
+		return "option", s[len("store.Option[") : len(s)-1]
+	}
 	if strings.HasPrefix(s, "*") {
 		return "ptr", strings.TrimPrefix(s, "*")
 	}
@@ -588,15 +593,17 @@ func (r *inkRegistry) goTypeToABIRefNamed(goType string) (abiTypeRef, error) {
 		return abiTypeRef{Display: []string{"u32"}, TypeID: r.goTypeToID["u32"]}, nil
 	case "uint64":
 		return abiTypeRef{Display: []string{"u64"}, TypeID: r.goTypeToID["u64"]}, nil
-	case "model.Amount":
+	case "model.Amount", "store.Amount":
 		return abiTypeRef{Display: []string{"U256"}, TypeID: r.u256ID}, nil
-	case "model.UniAddr":
+	case "model.UniAddr", "store.UniAddr":
 		return abiTypeRef{Display: []string{"UniAddr"}, TypeID: r.addressID}, nil
 	}
 
-	// 处理 util.Option[T] 类型
-	if strings.HasPrefix(goType, "util.Option[") && strings.HasSuffix(goType, "]") {
-		innerType := goType[len("util.Option[") : len(goType)-1]
+	// 处理 Option[T] 类型（util 和 store 包）
+	if (strings.HasPrefix(goType, "util.Option[") || strings.HasPrefix(goType, "store.Option[")) && strings.HasSuffix(goType, "]") {
+		// 找到第一个 '[' 的位置，提取内部类型
+		idx := strings.Index(goType, "[")
+		innerType := goType[idx+1 : len(goType)-1]
 		innerID, err := r.ensureInnerQueryReturn(innerType)
 		if err != nil {
 			return abiTypeRef{}, err

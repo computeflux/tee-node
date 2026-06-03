@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 53
+        "type": 52
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 54
+        "type": 53
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -62,9 +62,9 @@
             "label": "user",
             "type": {
               "displayName": [
-                "store.UniAddr"
+                "UniAddr"
               ],
-              "type": 15
+              "type": 13
             }
           }
         ],
@@ -77,7 +77,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 24
+          "type": 23
         },
         "selector": "0x04601fca"
       },
@@ -92,7 +92,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 29
+          "type": 28
         },
         "selector": "0x05edbaf5"
       },
@@ -192,7 +192,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 20
+              "type": 19
             }
           },
           {
@@ -393,7 +393,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 19
+              "type": 18
             }
           }
         ],
@@ -537,7 +537,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 17
+              "type": 16
             }
           }
         ],
@@ -564,7 +564,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 16
+              "type": 15
             }
           },
           {
@@ -624,7 +624,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 51
+          "type": 50
         },
         "selector": "0x36e09037"
       },
@@ -635,9 +635,9 @@
             "label": "owner",
             "type": {
               "displayName": [
-                "store.UniAddr"
+                "UniAddr"
               ],
-              "type": 15
+              "type": 13
             }
           }
         ],
@@ -650,7 +650,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 23
+          "type": 22
         },
         "selector": "0x42cc03e6"
       },
@@ -665,7 +665,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 29
+          "type": 28
         },
         "selector": "0x467c95d9"
       },
@@ -696,7 +696,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 40
+          "type": 39
         },
         "selector": "0x55c04847"
       },
@@ -707,9 +707,9 @@
             "label": "user",
             "type": {
               "displayName": [
-                "store.UniAddr"
+                "UniAddr"
               ],
-              "type": 15
+              "type": 13
             }
           },
           {
@@ -742,7 +742,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 49
+          "type": 48
         },
         "selector": "0x56b906c0"
       },
@@ -768,7 +768,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 35
+          "type": 34
         },
         "selector": "0x59d9424a"
       },
@@ -871,7 +871,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 35
+          "type": 34
         },
         "selector": "0x60d00c96"
       },
@@ -917,7 +917,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 46
+          "type": 45
         },
         "selector": "0x74d599fb"
       },
@@ -930,7 +930,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 16
+              "type": 15
             }
           }
         ],
@@ -1022,9 +1022,9 @@
             "label": "user",
             "type": {
               "displayName": [
-                "store.UniAddr"
+                "UniAddr"
               ],
-              "type": 15
+              "type": 13
             }
           },
           {
@@ -1061,7 +1061,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 20
+              "type": 19
             }
           }
         ],
@@ -1074,7 +1074,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 33
+          "type": 32
         },
         "selector": "0xa1119c12"
       },
@@ -1100,7 +1100,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 29
+          "type": 28
         },
         "selector": "0xad4c38cd"
       },
@@ -1126,7 +1126,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 36
+          "type": 35
         },
         "selector": "0xb34c16d8"
       },
@@ -1162,7 +1162,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 28
+          "type": 27
         },
         "selector": "0xb51e556b"
       },
@@ -1198,7 +1198,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 51
+          "type": 50
         },
         "selector": "0xbd24209b"
       },
@@ -1234,7 +1234,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 35
+          "type": 34
         },
         "selector": "0xc1511fbf"
       },
@@ -1310,7 +1310,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 33
+          "type": 32
         },
         "selector": "0xc3ef490c"
       },
@@ -1323,7 +1323,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 16
+              "type": 15
             }
           }
         ],
@@ -1336,7 +1336,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 52
+          "type": 51
         },
         "selector": "0xc533a84f"
       },
@@ -1347,9 +1347,9 @@
             "label": "user",
             "type": {
               "displayName": [
-                "store.UniAddr"
+                "UniAddr"
               ],
-              "type": 15
+              "type": 13
             }
           },
           {
@@ -1382,7 +1382,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 43
+          "type": 42
         },
         "selector": "0xc89f2f8f"
       },
@@ -1408,7 +1408,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 35
+          "type": 34
         },
         "selector": "0xcd2ef88d"
       },
@@ -1434,7 +1434,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 26
+          "type": 25
         },
         "selector": "0xd3ff81e9"
       },
@@ -1497,7 +1497,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 35
+          "type": 34
         },
         "selector": "0xdaa1c2d5"
       },
@@ -1560,7 +1560,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 38
+          "type": 37
         },
         "selector": "0xe2a8c1e4"
       },
@@ -1573,7 +1573,7 @@
               "displayName": [
                 "Vec"
               ],
-              "type": 16
+              "type": 15
             }
           },
           {
@@ -1842,17 +1842,6 @@
       "id": 15,
       "type": {
         "def": {
-          "composite": {}
-        },
-        "path": [
-          "store.UniAddr"
-        ]
-      }
-    },
-    {
-      "id": 16,
-      "type": {
-        "def": {
           "sequence": {
             "type": 0
           }
@@ -1861,6 +1850,25 @@
           {
             "name": "T",
             "type": 0
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 14
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 14
           }
         ],
         "path": [
@@ -1872,30 +1880,11 @@
       "id": 17,
       "type": {
         "def": {
-          "sequence": {
-            "type": 14
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 14
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 18,
-      "type": {
-        "def": {
           "composite": {
             "fields": [
               {
                 "name": "User",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "ModelID",
@@ -1923,7 +1912,7 @@
               },
               {
                 "name": "Nonce",
-                "type": 16
+                "type": 15
               }
             ]
           }
@@ -1934,17 +1923,36 @@
       }
     },
     {
-      "id": 19,
+      "id": 18,
       "type": {
         "def": {
           "sequence": {
-            "type": 18
+            "type": 17
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 18
+            "type": 17
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 3
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 3
           }
         ],
         "path": [
@@ -1956,25 +1964,6 @@
       "id": 20,
       "type": {
         "def": {
-          "sequence": {
-            "type": 3
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 3
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 21,
-      "type": {
-        "def": {
           "composite": {
             "fields": [
               {
@@ -1983,11 +1972,11 @@
               },
               {
                 "name": "Owner",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "KeyHash",
-                "type": 16
+                "type": 15
               },
               {
                 "name": "RateLimit",
@@ -2010,17 +1999,17 @@
       }
     },
     {
-      "id": 22,
+      "id": 21,
       "type": {
         "def": {
           "sequence": {
-            "type": 21
+            "type": 20
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 21
+            "type": 20
           }
         ],
         "path": [
@@ -2029,7 +2018,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 22,
       "type": {
         "def": {
           "variant": {
@@ -2037,7 +2026,7 @@
               {
                 "fields": [
                   {
-                    "type": 22
+                    "type": 21
                   }
                 ],
                 "index": 0,
@@ -2058,7 +2047,7 @@
         "params": [
           {
             "name": "T",
-            "type": 22
+            "type": 21
           },
           {
             "name": "E",
@@ -2071,7 +2060,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 23,
       "type": {
         "def": {
           "variant": {
@@ -2113,7 +2102,7 @@
       }
     },
     {
-      "id": 25,
+      "id": 24,
       "type": {
         "def": {
           "composite": {
@@ -2124,7 +2113,7 @@
               },
               {
                 "name": "Owner",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "ProviderID",
@@ -2164,7 +2153,7 @@
               },
               {
                 "name": "APIKeys",
-                "type": 17
+                "type": 16
               },
               {
                 "name": "IsActive",
@@ -2183,7 +2172,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 25,
       "type": {
         "def": {
           "variant": {
@@ -2191,7 +2180,7 @@
               {
                 "fields": [
                   {
-                    "type": 25
+                    "type": 24
                   }
                 ],
                 "index": 0,
@@ -2212,7 +2201,7 @@
         "params": [
           {
             "name": "T",
-            "type": 25
+            "type": 24
           },
           {
             "name": "E",
@@ -2225,7 +2214,7 @@
       }
     },
     {
-      "id": 27,
+      "id": 26,
       "type": {
         "def": {
           "composite": {
@@ -2236,7 +2225,7 @@
               },
               {
                 "name": "Data",
-                "type": 25
+                "type": 24
               }
             ]
           }
@@ -2247,7 +2236,7 @@
       }
     },
     {
-      "id": 28,
+      "id": 27,
       "type": {
         "def": {
           "variant": {
@@ -2255,7 +2244,7 @@
               {
                 "fields": [
                   {
-                    "type": 27
+                    "type": 26
                   }
                 ],
                 "index": 0,
@@ -2276,7 +2265,7 @@
         "params": [
           {
             "name": "T",
-            "type": 27
+            "type": 26
           },
           {
             "name": "E",
@@ -2289,7 +2278,7 @@
       }
     },
     {
-      "id": 29,
+      "id": 28,
       "type": {
         "def": {
           "variant": {
@@ -2331,7 +2320,7 @@
       }
     },
     {
-      "id": 30,
+      "id": 29,
       "type": {
         "def": {
           "composite": {
@@ -2342,11 +2331,11 @@
               },
               {
                 "name": "Model",
-                "type": 25
+                "type": 24
               },
               {
                 "name": "Provider",
-                "type": 31
+                "type": 30
               }
             ]
           }
@@ -2357,14 +2346,14 @@
       }
     },
     {
-      "id": 31,
+      "id": 30,
       "type": {
         "def": {
           "composite": {
             "fields": [
               {
                 "name": "Owner",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "Name",
@@ -2380,7 +2369,7 @@
               },
               {
                 "name": "ModelIds",
-                "type": 20
+                "type": 19
               },
               {
                 "name": "Region",
@@ -2431,129 +2420,26 @@
       }
     },
     {
+      "id": 31,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 29
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 29
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
       "id": 32,
-      "type": {
-        "def": {
-          "sequence": {
-            "type": 30
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 30
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 33,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 32
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 32
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 34,
-      "type": {
-        "def": {
-          "sequence": {
-            "type": 25
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 25
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 35,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 34
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 34
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 36,
       "type": {
         "def": {
           "variant": {
@@ -2595,7 +2481,110 @@
       }
     },
     {
-      "id": 37,
+      "id": 33,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 24
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 24
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 33
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 33
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 35,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 30
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 30
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 36,
       "type": {
         "def": {
           "composite": {
@@ -2606,7 +2595,7 @@
               },
               {
                 "name": "Data",
-                "type": 31
+                "type": 30
               }
             ]
           }
@@ -2617,7 +2606,7 @@
       }
     },
     {
-      "id": 38,
+      "id": 37,
       "type": {
         "def": {
           "variant": {
@@ -2625,7 +2614,7 @@
               {
                 "fields": [
                   {
-                    "type": 37
+                    "type": 36
                   }
                 ],
                 "index": 0,
@@ -2646,7 +2635,7 @@
         "params": [
           {
             "name": "T",
-            "type": 37
+            "type": 36
           },
           {
             "name": "E",
@@ -2655,6 +2644,39 @@
         ],
         "path": [
           "Result"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Option"
         ]
       }
     },
@@ -2662,23 +2684,12 @@
       "id": 39,
       "type": {
         "def": {
-          "composite": {}
-        },
-        "path": [
-          "store.Option[uint64]"
-        ]
-      }
-    },
-    {
-      "id": 40,
-      "type": {
-        "def": {
           "variant": {
             "variants": [
               {
                 "fields": [
                   {
-                    "type": 39
+                    "type": 38
                   }
                 ],
                 "index": 0,
@@ -2699,7 +2710,7 @@
         "params": [
           {
             "name": "T",
-            "type": 39
+            "type": 38
           },
           {
             "name": "E",
@@ -2712,14 +2723,14 @@
       }
     },
     {
-      "id": 41,
+      "id": 40,
       "type": {
         "def": {
           "composite": {
             "fields": [
               {
                 "name": "User",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "Amount",
@@ -2738,17 +2749,17 @@
       }
     },
     {
-      "id": 42,
+      "id": 41,
       "type": {
         "def": {
           "sequence": {
-            "type": 41
+            "type": 40
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 41
+            "type": 40
           }
         ],
         "path": [
@@ -2757,7 +2768,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 42,
       "type": {
         "def": {
           "variant": {
@@ -2765,7 +2776,7 @@
               {
                 "fields": [
                   {
-                    "type": 42
+                    "type": 41
                   }
                 ],
                 "index": 0,
@@ -2786,7 +2797,7 @@
         "params": [
           {
             "name": "T",
-            "type": 42
+            "type": 41
           },
           {
             "name": "E",
@@ -2799,14 +2810,14 @@
       }
     },
     {
-      "id": 44,
+      "id": 43,
       "type": {
         "def": {
           "composite": {
             "fields": [
               {
                 "name": "User",
-                "type": 15
+                "type": 13
               },
               {
                 "name": "ModelID",
@@ -2845,17 +2856,17 @@
       }
     },
     {
-      "id": 45,
+      "id": 44,
       "type": {
         "def": {
           "sequence": {
-            "type": 44
+            "type": 43
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 44
+            "type": 43
           }
         ],
         "path": [
@@ -2864,7 +2875,7 @@
       }
     },
     {
-      "id": 46,
+      "id": 45,
       "type": {
         "def": {
           "variant": {
@@ -2872,7 +2883,7 @@
               {
                 "fields": [
                   {
-                    "type": 45
+                    "type": 44
                   }
                 ],
                 "index": 0,
@@ -2893,7 +2904,7 @@
         "params": [
           {
             "name": "T",
-            "type": 45
+            "type": 44
           },
           {
             "name": "E",
@@ -2906,7 +2917,7 @@
       }
     },
     {
-      "id": 47,
+      "id": 46,
       "type": {
         "def": {
           "composite": {
@@ -2952,17 +2963,17 @@
       }
     },
     {
-      "id": 48,
+      "id": 47,
       "type": {
         "def": {
           "sequence": {
-            "type": 47
+            "type": 46
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 47
+            "type": 46
           }
         ],
         "path": [
@@ -2971,7 +2982,7 @@
       }
     },
     {
-      "id": 49,
+      "id": 48,
       "type": {
         "def": {
           "variant": {
@@ -2979,7 +2990,7 @@
               {
                 "fields": [
                   {
-                    "type": 48
+                    "type": 47
                   }
                 ],
                 "index": 0,
@@ -3000,7 +3011,7 @@
         "params": [
           {
             "name": "T",
-            "type": 48
+            "type": 47
           },
           {
             "name": "E",
@@ -3013,17 +3024,17 @@
       }
     },
     {
-      "id": 50,
+      "id": 49,
       "type": {
         "def": {
           "sequence": {
-            "type": 31
+            "type": 30
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 31
+            "type": 30
           }
         ],
         "path": [
@@ -3032,7 +3043,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 50,
       "type": {
         "def": {
           "variant": {
@@ -3040,7 +3051,7 @@
               {
                 "fields": [
                   {
-                    "type": 50
+                    "type": 49
                   }
                 ],
                 "index": 0,
@@ -3061,7 +3072,49 @@
         "params": [
           {
             "name": "T",
-            "type": 50
+            "type": 49
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 20
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 20
           },
           {
             "name": "E",
@@ -3077,48 +3130,6 @@
       "id": 52,
       "type": {
         "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 21
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 21
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 53,
-      "type": {
-        "def": {
           "primitive": "u128"
         },
         "path": [
@@ -3127,7 +3138,7 @@
       }
     },
     {
-      "id": 54,
+      "id": 53,
       "type": {
         "def": {
           "composite": {

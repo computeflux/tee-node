@@ -66,7 +66,7 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 		state: state,
 	}
 
-	if err := ensureRuntimeV0(); err != nil {
+	if err := CheckRuntimeV0(); err != nil {
 		return nil, err
 	}
 
