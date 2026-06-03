@@ -37,6 +37,8 @@ func ScaleEncode[T any](v T) ([]byte, error) {
 		if enc, ok := rv.Elem().Addr().Interface().(ScaleEncoder); ok {
 			return enc.Encode()
 		}
+		// dereference pointer for encodeAny (e.g. *[]T → []T)
+		return encodeAny(rv.Elem().Interface())
 	}
 	return encodeAny(v)
 }
@@ -202,22 +204,22 @@ func encodeOption(v any) ([]byte, bool) {
 	return append([]byte{0x01}, data...), true
 }
 
-// decodeSlice 用 reflect 检测 *[]T，递归解码每个元素。
+// decodeSlice 用 reflect，接受 []T 或 *[]T，递归解码每个元素。
 func decodeSlice(v any, data []byte) error {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("not a pointer")
+	if rv.Kind() == reflect.Ptr {
+		// *[]T → 解引用为 []T
+		rv = rv.Elem()
 	}
-	elem := rv.Elem()
-	if elem.Kind() != reflect.Slice {
+	if rv.Kind() != reflect.Slice {
 		return fmt.Errorf("not a slice")
 	}
 	count, sz := DecodeCompact(data)
 	if count == 0 {
-		elem.Set(reflect.MakeSlice(elem.Type(), 0, 0))
+		rv.Set(reflect.MakeSlice(rv.Type(), 0, 0))
 		return nil
 	}
-	sl := reflect.MakeSlice(elem.Type(), int(count), int(count))
+	sl := reflect.MakeSlice(rv.Type(), int(count), int(count))
 	off := sz
 	for i := 0; i < int(count); i++ {
 		item := sl.Index(i)
@@ -263,23 +265,23 @@ func decodeSlice(v any, data []byte) error {
 					n, sz := DecodeCompact(data[off:])
 					consumed = sz + int(n)
 				} else {
-					elem.Set(reflect.MakeSlice(elem.Type(), i+1, i+1))
+					rv.Set(reflect.MakeSlice(rv.Type(), i+1, i+1))
 					for j := 0; j <= i; j++ {
-						elem.Index(j).Set(sl.Index(j))
+						rv.Index(j).Set(sl.Index(j))
 					}
 					return nil
 				}
 			default:
-				elem.Set(reflect.MakeSlice(elem.Type(), i+1, i+1))
+				rv.Set(reflect.MakeSlice(rv.Type(), i+1, i+1))
 				for j := 0; j <= i; j++ {
-					elem.Index(j).Set(sl.Index(j))
+					rv.Index(j).Set(sl.Index(j))
 				}
 				return nil
 			}
 			off += consumed
 		}
 	}
-	elem.Set(sl)
+	rv.Set(sl)
 	return nil
 }
 
@@ -349,7 +351,7 @@ func decodeAny(v any, data []byte) error {
 		*val = make([]byte, n)
 		copy(*val, data[sz:sz+int(n)])
 	default:
-		// 尝试 *slice<T> 解码
+		// 尝试 *slice<T> 或 []T 解码
 		if err := decodeSlice(v, data); err == nil {
 			return nil
 		}

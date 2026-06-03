@@ -45,6 +45,18 @@ func main() {
 	}
 }
 
+func hasGenerateAnnotation(doc *ast.CommentGroup) bool {
+	if doc == nil {
+		return false
+	}
+	for _, c := range doc.List {
+		if strings.Contains(c.Text, "scale-codec-gen:generate") {
+			return true
+		}
+	}
+	return false
+}
+
 func processDir(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -63,13 +75,19 @@ func processDir(dir string) {
 			continue
 		}
 		for _, decl := range f.Decls {
+			// only generate codec for types annotated with // scale-codec-gen:generate
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok || genDecl.Tok != token.TYPE {
 				continue
 			}
+			// check annotation on the GenDecl (group) or individual spec
+			hasGenerate := hasGenerateAnnotation(genDecl.Doc)
 			for _, spec := range genDecl.Specs {
 				typeSpec, ok := spec.(*ast.TypeSpec)
 				if !ok {
+					continue
+				}
+				if !hasGenerate && !hasGenerateAnnotation(typeSpec.Doc) {
 					continue
 				}
 				structType, ok := typeSpec.Type.(*ast.StructType)
@@ -82,9 +100,6 @@ func processDir(dir string) {
 				}
 				fields := collectFields(structType)
 				if len(fields) == 0 {
-					continue
-				}
-				if hasStoreInternals(fields) {
 					continue
 				}
 				structs = append(structs, structDef{name: name, fields: fields})
@@ -201,10 +216,6 @@ func writeEncode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint32(buf, %s.T)\n", t, acc))
 		buf.WriteString(fmt.Sprintf("%sbuf = store.EncodeCompact(buf, uint64(len(%s.V)))\n", t, acc))
 		buf.WriteString(fmt.Sprintf("%sbuf = append(buf, %s.V...)\n", t, acc))
-	case kAmount:
-		buf.WriteString(fmt.Sprintf("%s{ b := %s.Int.Bytes(); ln := len(b)\n", t, acc))
-		buf.WriteString(fmt.Sprintf("%sfor i := 0; i < 32-ln; i++ { buf = append(buf, 0) }\n", t))
-		buf.WriteString(fmt.Sprintf("%sfor i := ln-1; i >= 0; i-- { buf = append(buf, b[i]) } }\n", t))
 	case kOption:
 		buf.WriteString(fmt.Sprintf("%sif %s.IsSome() {\n", t, acc))
 		buf.WriteString(fmt.Sprintf("%s\tbuf = append(buf, 1)\n", t))
@@ -216,6 +227,9 @@ func writeEncode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 		buf.WriteString(fmt.Sprintf("%s} else { buf = append(buf, 0) }\n", t))
 	case kStruct:
 		buf.WriteString(fmt.Sprintf("%s{ b, err := %s.Encode(); if err != nil { return nil, err }; buf = append(buf, b...) }\n", t, acc))
+	case kUnsupported:
+		buf.WriteString(fmt.Sprintf("%s// ERROR: unsupported type %q - add manual ScaleEncoder\n", t, f.Type))
+		buf.WriteString(fmt.Sprintf("%s_ = %s // force compile error\n", t, acc))
 	}
 }
 
@@ -281,9 +295,6 @@ func writeDecode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 		buf.WriteString(fmt.Sprintf("%s{ n, sz := store.DecodeCompact(data[off:]); off += sz\n", t))
 		buf.WriteString(fmt.Sprintf("%sif off+int(n) > len(data) { return 0, fmt.Errorf(\"EOF reading %s.V\") }\n", t, f.Name))
 		buf.WriteString(fmt.Sprintf("%s%s.V = make([]byte, n); copy(%s.V, data[off:off+int(n)]); off += int(n) }\n", t, acc, acc))
-	case kAmount:
-		buf.WriteString(fmt.Sprintf("%sif off+32 > len(data) { %s }\n", t, errf))
-		buf.WriteString(fmt.Sprintf("%s%s.Int.SetBytes(store.ReverseBytes(data[off:off+32])); off += 32\n", t, acc))
 	case kOption:
 		buf.WriteString(fmt.Sprintf("%sif off >= len(data) { %s }\n", t, errf))
 		buf.WriteString(fmt.Sprintf("%sif data[off] == 0 {\n%soff++\n%s%s = store.NewNone[%s]()\n", t, t, t, acc, elemTypeName(f)))
@@ -300,6 +311,9 @@ func writeDecode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 		buf.WriteString(fmt.Sprintf("%s}\n", t))
 	case kStruct:
 		buf.WriteString(fmt.Sprintf("%s{ n, err := %s.Decode(data[off:]); if err != nil { return 0, err }; off += n }\n", t, acc))
+	case kUnsupported:
+		buf.WriteString(fmt.Sprintf("%s// ERROR: unsupported type %q - add manual ScaleDecoder\n", t, f.Type))
+		buf.WriteString(fmt.Sprintf("%s_ = %s // force compile error\n", t, acc))
 	}
 }
 
@@ -367,28 +381,9 @@ const (
 	kArr
 	kStruct
 	kUniAddr
-	kAmount
 	kOption
 	kUnsupported
 )
-
-func hasStoreInternals(fields []fieldInfo) bool {
-	for _, f := range fields {
-		switch f.Kind {
-		case kUnsupported:
-			return true
-		case kStruct:
-			t := f.Type
-			if strings.HasPrefix(t, "store.") || strings.Contains(t, "StoreMapping") || strings.Contains(t, "StoreValue") || strings.Contains(t, "StoreList") || strings.Contains(t, "ContractApi") || strings.Contains(t, "StoreTx") {
-				return true
-			}
-		}
-		if f.Elem != nil && hasStoreInternals([]fieldInfo{*f.Elem}) {
-			return true
-		}
-	}
-	return false
-}
 
 func collectFields(st *ast.StructType) []fieldInfo {
 	var fields []fieldInfo
@@ -484,7 +479,7 @@ func selKind(pkg, name string, expr ast.Expr) fieldInfo {
 	case name == "UniAddr" && (pkg == "store" || strings.HasSuffix(pkg, ".store")):
 		return fieldInfo{Type: t, Kind: kUniAddr}
 	case name == "Amount" && (pkg == "store" || strings.HasSuffix(pkg, ".store")):
-		return fieldInfo{Type: t, Kind: kAmount}
+		return fieldInfo{Type: t, Kind: kStruct}
 	case name == "Option" && (pkg == "store" || strings.HasSuffix(pkg, ".store") || pkg == "util" || strings.HasSuffix(pkg, ".util")):
 		return fieldInfo{Type: t, Kind: kOption}
 	default:

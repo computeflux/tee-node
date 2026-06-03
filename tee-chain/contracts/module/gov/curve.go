@@ -7,6 +7,7 @@ package gov
 //   - LinearDecreasing: 线性递减，从 begin 线性递减到 end
 //   - SteppedDecreasing: 阶梯递减，每隔 period 区块下降 step
 //   - Reciprocal: 倒数曲线，公式 K/(x/S + x_offset) - y_offset
+// scale-codec-gen:generate
 type Curve struct {
 	Type string // 曲线类型：LinearDecreasing, SteppedDecreasing, Reciprocal
 

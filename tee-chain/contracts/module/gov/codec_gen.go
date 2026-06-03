@@ -22,14 +22,11 @@ func (v *CallContent) Encode() ([]byte, error) {
 		buf = append(buf, item...)
 	}
 	{
-		b := v.Amount.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.Amount.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	return buf, nil
 }
@@ -67,11 +64,13 @@ func (v *CallContent) Decode(data []byte) (int, error) {
 			off += int(ln)
 		}
 	}
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading Amount")
+	{
+		n, err := v.Amount.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.Amount.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	return off, nil
 }
 
@@ -171,14 +170,11 @@ func (v *Member) Encode() ([]byte, error) {
 	buf = store.EncodeCompact(buf, uint64(len(v.Account.V)))
 	buf = append(buf, v.Account.V...)
 	{
-		b := v.Balance.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.Balance.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	return buf, nil
 }
@@ -201,11 +197,13 @@ func (v *Member) Decode(data []byte) (int, error) {
 		copy(v.Account.V, data[off:off+int(n)])
 		off += int(n)
 	}
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading Balance")
+	{
+		n, err := v.Balance.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.Balance.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	return off, nil
 }
 
@@ -316,14 +314,11 @@ func (v *ProposalDeposit) Encode() ([]byte, error) {
 	buf = store.EncodeCompact(buf, uint64(len(v.Depositor.V)))
 	buf = append(buf, v.Depositor.V...)
 	{
-		b := v.Amount.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.Amount.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Block))
 	return buf, nil
@@ -347,11 +342,13 @@ func (v *ProposalDeposit) Decode(data []byte) (int, error) {
 		copy(v.Depositor.V, data[off:off+int(n)])
 		off += int(n)
 	}
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading Amount")
+	{
+		n, err := v.Amount.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.Amount.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading Block")
 	}
@@ -531,14 +528,11 @@ func (v *Spend) Encode() ([]byte, error) {
 	buf = store.EncodeCompact(buf, uint64(len(v.To.V)))
 	buf = append(buf, v.To.V...)
 	{
-		b := v.Amount.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.Amount.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	buf = binary.LittleEndian.AppendUint32(buf, v.TrackID)
 	if v.Payout {
@@ -587,11 +581,13 @@ func (v *Spend) Decode(data []byte) (int, error) {
 		copy(v.To.V, data[off:off+int(n)])
 		off += int(n)
 	}
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading Amount")
+	{
+		n, err := v.Amount.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.Amount.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	if off+4 > len(data) {
 		return 0, fmt.Errorf("EOF reading TrackID")
 	}
@@ -616,24 +612,18 @@ func (v *TrackData) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.DecisionPeriod)
 	buf = binary.LittleEndian.AppendUint32(buf, v.MinEnactmentPeriod)
 	{
-		b := v.DecisionDeposit.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.DecisionDeposit.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	{
-		b := v.MaxBalance.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.MaxBalance.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	{
 		b, err := v.MinApproval.Encode()
@@ -689,16 +679,20 @@ func (v *TrackData) Decode(data []byte) (int, error) {
 	}
 	v.MinEnactmentPeriod = binary.LittleEndian.Uint32(data[off:])
 	off += 4
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading DecisionDeposit")
+	{
+		n, err := v.DecisionDeposit.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.DecisionDeposit.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading MaxBalance")
+	{
+		n, err := v.MaxBalance.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.MaxBalance.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	{
 		n, err := v.MinApproval.Decode(data[off:])
 		if err != nil {
@@ -757,14 +751,11 @@ func (v *Vote) Encode() ([]byte, error) {
 	buf = store.EncodeCompact(buf, uint64(len(v.Caller.V)))
 	buf = append(buf, v.Caller.V...)
 	{
-		b := v.Pledge.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.Pledge.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	if v.OpinionYes {
 		buf = append(buf, 1)
@@ -772,14 +763,11 @@ func (v *Vote) Encode() ([]byte, error) {
 		buf = append(buf, 0)
 	}
 	{
-		b := v.VoteWeight.Int.Bytes()
-		ln := len(b)
-		for i := 0; i < ln; i++ {
-			buf = append(buf, b[ln-1-i])
+		b, err := v.VoteWeight.Encode()
+		if err != nil {
+			return nil, err
 		}
-		for i := 0; i < 32-ln; i++ {
-			buf = append(buf, 0)
-		}
+		buf = append(buf, b...)
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.VoteBlock))
 	if v.Deleted {
@@ -818,21 +806,25 @@ func (v *Vote) Decode(data []byte) (int, error) {
 		copy(v.Caller.V, data[off:off+int(n)])
 		off += int(n)
 	}
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading Pledge")
+	{
+		n, err := v.Pledge.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.Pledge.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading OpinionYes")
 	}
 	v.OpinionYes = data[off] != 0
 	off++
-	if off+32 > len(data) {
-		return 0, fmt.Errorf("EOF reading VoteWeight")
+	{
+		n, err := v.VoteWeight.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
 	}
-	v.VoteWeight.Int.SetBytes(store.ReverseBytes(data[off : off+32]))
-	off += 32
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading VoteBlock")
 	}

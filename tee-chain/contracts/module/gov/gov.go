@@ -57,6 +57,7 @@ var (
 )
 
 // Gov 治理合约结构体，包含所有存储状态
+// scale-codec-gen:skip
 type Gov struct {
 	// api 合约API接口
 	api store.ContractApi
@@ -93,11 +94,13 @@ type Gov struct {
 }
 
 // GovQuery 治理合约查询接口
+// scale-codec-gen:skip
 type GovQuery struct {
 	Gov
 }
 
 // GovMutation 治理合约变更接口
+// scale-codec-gen:skip
 type GovMutation struct {
 	Gov
 }

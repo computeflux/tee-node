@@ -25,40 +25,62 @@ func (a UniAddr) String() string {
 	return fmt.Sprint(a.T) + ":" + hex.EncodeToString(a.V)
 }
 
+// Amount 链上金额类型。
+type Amount = U256
+
 // U256 256 位无符号整数，内部使用 big.Int。
 type U256 struct {
 	Int *big.Int
 }
 
-// Amount 链上金额类型。
-type Amount = U256
-
 var ZeroAmount = NewU256(big.NewInt(0))
 
+// NewU256 creates a new U256 type
 func NewU256(i *big.Int) U256 {
-	return U256{Int: new(big.Int).Set(i)}
+	return U256{i}
 }
 
-// Encode 实现 ScaleEncoder：SCALE U256 LE（256-bit 小端序）。
-func (u *U256) Encode() ([]byte, error) {
-	b := u.Int.Bytes()
-	buf := make([]byte, 32)
-	for i := 0; i < len(b); i++ {
-		buf[i] = b[len(b)-1-i]
-	}
-	return buf, nil
-}
-
-// Decode 实现 ScaleDecoder。
-func (u *U256) Decode(data []byte) (int, error) {
+// Decode implements ScaleDecoder: decodes 32 bytes (little-endian) into a U256.
+func (i *U256) Decode(data []byte) (int, error) {
 	if len(data) < 32 {
-		return 0, fmt.Errorf("decode U256: need 32 bytes")
+		return 0, fmt.Errorf("decode U256: need 32 bytes, got %d", len(data))
 	}
-	if u.Int == nil {
-		u.Int = new(big.Int)
+	bs := make([]byte, 32)
+	copy(bs, data[:32])
+
+	// reverse bytes, scale uses little-endian encoding, big.int's bytes are expected in big-endian
+	Reverse(bs)
+
+	b, err := UintBytesToBigInt(bs)
+	if err != nil {
+		return 0, err
 	}
-	u.Int.SetBytes(ReverseBytes(data[:32]))
+
+	// deal with zero differently to get a nil representation (this is how big.Int deals with 0)
+	if b.Sign() == 0 {
+		*i = U256{big.NewInt(0)}
+		return 32, nil
+	}
+
+	*i = U256{b}
 	return 32, nil
+}
+
+// Encode implements ScaleEncoder: encodes U256 as 32 bytes (little-endian).
+func (i *U256) Encode() ([]byte, error) {
+	if i.Int == nil {
+		return make([]byte, 32), nil
+	}
+
+	b, err := BigIntToUintBytes(i.Int, 32)
+	if err != nil {
+		return nil, err
+	}
+
+	// reverse bytes, scale uses little-endian encoding, big.int's bytes are expected in big-endian
+	Reverse(b)
+
+	return b, nil
 }
 
 // Encode 实现 ScaleEncoder：SCALE UniAddr。

@@ -110,7 +110,6 @@ func TestCodec_Compact(t *testing.T) {
 }
 
 // ── Option ──────────────────────────────────────
-
 func TestCodec_OptionNone(t *testing.T) {
 	v := NewNone[uint32]()
 	data, _ := ScaleEncode(v)
@@ -267,4 +266,34 @@ func TestCodec_NilSlice(t *testing.T) {
 	var out []uint32
 	check(t, ScaleDecode(&out, data))
 	eq(t, 0, len(out))
+}
+
+// ── DecodeScaleArgBytes 路径（*[]T 解码）──
+// 模拟 DecodeScaleArgBytes[[]T] → ScaleDecode(&z, data) 场景
+func TestCodec_DecodePtrSlice(t *testing.T) {
+	// 构造编码数据
+	items := []TestValue{{X: 10}, {X: 20}}
+	data, err := ScaleEncode(items)
+	check(t, err)
+
+	// 模拟 DecodeScaleArgBytes[[]TestValue] 的调用方式
+	var out []TestValue
+	err = ScaleDecode(&out, data)
+	check(t, err)
+	eq(t, 2, len(out))
+	eq(t, uint32(10), out[0].X)
+	eq(t, uint32(20), out[1].X)
+
+	// 空切片
+	emptyData, _ := ScaleEncode([]TestValue{})
+	var emptyOut []TestValue
+	check(t, ScaleDecode(&emptyOut, emptyData))
+	eq(t, 0, len(emptyOut))
+
+	// nil 切片
+	var nilData []byte
+	nilData, _ = ScaleEncode([]TestValue(nil))
+	var nilOut []TestValue
+	check(t, ScaleDecode(&nilOut, nilData))
+	eq(t, 0, len(nilOut))
 }

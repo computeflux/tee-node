@@ -15,12 +15,14 @@ var (
 )
 
 // Member 成员账户与余额。
+// scale-codec-gen:generate
 type Member struct {
 	Account store.UniAddr // 成员账户地址
 	Balance store.Amount  // 成员余额
 }
 
 // TrackData 治理轨道参数。
+// scale-codec-gen:generate
 type TrackData struct {
 	Name               string       // 轨道名称
 	PreparePeriod      uint32       // 准备期（区块数），提案提交后需要等待的准备时间
@@ -35,12 +37,14 @@ type TrackData struct {
 }
 
 // TrackWithID 带ID的轨道数据
+// scale-codec-gen:generate
 type TrackWithID struct {
 	ID    uint32    // 轨道ID
 	Track TrackData // 轨道数据
 }
 
 // CallContent 提案内嵌调用内容。
+// scale-codec-gen:generate
 type CallContent struct {
 	Contract []byte       // 目标合约地址
 	Selector [4]byte      // 方法选择器
@@ -49,11 +53,13 @@ type CallContent struct {
 }
 
 // ProposalStatus 提案状态
+// scale-codec-gen:generate
 type ProposalStatus struct {
 	State uint8 // 状态码：0-待存款,1-进行中,2-确认中,3-已确认,4-已批准,5-已拒绝,6-已取消
 	Block int64 // 状态变更时的区块号
 }
 
+// scale-codec-gen:generate
 type ProposalStatusQuery struct {
 	// 当前的动态状态
 	State uint8
@@ -66,6 +72,7 @@ type ProposalStatusQuery struct {
 }
 
 // ProposalDeposit 提案押金信息
+// scale-codec-gen:generate
 type ProposalDeposit struct {
 	Depositor store.UniAddr // 押金支付者地址
 	Amount    store.Amount  // 押金金额
@@ -73,6 +80,7 @@ type ProposalDeposit struct {
 }
 
 // Proposal 提案数据
+// scale-codec-gen:generate
 type Proposal struct {
 	Call        store.Option[CallContent] // 提案调用内容
 	TrackID     uint32                   // 所属轨道ID
@@ -83,18 +91,21 @@ type Proposal struct {
 }
 
 // ProposalWithID 带ID的提案数据
+// scale-codec-gen:generate
 type ProposalWithID struct {
 	ID       uint32   // 提案ID
 	Proposal Proposal // 提案数据
 }
 
 // ProposalResult 提案执行结果
+// scale-codec-gen:generate
 type ProposalResult struct {
 	Result    store.Option[[]byte] // 执行返回值
 	ExecError store.Option[[]byte] // 执行错误信息
 }
 
 // Vote 投票记录
+// scale-codec-gen:generate
 type Vote struct {
 	Index      uint32        // 投票索引
 	ProposalID uint32        // 提案ID
@@ -107,6 +118,7 @@ type Vote struct {
 }
 
 // Spend 支出记录
+// scale-codec-gen:generate
 type Spend struct {
 	ID      uint64        // 支出ID
 	Caller  store.UniAddr // 发起人地址
@@ -118,6 +130,7 @@ type Spend struct {
 
 // VoteRef 投票引用，用于记录用户的投票
 // 存储在 votesOfUser 中，方便用户查询自己的投票
+// scale-codec-gen:generate
 type VoteRef struct {
 	ProposalID uint32 // 提案ID
 	VoteIndex  uint32 // 投票索引

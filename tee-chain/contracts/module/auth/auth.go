@@ -15,6 +15,7 @@ var (
 )
 
 // Auth 认证合约 — 使用 []byte 作为 key
+// scale-codec-gen:skip
 type Auth struct {
 	api store.ContractApi
 
@@ -27,8 +28,13 @@ type Auth struct {
 	encryptedKey  *store.StoreMapping[string, PrivateKeyRecord] // email → 私钥（跨节点同步）
 }
 
+// scale-codec-gen:skip
 type AuthQuery struct{ Auth }
+
+// scale-codec-gen:skip
 type AuthMutation struct{ Auth }
+
+// scale-codec-gen:skip
 type AuthSecret struct{ Auth }
 
 // ── RegisterUser ─────────────────────────────────────────

@@ -1,6 +1,9 @@
 package store
 
-import "fmt"
+import (
+	"fmt"
+	"math/big"
+)
 
 // StoreTx 抽象化存储操作接口。Native (*model.Txn) 和 WASM 均满足。
 type StoreTx interface {
@@ -84,4 +87,40 @@ func (o *Option[T]) Decode(data []byte) (int, error) {
 	// 无法精确计算消费字节数，ScaleDecode 不返回字节数
 	// 对于 SCALE，数据是紧凑的，消费全部剩余字节
 	return len(data), nil
+}
+
+// BigIntToUintBytes encodes the given big.Int to a big endian encoded unsigned integer byte slice of the given byte
+// length, returning an error if the given big.Int would be bigger than the maximum number the byte slice of the given
+// length could hold
+func BigIntToUintBytes(i *big.Int, bytelen int) ([]byte, error) {
+	if i.Sign() < 0 {
+		return nil, fmt.Errorf("cannot encode a negative big.Int into an unsigned integer")
+	}
+
+	max := big.NewInt(0).Exp(big.NewInt(2), big.NewInt(int64(bytelen*8)), nil)
+	if i.CmpAbs(max) > 0 {
+		return nil, fmt.Errorf("cannot encode big.Int to []byte: given big.Int exceeds highest number "+
+			"%v for an uint with %v bits", max, bytelen*8)
+	}
+
+	res := make([]byte, bytelen)
+
+	bs := i.Bytes()
+	copy(res[len(res)-len(bs):], bs)
+	return res, nil
+}
+
+// UintBytesToBigInt decodes the given byte slice containing a big endian encoded unsigned integer to a big.Int
+func UintBytesToBigInt(b []byte) (*big.Int, error) {
+	if len(b) == 0 {
+		return nil, fmt.Errorf("cannot decode an empty byte slice")
+	}
+
+	return big.NewInt(0).SetBytes(b), nil
+}
+
+func Reverse(b []byte) {
+	for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
+		b[i], b[j] = b[j], b[i]
+	}
 }

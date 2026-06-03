@@ -41,6 +41,7 @@ const (
 // ── Model ────────────────────────────────────────────────
 
 // ModelInfo 独立注册的模型
+// scale-codec-gen:generate
 type ModelInfo struct {
 	Name            string        `json:"name" idx:"exact"`
 	Owner           store.UniAddr `json:"owner"`
@@ -62,17 +63,20 @@ type ModelInfo struct {
 }
 
 // ModelInfoWithID 是 DataWithID[ModelInfo] 的非泛型版本，用于合约 metadata 兼容。
+// scale-codec-gen:generate
 type ModelInfoWithID struct {
 	ID   uint64    `json:"id"`
 	Data ModelInfo `json:"data"`
 }
 
 // ProviderInfoWithID 是 DataWithID[ProviderInfo] 的非泛型版本，用于合约 metadata 兼容。
+// scale-codec-gen:generate
 type ProviderInfoWithID struct {
 	ID   uint64       `json:"id"`
 	Data ProviderInfo `json:"data"`
 }
 
+// scale-codec-gen:generate
 type ModelInfoWithProvider struct {
 	ID       uint64 `json:"id"`
 	Model    ModelInfo
@@ -82,6 +86,7 @@ type ModelInfoWithProvider struct {
 // ── Provider / Provider ──────────────────────────────────
 
 // ProviderInfo 去中心化 AI 服务提供者
+// scale-codec-gen:generate
 type ProviderInfo struct {
 	// ── 身份 ──
 	Owner store.UniAddr `json:"owner"`
@@ -117,6 +122,7 @@ type ProviderInfo struct {
 
 // APIKeyInfo 用户 API Key（仅存哈希，原始 key 绝不上链）
 // TEE 提供方收到明文 key 后 blake2b 哈希，再以此查询链上记录
+// scale-codec-gen:generate
 type APIKeyInfo struct {
 	OwnerKey  uint64        `json:"ownerKey" idx:"exact"` // blake2b(owner.V)[:8] 转 uint64，用于索引
 	Owner     store.UniAddr `json:"owner"`
@@ -127,6 +133,7 @@ type APIKeyInfo struct {
 }
 
 // Settlement 单笔结算记录
+// scale-codec-gen:generate
 type Settlement struct {
 	User        store.UniAddr `json:"user"`
 	ModelID     uint64        `json:"modelId"`
@@ -141,6 +148,7 @@ type Settlement struct {
 // ── DailyUsage ───────────────────────────────────────────
 
 // DailyUsage 每日用量（已废弃，不再写入，保留类型用于兼容查询）
+// scale-codec-gen:generate
 type DailyUsage struct {
 	User        store.UniAddr `json:"user"`
 	ProviderID  uint64        `json:"providerId"`
@@ -155,6 +163,7 @@ type DailyUsage struct {
 // ── RechargeHistory ──────────────────────────────────────
 
 // RechargeRecord 单笔充值记录
+// scale-codec-gen:generate
 type RechargeRecord struct {
 	User   store.UniAddr `json:"user" idx:"exact"`
 	Amount uint64        `json:"amount"`
@@ -164,6 +173,7 @@ type RechargeRecord struct {
 // ── SettlementHistory ────────────────────────────────────
 
 // SettlementRecord 单笔结算记录（Provider 视角）
+// scale-codec-gen:generate
 type UserSettlementRecord struct {
 	ProviderID  uint64 `json:"providerId"`
 	ModelID     uint64 `json:"modelId"`
@@ -176,6 +186,7 @@ type UserSettlementRecord struct {
 }
 
 // SettlementRecord 单笔结算记录（Provider 视角）
+// scale-codec-gen:generate
 type ProviderSettlementRecord struct {
 	User        store.UniAddr `json:"user" idx:"exact"`
 	ModelID     uint64        `json:"modelId"`

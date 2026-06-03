@@ -1,6 +1,7 @@
 package auth
 
 // UserInfo 用户信息（链上存储）
+// scale-codec-gen:generate
 type UserInfo struct {
 	EmailHash      []byte // email 的哈希 (H160)
 	ShareRoot      []byte // 分片承诺 Merkle 根 (H256)
@@ -9,18 +10,21 @@ type UserInfo struct {
 }
 
 // AuthUserRecord Web3Auth 用户信息（跨节点同步）
+// scale-codec-gen:generate
 type AuthUserRecord struct {
 	Ref        string `json:"ref"`        // email（作为引用标识）
 	Ciphertext []byte `json:"ciphertext"` // json(AuthUser)
 }
 
 // PrivateKeyRecord 用户私钥（跨节点同步）
+// scale-codec-gen:generate
 type PrivateKeyRecord struct {
 	Ref        string `json:"ref"`        // email
 	Ciphertext []byte `json:"ciphertext"` // json(EncryptedKey)
 }
 
 // RecoveryConfig 社交恢复配置
+// scale-codec-gen:generate
 type RecoveryConfig struct {
 	Guardians     [][]byte // 守护者 email_hash 列表
 	Threshold     uint32   // 恢复所需最小守护者数
@@ -28,6 +32,7 @@ type RecoveryConfig struct {
 }
 
 // RecoveryRequest 进行中的恢复请求
+// scale-codec-gen:generate
 type RecoveryRequest struct {
 	EmailHash    []byte
 	NewShareRoot []byte
@@ -36,6 +41,7 @@ type RecoveryRequest struct {
 }
 
 // AuthConfig 认证服务配置（链上存储，仅 AuthSecret 可查询）
+// scale-codec-gen:generate
 type AuthConfig struct {
 	JWTSecret           string `json:"jwt_secret"`
 	SeedSecret          string `json:"seed_secret"`
