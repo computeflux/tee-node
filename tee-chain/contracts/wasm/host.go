@@ -1,3 +1,6 @@
+// Package wasm provides host functions for WASM contract execution.
+// Uses wazero (v1.12+) HostModuleBuilder, registered under the "runtime" module.
+//
 // Package wasm 提供 WASM 合约执行所需的 host functions。
 // 使用 wazero (v1.12+) HostModuleBuilder，注册到独立 "runtime" 模块。
 package wasm
@@ -12,20 +15,21 @@ import (
 
 var i32, i64 = wazapi.ValueTypeI32, wazapi.ValueTypeI64
 
-func readU32At(mem wazapi.Memory, off uint32) uint32 {
-	b, _ := mem.Read(off, 4)
-	return uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16 | uint32(b[3])<<24
-}
-
+// Error codes returned by host functions to WASM.
+// 宿主函数返回给 WASM 的错误码。
 const (
-	errOK          = uint64(0)
-	errMem         = uint64(0xFFFFFFFF)
-	errStorage     = uint64(0xFFFFFFFE)
-	errBufTooSmall = uint64(0xFFFFFFFD)
-	errKeyNotFound = uint64(0xFFFFFFFC)
+	errOK          = uint64(0)          // success
+	errMem         = uint64(0xFFFFFFFF) // memory access error
+	errStorage     = uint64(0xFFFFFFFE) // storage operation error
+	errBufTooSmall = uint64(0xFFFFFFFD) // output buffer too small
+	errKeyNotFound = uint64(0xFFFFFFFC) // key not found
 )
 
-// copyBytes 复制字节切片（wazero 的 mem.Read 返回 WASM 内存视图，需独立副本）。
+// copyBytes deep-copies a byte slice.
+// Needed because wazero's mem.Read returns a view into WASM memory that may be reused.
+//
+// copyBytes 深拷贝字节切片。
+// wazero 的 mem.Read 返回 WASM 内存视图，需独立副本以避免被覆盖。
 func copyBytes(b []byte) []byte {
 	if b == nil {
 		return nil
@@ -35,7 +39,12 @@ func copyBytes(b []byte) []byte {
 	return cp
 }
 
-// ── Host Module ───────────────────────────────────────────
+// encodeScanPairs writes keys and vals arrays into WASM memory at the given pointers.
+// Format: [count: u32LE][len: u32LE][data...][count: u32LE][len: u32LE][data...]
+// Returns the number of key-value pairs written.
+//
+// encodeScanPairs 将 keys/vals 数组写入 WASM 内存指定位置。
+// 格式: [数量: u32LE][长度: u32LE][数据...][数量: u32LE][长度: u32LE][数据...]
 func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]byte) uint32 {
 	buf := make([]byte, 0, 1024)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(keys)))
@@ -56,20 +65,25 @@ func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]
 	return uint32(len(keys))
 }
 
-// instantiateHostModule 创建并注册 "runtime" host module（singleton，只调用一次）。
-// s 是共享状态指针，host functions 通过 s 访问 callData/result/api。
+// instantiateHostModule creates and registers the "runtime" host module.
+// s is shared mutable state; host functions access s.api for contract context.
+//
+// instantiateHostModule 创建并注册 "runtime" host module。
+// s 是共享状态指针，host functions 通过 s.api 访问合约上下文。
 func instantiateHostModule(ctx context.Context, rt wazero.Runtime, s *hostState) (wazapi.Module, error) {
 	b := rt.NewHostModuleBuilder("runtime")
 	registerStorage(b, s)
 	registerContext(b, s)
 	registerIdentity(b, s)
-	registerCallIO(b, s)
 	return b.Instantiate(ctx)
 }
 
-// ── 存储 ─────────────────────────────────────────────────
+// ── Storage host functions / 存储宿主函数 ─────────────────
 
 func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
+	// storage_get: reads value by key from the transaction store.
+	// Params: keyPtr, keyLen, valPtr (output), valLen (max output size).
+	// Returns: length of value on success, error code on failure.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			txn := s.api.GetTxn()
@@ -94,6 +108,8 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
 	).Export("storage_get")
 
+	// storage_set: writes a key-value pair to the transaction store.
+	// Params: keyPtr, keyLen, valPtr, valLen. Returns errOK on success.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			txn := s.api.GetTxn()
@@ -113,6 +129,8 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
 	).Export("storage_set")
 
+	// storage_delete: deletes a key from the transaction store.
+	// Params: keyPtr, keyLen. Returns errOK on success.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			txn := s.api.GetTxn()
@@ -131,6 +149,9 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
 	).Export("storage_delete")
 
+	// storage_scan_prefix: lists all key-value pairs with the given prefix.
+	// Params: prefixPtr, prefixLen, keysPtr (output), valsPtr (output).
+	// Returns: number of pairs found.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			txn := s.api.GetTxn()
@@ -151,6 +172,8 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
 	).Export("storage_scan_prefix")
 
+	// storage_delete_prefix: deletes all keys with the given prefix.
+	// Params: prefixPtr, prefixLen. Returns errOK on success.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			txn := s.api.GetTxn()
@@ -170,9 +193,10 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 	).Export("storage_delete_prefix")
 }
 
-// ── 上下文 ───────────────────────────────────────────────
+// ── Context host functions / 上下文宿主函数 ───────────────
 
 func registerContext(b wazero.HostModuleBuilder, s *hostState) {
+	// get_height: returns the current block height.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
 			stack[0] = uint64(s.api.GetHeight())
@@ -180,6 +204,7 @@ func registerContext(b wazero.HostModuleBuilder, s *hostState) {
 		nil, []wazapi.ValueType{i64},
 	).Export("get_height")
 
+	// get_block_time: returns the current block timestamp.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
 			stack[0] = uint64(s.api.GetBlockTime())
@@ -187,6 +212,7 @@ func registerContext(b wazero.HostModuleBuilder, s *hostState) {
 		nil, []wazapi.ValueType{i64},
 	).Export("get_block_time")
 
+	// get_version: returns the current runtime version.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
 			stack[0] = uint64(s.api.GetVersion())
@@ -195,9 +221,11 @@ func registerContext(b wazero.HostModuleBuilder, s *hostState) {
 	).Export("get_version")
 }
 
-// ── 身份权限 ─────────────────────────────────────────────
+// ── Identity host functions / 身份宿主函数 ─────────────────
 
 func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
+	// get_caller: returns the SCALE-encoded UniAddr of the caller.
+	// Params: outPtr, outLen. Returns encoded length on success, error code on failure.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			addr := s.api.GetCaller()
@@ -212,6 +240,7 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
 	).Export("get_caller")
 
+	// get_system_account: returns the SCALE-encoded UniAddr of the system account.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			addr := s.api.GetSystemAccount()
@@ -226,6 +255,7 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
 	).Export("get_system_account")
 
+	// is_system: returns 1 if the caller is the system account, 0 otherwise.
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, _ wazapi.Module, stack []uint64) {
 			if s.api.CallbySystem() {
@@ -236,9 +266,4 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 		}),
 		nil, []wazapi.ValueType{i32},
 	).Export("is_system")
-}
-
-// ── 调用 IO ──────────────────────────────────────────────
-
-func registerCallIO(b wazero.HostModuleBuilder, s *hostState) {
 }

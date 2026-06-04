@@ -14,11 +14,41 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 	hubtx := make([][]byte, 0, 50)
 	hubCalls := make([]*model.HubCall, 0, 50)
 
+	// RuntimeUpgrade 独占整个区块：有升级交易时忽略其他所有交易
+	// RuntimeUpgrade takes the whole block: skip all other txs when upgrade is present
+	var runtimeUpgradeTx []byte
+	hasRuntimeUpgrade := false
+	for _, txbt := range txs {
+		txbox := new(model.Tx)
+		if protoio.ReadMessage(bytes.NewBuffer(txbt), txbox) != nil {
+			continue
+		}
+		tx := new(model.SysCall)
+		if protoio.ReadMessage(bytes.NewBuffer(txbox.Call), tx) != nil {
+			continue
+		}
+		if _, ok := tx.Payload.(*model.SysCall_RuntimeUpgrade); ok {
+			runtimeUpgradeTx = txbt
+			hasRuntimeUpgrade = true
+			break
+		}
+	}
+
+	if hasRuntimeUpgrade {
+		*finaltx = append(*finaltx, runtimeUpgradeTx)
+		util.LogWithGreen("PrepareTx", "RuntimeUpgrade: exclusive block, only upgrade tx included")
+		return
+	}
+
 	// 使用临时 txn 累积 nonce 状态，确保同区块内多笔同 caller 合约交易的 nonce 连续
 	txn := model.DBINS.NewTransaction()
 	defer txn.Rollback()
 
-	// 第一步：收集所有HubCall并检查正在提交到主链的块中是否有相同caller
+	// 同一区块内每个 caller 只允许一笔交易（含合约和HubCall）
+	// Only one tx per caller per block (contract + HubCall)
+	seenCallers := make(map[string]bool)
+
+	// 第一步：收集所有交易，同 caller 只保留第一笔
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
 		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)
@@ -30,6 +60,17 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 		err = protoio.ReadMessage(bytes.NewBuffer(txbox.Call), tx)
 		if err != nil {
 			continue
+		}
+
+		// 同 caller 只保留第一笔，对所有交易类型生效
+		// Dedup by caller for all tx types
+		if len(txbox.GetCaller()) > 0 {
+			callerKey := string(txbox.GetCaller())
+			if seenCallers[callerKey] {
+				util.LogWithGray("PrepareTx", "Skip duplicate tx, caller:", fmt.Sprintf("%x", txbox.GetCaller()))
+				continue
+			}
+			seenCallers[callerKey] = true
 		}
 
 		switch tx.Payload.(type) {
@@ -52,38 +93,30 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 				hubtx = append(hubtx, txbt)
 			}
 		case *model.SysCall_Contract:
-			// PrepareProposal 阶段预校验合约交易 nonce，过滤过期交易
-			// 使用 txn 读取 nonce，感知同区块内前面交易对 nonce 的修改
 			contractNonce := tx.GetContract().GetNonce()
 			currentNonce, err := TxnGetCurrentCallerNonce(txn, txbox.GetCaller(), txbox.GetCallerType())
 			if err != nil {
-				util.LogWithGray("PrepareTx", "Skip contract tx: failed to get nonce, err:", err, "caller", fmt.Sprintf("%x", txbox.GetCaller()))
+				util.LogWithGray("PrepareTx", "Skip contract tx: failed to get nonce, err:", err)
 				continue
 			}
 
 			expectedNonce := currentNonce + 1
 			if contractNonce != expectedNonce {
-				util.LogWithGray("PrepareTx", "Skip contract tx with invalid nonce, expected", expectedNonce, "got", contractNonce, "caller", fmt.Sprintf("%x", txbox.GetCaller()))
+				util.LogWithGray("PrepareTx", "Skip contract tx with invalid nonce, expected", expectedNonce, "got", contractNonce)
 				continue
 			}
 
-			// 在 txn 中更新 nonce，使后续同 caller 交易的 nonce 校验基于最新状态
 			if err := TxnSetCallerNonce(txn, txbox.GetCaller(), txbox.GetCallerType(), contractNonce); err != nil {
-				util.LogWithGray("PrepareTx", "Skip contract tx: failed to set nonce, err:", err, "caller", fmt.Sprintf("%x", txbox.GetCaller()))
+				util.LogWithGray("PrepareTx", "Skip contract tx: failed to set nonce, err:", err)
 				continue
 			}
-			*finaltx = append(*finaltx, txbt)
-		case *model.SysCall_RuntimeUpgrade:
-			// RuntimeUpgrade 不需要 nonce 校验，直接包含在区块中
 			*finaltx = append(*finaltx, txbt)
 		default:
 			break
 		}
 	}
 
-	// 第二步：在同一块内去重相同caller的HubCall，只保留第一个
-	hubtx = s.deduplicateCallersInBlock(hubtx, hubCalls)
-
+	// 第二步：HubCall 同步到主链
 	if len(hubtx) > 0 {
 		tx, err := HubSyncStep1(s)
 		if err != nil {
@@ -100,61 +133,9 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 
 		*finaltx = append(*finaltx, tx)
 		*finaltx = append(*finaltx, hubtx...)
+
 		// TODO: DeleteSigOfTx should be moved to FinalizeTx or Commit to ensure
 		// it only runs after the block is actually committed.
 		s.DeleteSigOfTx(height)
 	}
-}
-
-// extractCallersFromHubCall 从HubCall中提取所有caller
-func extractCallersFromHubCall(hub *model.HubCall) map[string]bool {
-	callers := make(map[string]bool)
-	if hub == nil {
-		return callers
-	}
-	for _, call := range hub.Call {
-		if call != nil && len(call.Caller) > 0 {
-			callerKey := string(call.Caller)
-			callers[callerKey] = true
-		}
-	}
-	return callers
-}
-
-// deduplicateCallersInBlock 在同一块内去重相同caller的HubCall，只保留第一个
-func (s *TeeChain) deduplicateCallersInBlock(hubtx [][]byte, hubCalls []*model.HubCall) [][]byte {
-	if len(hubtx) == 0 {
-		return hubtx
-	}
-
-	seenCallers := make(map[string]bool)
-	result := make([][]byte, 0, len(hubtx))
-
-	for i, hub := range hubCalls {
-		if hub == nil {
-			continue
-		}
-
-		callers := extractCallersFromHubCall(hub)
-		hasDuplicate := false
-
-		// 检查是否有已见过的caller
-		for caller := range callers {
-			if seenCallers[caller] {
-				hasDuplicate = true
-				util.LogWithGray("PrepareTx", "Duplicate caller in block, skipping:", caller)
-				break
-			}
-		}
-
-		// 如果没有重复，添加到结果中并记录caller
-		if !hasDuplicate {
-			result = append(result, hubtx[i])
-			for caller := range callers {
-				seenCallers[caller] = true
-			}
-		}
-	}
-
-	return result
 }

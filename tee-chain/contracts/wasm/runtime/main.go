@@ -13,8 +13,6 @@ const bufSize = 128 * 1024 // 128KB
 
 var buf [bufSize]byte
 
-func bufPtr() uint32 { return uint32(uintptr(unsafe.Pointer(&buf[0]))) }
-
 //go:wasmimport runtime get_height
 func hostGetHeight() int64
 
@@ -22,23 +20,36 @@ func hostGetHeight() int64
 func ping() int32 { return 1 }
 
 //go:wasmexport get_buffer
-func get_buffer() uint32 { return bufPtr() }
+func get_buffer() uint32 { return uint32(uintptr(unsafe.Pointer(&buf[0]))) }
 
-// 返回值: 高 32 位 = 结果指针, 低 32 位 = 结果长度; (0, 0) 表示无结果
+// execute is the main entry point called by the host.
+// Parameters:
+//
+//	isQuery      - 0 = mutation, non-zero = query
+//	callDataPtr  - pointer to SCALE-encoded InContractCall in WASM memory
+//	callDataLen  - byte length of the encoded data
+//
+// Returns packed uint64:
+//
+//	high 32 bits = result pointer in WASM memory
+//	low 32 bits  = result byte length
+//	0 means no result
+//
+// execute 是宿主调用的主入口。
+// 参数: isQuery(0=变更,非0=查询), callDataPtr(SCALE编码数据指针), callDataLen(字节长度)
+// 返回打包 uint64: 高32位=结果指针, 低32位=结果长度, 0表示无结果
 //
 //go:wasmexport execute
 func execute(isQuery uint32, callDataPtr uint32, callDataLen uint32) uint64 {
 	if callDataLen == 0 {
 		return 0
 	}
-	// 直接从 WASM 内存读取 SCALE 编码的 InContractCall
 	data := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(callDataPtr))), int(callDataLen))
 
 	var call store.InContractCall
 	if _, err := call.Decode(data); err != nil {
-		bp := bufPtr()
 		n := copy(buf[:], err.Error())
-		return packResult(bp, uint32(n))
+		return packResult(uint32(uintptr(unsafe.Pointer(&buf[0]))), uint32(n))
 	}
 
 	rt := &wasmRuntime{txn: &WasmTxn{}, height: hostGetHeight()}
@@ -56,16 +67,16 @@ func execute(isQuery uint32, callDataPtr uint32, callDataLen uint32) uint64 {
 	if len(result) == 0 {
 		return 0
 	}
-	bp := bufPtr()
-	return packResult(bp, uint32(copy(buf[:], result)))
+	return packResult(uint32(uintptr(unsafe.Pointer(&buf[0]))), uint32(copy(buf[:], result)))
 }
 
-// packResult 将 (ptr, len) 打包为 uint64: 高 32 位 ptr, 低 32 位 len
+// packResult packs (ptr, length) into a uint64: high 32 bits = ptr, low 32 bits = length.
 func packResult(ptr, length uint32) uint64 {
 	return uint64(ptr)<<32 | uint64(length)
 }
 
-// ── 运行时适配层 ──────────────────────────────────────────
+// wasmRuntime adapts the WASM environment to the contract API interface.
+// wasmRuntime 将 WASM 环境适配为合约 API 接口。
 
 type wasmRuntime struct {
 	txn    store.StoreTx
