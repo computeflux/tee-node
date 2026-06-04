@@ -90,3 +90,17 @@ func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 	// 2. 回退到环境变量（开发环境）
 	return &AuthConfig{}
 }
+
+// ResetConfigCache 清除配置缓存，仅用于测试。
+func ResetConfigCache() {
+	cacheMu.Lock()
+	cachedCfg = nil
+	cacheMu.Unlock()
+}
+
+// SetCachedConfigForTest 直接设置配置缓存，仅用于测试。
+func SetCachedConfigForTest(cfg *AuthConfig) {
+	cacheMu.Lock()
+	cachedCfg = cfg
+	cacheMu.Unlock()
+}

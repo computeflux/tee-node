@@ -169,5 +169,7 @@ func decodeMessage(msg string) ([]byte, error) {
 }
 
 func cleanHex(s string) string {
-	return strings.TrimPrefix(s, "0x")
+	s = strings.TrimPrefix(s, "0x")
+	s = strings.TrimPrefix(s, "0X")
+	return s
 }

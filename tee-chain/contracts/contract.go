@@ -31,7 +31,7 @@ func getWasmEngine() *wasm.Engine {
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
-	if version == wasm.NativeVersion {
+	if version == module.NativeVersion {
 		util.LogWithGray("CONTRACT", "NATIVE QUERY")
 		return module.Query(call, runtime)
 	}
@@ -50,7 +50,7 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 		return nil
 	}
 
-	if version == wasm.NativeVersion {
+	if version == module.NativeVersion {
 		util.LogWithGray("CONTRACT", "NATIVE Mutation")
 		err := module.Mutation(call, runtime)
 		if selector == store.MethodToSelector("Init") && err == nil {

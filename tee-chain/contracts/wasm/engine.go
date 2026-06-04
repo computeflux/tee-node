@@ -26,9 +26,6 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-// NativeVersion is the version number for native (non-WASM) contract execution.
-const NativeVersion = uint32(0)
-
 // Engine is the WASM contract execution engine.
 // It manages WASM runtime lifecycle, module compilation, caching, and invocation.
 type Engine struct {
