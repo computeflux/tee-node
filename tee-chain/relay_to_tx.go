@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
@@ -202,7 +203,7 @@ func (app *TeeChain) submitEmptyTx() {
 		return
 	}
 	call := &model.SysCall{Payload: &model.SysCall_Empty{Empty: time.Now().Unix()}}
-	signer := app.NodePriv.ToSigner(model.SuiteEd25519)
+	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
 	tx, err := signTx(call, signer)
 	if err != nil {
 		util.LogWithRed("RELAY-WORKER", "submit empty tx failed:", err)

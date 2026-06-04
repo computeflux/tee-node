@@ -75,11 +75,11 @@ func (p *testProvider) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
-func (m *memStoreTx) Get(key []byte) ([]byte, error)     { return m.data[string(key)], nil }
-func (m *memStoreTx) Set(key, value []byte) error        { m.data[string(key)] = value; return nil }
-func (m *memStoreTx) Delete(key []byte) error            { delete(m.data, string(key)); return nil }
-func (m *memStoreTx) Commit() error                      { return nil }
-func (m *memStoreTx) Rollback() error                    { return nil }
+func (m *memStoreTx) Get(key []byte) ([]byte, error) { return m.data[string(key)], nil }
+func (m *memStoreTx) Set(key, value []byte) error    { m.data[string(key)] = value; return nil }
+func (m *memStoreTx) Delete(key []byte) error        { delete(m.data, string(key)); return nil }
+func (m *memStoreTx) Commit() error                  { return nil }
+func (m *memStoreTx) Rollback() error                { return nil }
 func (m *memStoreTx) DeletekeysByPrefix(prefix []byte) error {
 	for k := range m.data {
 		if strings.HasPrefix(k, string(prefix)) {
@@ -417,7 +417,6 @@ func TestIndexedStore_QueryAND(t *testing.T) {
 }
 
 // ── IndexedList ──────────────────────────────────────────
-
 
 func TestIndexedList_InsertUpdateQuery(t *testing.T) {
 	txn := newMemStoreTx()

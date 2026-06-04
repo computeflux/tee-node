@@ -38,7 +38,7 @@ type ContractApi interface {
 	Call(UniAddr, ContractCall) ([]byte, error)
 }
 
-// StoreTx 抽象化存储操作接口。Native (*model.Txn) 和 WASM 均满足。
+// StoreTx 抽象化存储操作接口。Native (*store.Txn) 和 WASM 均满足。
 type StoreTx interface {
 	Get(key []byte) ([]byte, error)
 	Set(key, value []byte) error

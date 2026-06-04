@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.dedis.ch/kyber/v4"
@@ -30,7 +31,7 @@ func hashToG1BLS12381(suite pairing.Suite, msg []byte) (kyber.Point, error) {
 	return hmG1, nil
 }
 
-func (d *DssSigner) signBLS12381(suite pairing.Suite, long *model.DistKeyShare, threshold, n int, msg []byte) ([]byte, error) {
+func (d *DssSigner) signBLS12381(suite pairing.Suite, long *dkgtypes.DistKeyShare, threshold, n int, msg []byte) ([]byte, error) {
 	if long == nil {
 		return nil, errors.New("long-term share not available")
 	}
@@ -74,7 +75,7 @@ func (d *DssSigner) signBLS12381(suite pairing.Suite, long *model.DistKeyShare, 
 	return fullSig.MarshalBinary()
 }
 
-func (d *DssSigner) partialSignBLS12381(suite pairing.Suite, long *model.DistKeyShare, msg []byte) ([]byte, error) {
+func (d *DssSigner) partialSignBLS12381(suite pairing.Suite, long *dkgtypes.DistKeyShare, msg []byte) ([]byte, error) {
 	if long == nil {
 		return nil, errors.New("long-term share not available")
 	}
@@ -133,7 +134,7 @@ func (d *DssSigner) verifyBLS12381(msg, signature []byte) bool {
 // parameters needed for on-chain verification: the raw signature, the negated
 // signature in EIP-2537 format, and the hash-to-curve G1 point in EIP-2537 format.
 func (d *DssSigner) BLSSignEIP2537(msg []byte) (signature []byte, negSigEIP []byte, hmG1EIP []byte, err error) {
-	if d.suite != model.SuiteBLS12381 {
+	if d.suite != teecrypto.SuiteBLS12381 {
 		return nil, nil, nil, errors.New("not BLS suite")
 	}
 

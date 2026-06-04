@@ -1025,8 +1025,8 @@ func randMember(rng *rand.Rand) *gov.Member {
 }
 
 func randTrackData(rng *rand.Rand) *gov.TrackData {
-	return    &gov.TrackData{
-		Name:            randString(rng, 32),
+	return &gov.TrackData{
+		Name:               randString(rng, 32),
 		PreparePeriod:      rng.Uint32(),
 		MaxDeciding:        rng.Uint32(),
 		ConfirmPeriod:      rng.Uint32(),
@@ -1065,10 +1065,10 @@ func randProposalStatus(rng *rand.Rand) *gov.ProposalStatus {
 }
 
 func randProposalStatusQuery(rng *rand.Rand) *gov.ProposalStatusQuery {
-	return  &gov.ProposalStatusQuery{
+	return &gov.ProposalStatusQuery{
 		State:              uint8(rng.Intn(7)),
 		BlockHeight:        randInt63(rng),
-		ConfirmedNumber:   rng.Uint32(),
+		ConfirmedNumber:    rng.Uint32(),
 		LastConfirmedBlock: randInt63(rng),
 	}
 }

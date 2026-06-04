@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 )
 
 type AppState struct {
@@ -23,7 +23,7 @@ func (s AppState) Hash() []byte {
 }
 
 func loadAppState() (AppState, error) {
-	state, err := model.GetJson[AppState]("", stateKey)
+	state, err := dbstore.GetJson[AppState]("", stateKey)
 	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
 		return AppState{}, err
 	}
@@ -36,5 +36,5 @@ func loadAppState() (AppState, error) {
 }
 
 func saveAppState(state *AppState) error {
-	return model.SetJson("", stateKey, state)
+	return dbstore.SetJson("", stateKey, state)
 }

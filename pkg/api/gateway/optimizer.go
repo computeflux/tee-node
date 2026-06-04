@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 
 	"crypto/rand"
 	"fmt"
@@ -9,7 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/store"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
@@ -17,7 +18,7 @@ import (
 // 批量写入 Pebble，避免每个请求都同步写磁盘
 
 type usageRecord struct {
-	user        model.UniAddr
+	user        chaintypes.UniAddr
 	tokenID     uint64
 	model       *cgateway.ModelInfoWithID
 	tokenIn     uint64
@@ -37,16 +38,16 @@ func initUsageWriter() {
 		usageWg.Add(1)
 		go func() {
 			defer usageWg.Done()
-			batch := make(map[string]*model.GatewayDailyUsage, 64)
+			batch := make(map[string]*store.GatewayDailyUsage, 64)
 			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
 
 			flush := func() {
 				if len(batch) > 0 {
 					for k, u := range batch {
-						model.SetJson("GATEWAY", "usage:"+k, u)
+						store.SetJson("GATEWAY", "usage:"+k, u)
 					}
-					batch = make(map[string]*model.GatewayDailyUsage, 64)
+					batch = make(map[string]*store.GatewayDailyUsage, 64)
 				}
 			}
 
@@ -60,7 +61,7 @@ func initUsageWriter() {
 						u.TokenOut += r.tokenOut
 						u.CachedToken += r.cachedToken
 					} else {
-						batch[key] = &model.GatewayDailyUsage{
+						batch[key] = &store.GatewayDailyUsage{
 							User:        r.user,
 							ModelID:     r.model.ID,
 							ProviderID:  r.model.Data.ProviderID,
@@ -100,7 +101,7 @@ func StopUsageWriter() {
 // recordUsageAsyncFn 可被测试替换为 mock。
 var recordUsageAsyncFn = recordUsageAsync
 
-func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
+func recordUsageAsync(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
 	initUsageWriter()
 	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
 	usageCh <- usageRecord{user, tokenID, model, in, out, cachedTokens}
@@ -227,7 +228,7 @@ func settlePendingUsage() error {
 	GATEWAYLOG().Printf("[SETTLE] SUBMIT: pool empty, collecting usage records")
 
 	// 1. 扫描本地 usage: 前缀的所有记录
-	records, keys, err := model.GetJsonList[model.GatewayDailyUsage]("GATEWAY", "usage:")
+	records, keys, err := store.GetJsonList[store.GatewayDailyUsage]("GATEWAY", "usage:")
 	if err != nil {
 		return fmt.Errorf("list usage: %w", err)
 	}
@@ -274,7 +275,7 @@ func settlePendingUsage() error {
 	//    等到 ApplyToChain 消费 pool 后，下次成功 tick 才会提交新一轮 usage。
 	deleted := 0
 	for _, k := range keys {
-		if err := model.DeleteByteKey(k); err != nil {
+		if err := store.DeleteByteKey(k); err != nil {
 			GATEWAYLOG().Printf("[SETTLE] delete usage key=%x failed: %v", k, err)
 			return fmt.Errorf("[SETTLE] delete usage key failed: %w", err)
 		}
@@ -303,12 +304,12 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 	}
 
 	// SCALE 编码 Settlement 数组
-	argBytes, err := store.ScaleEncode(records)
+	argBytes, err := cstore.ScaleEncode(records)
 	if err != nil {
 		return fmt.Errorf("encode settlements: %w", err)
 	}
 
-	method := store.MethodToSelector("SettleUsage")
+	method := cstore.MethodToSelector("SettleUsage")
 
 	// 使用固定 dedupKey，确保交易池中最多只有一个 settle_usage 调用。
 	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage")

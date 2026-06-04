@@ -7,7 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/domain"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -83,7 +84,7 @@ func InitRuntimeVersion(genesisWasm []byte) error {
 }
 
 func createRuntimeV0(wasmBytes []byte, desc string) error {
-	info := &model.RuntimeVersionInfo{
+	info := &domain.RuntimeVersionInfo{
 		Version:          RuntimeDefaultVersion,
 		ActivationHeight: 0,
 		CodeHash:         nil,
@@ -95,11 +96,11 @@ func createRuntimeV0(wasmBytes []byte, desc string) error {
 		return err
 	}
 
-	if err := model.SetCodec("", RuntimeVersionKey, RuntimeDefaultVersion); err != nil {
+	if err := store.SetCodec("", RuntimeVersionKey, RuntimeDefaultVersion); err != nil {
 		return err
 	}
 
-	if err := model.SetCodec("", RuntimeAtHeightPrefix+"0", RuntimeDefaultVersion); err != nil {
+	if err := store.SetCodec("", RuntimeAtHeightPrefix+"0", RuntimeDefaultVersion); err != nil {
 		return err
 	}
 	return nil
@@ -107,7 +108,7 @@ func createRuntimeV0(wasmBytes []byte, desc string) error {
 
 // GetCurrentRuntimeVersion 获取当前激活的运行时版本
 func GetCurrentRuntimeVersion() (uint32, error) {
-	v, err := model.GetCodecOrDefault("", RuntimeVersionKey, RuntimeDefaultVersion)
+	v, err := store.GetCodecOrDefault("", RuntimeVersionKey, RuntimeDefaultVersion)
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
@@ -115,8 +116,8 @@ func GetCurrentRuntimeVersion() (uint32, error) {
 }
 
 // GetRuntimeVersionAtHeightTxn 从当前交易中优先读取版本（支持同区块内 RuntimeUpgrade 立即生效）。
-func GetRuntimeVersionAtHeightTxn(txn *model.Txn, height int64) (uint32, error) {
-	v, err := model.TxnGetCodec[uint32](txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
+func GetRuntimeVersionAtHeightTxn(txn *store.Txn, height int64) (uint32, error) {
+	v, err := store.TxnGetCodec[uint32](txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
@@ -128,7 +129,7 @@ func GetRuntimeVersionAtHeightTxn(txn *model.Txn, height int64) (uint32, error) 
 
 // GetRuntimeVersionAtHeight 获取指定区块高度使用的运行时版本
 func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
-	v, err := model.GetCodec[uint32]("", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
+	v, err := store.GetCodec[uint32]("", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
@@ -155,17 +156,17 @@ func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
 }
 
 // GetRuntimeVersionInfo 获取指定版本的元数据
-func GetRuntimeVersionInfo(version uint32) (*model.RuntimeVersionInfo, error) {
-	return model.GetJson[model.RuntimeVersionInfo]("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(version), 10))
+func GetRuntimeVersionInfo(version uint32) (*domain.RuntimeVersionInfo, error) {
+	return store.GetJson[domain.RuntimeVersionInfo]("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(version), 10))
 }
 
 // SetRuntimeVersionInfo 保存版本元数据
-func SetRuntimeVersionInfo(info *model.RuntimeVersionInfo) error {
-	return model.SetJson("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10), info)
+func SetRuntimeVersionInfo(info *domain.RuntimeVersionInfo) error {
+	return store.SetJson("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10), info)
 }
 
 // ApplyRuntimeUpgrade 应用运行时升级（用于 v1+，版本号递增）
-func ApplyRuntimeUpgrade(txn *model.Txn, info *model.RuntimeVersionInfo, height int64) error {
+func ApplyRuntimeUpgrade(txn *store.Txn, info *domain.RuntimeVersionInfo, height int64) error {
 	if info == nil {
 		return fmt.Errorf("runtime upgrade info is nil")
 	}
@@ -174,11 +175,11 @@ func ApplyRuntimeUpgrade(txn *model.Txn, info *model.RuntimeVersionInfo, height 
 		return err
 	}
 
-	if err := model.TxnSetCodec(txn, "", RuntimeVersionKey, info.Version); err != nil {
+	if err := store.TxnSetCodec(txn, "", RuntimeVersionKey, info.Version); err != nil {
 		return fmt.Errorf("update runtime version: %w", err)
 	}
 
-	if err := model.TxnSetCodec(txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10), info.Version); err != nil {
+	if err := store.TxnSetCodec(txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10), info.Version); err != nil {
 		return fmt.Errorf("record runtime at height: %w", err)
 	}
 
@@ -186,13 +187,13 @@ func ApplyRuntimeUpgrade(txn *model.Txn, info *model.RuntimeVersionInfo, height 
 }
 
 // UpdateRuntimeMeta 仅更新版本元数据（不修改当前版本号和高度映射）
-func UpdateRuntimeMeta(txn *model.Txn, info *model.RuntimeVersionInfo) error {
+func UpdateRuntimeMeta(txn *store.Txn, info *domain.RuntimeVersionInfo) error {
 	if info == nil {
 		return fmt.Errorf("runtime upgrade info is nil")
 	}
 
-	metaKey := model.ComboNamespaceKey("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10))
-	if err := model.TxnSetJson(txn, metaKey, info); err != nil {
+	metaKey := store.ComboNamespaceKey("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10))
+	if err := store.TxnSetJson(txn, metaKey, info); err != nil {
 		return fmt.Errorf("save runtime meta: %w", err)
 	}
 

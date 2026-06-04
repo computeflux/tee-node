@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -16,7 +19,7 @@ func (dkg *DKG) handleDkg(msg *model.DkgMessage) error {
 	// 根据消息类型执行相应的处理逻辑
 	switch msg.Type {
 	case "consensus":
-		consensusMsg := model.ConsensusMsg{}
+		consensusMsg := dkgtypes.ConsensusMsg{}
 		err := json.Unmarshal(msg.Payload, &consensusMsg)
 		if err != nil {
 			return fmt.Errorf("unmarshal consensus msg: %w", err)
@@ -73,7 +76,7 @@ func (r *DKG) handleSecretSave() {
 			return errors.New("invalid message type")
 		}
 		// 解析消息
-		var datas []model.Kvs
+		var datas []domain.Kvs
 		err := json.Unmarshal(msg.Payload, &datas)
 		if err != nil {
 			fmt.Println("Error unmarshalling message data: ", err)
@@ -82,7 +85,7 @@ func (r *DKG) handleSecretSave() {
 
 		for _, data := range datas {
 			fmt.Println("-------------------------Save key: ", data.K)
-			err := model.SetKey("secret", data.K, data.V)
+			err := store.SetKey("secret", data.K, data.V)
 			if err != nil {
 				fmt.Println("Error setting key: ", err)
 				continue

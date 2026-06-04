@@ -9,6 +9,8 @@ import (
 
 	"strings"
 
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -19,7 +21,7 @@ func DecodeCaller(caller string) ([]byte, error) {
 	if strings.HasPrefix(caller, "0x") {
 		return hex.DecodeString(caller[2:])
 	}
-	_, address, err := model.SS58Decode(caller)
+	_, address, err := crypto.SS58Decode(caller)
 	return address, err
 }
 
@@ -54,7 +56,7 @@ func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract
 		},
 	}
 
-	err := model.SideSysCallVerify(caller, callerType, call, signature)
+	err := domain.SideSysCallVerify(caller, callerType, call, signature)
 	if err != nil {
 		return "", fmt.Errorf("SubmitContractCall: contract verify: %w", err)
 	}

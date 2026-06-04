@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
@@ -15,7 +18,7 @@ import (
 const StartEpoch = 1
 
 func (dkg *DKG) TryEpochConsensus(
-	msg model.ConsensusMsg,
+	msg dkgtypes.ConsensusMsg,
 	callback func(*DssSigner, uint64),
 	fail func(error),
 ) error {
@@ -43,9 +46,9 @@ func (dkg *DKG) TryEpochConsensus(
 
 	// get ed25519 share for backward compat check
 	dkg.mu.RLock()
-	edShare := dkg.GetDkgKeyShare(model.SuiteEd25519)
+	edShare := dkg.GetDkgKeyShare(crypto.SuiteEd25519)
 	nodeCount := len(dkg.Nodes)
-	nodesCopy := make([]*model.Validator, 0, nodeCount)
+	nodesCopy := make([]*chaintypes.Validator, 0, nodeCount)
 	for _, n := range dkg.Nodes {
 		nodesCopy = append(nodesCopy, n)
 	}
@@ -58,12 +61,12 @@ func (dkg *DKG) TryEpochConsensus(
 
 	// init consensus msg
 	// 注：ShareCommits 按 suite 携带，每个 suite 的 reConsensus 都需要 PublicCoeffs
-	msg.ShareCommits = make(map[model.SuiteType]model.KyberPoints)
+	msg.ShareCommits = make(map[crypto.SuiteType]dkgtypes.KyberPoints)
 	if edShare != nil {
-		for _, st := range model.AllSuites() {
+		for _, st := range crypto.AllSuites() {
 			share := dkg.GetDkgKeyShare(st)
 			if share != nil {
-				commitsCopy, err := model.DeepCopyIf(share.CommitsWrap)
+				commitsCopy, err := dkgtypes.DeepCopyIf(share.CommitsWrap)
 				if err != nil {
 					return err
 				}
@@ -77,8 +80,8 @@ func (dkg *DKG) TryEpochConsensus(
 	}
 
 	// generate new validators sidekey
-	dkgSigner := dkg.Signer.GetPublicForSuite(model.SuiteEd25519).SS58()
-	validator := new(model.Validator)
+	dkgSigner := dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58()
+	validator := new(chaintypes.Validator)
 	for _, v := range msg.Validators {
 		if v.ValidatorId.SS58() == dkgSigner {
 			validator = v
@@ -114,7 +117,7 @@ func (dkg *DKG) TryEpochConsensus(
 }
 
 // start dkg consensus
-func (dkg *DKG) startConsensus(msg model.ConsensusMsg) error {
+func (dkg *DKG) startConsensus(msg dkgtypes.ConsensusMsg) error {
 	if !dkg.TrySetConsensusBusy() {
 		return errors.New("DKG Consensus going")
 	}
@@ -132,7 +135,7 @@ func (dkg *DKG) startConsensus(msg model.ConsensusMsg) error {
 	dkg.addConsensusTimeout()
 
 	hasShareCommits := false
-	for _, st := range model.AllSuites() {
+	for _, st := range crypto.AllSuites() {
 		if len(msg.ShareCommits[st].Public) > 0 {
 			hasShareCommits = true
 			break
@@ -153,27 +156,27 @@ func (dkg *DKG) startConsensus(msg model.ConsensusMsg) error {
 }
 
 // Init Consensus — runs DKG for ALL suites in parallel
-func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
+func (dkg *DKG) initConsensus(msg dkgtypes.ConsensusMsg) error {
 	dkg.mu.Lock()
 	dkg.Nodes = msg.Validators
 	dkg.NewNodes = msg.Validators
 	dkg.NewEpoch = msg.Epoch
 	dkg.Threshold = len(msg.Validators) - (len(msg.Validators)-1)/3
 	// Snapshot before unlock (avoids race)
-	nodesSnapshot := make([]*model.Validator, len(dkg.Nodes))
+	nodesSnapshot := make([]*chaintypes.Validator, len(dkg.Nodes))
 	copy(nodesSnapshot, dkg.Nodes)
 	threshold := dkg.Threshold
 	dkg.mu.Unlock()
 
 	// 为所有 suite 并行生成 deal
-	newMsg, err := model.DeepCopyIf(msg)
+	newMsg, err := dkgtypes.DeepCopyIf(msg)
 	if err != nil {
 		return err
 	}
-	newMsg.DealBundles = make(map[model.SuiteType]*model.DealBundle)
-	newMsg.ShareCommits = make(map[model.SuiteType]model.KyberPoints)
+	newMsg.DealBundles = make(map[crypto.SuiteType]*dkgtypes.DealBundle)
+	newMsg.ShareCommits = make(map[crypto.SuiteType]dkgtypes.KyberPoints)
 
-	for _, st := range model.AllSuites() {
+	for _, st := range crypto.AllSuites() {
 		suite := dkg.Suites[st]
 
 		// Build node list from snapshot.
@@ -220,7 +223,7 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 		dkg.mu.Lock()
 		dkg.DistKeyGens[st] = gen
 		dkg.mu.Unlock()
-		newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal, Suite: st.String()}
+		newMsg.DealBundles[st] = &dkgtypes.DealBundle{DealBundle: deal, Suite: st.String()}
 	}
 
 	// 发送包含所有 suite deal 的消息
@@ -233,7 +236,7 @@ func (dkg *DKG) initConsensus(msg model.ConsensusMsg) error {
 }
 
 // Re-consensus DKG — runs DKG for ALL suites
-func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
+func (dkg *DKG) reConsensus(msg dkgtypes.ConsensusMsg) error {
 	// old
 	dkg.mu.Lock()
 	dkg.Threshold = len(msg.OldValidators) - (len(msg.OldValidators)-1)/3
@@ -242,7 +245,7 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 	dkg.NewNodes = msg.Validators
 	dkg.NewEpoch = msg.Epoch
 	// Snapshot before unlock
-	nodesSnapshot := make([]*model.Validator, len(dkg.Nodes))
+	nodesSnapshot := make([]*chaintypes.Validator, len(dkg.Nodes))
 	copy(nodesSnapshot, dkg.Nodes)
 	threshold := dkg.Threshold
 	dkg.mu.Unlock()
@@ -250,13 +253,13 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 	newThreshold := len(msg.Validators) - (len(msg.Validators)-1)/3
 
 	// 为所有 suite 并行生成 deal
-	newMsg, err := model.DeepCopyIf(msg)
+	newMsg, err := dkgtypes.DeepCopyIf(msg)
 	if err != nil {
 		return err
 	}
-	newMsg.DealBundles = make(map[model.SuiteType]*model.DealBundle)
+	newMsg.DealBundles = make(map[crypto.SuiteType]*dkgtypes.DealBundle)
 
-	for _, st := range model.AllSuites() {
+	for _, st := range crypto.AllSuites() {
 		suite := dkg.Suites[st]
 
 		// new DKG 节点列表
@@ -328,14 +331,14 @@ func (dkg *DKG) reConsensus(msg model.ConsensusMsg) error {
 				dkg.finishDkgConsensusStep(false, "re-Deals:"+st.String())
 				return fmt.Errorf("failed to generate key shares for %s: %w", st, err)
 			}
-			newMsg.DealBundles[st] = &model.DealBundle{DealBundle: deal, Suite: st.String()}
+			newMsg.DealBundles[st] = &dkgtypes.DealBundle{DealBundle: deal, Suite: st.String()}
 		}
 	}
 
 	// 重置缓存
 	dkg.mu.Lock()
-	for _, st := range model.AllSuites() {
-		dkg.deals[st] = make(map[string]*model.DealBundle)
+	for _, st := range crypto.AllSuites() {
+		dkg.deals[st] = make(map[string]*dkgtypes.DealBundle)
 		dkg.responses[st] = make(map[string]*pedersen.ResponseBundle)
 	}
 	dkg.justifs = []*pedersen.JustificationBundle{}
@@ -370,8 +373,8 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 	if dkg.failConsensusTimer != nil {
 		dkg.failConsensusTimer.Stop()
 	}
-	for _, st := range model.AllSuites() {
-		dkg.deals[st] = make(map[string]*model.DealBundle)
+	for _, st := range crypto.AllSuites() {
+		dkg.deals[st] = make(map[string]*dkgtypes.DealBundle)
 		dkg.responses[st] = make(map[string]*pedersen.ResponseBundle)
 	}
 	dkg.justifs = []*pedersen.JustificationBundle{}
@@ -397,7 +400,7 @@ func (dkg *DKG) finishDkgConsensusStep(isok bool, tag string) {
 		dkg.Nodes = dkg.NewNodes
 		// dkg.Epoch = dkg.NewEpoch
 		dkg.Threshold = len(dkg.NewNodes) - (len(dkg.NewNodes)-1)/3
-		for _, st := range model.AllSuites() {
+		for _, st := range crypto.AllSuites() {
 			dkg.DkgPubKeys[st] = dkg.NewDkgPubKeys[st]
 			dkg.DkgKeyShares[st] = dkg.NewDkgKeyShares[st]
 		}
@@ -422,7 +425,7 @@ func (dkg *DKG) ToNewEpoch() {
 	defer dkg.setConsensusFree()
 
 	dkg.mu.Lock()
-	edShare := dkg.NewDkgKeyShares[model.SuiteEd25519]
+	edShare := dkg.NewDkgKeyShares[crypto.SuiteEd25519]
 	if edShare == nil {
 		failBack := dkg.consensusFailBack
 		dkg.mu.Unlock()
@@ -436,7 +439,7 @@ func (dkg *DKG) ToNewEpoch() {
 	dkg.Nodes = dkg.NewNodes
 	dkg.Epoch = dkg.NewEpoch
 	dkg.Threshold = len(dkg.NewNodes) - (len(dkg.NewNodes)-1)/3
-	for _, st := range model.AllSuites() {
+	for _, st := range crypto.AllSuites() {
 		dkg.DkgPubKeys[st] = dkg.NewDkgPubKeys[st]
 		dkg.DkgKeyShares[st] = dkg.NewDkgKeyShares[st]
 		dkg.NewDkgPubKeys[st] = nil
@@ -480,7 +483,7 @@ func (dkg *DKG) setConsensusFree() {
 	dkg.mu.Unlock()
 }
 
-func (dkg *DKG) NewValidatorNodeLen(nodes []*model.Validator) int {
+func (dkg *DKG) NewValidatorNodeLen(nodes []*chaintypes.Validator) int {
 	var count int = 1
 	peers := dkg.Peer.AvailableNodes()
 	for _, p := range peers {
@@ -493,9 +496,9 @@ func (dkg *DKG) NewValidatorNodeLen(nodes []*model.Validator) int {
 	return count
 }
 
-func (dkg *DKG) OldAndNetIds() []*model.PubKey {
-	news := make([]*model.PubKey, 0)
-	olds := make([]*model.PubKey, 0)
+func (dkg *DKG) OldAndNetIds() []*crypto.PubKey {
+	news := make([]*crypto.PubKey, 0)
+	olds := make([]*crypto.PubKey, 0)
 	for _, node := range dkg.NewNodes {
 		news = append(news, &node.P2pId)
 	}
@@ -506,25 +509,25 @@ func (dkg *DKG) OldAndNetIds() []*model.PubKey {
 	return MergePubKey(news, olds)
 }
 
-func (dkg *DKG) NewNetIds() []*model.PubKey {
-	news := make([]*model.PubKey, 0)
+func (dkg *DKG) NewNetIds() []*crypto.PubKey {
+	news := make([]*crypto.PubKey, 0)
 	for _, node := range dkg.NewNodes {
 		news = append(news, &node.P2pId)
 	}
 	return news
 }
 
-func (dkg *DKG) NetIds() []*model.PubKey {
-	olds := make([]*model.PubKey, 0)
+func (dkg *DKG) NetIds() []*crypto.PubKey {
+	olds := make([]*crypto.PubKey, 0)
 	for _, node := range dkg.Nodes {
 		olds = append(olds, &node.P2pId)
 	}
 	return olds
 }
 
-func MergePubKey(slices ...[]*model.PubKey) []*model.PubKey {
+func MergePubKey(slices ...[]*crypto.PubKey) []*crypto.PubKey {
 	seen := make(map[string]bool)
-	var result []*model.PubKey
+	var result []*crypto.PubKey
 
 	for _, slice := range slices {
 		for _, val := range slice {

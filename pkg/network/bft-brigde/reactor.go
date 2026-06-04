@@ -10,6 +10,7 @@ import (
 	"github.com/cometbft/cometbft/types"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
@@ -46,9 +47,9 @@ type BTFReactor struct {
 	service.BaseService
 	Switch p2p.Switcher
 
-	id                      *model.PubKey
-	validators              []*model.PubKey
-	nodekeys                []*model.PubKey
+	id                      *crypto.PubKey
+	validators              []*crypto.PubKey
+	nodekeys                []*crypto.PubKey
 	dkgHandler              func(any) error
 	blockPartialSignHandler func(any) error
 	secretHandler           func(any) error
@@ -72,7 +73,7 @@ func NewBTFReactor(name string) *BTFReactor {
 }
 
 // SetID 设置本节点的公钥标识，应在 P2P 启动前调用。
-func (r *BTFReactor) SetID(id *model.PubKey) {
+func (r *BTFReactor) SetID(id *crypto.PubKey) {
 	r.id = id
 }
 
@@ -199,7 +200,7 @@ func (*BTFReactor) InitPeer(peer p2p.Peer) p2p.Peer {
 	return peer
 }
 
-func (r *BTFReactor) GetPubkeyFromPeerID(peer p2p.ID) (*model.PubKey, error) {
+func (r *BTFReactor) GetPubkeyFromPeerID(peer p2p.ID) (*crypto.PubKey, error) {
 	for _, node := range r.nodekeys {
 		if node.TeeChainNodeID() == peer {
 			return node, nil
@@ -229,7 +230,7 @@ func (r *BTFReactor) PrintPeers(event string) {
 
 	// save all nodekeys and validators
 	r.nodekeys = pubkeys
-	validators := make([]*model.PubKey, len(validatorWrap))
+	validators := make([]*crypto.PubKey, len(validatorWrap))
 	for i, v := range validatorWrap {
 		validators[i] = &v.P2pId
 	}

@@ -6,12 +6,13 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/util"
 )
 
-func (c *Contract) GetMintWorker(user types.AccountID) (*model.K8sCluster, error) {
+func (c *Contract) GetMintWorker(user types.AccountID) (*chaintypes.K8sCluster, error) {
 	workerWrap, _, err := c.subnet.QueryMintWorker(user, chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, err
@@ -23,7 +24,7 @@ func (c *Contract) GetMintWorker(user types.AccountID) (*model.K8sCluster, error
 
 	tuple, _ := workerWrap.UnWrap()
 	worker := tuple.F1
-	return &model.K8sCluster{
+	return &chaintypes.K8sCluster{
 		Id:            tuple.F0,
 		Name:          worker.Name,
 		Owner:         worker.Owner,
@@ -33,13 +34,13 @@ func (c *Contract) GetMintWorker(user types.AccountID) (*model.K8sCluster, error
 		StopBlock:     worker.StopBlock,
 		TerminalBlock: worker.TerminalBlock,
 		P2pId:         worker.P2pId,
-		Ip:            model.Ip(worker.Ip),
+		Ip:            chaintypes.Ip(worker.Ip),
 		Port:          worker.Port,
 		Status:        worker.Status,
 	}, nil
 }
 
-func (c *Contract) GetWorker(workerId uint64) (*model.K8sCluster, error) {
+func (c *Contract) GetWorker(workerId uint64) (*chaintypes.K8sCluster, error) {
 	workerWrap, _, err := c.subnet.QueryWorker(workerId, chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, err
@@ -51,7 +52,7 @@ func (c *Contract) GetWorker(workerId uint64) (*model.K8sCluster, error) {
 
 	worker, _ := workerWrap.UnWrap()
 
-	return &model.K8sCluster{
+	return &chaintypes.K8sCluster{
 		Id:            workerId,
 		Name:          worker.Name,
 		Owner:         worker.Owner,
@@ -61,13 +62,13 @@ func (c *Contract) GetWorker(workerId uint64) (*model.K8sCluster, error) {
 		StopBlock:     worker.StopBlock,
 		TerminalBlock: worker.TerminalBlock,
 		P2pId:         worker.P2pId,
-		Ip:            model.Ip(worker.Ip),
+		Ip:            chaintypes.Ip(worker.Ip),
 		Port:          worker.Port,
 		Status:        worker.Status,
 	}, nil
 }
 
-func (c *Contract) ResigerCluster(name []byte, p2p_id [32]byte, ip model.Ip, port uint32, level byte, region_id uint32) error {
+func (c *Contract) ResigerCluster(name []byte, p2p_id [32]byte, ip chaintypes.Ip, port uint32, level byte, region_id uint32) error {
 	return c.subnet.ExecWorkerRegister(name, p2p_id, subnet.Ip(ip), port, level, region_id, chain.ExecParams{
 		Signer:    c.signer,
 		PayAmount: types.NewU128(*big.NewInt(0)),
@@ -75,18 +76,18 @@ func (c *Contract) ResigerCluster(name []byte, p2p_id [32]byte, ip model.Ip, por
 }
 
 // nodes
-func (c *Contract) GetBootPeers() ([]model.P2PAddr, error) {
+func (c *Contract) GetBootPeers() ([]chaintypes.P2PAddr, error) {
 	result, _, err := c.subnet.QueryBootNodes(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, err
 	}
 
 	nodes := result.V
-	boots := make([]model.P2PAddr, 0, len(nodes))
+	boots := make([]chaintypes.P2PAddr, 0, len(nodes))
 	for _, n := range nodes {
-		boots = append(boots, model.P2PAddr{
+		boots = append(boots, chaintypes.P2PAddr{
 			Id: n.P2pId,
-			Ip: model.Ip{
+			Ip: chaintypes.Ip{
 				Ipv4:   n.Ip.Ipv4,
 				Ipv6:   n.Ip.Ipv6,
 				Domain: n.Ip.Domain,
@@ -98,7 +99,7 @@ func (c *Contract) GetBootPeers() ([]model.P2PAddr, error) {
 	return boots, nil
 }
 
-func (c *Contract) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
+func (c *Contract) GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error) {
 	workers, _, err := c.subnet.QueryWorkers(util.NewNone[uint64](), 5000, chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, nil, err
@@ -108,40 +109,40 @@ func (c *Contract) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 		return nil, nil, err
 	}
 
-	nodes := make([]*model.PubKey, 0, len(*workers)+len(*dsecrets))
-	validators := make([]*model.Validator, 0, len(*dsecrets))
+	nodes := make([]*crypto.PubKey, 0, len(*workers)+len(*dsecrets))
+	validators := make([]*chaintypes.Validator, 0, len(*dsecrets))
 
 	for _, v := range *workers {
-		nodes = append(nodes, model.PubKeyFromByte(v.F1.P2pId[:]))
+		nodes = append(nodes, crypto.PubKeyFromByte(v.F1.P2pId[:]))
 	}
 	for _, v := range *dsecrets {
 		if !v.F1.TerminalBlock.IsNone() {
 			continue
 		}
-		nodes = append(nodes, model.PubKeyFromByte(v.F1.P2pId[:]))
-		validators = append(validators, &model.Validator{
+		nodes = append(nodes, crypto.PubKeyFromByte(v.F1.P2pId[:]))
+		validators = append(validators, &chaintypes.Validator{
 			NodeID:      v.F0,
-			P2pId:       *model.PubKeyFromByte(v.F1.P2pId[:]),
-			ValidatorId: *model.PubKeyFromByte(v.F1.ValidatorId[:]),
+			P2pId:       *crypto.PubKeyFromByte(v.F1.P2pId[:]),
+			ValidatorId: *crypto.PubKeyFromByte(v.F1.ValidatorId[:]),
 		})
 	}
 
 	return validators, nodes, nil
 }
 
-func (c *Contract) GetValidatorList() ([]*model.Validator, error) {
+func (c *Contract) GetValidatorList() ([]*chaintypes.Validator, error) {
 	dsecrets, _, err := c.subnet.QueryValidators(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, err
 	}
 
-	validators := make([]*model.Validator, 0, len(*dsecrets))
+	validators := make([]*chaintypes.Validator, 0, len(*dsecrets))
 	for _, v := range *dsecrets {
-		validators = append(validators, &model.Validator{
+		validators = append(validators, &chaintypes.Validator{
 			NodeID:         uint64(v.F0),
-			P2pId:          *model.PubKeyFromByte(v.F1.P2pId[:]),
-			ValidatorId:    *model.PubKeyFromByte(v.F1.ValidatorId[:]),
-			ValidatorIdBLS: *model.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
+			P2pId:          *crypto.PubKeyFromByte(v.F1.P2pId[:]),
+			ValidatorId:    *crypto.PubKeyFromByte(v.F1.ValidatorId[:]),
+			ValidatorIdBLS: *crypto.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
 		})
 	}
 
@@ -149,13 +150,13 @@ func (c *Contract) GetValidatorList() ([]*model.Validator, error) {
 }
 
 // epoch
-func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, error) {
+func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, crypto.PubKey, error) {
 	d, _, err := c.subnet.QueryEpochInfo(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
-		return 0, 0, 0, 0, model.PubKey{}, err
+		return 0, 0, 0, 0, crypto.PubKey{}, err
 	}
 
-	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *model.PubKeyFromByte(d.TeeChainPub[:]), nil
+	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *crypto.PubKeyFromByte(d.TeeChainPub[:]), nil
 }
 
 // go to new epoch
@@ -166,7 +167,7 @@ func (c *Contract) SetNewEpoch(nodeId uint64) error {
 	})
 }
 
-func (c *Contract) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error) {
+func (c *Contract) TxCallOfSetNextEpoch(nodeId uint64, signer crypto.PubKey) (*chaintypes.ChainCall, error) {
 	call, err := c.subnet.CallOfSetNextEpoch(nodeId, chain.DryRunParams{
 		Origin:    types.AccountID(signer.AccountID()),
 		PayAmount: types.NewU128(*big.NewInt(0)),
@@ -174,22 +175,22 @@ func (c *Contract) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*mo
 	if err != nil {
 		return nil, err
 	}
-	return &model.ChainCall{Substrate: *call}, nil
+	return &chaintypes.ChainCall{Substrate: *call}, nil
 }
 
-func (c *Contract) GetNextEpochValidatorList() ([]*model.Validator, error) {
+func (c *Contract) GetNextEpochValidatorList() ([]*chaintypes.Validator, error) {
 	dsecrets, _, err := c.subnet.QueryNextEpochValidators(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
 	if err != nil {
 		return nil, err
 	}
 
-	validators := make([]*model.Validator, 0, len(dsecrets.V))
+	validators := make([]*chaintypes.Validator, 0, len(dsecrets.V))
 	for _, v := range dsecrets.V {
-		validators = append(validators, &model.Validator{
+		validators = append(validators, &chaintypes.Validator{
 			NodeID:         v.F0,
-			P2pId:          *model.PubKeyFromByte(v.F1.P2pId[:]),
-			ValidatorId:    *model.PubKeyFromByte(v.F1.ValidatorId[:]),
-			ValidatorIdBLS: *model.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
+			P2pId:          *crypto.PubKeyFromByte(v.F1.P2pId[:]),
+			ValidatorId:    *crypto.PubKeyFromByte(v.F1.ValidatorId[:]),
+			ValidatorIdBLS: *crypto.PubKeyFromBLS12381Byte(v.F1.Bls[:]),
 		})
 	}
 

@@ -459,7 +459,7 @@ func collectType(types map[string]bool, typ string) {
 	// 基础类型和自定义类型
 	switch typ {
 	case "bool", "uint32", "uint64", "[]byte",
-		"model.UniAddr", "model.Amount", "store.UniAddr", "store.Amount",
+		"chaintypes.UniAddr", "model.Amount", "store.UniAddr", "store.Amount",
 		"CallContent", "TrackData", "Member":
 		types[typ] = true
 	}

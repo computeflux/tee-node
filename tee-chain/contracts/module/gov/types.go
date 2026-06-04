@@ -83,11 +83,11 @@ type ProposalDeposit struct {
 // scale-codec-gen:generate
 type Proposal struct {
 	Call        store.Option[CallContent] // 提案调用内容
-	TrackID     uint32                   // 所属轨道ID
-	Caller      store.UniAddr            // 提案发起人
-	Status      ProposalStatus           // 提案状态
-	SubmitBlock int64                    // 提交区块
-	Deposit     ProposalDeposit          // 押金信息
+	TrackID     uint32                    // 所属轨道ID
+	Caller      store.UniAddr             // 提案发起人
+	Status      ProposalStatus            // 提案状态
+	SubmitBlock int64                     // 提交区块
+	Deposit     ProposalDeposit           // 押金信息
 }
 
 // ProposalWithID 带ID的提案数据

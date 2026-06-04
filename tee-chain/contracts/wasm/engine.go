@@ -18,7 +18,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/domain"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/tetratelabs/wazero"
@@ -70,7 +71,7 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 		return e.cachedMod, nil
 	}
 
-	info, err := model.GetJson[model.RuntimeVersionInfo]("", "RUNTIME_META_"+fmt.Sprint(version))
+	info, err := dbstore.GetJson[domain.RuntimeVersionInfo]("", "RUNTIME_META_"+fmt.Sprint(version))
 	if err != nil {
 		util.LogError("wasm.LoadModule", fmt.Errorf("get runtime meta v%d: %w", version, err))
 		return nil, fmt.Errorf("get runtime meta: %w", err)

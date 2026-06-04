@@ -9,7 +9,8 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/store"
 )
 
 const (
@@ -36,20 +37,20 @@ func LogWithTime(a ...any) {
 	fmt.Println(a...)
 }
 
-func (s *TeeChain) ProposerAddressToNodeKey(proposer []byte) (*model.PubKey, error) {
+func (s *TeeChain) ProposerAddressToNodeKey(proposer []byte) ([]byte, error) {
 	if s.dkg == nil {
 		return nil, errors.New("dkg is nil")
 	}
 	for _, node := range s.dkg.Nodes {
 		if bytes.Equal(proposer, crypto.AddressHash(node.ValidatorId.PublicKey)) {
-			return &node.P2pId, nil
+			return node.P2pId.Byte(), nil
 		}
 	}
 	return nil, errors.New("ProposerAddress not in DKG")
 }
 
 func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
-	key, err := model.GetKey(GLOABL_STATE, DKG_PUB_KEY)
+	key, err := store.GetKey(GLOABL_STATE, DKG_PUB_KEY)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_key error")
 	}
@@ -62,13 +63,13 @@ func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
 	return account, nil
 }
 
-func GetDkgCommits() (*model.KyberPoints, error) {
-	bt, err := model.GetKey(GLOABL_STATE, DKG_PUB_COMMITS)
+func GetDkgCommits() (*dkgtypes.KyberPoints, error) {
+	bt, err := store.GetKey(GLOABL_STATE, DKG_PUB_COMMITS)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_commits error")
 	}
 
-	points := &model.KyberPoints{}
+	points := &dkgtypes.KyberPoints{}
 	err = json.Unmarshal(bt, points)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_commits error")

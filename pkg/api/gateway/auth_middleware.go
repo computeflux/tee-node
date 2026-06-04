@@ -6,8 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/computeflux/tee-provider/pkg/model"
-	modelpkg "github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
@@ -127,7 +126,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		if userKey == "" {
 			userKey = r.RemoteAddr
 		}
-		b := modelpkg.NewEndpointBalancerFromEndpoints(endpoints)
+		b := store.NewEndpointBalancerFromEndpoints(endpoints)
 		if b == nil {
 			writeError(w, http.StatusServiceUnavailable,
 				"no available endpoint for model "+modelName, "server_error")
@@ -167,13 +166,13 @@ func GetBodyFromContext(r *http.Request) []byte {
 
 // ── Context accessors ────────────────────────────────────
 
-func GetTokenFromContext(r *http.Request) *modelpkg.GatewayTokenInfo {
-	t, _ := r.Context().Value(ctxToken).(*modelpkg.GatewayTokenInfo)
+func GetTokenFromContext(r *http.Request) *store.GatewayTokenInfo {
+	t, _ := r.Context().Value(ctxToken).(*store.GatewayTokenInfo)
 	return t
 }
 
-func GetEndpointFromContext(r *http.Request) *model.GatewayEndpoint {
-	e, _ := r.Context().Value(ctxEndpoint).(*model.GatewayEndpoint)
+func GetEndpointFromContext(r *http.Request) *store.GatewayEndpoint {
+	e, _ := r.Context().Value(ctxEndpoint).(*store.GatewayEndpoint)
 	return e
 }
 

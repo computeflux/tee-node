@@ -7,7 +7,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -21,7 +21,7 @@ type contextKey struct {
 
 // AuthCheck checks the API key is valid via context.
 func AuthCheck(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
-	token := ctx.Value(gatewayTokenCtxKey).(*model.GatewayTokenInfo)
+	token := ctx.Value(gatewayTokenCtxKey).(*store.GatewayTokenInfo)
 	if token == nil {
 		err = gqlerror.Errorf("Please log in first.")
 		return
@@ -52,7 +52,7 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 
 // initToken decodes the Authorization header and validates the API Key.
 // Supports: Bearer <apiKey>
-func initToken(r *http.Request) *model.GatewayTokenInfo {
+func initToken(r *http.Request) *store.GatewayTokenInfo {
 	header := r.Header
 	token, ok := header["Authorization"]
 	if !ok || len(token) == 0 {

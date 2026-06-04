@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/cockroachdb/pebble"
+	"github.com/computeflux/tee-provider/pkg/api/auth"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -23,7 +23,7 @@ func setupTestWallet(t *testing.T) *WalletService {
 	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
-	model.DBINS = &model.DB{DB: db}
+	store.DBINS = &store.DB{DB: db}
 
 	// 重置并设置测试配置
 	auth.ResetConfigCache()
@@ -159,7 +159,7 @@ func TestWallet_DecryptWithServerKey_InvalidCiphertext(t *testing.T) {
 	email := "alice@example.com"
 
 	// 存入一个过短的 blob（小于 nonce size）
-	err := model.PutEncryptedKey(&model.EncryptedKey{
+	err := store.PutEncryptedKey(&store.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString([]byte{0x01, 0x02}),
 		BlobType: "aes-256-gcm-server",
@@ -220,10 +220,10 @@ func TestWallet_decryptKeyByType_UnknownType(t *testing.T) {
 	ws.DeriveAddress(email)
 
 	// 把 blob type 改成未知的
-	record, err := model.GetEncryptedKey(email)
+	record, err := store.GetEncryptedKey(email)
 	require.NoError(t, err)
 	record.BlobType = "unknown-type"
-	err = model.PutEncryptedKey(record)
+	err = store.PutEncryptedKey(record)
 	require.NoError(t, err)
 
 	// 回退逻辑：先尝试密码（失败），再尝试服务端密钥（成功）

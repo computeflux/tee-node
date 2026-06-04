@@ -9,8 +9,12 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/chains"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -47,7 +51,7 @@ func (app *TeeChain) CheckEpochFromValidator() []byte {
 			})
 		}
 
-		commits, _ := json.Marshal(app.dkg.NewDkgKeyShares[model.SuiteEd25519].CommitsWrap)
+		commits, _ := json.Marshal(app.dkg.NewDkgKeyShares[teecrypto.SuiteEd25519].CommitsWrap)
 		tx := &model.SysCall{
 			Payload: &model.SysCall_EpochEnd{
 				EpochEnd: &model.EpochEnd{
@@ -85,7 +89,7 @@ func (app *TeeChain) CheckEpochFromValidator() []byte {
 			}
 
 			util.LogWithYellow("NewEpoch", "P1 at epoch", epoch, "len(validators)", len(validators))
-			err = app.dkg.TryEpochConsensus(model.ConsensusMsg{
+			err = app.dkg.TryEpochConsensus(dkgtypes.ConsensusMsg{
 				Validators: validators,
 				Epoch:      epoch + 1,
 			}, app.newEpochSucceded, app.newEpochFail)
@@ -137,7 +141,7 @@ func (app *TeeChain) newEpochFail(err error) {
 
 // Callback when DKG consensus success
 func (app *TeeChain) GetEpochStatus() int64 {
-	bt, err := model.GetKey(GLOABL_STATE, "epoch_status")
+	bt, err := store.GetKey(GLOABL_STATE, "epoch_status")
 	if err != nil {
 		return 0
 	}
@@ -147,12 +151,12 @@ func (app *TeeChain) GetEpochStatus() int64 {
 
 // SetEpochStatus last epoch timestamp
 func (app *TeeChain) SetEpochStatus(status int64) error {
-	return model.SetKey(GLOABL_STATE, "epoch_status", util.Int64ToBytes(status))
+	return store.SetKey(GLOABL_STATE, "epoch_status", util.Int64ToBytes(status))
 }
 
 // GetEpoch get last epoch
 func (app *TeeChain) GetEpoch() uint32 {
-	bt, err := model.GetKey(GLOABL_STATE, "epoch")
+	bt, err := store.GetKey(GLOABL_STATE, "epoch")
 	if err != nil {
 		return 0
 	}
@@ -167,7 +171,7 @@ func (app *TeeChain) GetEpoch() uint32 {
 }
 
 // SetEpoch set new epoch
-func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
+func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *store.Txn) error {
 	// Save new epoch to DKG
 	if app.dkg != nil {
 		app.dkg.ToNewEpoch()
@@ -190,7 +194,7 @@ func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
 
 	// Save new epoch validators
 	for i, v := range epoch.Validators {
-		if err = model.TxnSetProtoMessage(txn, []byte("G_validator"+fmt.Sprint(i)), v); err != nil {
+		if err = store.TxnSetProtoMessage(txn, []byte("G_validator"+fmt.Sprint(i)), v); err != nil {
 			return err
 		}
 	}
@@ -199,16 +203,16 @@ func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *model.Txn) error {
 }
 
 // Get validators form local db
-func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*model.PubKey, error) {
+func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*teecrypto.PubKey, error) {
 	var err error
-	list, _, err := model.GetProtoMessageList[model.SideValidator](GLOABL_STATE, "validator")
+	list, _, err := dbstore.GetProtoMessageList[model.SideValidator](GLOABL_STATE, "validator")
 	if err != nil {
 		return nil, nil, err
 	}
 
-	validatorMap := map[string]*model.PubKey{}
+	validatorMap := map[string]*teecrypto.PubKey{}
 	for _, v := range list {
-		pub := model.PubKeyFromByte(v.Pubkey)
+		pub := teecrypto.PubKeyFromByte(v.Pubkey)
 		validatorMap[pub.SS58()] = pub
 	}
 
@@ -217,11 +221,11 @@ func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*model.
 
 // Init validator to db From init chain
 func (app *TeeChain) initValidators(vs []abci.ValidatorUpdate) error {
-	tx := model.DBINS.NewTransaction()
+	tx := store.DBINS.NewTransaction()
 
 	var err error
 	for i, v := range vs {
-		if err = model.TxnSetProtoMessage(tx, []byte("G_validator"+fmt.Sprint(i)), &model.SideValidator{
+		if err = store.TxnSetProtoMessage(tx, []byte("G_validator"+fmt.Sprint(i)), &model.SideValidator{
 			Pubkey: v.PubKey.GetEd25519(),
 			Power:  v.Power,
 		}); err != nil {

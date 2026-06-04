@@ -3,7 +3,9 @@ package dkg
 import (
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4"
@@ -29,23 +31,23 @@ func TestDssSigner_BLS12381(t *testing.T) {
 
 	// Build a minimal DKG with just the BLS share.
 	dkgInst := &DKG{
-		Suites: map[model.SuiteType]suites.Suite{
-			model.SuiteBLS12381: circl.NewSuiteBLS12381(),
+		Suites: map[crypto.SuiteType]suites.Suite{
+			crypto.SuiteBLS12381: circl.NewSuiteBLS12381(),
 		},
-		DkgPubKeys: map[model.SuiteType]*model.PubKey{
-			model.SuiteBLS12381: mustPubKeyFromPoint(groupPub, model.SuiteBLS12381),
+		DkgPubKeys: map[crypto.SuiteType]*crypto.PubKey{
+			crypto.SuiteBLS12381: mustPubKeyFromPoint(groupPub, crypto.SuiteBLS12381),
 		},
-		DkgKeyShares: map[model.SuiteType]*model.DistKeyShare{
-			model.SuiteBLS12381: {
-				CommitsWrap:  model.KyberPoints{Public: commitments},
-				PriShareWrap: model.PriShareWithSuite{PriShare: shares[0], Suite: "bls12381"},
+		DkgKeyShares: map[crypto.SuiteType]*dkgtypes.DistKeyShare{
+			crypto.SuiteBLS12381: {
+				CommitsWrap:  dkgtypes.KyberPoints{Public: commitments},
+				PriShareWrap: dkgtypes.PriShareWithSuite{PriShare: shares[0], Suite: "bls12381"},
 			},
 		},
-		Nodes:     make([]*model.Validator, n),
+		Nodes:     make([]*chaintypes.Validator, n),
 		Threshold: threshold,
 	}
 	for i := 0; i < n; i++ {
-		dkgInst.Nodes[i] = &model.Validator{}
+		dkgInst.Nodes[i] = &chaintypes.Validator{}
 	}
 
 	msg := []byte("hello BLS12381")
@@ -55,12 +57,12 @@ func TestDssSigner_BLS12381(t *testing.T) {
 	for i := 0; i < n; i++ {
 		signer := &DssSigner{
 			dkg:   dkgInst,
-			suite: model.SuiteBLS12381,
+			suite: crypto.SuiteBLS12381,
 		}
 		// Manually set the long-term share for this node.
-		dkgInst.DkgKeyShares[model.SuiteBLS12381] = &model.DistKeyShare{
-			CommitsWrap:  model.KyberPoints{Public: commitments},
-			PriShareWrap: model.PriShareWithSuite{PriShare: shares[i], Suite: "bls12381"},
+		dkgInst.DkgKeyShares[crypto.SuiteBLS12381] = &dkgtypes.DistKeyShare{
+			CommitsWrap:  dkgtypes.KyberPoints{Public: commitments},
+			PriShareWrap: dkgtypes.PriShareWithSuite{PriShare: shares[i], Suite: "bls12381"},
 		}
 		sig, err := signer.PartialSign(msg)
 		require.NoError(t, err, "node %d partial sign failed", i)
@@ -70,7 +72,7 @@ func TestDssSigner_BLS12381(t *testing.T) {
 	// Aggregator (node 0) collects partial signatures.
 	aggregator := &DssSigner{
 		dkg:   dkgInst,
-		suite: model.SuiteBLS12381,
+		suite: crypto.SuiteBLS12381,
 	}
 	// Use only threshold signatures.
 	aggregator.SetSigs(partialSigs[:threshold])
@@ -126,8 +128,8 @@ func TestDssSigner_BLS12381(t *testing.T) {
 	t.Logf("PAIRING_INPUT: %x", pairingInput)
 }
 
-func mustPubKeyFromPoint(pt kyber.Point, st model.SuiteType) *model.PubKey {
-	pk, err := model.PubKeyFromPointWithSuite(pt, st)
+func mustPubKeyFromPoint(pt kyber.Point, st crypto.SuiteType) *crypto.PubKey {
+	pk, err := crypto.PubKeyFromPointWithSuite(pt, st)
 	if err != nil {
 		panic(err)
 	}

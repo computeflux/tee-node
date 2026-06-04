@@ -1,7 +1,7 @@
 package revive
 
 import (
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	chain "github.com/wetee-dao/ink.go"
 )
 
@@ -16,7 +16,7 @@ func (c *Contract) GetLatestNonce() (uint64, error) {
 }
 
 // GetRelayEvents 批量查询 events (from..=to) | Batch query events from..=to
-func (c *Contract) GetRelayEvents(from, to uint64) ([]model.RelayEvent, error) {
+func (c *Contract) GetRelayEvents(from, to uint64) ([]chaintypes.RelayEvent, error) {
 	param := chain.DefaultParamWithOrigin(c.signer.AccountID())
 	records, _, err := c.token.QueryGetEvents(from, to, param)
 	if err != nil {
@@ -25,9 +25,9 @@ func (c *Contract) GetRelayEvents(from, to uint64) ([]model.RelayEvent, error) {
 	if records == nil || len(*records) == 0 {
 		return nil, nil
 	}
-	events := make([]model.RelayEvent, 0, len(*records))
+	events := make([]chaintypes.RelayEvent, 0, len(*records))
 	for _, rec := range *records {
-		events = append(events, model.RelayEvent{
+		events = append(events, chaintypes.RelayEvent{
 			TargetContract: rec.TargetContract,
 			EventType:      rec.EventType,
 			EventData:      rec.EventData,

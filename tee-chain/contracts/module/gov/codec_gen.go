@@ -5,6 +5,7 @@ package gov
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 

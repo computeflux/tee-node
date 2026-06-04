@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
+	"github.com/computeflux/tee-provider/pkg/store"
 )
 
 func RegisterGatewayRoutes(r chi.Router) {
@@ -110,7 +110,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 // relayToUpstreamFn 可被测试替换为 mock。
 var relayToUpstreamFn = relayToUpstream
 
-func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
 
 	meta := relay.GetMetaByContext(ctx)

@@ -14,14 +14,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/teetypes"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"golang.org/x/crypto/blake2b"
 )
 
 // UploadSecret is the resolver for the upload_secret field.
 func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secret string, hash string, user string) (bool, error) {
-	pubkey, err := model.PubKeyFromSS58(user)
+	pubkey, err := crypto.PubKeyFromSS58(user)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "PubKeyFromSS58 error:"+err.Error())
 	}
@@ -60,7 +62,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(teeChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
+	err = teetypes.IssueReport(teeChain.GetDKG().Signer.ToSigner(crypto.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}
@@ -82,7 +84,7 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 
 // InitDiskKey is the resolver for the init_disk_key field.
 func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user string) (bool, error) {
-	pubkey, err := model.PubKeyFromSS58(user)
+	pubkey, err := crypto.PubKeyFromSS58(user)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "PubKeyFromSS58 error:"+err.Error())
 	}
@@ -117,7 +119,7 @@ func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user s
 		Hash:  h[:],
 		Time:  uint64(time.Now().Unix()),
 	}}}
-	err = model.IssueReport(teeChain.GetDKG().Signer.ToSigner(model.SuiteEd25519), &call)
+	err = teetypes.IssueReport(teeChain.GetDKG().Signer.ToSigner(crypto.SuiteEd25519), &call)
 	if err != nil {
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}

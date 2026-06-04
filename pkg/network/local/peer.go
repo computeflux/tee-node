@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"go.dedis.ch/kyber/v4"
 )
@@ -14,8 +15,8 @@ var (
 	peers = make(map[string]*Peer)
 )
 
-func NewNetwork(priv *model.PrivKey, boots []string, nodes []*model.PubKey, tcp, udp uint32) (*Peer, error) {
-	id := priv.GetPublicForSuite(model.SuiteEd25519).String()
+func NewNetwork(priv *crypto.PrivKey, boots []string, nodes []*crypto.PubKey, tcp, udp uint32) (*Peer, error) {
+	id := priv.GetPublicForSuite(crypto.SuiteEd25519).String()
 
 	// 创建 P2P 网络实例
 	peer := &Peer{
@@ -38,7 +39,7 @@ func NewNetwork(priv *model.PrivKey, boots []string, nodes []*model.PubKey, tcp,
 type Peer struct {
 	id         string
 	privKey    ed25519.PrivateKey
-	nodes      []*model.PubKey
+	nodes      []*crypto.PubKey
 	handlers   map[string]func(any) error
 	callBack   func(string) error
 	version    uint32
@@ -122,14 +123,14 @@ func (p *Peer) Sub(topic string, handler func(any) error) error {
 	return nil
 }
 
-func (p *Peer) AvailableNodes() []*model.PubKey {
+func (p *Peer) AvailableNodes() []*crypto.PubKey {
 	return p.nodes
 }
 
-func (p *Peer) AllNodes() []*model.PubKey {
+func (p *Peer) AllNodes() []*crypto.PubKey {
 	return p.nodes
 }
 
-func (p *Peer) SetNodes(nodes []*model.PubKey) {
+func (p *Peer) SetNodes(nodes []*crypto.PubKey) {
 	p.nodes = nodes
 }

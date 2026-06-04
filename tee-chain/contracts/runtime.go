@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -32,12 +32,12 @@ type Runtime struct {
 //
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
-func NewRuntime(height int64, ts time.Time, txn *model.Txn, caller store.UniAddr, sudo store.UniAddr) *Runtime {
+func NewRuntime(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr) *Runtime {
 	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo}
 }
 
 // NewRuntimeWithVersion 创建带指定版本的合约运行时实例。
-func NewRuntimeWithVersion(height int64, ts time.Time, txn *model.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32) *Runtime {
+func NewRuntimeWithVersion(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32) *Runtime {
 	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo}
 }
 
@@ -67,7 +67,7 @@ func (r *Runtime) GetVersion() uint32 {
 // GetTxn 获取当前交易对象。
 // 交易对象包含签名数据和原始交易数据，可用于验证交易有效性。
 // 返回:
-//   - *store.Txn: 当前交易对象的指针
+//   - *dbstore.Txn: 当前交易对象的指针
 func (r *Runtime) GetTxn() store.StoreTx {
 	return r.txn
 }
@@ -110,7 +110,7 @@ func (r *Runtime) CallbySystem() bool {
 // 返回:
 //   - bool: true 表示已初始化，false 表示未初始化
 func IsContractIsInited(txn store.StoreTx, contract string) bool {
-	b, err := model.TxnGetCodec[bool](txn, "CONTRACT___INITED", contract)
+	b, err := dbstore.TxnGetCodec[bool](txn, "CONTRACT___INITED", contract)
 	if err != nil {
 		fmt.Println("contract init db error", err)
 		return false
@@ -133,7 +133,7 @@ func IsContractIsInited(txn store.StoreTx, contract string) bool {
 // 返回:
 //   - error: 写入数据库时的错误信息
 func SetContractInited(txn store.StoreTx, contract string) error {
-	return model.TxnSetCodec(txn, "CONTRACT___INITED", contract, true)
+	return dbstore.TxnSetCodec(txn, "CONTRACT___INITED", contract, true)
 }
 
 // Query 查询其他合约（只读操作）。

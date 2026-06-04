@@ -7,6 +7,8 @@ import (
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/chains/evm"
 	"github.com/computeflux/tee-provider/pkg/chains/revive"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/wetee-dao/ink.go"
@@ -21,16 +23,16 @@ var Chains []ChainApi
 type ChainApi interface {
 	ChainType() string
 	ChainId() uint32
-	GetCipher() model.SuiteType
-	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error)
+	GetCipher() crypto.SuiteType
+	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error)
 
 	// Relay 同步 (替代旧的 SyncRecharge/SyncWithdraw/Events)
 	// 主链合约 emit 事件 → relayer 拉取 → 侧链 relay engine 验证执行
 	GetLatestNonce() (uint64, error)
-	GetRelayEvents(from, to uint64) ([]model.RelayEvent, error)
+	GetRelayEvents(from, to uint64) ([]chaintypes.RelayEvent, error)
 
-	PartialSign(signer ink.PartialSignerType, call model.ChainCall) ([]byte, error)
-	SignAndSubmit(signer ink.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error
+	PartialSign(signer ink.PartialSignerType, call chaintypes.ChainCall) ([]byte, error)
+	SignAndSubmit(signer ink.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error
 }
 
 // ── MainChainApi ──────────────────────────────────────────
@@ -43,26 +45,26 @@ type MainChainApi interface {
 	GetSignerAddress() string
 
 	// Node / validator discovery.
-	GetBootPeers() ([]model.P2PAddr, error)
-	GetNodes() ([]*model.Validator, []*model.PubKey, error)
-	GetValidatorList() ([]*model.Validator, error)
+	GetBootPeers() ([]chaintypes.P2PAddr, error)
+	GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error)
+	GetValidatorList() ([]*chaintypes.Validator, error)
 
 	// Epoch management.
-	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, teeChainPub model.PubKey, err error)
-	GetNextEpochValidatorList() ([]*model.Validator, error)
+	GetEpoch() (epoch uint32, epochSlot uint32, lastEpochBlock uint32, now uint32, teeChainPub crypto.PubKey, err error)
+	GetNextEpochValidatorList() ([]*chaintypes.Validator, error)
 	SetNewEpoch(nodeId uint64) error
 
 	// Extrinsic construction helpers.
-	TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error)
-	BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error)
-	CheckMapAccount(addr model.PubKey) (bool, error)
-	CallOfMapAccount(signer model.PubKey) (*model.ChainCall, error)
+	TxCallOfSetNextEpoch(nodeId uint64, signer crypto.PubKey) (*chaintypes.ChainCall, error)
+	BatchCall(method string, calls []chaintypes.ChainCall) (*chaintypes.ChainCall, error)
+	CheckMapAccount(addr crypto.PubKey) (bool, error)
+	CallOfMapAccount(signer crypto.PubKey) (*chaintypes.ChainCall, error)
 }
 
 // ── Factory ───────────────────────────────────────────────
 
 // ConnectMainChain creates or reuses the singleton main-chain connection.
-func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
+func ConnectMainChain(env string, pk *crypto.PrivKey) (MainChainApi, error) {
 	config := config.GetMainChainConfig(env)
 	if config == nil {
 		return nil, fmt.Errorf("invalid environment: %s", env)
@@ -74,7 +76,7 @@ func ConnectMainChain(env string, pk *model.PrivKey) (MainChainApi, error) {
 }
 
 // ConnectChain creates a tee-chain connection.
-func ConnectChain(env string, pk *model.PrivKey) {
+func ConnectChain(env string, pk *crypto.PrivKey) {
 	var chains []ChainApi = []ChainApi{MainChain}
 	chainConfigs := config.GetChainConfigs(env)
 	for _, chainConfig := range chainConfigs {
@@ -89,7 +91,7 @@ func ConnectChain(env string, pk *model.PrivKey) {
 }
 
 // connectMainChain creates a MainChainApi for the given config.
-func connectMainChain(config *model.ChainConfigType, pk *model.PrivKey) (MainChainApi, error) {
+func connectMainChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (MainChainApi, error) {
 	switch config.ChainType {
 	case "evm":
 		return evm.NewContract(config, pk)
@@ -112,7 +114,7 @@ func GetChainByID(chainId uint32) (ChainApi, error) {
 }
 
 // connectChain creates a ChainApi for the given config.
-func connectChain(config *model.ChainConfigType, pk *model.PrivKey) (ChainApi, error) {
+func connectChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (ChainApi, error) {
 	switch config.ChainType {
 	case "evm":
 		return evm.NewContract(config, pk)

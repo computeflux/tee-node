@@ -8,13 +8,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	inkutil "github.com/wetee-dao/ink.go/util"
 )
 
 // ── Subnet: Epoch ────────────────────────────────────────
 
-func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, error) {
+func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, crypto.PubKey, error) {
 	e.mu.RLock()
 	info, err := e.subnet.EpochInfo(&bind.CallOpts{})
 	e.mu.RUnlock()
@@ -26,11 +27,11 @@ func (e *EvmChain) GetEpoch() (uint32, uint32, uint32, uint32, model.PubKey, err
 		}
 	}
 	if err != nil {
-		return 0, 0, 0, 0, model.PubKey{}, err
+		return 0, 0, 0, 0, crypto.PubKey{}, err
 	}
 
 	//TODO
-	return info.Epoch, info.EpochSlot, uint32(info.LastEpochBlock.Uint64()), info.Now, model.PubKey{}, nil
+	return info.Epoch, info.EpochSlot, uint32(info.LastEpochBlock.Uint64()), info.Now, crypto.PubKey{}, nil
 }
 
 func (e *EvmChain) SetNewEpoch(nodeId uint64) error {
@@ -53,7 +54,7 @@ func (e *EvmChain) SetNewEpoch(nodeId uint64) error {
 
 // ── Subnet: Validators ────────────────────────────────────
 
-func (e *EvmChain) GetBootPeers() ([]model.P2PAddr, error) {
+func (e *EvmChain) GetBootPeers() ([]chaintypes.P2PAddr, error) {
 	e.mu.RLock()
 	nodes, err := e.subnet.GetBootNodes(&bind.CallOpts{})
 	e.mu.RUnlock()
@@ -67,13 +68,13 @@ func (e *EvmChain) GetBootPeers() ([]model.P2PAddr, error) {
 	if err != nil {
 		return nil, err
 	}
-	var peers []model.P2PAddr
+	var peers []chaintypes.P2PAddr
 	for _, n := range nodes {
 		var id [32]byte
 		copy(id[:], n.P2pId[:])
 		ipv4 := uint32(n.Ip.A)<<24 | uint32(n.Ip.B)<<16 | uint32(n.Ip.C)<<8 | uint32(n.Ip.D)
-		peers = append(peers, model.P2PAddr{
-			Ip:   model.Ip{Ipv4: inkutil.NewSome(ipv4)},
+		peers = append(peers, chaintypes.P2PAddr{
+			Ip:   chaintypes.Ip{Ipv4: inkutil.NewSome(ipv4)},
 			Port: uint16(n.Port),
 			Id:   id,
 		})
@@ -81,7 +82,7 @@ func (e *EvmChain) GetBootPeers() ([]model.P2PAddr, error) {
 	return peers, nil
 }
 
-func (e *EvmChain) GetValidatorList() ([]*model.Validator, error) {
+func (e *EvmChain) GetValidatorList() ([]*chaintypes.Validator, error) {
 	e.mu.RLock()
 	ids, nodes, _, err := e.subnet.GetValidators(&bind.CallOpts{})
 	e.mu.RUnlock()
@@ -98,7 +99,7 @@ func (e *EvmChain) GetValidatorList() ([]*model.Validator, error) {
 	return buildValidators(ids, nodes), nil
 }
 
-func (e *EvmChain) GetNextEpochValidatorList() ([]*model.Validator, error) {
+func (e *EvmChain) GetNextEpochValidatorList() ([]*chaintypes.Validator, error) {
 	e.mu.RLock()
 	ids, nodes, _, err := e.subnet.NextEpochValidators(&bind.CallOpts{})
 	e.mu.RUnlock()
@@ -115,27 +116,27 @@ func (e *EvmChain) GetNextEpochValidatorList() ([]*model.Validator, error) {
 	return buildValidators(ids, nodes), nil
 }
 
-func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*model.Validator {
-	validators := make([]*model.Validator, 0, len(ids))
+func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*chaintypes.Validator {
+	validators := make([]*chaintypes.Validator, 0, len(ids))
 	for i, id := range ids {
 		var vId, pId [32]byte
 		if i < len(nodes) {
 			copy(vId[:], nodes[i].ValidatorId[:])
 			copy(pId[:], nodes[i].P2pId[:])
 		}
-		var blsPub *model.PubKey
+		var blsPub *crypto.PubKey
 		if i < len(nodes) && len(nodes[i].Bls) == 96 {
-			blsPub = model.PubKeyFromBLS12381Byte(nodes[i].Bls)
+			blsPub = crypto.PubKeyFromBLS12381Byte(nodes[i].Bls)
 		}
-		validators = append(validators, &model.Validator{
+		validators = append(validators, &chaintypes.Validator{
 			NodeID:      id,
-			ValidatorId: *model.PubKeyFromByte(vId[:]),
-			P2pId:       *model.PubKeyFromByte(pId[:]),
-			ValidatorIdBLS: func() model.PubKey {
+			ValidatorId: *crypto.PubKeyFromByte(vId[:]),
+			P2pId:       *crypto.PubKeyFromByte(pId[:]),
+			ValidatorIdBLS: func() crypto.PubKey {
 				if blsPub != nil {
 					return *blsPub
 				}
-				return model.PubKey{}
+				return crypto.PubKey{}
 			}(),
 		})
 
@@ -143,7 +144,7 @@ func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*model.Validat
 	return validators
 }
 
-func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
+func (e *EvmChain) GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error) {
 	// 获取所有 workers（与旧版 ink! 逻辑一致）
 	workers, _, err := e.subnet.GetWorkers(&bind.CallOpts{}, 0, 5000)
 	if err != nil {
@@ -160,14 +161,14 @@ func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 		return nil, nil, fmt.Errorf("GetSecrets: %w", err)
 	}
 
-	nodes := make([]*model.PubKey, 0, len(workers)+len(secretsResult.Nodes))
-	validators := make([]*model.Validator, 0, len(secretsResult.Nodes))
+	nodes := make([]*crypto.PubKey, 0, len(workers)+len(secretsResult.Nodes))
+	validators := make([]*chaintypes.Validator, 0, len(secretsResult.Nodes))
 
 	// Workers → P2P nodes
 	for _, w := range workers {
 		var p2pId [32]byte
 		copy(p2pId[:], w.P2pId[:])
-		nodes = append(nodes, model.PubKeyFromByte(p2pId[:]))
+		nodes = append(nodes, crypto.PubKeyFromByte(p2pId[:]))
 	}
 
 	// Secrets → P2P nodes + validators（排除已终止的）
@@ -178,21 +179,21 @@ func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 		var vId, pId [32]byte
 		copy(vId[:], s.ValidatorId[:])
 		copy(pId[:], s.P2pId[:])
-		nodes = append(nodes, model.PubKeyFromByte(pId[:]))
+		nodes = append(nodes, crypto.PubKeyFromByte(pId[:]))
 
-		var blsPub *model.PubKey
+		var blsPub *crypto.PubKey
 		if len(s.Bls) == 96 {
-			blsPub = model.PubKeyFromBLS12381Byte(s.Bls)
+			blsPub = crypto.PubKeyFromBLS12381Byte(s.Bls)
 		}
-		v := &model.Validator{
+		v := &chaintypes.Validator{
 			NodeID:      s.Id,
-			P2pId:       *model.PubKeyFromByte(pId[:]),
-			ValidatorId: *model.PubKeyFromByte(vId[:]),
-			ValidatorIdBLS: func() model.PubKey {
+			P2pId:       *crypto.PubKeyFromByte(pId[:]),
+			ValidatorId: *crypto.PubKeyFromByte(vId[:]),
+			ValidatorIdBLS: func() crypto.PubKey {
 				if blsPub != nil {
 					return *blsPub
 				}
-				return model.PubKey{}
+				return crypto.PubKey{}
 			}(),
 		}
 		validators = append(validators, v)
@@ -203,6 +204,6 @@ func (e *EvmChain) GetNodes() ([]*model.Validator, []*model.PubKey, error) {
 
 // ── Subnet: MapAccount ────────────────────────────────────
 
-func (e *EvmChain) CheckMapAccount(addr model.PubKey) (bool, error) {
+func (e *EvmChain) CheckMapAccount(addr crypto.PubKey) (bool, error) {
 	return true, nil
 }

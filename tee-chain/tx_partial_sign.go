@@ -5,8 +5,10 @@ import (
 	"sort"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -28,8 +30,8 @@ type hubCallsStore struct {
 // Parameters:
 // tx_index - The index of the transaction.
 // hubs - A slice of pointers to model.HubCall objects containing the calls to be batched.
-// proposer - A pointer to a model.PubKey object representing the proposer's public key.
-func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model.HubCall, proposer *model.PubKey) error {
+// proposer - A pointer to a crypto.PubKey object representing the proposer's public key.
+func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model.HubCall, proposer []byte) error {
 	// Check if the list of hub calls is empty. If so, exit the function early.
 	if len(hubs) == 0 {
 		return errors.New("hubs is empty")
@@ -58,7 +60,7 @@ func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model
 	})
 
 	// Initialize a slice to hold ChainCall objects.
-	var calls []model.ChainCall
+	var calls []chaintypes.ChainCall
 	// Iterate through each index call and decode it.
 	for _, c := range teeCalls {
 		call, err := chain.TEECallToCall(c, s.dkg.DkgPubKeys[chain.GetCipher()].Byte())
@@ -95,18 +97,22 @@ func (s *TeeChain) sendPartialSign(chainId uint32, tx_index int64, hubs []*model
 
 	baseKey := TxIndexPrefix + fmt.Sprint(tx_index)
 	// Store the batch call and hubCalls for retry after main-chain submit.
-	err = model.SetCodec(GLOABL_STATE, baseKey+TxIndexCallSuffix, *call)
+	err = store.SetCodec(GLOABL_STATE, baseKey+TxIndexCallSuffix, *call)
 	if err != nil {
 		return errors.Wrap(err, "Set tx call error")
 	}
-	err = model.SetJson(GLOABL_STATE, baseKey+TxIndexHubCallsSuffix, &hubCallsStore{HubCalls: hubs})
+	err = store.SetJson(GLOABL_STATE, baseKey+TxIndexHubCallsSuffix, &hubCallsStore{HubCalls: hubs})
 	if err != nil {
 		return errors.Wrap(err, "Set tx hubcalls error")
 	}
 
 	// Send the partial signature to the proposer vio the proposer via P2P.
 	err = s.p2p.Send(&model.PeerMsg{
-		To:      model.SendToNode(proposer),
+		To: &model.To{
+			Payload: &model.To_Node{
+				Node: proposer,
+			},
+		},
 		Payload: &model.PeerMsg_BlockPartialSign{BlockPartialSign: psig},
 	})
 	if err != nil {
@@ -197,7 +203,7 @@ func (s *TeeChain) SavePartialSig(user_id string, msg *model.BlockPartialSign) e
 	}
 	// Store the serialized data in the global state with a constructed key.
 	// The key is formed by combining the partial signature prefix, transaction index, and user ID.
-	return model.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+user_id, bt)
+	return store.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+user_id, bt)
 }
 
 // SigListOfTx retrieves a list of block partial signatures associated with a specific transaction index.
@@ -215,7 +221,7 @@ func (s *TeeChain) SigListOfTx(txIndex int64) ([]*model.BlockPartialSign, error)
 	// Fetch the list of serialized partial signatures from the global state with the given prefix.
 	// The prefix is constructed using the PartialSigPrefix and the transaction index.
 	// The method fetches a maximum of 5000 items starting from the first item.
-	bts, _, err := model.GetList(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_", nil, 5000)
+	bts, _, err := store.GetList(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_", nil, 5000)
 	if err != nil {
 		// If an error occurs during the retrieval, return nil and the error.
 		return nil, err
@@ -247,5 +253,5 @@ func (s *TeeChain) SigListOfTx(txIndex int64) ([]*model.BlockPartialSign, error)
 }
 
 func (s *TeeChain) DeleteSigOfTx(txIndex int64) error {
-	return model.DeletekeysByPrefix(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_")
+	return store.DeletekeysByPrefix(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_")
 }

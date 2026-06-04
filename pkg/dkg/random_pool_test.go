@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/model"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,14 +15,14 @@ func setupTestDB(t *testing.T) {
 	t.Helper()
 	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
 	require.NoError(t, err)
-	model.DBINS = &model.DB{DB: db}
+	store.DBINS = &store.DB{DB: db}
 	t.Cleanup(func() { db.Close() })
 }
 
 func TestRandomSharePool_AddShareAndAcquire(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 10)
 
 	// Initially empty
@@ -51,7 +53,7 @@ func TestRandomSharePool_AddShareAndAcquire(t *testing.T) {
 func TestRandomSharePool_PeekAt(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 10)
 
 	pool.AddShare(5, makeTestDistKeyShare(t, 5))
@@ -67,10 +69,10 @@ func TestRandomSharePool_PeekAt(t *testing.T) {
 func TestRandomSharePool_SetShares(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 10)
 
-	pool.SetShares(map[uint32]*model.DistKeyShare{
+	pool.SetShares(map[uint32]*dkgtypes.DistKeyShare{
 		0: makeTestDistKeyShare(t, 0),
 		1: makeTestDistKeyShare(t, 1),
 		2: makeTestDistKeyShare(t, 2),
@@ -84,7 +86,7 @@ func TestRandomSharePool_SetShares(t *testing.T) {
 func TestRandomSharePool_SaveAndLoad(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool1 := NewRandomSharePool(pk, 10)
 
 	pool1.AddShare(0, makeTestDistKeyShare(t, 0))
@@ -104,7 +106,7 @@ func TestRandomSharePool_SaveAndLoad(t *testing.T) {
 func TestRandomSharePool_TxMapping(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 10)
 
 	// TxMapping not set by default for simple AddShare
@@ -115,7 +117,7 @@ func TestRandomSharePool_TxMapping(t *testing.T) {
 func TestRandomSharePool_CapacityDefault(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 0) // 0 should default to DefaultRandomSharePoolCapacity
 	assert.Equal(t, DefaultRandomSharePoolCapacity, pool.Capacity())
 }
@@ -123,7 +125,7 @@ func TestRandomSharePool_CapacityDefault(t *testing.T) {
 func TestRandomSharePool_ConcurrentAccess(t *testing.T) {
 	setupTestDB(t)
 
-	pk, _ := model.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
+	pk, _ := crypto.PrivateKeyFromHex("7512939e37970b04c2b9a6060b16654473cf0721b71f8e56126ee314cbd0a7e9fe9125a81688d932ea792e9722c777f7696117363f86a107ab9d3681a8c922c8")
 	pool := NewRandomSharePool(pk, 100)
 
 	// Pre-populate

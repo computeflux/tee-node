@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/cometbft/cometbft/p2p"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -82,7 +84,7 @@ func (p *BTFReactor) savePendingMsg(msg *model.PeerMsg) error {
 	store.Msgs = append(store.Msgs, msg)
 
 	// 保存到数据库
-	if err := model.SetJson("", p.pendingMsgKey(), store); err != nil {
+	if err := dbstore.SetJson("", p.pendingMsgKey(), store); err != nil {
 		return fmt.Errorf("save pending msgs failed: %w", err)
 	}
 
@@ -96,7 +98,7 @@ type pendingMsgsStore struct {
 
 // loadPendingMsgsStore 从数据库加载待发送消息
 func (p *BTFReactor) loadPendingMsgsStore() (*pendingMsgsStore, error) {
-	store, err := model.GetJson[pendingMsgsStore]("", p.pendingMsgKey())
+	store, err := dbstore.GetJson[pendingMsgsStore]("", p.pendingMsgKey())
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +130,7 @@ func (p *BTFReactor) loadPendingMsgs() {
 
 // clearPendingMsgs 清空数据库中的待发送消息
 func (p *BTFReactor) clearPendingMsgs() error {
-	return model.DeleteKey("", p.pendingMsgKey())
+	return dbstore.DeleteKey("", p.pendingMsgKey())
 }
 
 // flushPendingMsgs 发送所有暂存的消息（P2P就绪后调用）
@@ -187,9 +189,9 @@ func (p *BTFReactor) Sub(topic string, handler func(any) error) error {
 }
 
 // Get all available nodes
-func (p *BTFReactor) AvailableNodes() []*model.PubKey {
+func (p *BTFReactor) AvailableNodes() []*crypto.PubKey {
 	peers := p.Switch.Peers()
-	nodes := make([]*model.PubKey, 0, peers.Size())
+	nodes := make([]*crypto.PubKey, 0, peers.Size())
 	for _, n := range p.nodekeys {
 		for _, peer := range peers.Copy() {
 			if peer.ID() == n.TeeChainNodeID() {
@@ -202,6 +204,6 @@ func (p *BTFReactor) AvailableNodes() []*model.PubKey {
 }
 
 // Get all nodes
-func (p *BTFReactor) AllNodes() []*model.PubKey {
+func (p *BTFReactor) AllNodes() []*crypto.PubKey {
 	return p.nodekeys
 }

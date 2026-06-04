@@ -16,18 +16,18 @@ import (
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/version"
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
-	"github.com/computeflux/tee-provider/pkg/model"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 var TeeChainNode *nm.Node
-var P2PKey *model.PubKey
+var P2PKey *crypto.PubKey
 
 // init side chain
 func InitTeeChain(
-	nodePriv *model.PrivKey,
+	nodePriv *crypto.PrivKey,
 	chainPort int,
 	light bool,
 	callback func(),
@@ -100,8 +100,8 @@ func InitTeeChain(
 		return nil, nil, nil, errors.New("failed to load node key: " + err.Error())
 	}
 
-	_, p2pKey, _ := model.GetP2PKey()
-	P2PKey = p2pKey.GetPublicForSuite(model.SuiteEd25519)
+	_, p2pKey, _ := crypto.GetP2PKey()
+	P2PKey = p2pKey.GetPublicForSuite(crypto.SuiteEd25519)
 
 	// add boot nodes
 	seeds := []string{}

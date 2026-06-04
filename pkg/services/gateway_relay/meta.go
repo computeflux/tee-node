@@ -3,7 +3,7 @@ package relay
 import (
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 )
 
 // Meta 中继请求上下文（替代 token 的 meta.Meta）
@@ -11,7 +11,7 @@ type Meta struct {
 	ProviderId      uint64
 	BaseURL         string
 	APIKey          string
-	Config          model.GatewayProviderInfo
+	Config          store.GatewayProviderInfo
 	IsStream        bool
 	OriginModelName string
 	RequestURLPath  string
@@ -28,7 +28,7 @@ func GetMetaByContext(ctx *RelayContext) *Meta {
 	if meta.BaseURL == "" {
 		v, ok := ctx.Get("provider")
 		if ok {
-			if ch, ok2 := v.(*model.GatewayProviderInfo); ok2 {
+			if ch, ok2 := v.(*store.GatewayProviderInfo); ok2 {
 				meta.ProviderId = ch.ID
 			}
 		}

@@ -11,6 +11,7 @@ import (
 	"go.dedis.ch/kyber/v4/suites"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -44,7 +45,7 @@ func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRes
 		return nil, fmt.Errorf("get validator list: %w", err)
 	}
 	threshold := len(validators)*2/3 + 1
-	validatorP2Pkeys := make([]*model.PubKey, 0, len(validators))
+	validatorP2Pkeys := make([]*crypto.PubKey, 0, len(validators))
 	for _, v := range validators {
 		validatorP2Pkeys = append(validatorP2Pkeys, &v.P2pId)
 	}
@@ -209,7 +210,7 @@ func (s *TeeChain) HandleReencryptReq(req *model.PodStart, from string) error {
 	}
 
 	// 获取重新加密所需的公钥和密文
-	clientPubKey := model.PubKeyFromByte(req.PubKey)
+	clientPubKey := crypto.PubKeyFromByte(req.PubKey)
 	if clientPubKey == nil {
 		return fmt.Errorf("client pubkey is nil")
 	}
@@ -266,7 +267,7 @@ func (s *TeeChain) HandleReencryptReq(req *model.PodStart, from string) error {
 	}
 
 	// 发送重新加密的密文份额响应
-	formPubKey, err := model.PubKeyFromHex(from)
+	formPubKey, err := crypto.PubKeyFromHex(from)
 	if err != nil {
 		return fmt.Errorf("pubkey from hex: %w", err)
 	}
@@ -306,7 +307,7 @@ func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 	// 解析程序的空间
 	nameSpace := types.H160(req.NameSpace)
 	// 解析客户端的公钥
-	clientPubKey := model.PubKeyFromByte(req.PubKey)
+	clientPubKey := crypto.PubKeyFromByte(req.PubKey)
 	if clientPubKey == nil {
 		return fmt.Errorf("client pubkey is nil")
 	}

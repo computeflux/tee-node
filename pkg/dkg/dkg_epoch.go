@@ -5,6 +5,9 @@ import (
 	"errors"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/wetee-dao/ink.go/pallet/revive"
@@ -17,20 +20,20 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	sponsor := dkg.NewEpochSponsor
 	successBack := dkg.consensusSuccessBack
 	newEpochTime := dkg.NewEpochTime
-	newDkgPubKeysCopy := make(map[model.SuiteType]*model.PubKey)
+	newDkgPubKeysCopy := make(map[crypto.SuiteType]*crypto.PubKey)
 	for k, v := range dkg.NewDkgPubKeys {
 		if v != nil {
 			cpy := *v
 			newDkgPubKeysCopy[k] = &cpy
 		}
 	}
-	newDkgPubKeysEd := newDkgPubKeysCopy[model.SuiteEd25519]
+	newDkgPubKeysEd := newDkgPubKeysCopy[crypto.SuiteEd25519]
 	dkg.mu.RUnlock()
 
 	// No sponsor (e.g., test mode): trigger callback directly.
 	if sponsor == nil {
 		if chains.MainChain == nil && successBack != nil {
-			successBack(NewDssSigner(dkg, 0, model.SuiteEd25519), 0)
+			successBack(NewDssSigner(dkg, 0, crypto.SuiteEd25519), 0)
 		}
 		return
 	}
@@ -38,14 +41,14 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	// No chain environment (e.g., test mode): trigger callback directly.
 	if chains.MainChain == nil {
 		if successBack != nil {
-			successBack(NewDssSigner(dkg, 0, model.SuiteEd25519), sponsor.NodeID)
+			successBack(NewDssSigner(dkg, 0, crypto.SuiteEd25519), sponsor.NodeID)
 		}
 		return
 	}
 
 	// Test-only: skip actual chain partial signing.
 	if skipPartialSign {
-		msg := model.NewEpochMsg{}
+		msg := dkgtypes.NewEpochMsg{}
 		bt, err := json.Marshal(msg)
 		if err != nil {
 			util.LogError("DKG", "marshal NewEpochMsg error:", err)
@@ -65,14 +68,14 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 	}
 
 	// TODO
-	if cipher == model.SuiteEd25519 {
+	if cipher == crypto.SuiteEd25519 {
 		isSome, sig, err := dkg.CheckMapAccount(newDkgPubKeysEd)
 		if err != nil {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "CheckMapAccount error:"+err.Error())
 			return
 		}
 		if !isSome {
-			msg := model.NewEpochMsg{
+			msg := dkgtypes.NewEpochMsg{
 				Time:       newEpochTime,
 				PartialSig: sig,
 			}
@@ -103,7 +106,7 @@ func (dkg *DKG) SendNewEpochPartialSigToSponsor() {
 		util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "PartialSign error:"+err.Error())
 		return
 	}
-	msg := model.NewEpochMsg{
+	msg := dkgtypes.NewEpochMsg{
 		Time:       newEpochTime,
 		PartialSig: sig,
 	}
@@ -129,7 +132,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 		return nil
 	}
 
-	msg := new(model.NewEpochMsg)
+	msg := new(dkgtypes.NewEpochMsg)
 	err := json.Unmarshal(data, msg)
 	if err != nil {
 		dkg.mu.RLock()
@@ -143,7 +146,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	dkg.mu.Lock()
 	if dkg.NewEpochPartialSigs == nil || dkg.NewEpochPartialSigTime != dkg.NewEpochTime {
-		dkg.NewEpochPartialSigs = make(map[string]*model.NewEpochMsg)
+		dkg.NewEpochPartialSigs = make(map[string]*dkgtypes.NewEpochMsg)
 		dkg.NewEpochPartialSigTime = dkg.NewEpochTime
 	}
 	dkg.NewEpochPartialSigs[OrgId] = msg
@@ -151,7 +154,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	sponsorNodeID := dkg.NewEpochSponsor.NodeID
 	successBack := dkg.consensusSuccessBack
 	failBack2 := dkg.consensusFailBack
-	newDkgPubKeysEd := dkg.NewDkgPubKeys[model.SuiteEd25519]
+	newDkgPubKeysEd := dkg.NewDkgPubKeys[crypto.SuiteEd25519]
 	dkg.mu.Unlock()
 
 	if !enough {
@@ -161,7 +164,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 
 	// Test-only: skip actual chain signing.
 	if skipPartialSign {
-		successBack(&DssSigner{suite: model.SuiteEd25519}, sponsorNodeID)
+		successBack(&DssSigner{suite: crypto.SuiteEd25519}, sponsorNodeID)
 		return nil
 	}
 
@@ -173,7 +176,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	}
 
 	// TODO
-	if cipher == model.SuiteEd25519 {
+	if cipher == crypto.SuiteEd25519 {
 		pub := newDkgPubKeysEd
 		isSome, err := chains.MainChain.CheckMapAccount(*pub)
 		if err != nil {
@@ -195,7 +198,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 				return errors.New("AsCall error:" + err.Error())
 			}
 
-			err = chains.MainChain.SignAndSubmit(&signer, model.ChainCall{Substrate: call}, false, 0)
+			err = chains.MainChain.SignAndSubmit(&signer, chaintypes.ChainCall{Substrate: call}, false, 0)
 			if err != nil {
 				failBack2(errors.New("RevPartialSig side chain key MapAccount error:" + err.Error()))
 				return errors.New("side chain key MapAccount error:" + err.Error())
@@ -218,7 +221,7 @@ func (dkg *DKG) RevPartialSig(OrgId string, data []byte) error {
 	return nil
 }
 
-func (dkg *DKG) CheckMapAccount(addr *model.PubKey) (bool, []byte, error) {
+func (dkg *DKG) CheckMapAccount(addr *crypto.PubKey) (bool, []byte, error) {
 	isSome, err := chains.MainChain.CheckMapAccount(*addr)
 	if err != nil {
 		return false, nil, err
@@ -234,8 +237,8 @@ func (dkg *DKG) CheckMapAccount(addr *model.PubKey) (bool, []byte, error) {
 			return false, nil, err
 		}
 
-		signer := NewDssSigner(dkg, 0, model.SuiteEd25519)
-		sig, err = chains.MainChain.PartialSign(signer, model.ChainCall{Substrate: call})
+		signer := NewDssSigner(dkg, 0, crypto.SuiteEd25519)
+		sig, err = chains.MainChain.PartialSign(signer, chaintypes.ChainCall{Substrate: call})
 		if err != nil {
 			util.LogWithRed("DKG SendNewEpochPartialSigToSponsor", "MapAccount PartialSign error:"+err.Error())
 			return false, nil, err

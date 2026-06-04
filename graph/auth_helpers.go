@@ -14,7 +14,8 @@ import (
 
 	authpkg "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/store"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -29,10 +30,10 @@ func generateAPIKey() string {
 // addrHex 为 Ethereum 地址 hex 字符串（如 "0xabc..."），用于结算时构造 UniAddr。
 func createUserAPIKey(owner string, addrHex string) string {
 	apiKey := generateAPIKey()
-	nextID := model.GetNextID("gateway_token")
+	nextID := store.GetNextID("gateway_token")
 
 	// 构造 UniAddr：以太坊地址 callerType=2（EVM），去掉 0x 前缀
-	addr := model.UniAddr{T: 2, V: []byte{}}
+	addr := chaintypes.UniAddr{T: 2, V: []byte{}}
 	if addrHex != "" && addrHex != "0x" {
 		addrHex = strings.TrimPrefix(addrHex, "0x")
 		if b, err := hex.DecodeString(addrHex); err == nil && len(b) == 20 {
@@ -40,7 +41,7 @@ func createUserAPIKey(owner string, addrHex string) string {
 		}
 	}
 
-	token := &model.GatewayTokenInfo{
+	token := &store.GatewayTokenInfo{
 		ID:        nextID,
 		Owner:     owner,
 		Addr:      addr,
@@ -50,8 +51,8 @@ func createUserAPIKey(owner string, addrHex string) string {
 		CreatedAt: uint64(time.Now().Unix()),
 		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()), // 默认1天过期
 	}
-	model.SetGatewayTokenByKey(token) // 写入 key 索引，供 O(1) 查询
-	model.SetNextID("gateway_token", nextID+1)
+	store.SetGatewayTokenByKey(token) // 写入 key 索引，供 O(1) 查询
+	store.SetNextID("gateway_token", nextID+1)
 
 	return apiKey
 }
@@ -59,12 +60,12 @@ func createUserAPIKey(owner string, addrHex string) string {
 // resolveEmailFromToken resolves user email from an API Key or sig_ token.
 func resolveEmailFromToken(token string) (string, error) {
 	if len(token) > 4 && token[:4] == "sig_" {
-		session, err := model.GetSignSession(token)
+		session, err := store.GetSignSession(token)
 		if err != nil || session == nil {
 			return "", fmt.Errorf("invalid sign token")
 		}
 		if time.Now().Unix() > session.ExpiresAt {
-			model.DeleteSignSession(token)
+			store.DeleteSignSession(token)
 			return "", fmt.Errorf("sign token expired")
 		}
 		return session.Email, nil
@@ -76,7 +77,7 @@ func resolveEmailFromToken(token string) (string, error) {
 	}
 
 	// Fallback: PebbleDB（Web3Auth 登录生成的临时 key）
-	tk, _ := model.GetGatewayTokenByKey(token)
+	tk, _ := store.GetGatewayTokenByKey(token)
 	if tk != nil {
 		if tk.IsExpired() {
 			return "", fmt.Errorf("token expired")
@@ -127,12 +128,12 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 }
 
 // getAuthUserFromContract 优先从链上合约读取 AuthUser；链上读不到时回退到本地存储。
-func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*model.AuthUser, error) {
+func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*store.AuthUser, error) {
 	if tc != nil {
 		ref := "auth_user:" + email
 		rec, err := authpkg.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
-			var u model.AuthUser
+			var u store.AuthUser
 			if json.Unmarshal(rec.Ciphertext, &u) == nil {
 				return &u, nil
 			}
@@ -140,7 +141,7 @@ func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*model.AuthUs
 	}
 
 	// 回退到本地存储（用户注册后尚未上链时数据在本地）
-	user, err := model.GetJson[model.AuthUser]("WEB3AUTH", "u:"+email)
+	user, err := store.GetJson[store.AuthUser]("WEB3AUTH", "u:"+email)
 	if err != nil || user == nil {
 		return nil, fmt.Errorf("auth user not found")
 	}

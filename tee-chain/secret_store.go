@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
+	"github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"go.dedis.ch/kyber/v4/suites"
 )
 
@@ -25,7 +28,7 @@ func (s *TeeChain) Encrypt(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get dkg pubkey: %w", err)
 	}
-	dkgPub := model.PubKeyFromByte(dkgPubKey.ToBytes())
+	dkgPub := teecrypto.PubKeyFromByte(dkgPubKey.ToBytes())
 
 	// 加密秘密环境变量
 	encCmt, encScrt := proxy_reenc.EncryptSecret(suite, dkgPub.Point(), data)
@@ -58,12 +61,12 @@ func (s *TeeChain) Encrypt(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *TeeChain) SaveSecret(user types.H160, index uint64, data []byte, txn *model.Txn) error {
-	return txn.Set(model.ComboNamespaceKey(SecretSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
+func (s *TeeChain) SaveSecret(user types.H160, index uint64, data []byte, txn *store.Txn) error {
+	return txn.Set(store.ComboNamespaceKey(SecretSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
 }
 
 func (s *TeeChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
-	list, keys, err := model.GetProtoMessageList[model.SecretStore](SecretSpace, user.Hex())
+	list, keys, err := dbstore.GetProtoMessageList[model.SecretStore](SecretSpace, user.Hex())
 	if err != nil {
 		return nil, err
 	}
@@ -92,12 +95,12 @@ func (s *TeeChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*mod
 	return ids, nil
 }
 
-func (s *TeeChain) SaveDiskKey(user types.H160, index uint64, data []byte, txn *model.Txn) error {
-	return txn.Set(model.ComboNamespaceKey(DiskSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
+func (s *TeeChain) SaveDiskKey(user types.H160, index uint64, data []byte, txn *store.Txn) error {
+	return txn.Set(store.ComboNamespaceKey(DiskSpace, user.Hex()+"_"+fmt.Sprint(index)), data)
 }
 
 func (s *TeeChain) GetDiskKeys(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
-	list, keys, err := model.GetProtoMessageList[model.SecretStore](DiskSpace, user.Hex())
+	list, keys, err := dbstore.GetProtoMessageList[model.SecretStore](DiskSpace, user.Hex())
 	if err != nil {
 		return nil, err
 	}

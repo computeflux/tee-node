@@ -9,14 +9,14 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/token"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
 	"github.com/wetee-dao/ink.go/util"
-
-	"github.com/computeflux/tee-provider/pkg/model"
 )
 
-var MainChainConfig *model.ChainConfigType
+var MainChainConfig *chaintypes.ChainConfigType
 
 // Contract
 type Contract struct {
@@ -35,7 +35,7 @@ func GetSubnetAddress() string {
 	return MainChainConfig.SubnetAddress
 }
 
-func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, error) {
+func NewContract(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (*Contract, error) {
 	client, err := chain.InitClient(config.Urls, false)
 	if err != nil {
 		return nil, err
@@ -53,8 +53,8 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 		return nil, err
 	}
 
-	p := pk.ToSigner(model.SuiteEd25519)
-	h160 := pk.GetPublicForSuite(model.SuiteEd25519).H160()
+	p := pk.ToSigner(crypto.SuiteEd25519)
+	h160 := pk.GetPublicForSuite(crypto.SuiteEd25519).H160()
 
 	// check account is mapaccount in revive
 	_, isSome, err := revive.GetOriginalAccountLatest(client.Api().RPC.State, h160)
@@ -70,7 +70,7 @@ func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*Contract, e
 			return nil, err
 		}
 
-		util.LogWithYellow("MakeMapAccount", pk.GetPublicForSuite(model.SuiteEd25519).SS58())
+		util.LogWithYellow("MakeMapAccount", pk.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 		err = client.SignAndSubmit(p, call, true, 0)
 		if err != nil {
 			return nil, err
@@ -101,7 +101,7 @@ func (c *Contract) GetClient() *chain.ChainClient {
 }
 
 func (c *Contract) GetSignerAddress() string {
-	return model.PubKeyFromByte(c.signer.Public()).SS58()
+	return crypto.PubKeyFromByte(c.signer.Public()).SS58()
 }
 
 // ChainType returns the chain type string.
@@ -114,6 +114,6 @@ func (c *Contract) ChainId() uint32 {
 }
 
 // GetCipher returns the signing suite used by this chain.
-func (c *Contract) GetCipher() model.SuiteType {
-	return model.SuiteEd25519
+func (c *Contract) GetCipher() crypto.SuiteType {
+	return crypto.SuiteEd25519
 }

@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/network/local"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4/sign/dss"
@@ -16,28 +19,28 @@ import (
 func TestRandomShareGeneration(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
-	db, err := model.NewDB()
+	db, err := store.NewDB()
 	require.NoError(t, err)
 	defer db.Close()
 
 	// Skip partial sign to avoid chain dependencies.
 	skipPartialSign = true
 
-	nodes := []*model.PubKey{}
-	validators := []*model.Validator{}
+	nodes := []*crypto.PubKey{}
+	validators := []*chaintypes.Validator{}
 	for _, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
-		validators = append(validators, &model.Validator{
-			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(crypto.SuiteEd25519))
+		validators = append(validators, &chaintypes.Validator{
+			ValidatorId:    *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(crypto.SuiteBLS12381),
 		})
 	}
 
 	peers := make([]*local.Peer, 0, len(nodes))
 	for _, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
 		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
 		require.NoError(t, err)
 		peers = append(peers, peer)
@@ -45,7 +48,7 @@ func TestRandomShareGeneration(t *testing.T) {
 
 	dkgs := make([]*DKG, 0, len(nodes))
 	for i, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
 		dkg, err := NewDKG(nodeSecret, peers[i], Logger{
 			NodeTag: "NODE " + fmt.Sprint(i),
 		})
@@ -55,7 +58,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	}
 
 	// Run main DKG consensus.
-	err = dkgs[0].TryEpochConsensus(model.ConsensusMsg{
+	err = dkgs[0].TryEpochConsensus(dkgtypes.ConsensusMsg{
 		Validators: validators,
 		Epoch:      1,
 	}, func(signer *DssSigner, nodeId uint64) {
@@ -74,7 +77,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	// Trigger random share generation explicitly on node 0 only.
 	// The P2P broadcast ensures all nodes receive the deals/responses.
 	for _, d := range dkgs {
-		d.RandomPools[model.SuiteEd25519].SetShares(nil) // ensure pool is empty so generation triggers
+		d.RandomPools[crypto.SuiteEd25519].SetShares(nil) // ensure pool is empty so generation triggers
 	}
 	start := time.Now()
 	dkgs[0].StartRandomShareGeneration(10)
@@ -84,7 +87,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	for {
 		allDone := true
 		for _, d := range dkgs {
-			if d.RandomPools[model.SuiteEd25519].Len() < 10 {
+			if d.RandomPools[crypto.SuiteEd25519].Len() < 10 {
 				allDone = false
 				break
 			}
@@ -102,18 +105,18 @@ func TestRandomShareGeneration(t *testing.T) {
 
 	// Verify each DKG has at least 10 random shares.
 	for i, d := range dkgs {
-		require.GreaterOrEqual(t, d.RandomPools[model.SuiteEd25519].Len(), 10, "node %d should have random shares", i)
+		require.GreaterOrEqual(t, d.RandomPools[crypto.SuiteEd25519].Len(), 10, "node %d should have random shares", i)
 	}
 
 	// Verify all nodes have the same commitments for randomIndex 1.
 	var expectedPubKey string
 	var expectedCommits []string
 	for i, d := range dkgs {
-		share, err := d.RandomPools[model.SuiteEd25519].Acquire(1)
+		share, err := d.RandomPools[crypto.SuiteEd25519].Acquire(1)
 		require.NoError(t, err, "node %d should have randomIndex 1", i)
 		require.NotNil(t, share, "node %d random share should not be nil", i)
 		// Verify random share differs from long share.
-		require.NotEqual(t, d.DkgKeyShares[model.SuiteEd25519].PriShare().V.String(), share.PriShare().V.String(),
+		require.NotEqual(t, d.DkgKeyShares[crypto.SuiteEd25519].PriShare().V.String(), share.PriShare().V.String(),
 			"node %d: random share should differ from long share", i)
 
 		pubKeyStr := share.CommitsWrap.Public[0].String()
@@ -139,7 +142,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	partialSigs := make([][]byte, 0, len(dkgs))
 
 	for i, d := range dkgs {
-		signer := NewDssSigner(d, 1, model.SuiteEd25519)
+		signer := NewDssSigner(d, 1, crypto.SuiteEd25519)
 		require.NotNil(t, signer.randomShare, "signer should have acquired a random share")
 		fmt.Printf("Node %d random share index: %d\n", i, signer.randomShare.PriShare().I)
 		sig, err := signer.PartialSign(msg)
@@ -157,7 +160,7 @@ func TestRandomShareGeneration(t *testing.T) {
 	isok := signers[0].Verify(msg, aggregated)
 	if !isok {
 		randomPub := signers[0].randomShare.Commitments()[0]
-		longPub := dkgs[0].GetDkgPubKey(model.SuiteEd25519).Point()
+		longPub := dkgs[0].GetDkgPubKey(crypto.SuiteEd25519).Point()
 		rb, _ := randomPub.MarshalBinary()
 		lb, _ := longPub.MarshalBinary()
 		fmt.Printf("R (sig[:32]): %x\n", aggregated[:32])

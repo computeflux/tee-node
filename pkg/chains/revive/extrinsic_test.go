@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
@@ -30,7 +32,7 @@ func TestContract_BatchCall_ValidMethods(t *testing.T) {
 				defer func() {
 					_ = recover()
 				}()
-				_, _ = c.BatchCall(m, []model.ChainCall{})
+				_, _ = c.BatchCall(m, []chaintypes.ChainCall{})
 			})
 		})
 	}
@@ -49,7 +51,7 @@ func TestContract_TEECallToCall(t *testing.T) {
 
 func TestContract_CallOfMapAccount(t *testing.T) {
 	c := &Contract{}
-	call, err := c.CallOfMapAccount(model.PubKey{})
+	call, err := c.CallOfMapAccount(crypto.PubKey{})
 	assert.ErrorContains(t, err, "not implemented")
 	assert.Nil(t, call)
 }
@@ -78,6 +80,6 @@ func TestContract_CheckMapAccount_NoClient(t *testing.T) {
 	// ChainClient is nil → Api() will panic
 	assert.NotPanics(t, func() {
 		defer func() { _ = recover() }()
-		_, _ = c.CheckMapAccount(model.PubKey{})
+		_, _ = c.CheckMapAccount(crypto.PubKey{})
 	})
 }

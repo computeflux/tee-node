@@ -10,11 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
+	"github.com/computeflux/tee-provider/pkg/store"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,14 +25,14 @@ import (
 func setupMockFns(t *testing.T) func() {
 	// Save all mockable function pointers and restore on cleanup
 	old := map[string]interface{}{
-		"findTokenCachedFn":       findTokenCachedFn,
-		"findProviderNameFn":      findProviderNameFn,
+		"findTokenCachedFn":        findTokenCachedFn,
+		"findProviderNameFn":       findProviderNameFn,
 		"findGatewayModelByNameFn": findGatewayModelByNameFn,
-		"getBridgeFn":             getBridgeFn,
-		"gatewayGetCreditFn":      gatewayGetCreditFn,
+		"getBridgeFn":              getBridgeFn,
+		"gatewayGetCreditFn":       gatewayGetCreditFn,
 		"getCachedGatewayModelsFn": getCachedGatewayModelsFn,
-		"relayToUpstreamFn":       relayToUpstreamFn,
-		"recordUsageAsyncFn":      recordUsageAsyncFn,
+		"relayToUpstreamFn":        relayToUpstreamFn,
+		"recordUsageAsyncFn":       recordUsageAsyncFn,
 	}
 
 	// Reset global state
@@ -39,22 +40,22 @@ func setupMockFns(t *testing.T) func() {
 	providerMetrics = make(map[uint64]*providerMetric)
 
 	return func() {
-		findTokenCachedFn = old["findTokenCachedFn"].(func(string) *model.GatewayTokenInfo)
+		findTokenCachedFn = old["findTokenCachedFn"].(func(string) *store.GatewayTokenInfo)
 		findProviderNameFn = old["findProviderNameFn"].(func(string) *cgateway.ProviderInfoWithID)
 		findGatewayModelByNameFn = old["findGatewayModelByNameFn"].(func(uint64, string) *cgateway.ModelInfoWithID)
 		getBridgeFn = old["getBridgeFn"].(func() *teechain.TeeChain)
-		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, model.UniAddr) (int64, error))
+		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
 		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
-		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *model.GatewayEndpoint, string, []byte, bool) (*relay.Usage, *relay.ErrorWithStatusCode, error))
-		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(model.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
+		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, bool) (*relay.Usage, *relay.ErrorWithStatusCode, error))
+		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
 	}
 }
 
-func makeTestToken(active bool) *model.GatewayTokenInfo {
-	return &model.GatewayTokenInfo{
+func makeTestToken(active bool) *store.GatewayTokenInfo {
+	return &store.GatewayTokenInfo{
 		ID:       1,
 		Owner:    "test-owner",
-		Addr:     store.UniAddr{T: 0, V: []byte{0xab, 0xcd}},
+		Addr:     cstore.UniAddr{T: 0, V: []byte{0xab, 0xcd}},
 		Key:      "test-key",
 		IsActive: active,
 	}
@@ -64,7 +65,7 @@ func makeTestProvider(name string, active bool) *cgateway.ProviderInfoWithID {
 	return &cgateway.ProviderInfoWithID{
 		ID: 1,
 		Data: cgateway.ProviderInfo{
-			Owner:    store.UniAddr{T: 0, V: []byte{0x01}},
+			Owner:    cstore.UniAddr{T: 0, V: []byte{0x01}},
 			Name:     name,
 			IsActive: active,
 		},
@@ -75,19 +76,19 @@ func makeTestModel(name string, active bool, apiKeys []string) *cgateway.ModelIn
 	return &cgateway.ModelInfoWithID{
 		ID: 1,
 		Data: cgateway.ModelInfo{
-			Name:       name,
-			Owner:      store.UniAddr{T: 0, V: []byte{0x02}},
-			ProviderID: 1,
+			Name:         name,
+			Owner:        cstore.UniAddr{T: 0, V: []byte{0x02}},
+			ProviderID:   1,
 			ProviderType: 1,
-			URI:        "https://api.openai.com",
-			APIKeys:    apiKeys,
-			IsActive:   active,
-			CreatedAt:  uint64(time.Now().Unix()),
+			URI:          "https://api.openai.com",
+			APIKeys:      apiKeys,
+			IsActive:     active,
+			CreatedAt:    uint64(time.Now().Unix()),
 		},
 	}
 }
 
-func requestWithToken(token *model.GatewayTokenInfo, body string) *http.Request {
+func requestWithToken(token *store.GatewayTokenInfo, body string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
 	if token != nil {
 		req.Header.Set("Authorization", "Bearer "+token.Key)
@@ -96,7 +97,7 @@ func requestWithToken(token *model.GatewayTokenInfo, body string) *http.Request 
 	return req
 }
 
-func requestWithContext(token *model.GatewayTokenInfo, modelData *cgateway.ModelInfoWithID, endpoint *model.GatewayEndpoint, body string) *http.Request {
+func requestWithContext(token *store.GatewayTokenInfo, modelData *cgateway.ModelInfoWithID, endpoint *store.GatewayEndpoint, body string) *http.Request {
 	req := requestWithToken(token, body)
 	if modelData != nil {
 		req = req.WithContext(context.WithValue(req.Context(), ctxModel, modelData))
@@ -132,14 +133,14 @@ func TestTokenAuthMiddleware_ValidToken(t *testing.T) {
 	defer cleanup()
 
 	token := makeTestToken(true)
-	findTokenCachedFn = func(key string) *model.GatewayTokenInfo {
+	findTokenCachedFn = func(key string) *store.GatewayTokenInfo {
 		if key == token.Key {
 			return token
 		}
 		return nil
 	}
 
-	var ctxToken *model.GatewayTokenInfo
+	var ctxToken *store.GatewayTokenInfo
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctxToken = GetTokenFromContext(r)
 		w.WriteHeader(http.StatusOK)
@@ -161,7 +162,7 @@ func TestTokenAuthMiddleware_InvalidToken(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	findTokenCachedFn = func(key string) *model.GatewayTokenInfo { return nil }
+	findTokenCachedFn = func(key string) *store.GatewayTokenInfo { return nil }
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -182,7 +183,7 @@ func TestTokenAuthMiddleware_InactiveToken(t *testing.T) {
 	defer cleanup()
 
 	token := makeTestToken(false) // inactive
-	findTokenCachedFn = func(key string) *model.GatewayTokenInfo {
+	findTokenCachedFn = func(key string) *store.GatewayTokenInfo {
 		return token
 	}
 
@@ -229,10 +230,10 @@ func TestDistributeMiddleware_ValidRoute(t *testing.T) {
 	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
 	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
 	getBridgeFn = func() *teechain.TeeChain { return nil } // skip credit check
-	gatewayGetCreditFn = func(*teechain.TeeChain, model.UniAddr) (int64, error) { return 100, nil }
+	gatewayGetCreditFn = func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) { return 100, nil }
 
 	var ctxModel *cgateway.ModelInfoWithID
-	var ctxEndpoint *model.GatewayEndpoint
+	var ctxEndpoint *store.GatewayEndpoint
 	var ctxBody []byte
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctxModel = GetModelFromContext(r)
@@ -369,7 +370,7 @@ func TestDistributeMiddleware_InsufficientCredit(t *testing.T) {
 	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
 	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
 	getBridgeFn = func() *teechain.TeeChain { return &teechain.TeeChain{} } // non-nil bridge triggers credit check
-	gatewayGetCreditFn = func(*teechain.TeeChain, model.UniAddr) (int64, error) { return 0, nil }
+	gatewayGetCreditFn = func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) { return 0, nil }
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -422,8 +423,8 @@ func TestHandleListModels_WithModels(t *testing.T) {
 
 	getCachedGatewayModelsFn = func() []cgateway.ModelInfo {
 		return []cgateway.ModelInfo{
-			{Name: "gpt-4", Owner: store.UniAddr{T: 0, V: []byte{0x01}}, IsActive: true},
-			{Name: "claude-3", Owner: store.UniAddr{T: 0, V: []byte{0x02}}, IsActive: true},
+			{Name: "gpt-4", Owner: cstore.UniAddr{T: 0, V: []byte{0x01}}, IsActive: true},
+			{Name: "claude-3", Owner: cstore.UniAddr{T: 0, V: []byte{0x02}}, IsActive: true},
 		}
 	}
 
@@ -477,7 +478,7 @@ func TestHandleRelay_MissingModel(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &model.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
+	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	w := httptest.NewRecorder()
 	req := requestWithContext(makeTestToken(true), nil, endpoint, `{}`)
 	HandleRelay(w, req)
@@ -490,7 +491,7 @@ func TestHandleRelay_RateLimited(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &model.GatewayEndpoint{ID: 99, URL: "https://api.openai.com", APIKey: "sk-test"}
+	endpoint := &store.GatewayEndpoint{ID: 99, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
 	// Pre-exhaust the limiter: Allow 50 times (openai default maxConc=50) without Done
@@ -500,7 +501,7 @@ func TestHandleRelay_RateLimited(t *testing.T) {
 	}
 
 	// Mock relay so we don't hit real upstream if rate limit doesn't trigger
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *model.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		t.Fatal("relayToUpstream should not be called when rate limited")
 		return nil, nil, nil
 	}
@@ -522,10 +523,10 @@ func TestHandleRelay_UpstreamBizError(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &model.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
+	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *model.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return nil, &relay.ErrorWithStatusCode{StatusCode: http.StatusBadRequest, Error: relay.ErrorDetail{Message: "bad request", Type: "invalid_request"}}, nil
 	}
 
@@ -541,10 +542,10 @@ func TestHandleRelay_UpstreamTransportError(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &model.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
+	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *model.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return nil, nil, fmt.Errorf("connection refused")
 	}
 
@@ -560,15 +561,15 @@ func TestHandleRelay_Success(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &model.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
+	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
 	var recorded bool
-	recordUsageAsyncFn = func(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cached uint64) {
+	recordUsageAsyncFn = func(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cached uint64) {
 		recorded = true
 	}
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *model.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return &relay.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, nil, nil
 	}
 

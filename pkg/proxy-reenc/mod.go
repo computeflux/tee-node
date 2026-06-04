@@ -7,6 +7,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/share"
@@ -134,7 +136,7 @@ var (
 // 	return nil
 // }
 
-func Reencrypt(distKeyShare model.DistKeyShare, secret *model.SecretStore, clientPubKey model.PubKey) (*ReencryptReply, error) {
+func Reencrypt(distKeyShare dkgtypes.DistKeyShare, secret *model.SecretStore, clientPubKey crypto.PubKey) (*ReencryptReply, error) {
 	ste := clientPubKey.Suite()
 
 	idx := distKeyShare.PriShare().I
@@ -162,7 +164,7 @@ func Reencrypt(distKeyShare model.DistKeyShare, secret *model.SecretStore, clien
 }
 
 // Verify verifies an incoming re-encryption reply from another node.
-func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey model.PubKey, r *ReencryptReply) error {
+func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey crypto.PubKey, r *ReencryptReply) error {
 	ste := clientPubKey.Suite()
 
 	encCmt := ste.Point()

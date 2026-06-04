@@ -8,13 +8,14 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 )
 
 // ProcessTx 验证节点在 ProcessProposal 阶段验证区块中的交易。
 // 对 Contract 类型交易进行 nonce 预校验，确保区块中不包含 nonce 无效的交易，
 // 避免浪费区块空间（FinalizeBlock 中 nonce 无效会标记失败但仍占用空间）。
 func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.ResponseProcessProposal_ProposalStatus {
-	txn := model.DBINS.NewTransaction()
+	txn := dbstore.DBINS.NewTransaction()
 	defer txn.Rollback()
 
 	for _, txbt := range txs {

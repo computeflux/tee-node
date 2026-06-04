@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
@@ -15,7 +17,7 @@ const contractPoolNS = "POOL_TX"
 
 // HasPendingContract 检查指定 dedupKey 是否已在交易池中有待处理的调用。
 func (app *TeeChain) HasPendingContract(dedupKey string) bool {
-	pending, _ := model.GetJson[batch.BatchCall](contractPoolNS, dedupKey)
+	pending, _ := dbstore.GetJson[batch.BatchCall](contractPoolNS, dedupKey)
 	return pending != nil
 }
 
@@ -36,12 +38,12 @@ func (app *TeeChain) SubmitContractWithDedup(contract string, method []byte, arg
 	var key string
 	if dedupKey != "" {
 		key = dedupKey
-		_ = model.DeleteKey(contractPoolNS, key)
+		_ = dbstore.DeleteKey(contractPoolNS, key)
 	} else {
 		key = contractPoolKey()
 	}
 
-	if err := model.SetJson(contractPoolNS, key, call); err != nil {
+	if err := dbstore.SetJson(contractPoolNS, key, call); err != nil {
 		return fmt.Errorf("persist contract call: %w", err)
 	}
 
@@ -80,7 +82,7 @@ func (app *TeeChain) ApplyToChain() {
 		return
 	}
 
-	calls, keys, err := model.GetJsonList[batch.BatchCall](contractPoolNS, "")
+	calls, keys, err := dbstore.GetJsonList[batch.BatchCall](contractPoolNS, "")
 	if err != nil {
 		util.LogWithRed("TX-POOL", "read pool failed:", err)
 		return
@@ -96,7 +98,7 @@ func (app *TeeChain) ApplyToChain() {
 	validKeys := make([][]byte, 0, len(calls))
 	for i, c := range calls {
 		if c == nil {
-			_ = model.DeleteByteKey(keys[i])
+			_ = dbstore.DeleteByteKey(keys[i])
 			continue
 		}
 		batchCalls = append(batchCalls, *c)
@@ -115,7 +117,7 @@ func (app *TeeChain) ApplyToChain() {
 	}
 
 	// 3) 构造 batch 合约 execute_batch 调用
-	signer := app.NodePriv.ToSigner(model.SuiteEd25519)
+	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
 	nonce := GetNodeNextNonce(signer)
 	call := &model.SysCall{
 		Payload: &model.SysCall_Contract{
@@ -142,7 +144,7 @@ func (app *TeeChain) ApplyToChain() {
 
 	// 5) 提交成功，清空池中的所有相关 pending calls
 	for _, k := range validKeys {
-		err = model.DeleteByteKey(k)
+		err = dbstore.DeleteByteKey(k)
 		fmt.Println("TX-POOL delete key", string(k))
 		if err != nil {
 			util.LogWithRed("TX-POOL", "delete key failed:", err)

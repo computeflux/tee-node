@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 )
 
 const (
@@ -17,8 +19,8 @@ const (
 
 // RandomSharePoolStore is the persistent storage format for the pool.
 type RandomSharePoolStore struct {
-	Shares     map[uint32]*model.DistKeyShare `json:"shares"`
-	TxMappings map[int64]uint32               `json:"tx_mappings"`
+	Shares     map[uint32]*dkgtypes.DistKeyShare `json:"shares"`
+	TxMappings map[int64]uint32                  `json:"tx_mappings"`
 }
 
 // RandomSharePool manages a pool of pre-generated random shares for DSS signing.
@@ -29,7 +31,7 @@ type RandomSharePool struct {
 	mu sync.RWMutex
 
 	// shares holds the pre-generated random DistKeyShares keyed by randomIndex.
-	shares map[uint32]*model.DistKeyShare
+	shares map[uint32]*dkgtypes.DistKeyShare
 
 	// txMappings maps a txIndex to the randomIndex used for that tx.
 	// This ensures retries for the same tx use the same random share.
@@ -43,15 +45,15 @@ type RandomSharePool struct {
 }
 
 // NewRandomSharePool creates a new RandomSharePool and attempts to restore state from DB.
-func NewRandomSharePool(signer *model.PrivKey, capacity int) *RandomSharePool {
+func NewRandomSharePool(signer *crypto.PrivKey, capacity int) *RandomSharePool {
 	if capacity <= 0 {
 		capacity = DefaultRandomSharePoolCapacity
 	}
 	pool := &RandomSharePool{
 		capacity:   capacity,
-		shares:     make(map[uint32]*model.DistKeyShare),
+		shares:     make(map[uint32]*dkgtypes.DistKeyShare),
 		txMappings: make(map[int64]uint32),
-		persistKey: signer.GetPublicForSuite(model.SuiteEd25519).SS58(),
+		persistKey: signer.GetPublicForSuite(crypto.SuiteEd25519).SS58(),
 	}
 	_ = pool.load()
 	return pool
@@ -61,7 +63,7 @@ func NewRandomSharePool(signer *model.PrivKey, capacity int) *RandomSharePool {
 // The txIndex is used directly as the randomIndex key, ensuring all nodes
 // use the same share for the same transaction (provided all nodes have
 // generated a share for that index).
-func (pool *RandomSharePool) Acquire(txIndex int64) (*model.DistKeyShare, error) {
+func (pool *RandomSharePool) Acquire(txIndex int64) (*dkgtypes.DistKeyShare, error) {
 	pool.mu.RLock()
 	defer pool.mu.RUnlock()
 
@@ -76,7 +78,7 @@ func (pool *RandomSharePool) Acquire(txIndex int64) (*model.DistKeyShare, error)
 }
 
 // PeekAt returns the share at a specific randomIndex.
-func (pool *RandomSharePool) PeekAt(index uint32) (*model.DistKeyShare, error) {
+func (pool *RandomSharePool) PeekAt(index uint32) (*dkgtypes.DistKeyShare, error) {
 	pool.mu.RLock()
 	defer pool.mu.RUnlock()
 	if share, ok := pool.shares[index]; ok {
@@ -114,11 +116,11 @@ func (pool *RandomSharePool) Capacity() int {
 }
 
 // AddShare adds a single random share at the given randomIndex.
-func (pool *RandomSharePool) AddShare(randomIndex uint32, share *model.DistKeyShare) {
+func (pool *RandomSharePool) AddShare(randomIndex uint32, share *dkgtypes.DistKeyShare) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	if pool.shares == nil {
-		pool.shares = make(map[uint32]*model.DistKeyShare)
+		pool.shares = make(map[uint32]*dkgtypes.DistKeyShare)
 	}
 	pool.shares[randomIndex] = share
 	_ = pool.save()
@@ -126,7 +128,7 @@ func (pool *RandomSharePool) AddShare(randomIndex uint32, share *model.DistKeySh
 
 // SetShares replaces the pool's shares.
 // Used during loading/initialization or after a fresh batch generation.
-func (pool *RandomSharePool) SetShares(shares map[uint32]*model.DistKeyShare) {
+func (pool *RandomSharePool) SetShares(shares map[uint32]*dkgtypes.DistKeyShare) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	pool.shares = shares
@@ -147,20 +149,20 @@ func (pool *RandomSharePool) save() error {
 		Shares:     pool.shares,
 		TxMappings: pool.txMappings,
 	}
-	return model.SetJson(RandomShareNamespace, pool.persistKey, &store)
+	return dbstore.SetJson(RandomShareNamespace, pool.persistKey, &store)
 }
 
 func (pool *RandomSharePool) load() error {
-	store, err := model.GetJson[RandomSharePoolStore](RandomShareNamespace, pool.persistKey)
+	store, err := dbstore.GetJson[RandomSharePoolStore](RandomShareNamespace, pool.persistKey)
 	if err != nil || store == nil {
 		// Ignore errors (e.g. old format) and start with an empty pool.
-		pool.shares = make(map[uint32]*model.DistKeyShare)
+		pool.shares = make(map[uint32]*dkgtypes.DistKeyShare)
 		return nil
 	}
 	if store.Shares != nil {
 		pool.shares = store.Shares
 	} else {
-		pool.shares = make(map[uint32]*model.DistKeyShare)
+		pool.shares = make(map[uint32]*dkgtypes.DistKeyShare)
 	}
 	if store.TxMappings != nil {
 		pool.txMappings = store.TxMappings

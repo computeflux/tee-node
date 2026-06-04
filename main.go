@@ -13,10 +13,11 @@ import (
 	"github.com/computeflux/tee-provider/graph"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
-	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	_ "github.com/computeflux/tee-provider/pkg/util/cgostubs"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -31,7 +32,7 @@ func main() {
 	chainPort := util.GetEnvInt("SIDE_CHAIN_PORT", 61001)
 
 	// Init app db
-	db, err := model.NewDB()
+	db, err := store.NewDB()
 	if err != nil {
 		fmt.Println("Init db error:", err)
 		os.Exit(1)
@@ -41,7 +42,7 @@ func main() {
 	// TEE 节点启动
 
 	// init teechain node key
-	_, p2pKey, err := model.GetP2PKey()
+	_, p2pKey, err := crypto.GetP2PKey()
 	if err != nil {
 		fmt.Println("failed to load node key:", err)
 		os.Exit(1)
@@ -55,16 +56,16 @@ func main() {
 	dkgKey := validatorKey.Key.PrivKey
 
 	// Init node key for Mainchain
-	nodePriv, err := model.PrivateKeyFromOed25519(dkgKey.Bytes())
+	nodePriv, err := crypto.PrivateKeyFromOed25519(dkgKey.Bytes())
 	if err != nil {
 		fmt.Println("Marshal PKG_PK error:", err)
 		os.Exit(1)
 	}
 
-	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 	util.LogWithYellow("ETH Key", hex.EncodeToString(nodePriv.ToSecp256k1Signer().Public()))
-	util.LogWithYellow("BLS12381 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(model.SuiteBLS12381).Byte()))
-	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogWithYellow("BLS12381 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(crypto.SuiteBLS12381).Byte()))
+	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 
 	chainConfig := config.GetMainChainConfig(chainEnv)
 	if chainConfig == nil {

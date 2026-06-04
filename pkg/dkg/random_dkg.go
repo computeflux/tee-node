@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
@@ -25,9 +27,9 @@ type RandomDkgPayload struct {
 type randomDkgState struct {
 	randomIndex uint32
 	generator   *pedersen.DistKeyGenerator
-	deals       map[string]*model.DealBundle
+	deals       map[string]*dkgtypes.DealBundle
 	responses   map[string]*pedersen.ResponseBundle
-	result      *model.DistKeyShare
+	result      *dkgtypes.DistKeyShare
 	done        bool
 	doneCh      chan struct{} // closed when DKG completes (success or failure)
 	closeOnce   sync.Once     // ensures doneCh is closed exactly once
@@ -84,19 +86,19 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 		if _, exists := dkg.randomDkgStates[randomIndex]; exists {
 			continue
 		}
-		if dkg.RandomPools[model.SuiteEd25519] != nil {
-			if _, err := dkg.RandomPools[model.SuiteEd25519].Acquire(int64(randomIndex)); err == nil {
+		if dkg.RandomPools[crypto.SuiteEd25519] != nil {
+			if _, err := dkg.RandomPools[crypto.SuiteEd25519].Acquire(int64(randomIndex)); err == nil {
 				continue // already in pool
 			}
 		}
 
 		conf := pedersen.Config{
-			Suite:     dkg.Suites[model.SuiteEd25519],
+			Suite:     dkg.Suites[crypto.SuiteEd25519],
 			NewNodes:  nodes,
 			Threshold: uint32(threshold),
-			Auth:      schnorr.NewScheme(dkg.Suites[model.SuiteEd25519]),
+			Auth:      schnorr.NewScheme(dkg.Suites[crypto.SuiteEd25519]),
 			FastSync:  true,
-			Longterm:  dkg.Signer.Scalar(model.SuiteEd25519),
+			Longterm:  dkg.Signer.Scalar(crypto.SuiteEd25519),
 			Nonce:     randomNonce(randomIndex),
 			Log:       dkg.log,
 		}
@@ -110,7 +112,7 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 		state := &randomDkgState{
 			randomIndex: randomIndex,
 			generator:   generator,
-			deals:       make(map[string]*model.DealBundle),
+			deals:       make(map[string]*dkgtypes.DealBundle),
 			responses:   make(map[string]*pedersen.ResponseBundle),
 			doneCh:      make(chan struct{}),
 		}
@@ -123,7 +125,7 @@ func (dkg *DKG) GenerateRandomShares(count int) error {
 			continue
 		}
 
-		dealData, err := json.Marshal(&model.DealBundle{DealBundle: deal})
+		dealData, err := json.Marshal(&dkgtypes.DealBundle{DealBundle: deal})
 		if err != nil {
 			dkg.randomDkgMu.Unlock()
 			return err
@@ -238,19 +240,19 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 		if _, exists := dkg.randomDkgStates[item.RandomIndex]; exists {
 			continue
 		}
-		if dkg.RandomPools[model.SuiteEd25519] != nil {
-			if _, err := dkg.RandomPools[model.SuiteEd25519].Acquire(int64(item.RandomIndex)); err == nil {
+		if dkg.RandomPools[crypto.SuiteEd25519] != nil {
+			if _, err := dkg.RandomPools[crypto.SuiteEd25519].Acquire(int64(item.RandomIndex)); err == nil {
 				continue // already in pool
 			}
 		}
 
 		conf := pedersen.Config{
-			Suite:     dkg.Suites[model.SuiteEd25519],
+			Suite:     dkg.Suites[crypto.SuiteEd25519],
 			NewNodes:  nodes,
 			Threshold: uint32(threshold),
-			Auth:      schnorr.NewScheme(dkg.Suites[model.SuiteEd25519]),
+			Auth:      schnorr.NewScheme(dkg.Suites[crypto.SuiteEd25519]),
 			FastSync:  true,
-			Longterm:  dkg.Signer.Scalar(model.SuiteEd25519),
+			Longterm:  dkg.Signer.Scalar(crypto.SuiteEd25519),
 			Nonce:     randomNonce(item.RandomIndex),
 			Log:       dkg.log,
 		}
@@ -261,7 +263,7 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 		state := &randomDkgState{
 			randomIndex: item.RandomIndex,
 			generator:   generator,
-			deals:       make(map[string]*model.DealBundle),
+			deals:       make(map[string]*dkgtypes.DealBundle),
 			responses:   make(map[string]*pedersen.ResponseBundle),
 			doneCh:      make(chan struct{}),
 		}
@@ -269,7 +271,7 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 
 		deal, err := generator.Deals()
 		if err == nil {
-			dealData, _ := json.Marshal(&model.DealBundle{DealBundle: deal})
+			dealData, _ := json.Marshal(&dkgtypes.DealBundle{DealBundle: deal})
 			ourBatch = append(ourBatch, RandomDkgPayload{
 				RandomIndex: item.RandomIndex,
 				Data:        dealData,
@@ -293,7 +295,7 @@ func (dkg *DKG) handleRandomDealBatch(from string, payload []byte) error {
 
 	// Second pass: store received deals.
 	for _, item := range items {
-		var dealBundle model.DealBundle
+		var dealBundle dkgtypes.DealBundle
 		if err := json.Unmarshal(item.Data, &dealBundle); err != nil {
 			continue
 		}
@@ -454,13 +456,13 @@ func (dkg *DKG) handleRandomDealRespBatch(from string, payload []byte) error {
 			if r == nil || r.Key == nil {
 				return
 			}
-			state.result = &model.DistKeyShare{
-				CommitsWrap:  model.KyberPoints{Public: r.Key.Commits},
-				PriShareWrap: model.PriShareWithSuite{PriShare: r.Key.Share, Suite: "ed25519"},
+			state.result = &dkgtypes.DistKeyShare{
+				CommitsWrap:  dkgtypes.KyberPoints{Public: r.Key.Commits},
+				PriShareWrap: dkgtypes.PriShareWithSuite{PriShare: r.Key.Share, Suite: "ed25519"},
 			}
 			state.done = true
-			if dkg.RandomPools[model.SuiteEd25519] != nil {
-				dkg.RandomPools[model.SuiteEd25519].AddShare(state.randomIndex, state.result)
+			if dkg.RandomPools[crypto.SuiteEd25519] != nil {
+				dkg.RandomPools[crypto.SuiteEd25519].AddShare(state.randomIndex, state.result)
 			}
 			if state.doneCh != nil {
 				state.closeOnce.Do(func() { close(state.doneCh) })

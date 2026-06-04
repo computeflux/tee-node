@@ -1,11 +1,14 @@
 package config
 
-import "github.com/computeflux/tee-provider/pkg/model"
+import (
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
+)
 
-var MainChainConfig = model.ChainConfigType{
+var MainChainConfig = chaintypes.ChainConfigType{
 	ChainID:       0,
 	ChainType:     "evm",
-	Cipher:        model.SuiteBLS12381,
+	Cipher:        crypto.SuiteBLS12381,
 	Urls:          []string{""},
 	SubnetAddress: "",
 	TokenAddress:  "",

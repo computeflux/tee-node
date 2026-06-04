@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/pkg/store"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
 	// init test DB
-	db, err := model.NewDB()
+	db, err := store.NewDB()
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +72,7 @@ func TestBuildSyncEvent(t *testing.T) {
 // ── Nonce 读写 ────────────────────────────────────────
 
 func TestNonceSetAndGet(t *testing.T) {
-	txn := model.DBINS.NewTransaction()
+	txn := store.DBINS.NewTransaction()
 	defer txn.Rollback()
 
 	err := setLastNonce(txn, 1, 0)
@@ -90,7 +91,7 @@ func TestNonceSetAndGet(t *testing.T) {
 }
 
 func TestGetLastNonce_NotRegistered(t *testing.T) {
-	txn := model.DBINS.NewTransaction()
+	txn := store.DBINS.NewTransaction()
 	defer txn.Rollback()
 
 	n, err := getLastNonce(txn, 999)
@@ -109,33 +110,33 @@ func TestGetLastNonceBg_NotRegistered(t *testing.T) {
 // ── Mock API ──────────────────────────────────────────
 
 type mockAPI struct {
-	txn *model.Txn
+	txn *store.Txn
 }
 
-func (m *mockAPI) GetTxn() store.StoreTx           { return m.txn }
-func (m *mockAPI) GetHeight() int64                { return 0 }
-func (m *mockAPI) GetBlockTime() int64             { return 0 }
-func (m *mockAPI) GetVersion() uint32              { return 0 }
-func (m *mockAPI) GetCaller() store.UniAddr        { return store.UniAddr{} }
-func (m *mockAPI) GetSystemAccount() store.UniAddr { return store.UniAddr{} }
-func (m *mockAPI) CallbySystem() bool              { return false }
+func (m *mockAPI) GetTxn() cstore.StoreTx           { return m.txn }
+func (m *mockAPI) GetHeight() int64                 { return 0 }
+func (m *mockAPI) GetBlockTime() int64              { return 0 }
+func (m *mockAPI) GetVersion() uint32               { return 0 }
+func (m *mockAPI) GetCaller() cstore.UniAddr        { return cstore.UniAddr{} }
+func (m *mockAPI) GetSystemAccount() cstore.UniAddr { return cstore.UniAddr{} }
+func (m *mockAPI) CallbySystem() bool               { return false }
 
-func (m *mockAPI) Call(_ store.UniAddr, _ store.ContractCall) ([]byte, error) {
+func (m *mockAPI) Call(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockAPI) Query(_ store.UniAddr, _ store.ContractCall) ([]byte, error) {
+func (m *mockAPI) Query(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error) {
 	return nil, nil
 }
 
-func newMockEngine() (*Engine, *model.Txn) {
-	txn := model.DBINS.NewTransaction()
+func newMockEngine() (*Engine, *store.Txn) {
+	txn := store.DBINS.NewTransaction()
 	return NewEngine(), txn
 }
 
 // commitAndRefresh 提交 txn 并创建新 txn
-func commitAndRefresh(_ *Engine, oldTxn *model.Txn) *model.Txn {
+func commitAndRefresh(_ *Engine, oldTxn *store.Txn) *store.Txn {
 	oldTxn.Commit()
-	return model.DBINS.NewTransaction()
+	return store.DBINS.NewTransaction()
 }
 
 // ── CheckRelayEvent ───────────────────────────────────

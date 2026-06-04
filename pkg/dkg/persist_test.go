@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4"
@@ -12,17 +13,17 @@ import (
 )
 
 // makeTestDistKeyShare creates a minimal DistKeyShare for ed25519.
-func makeTestDistKeyShare(t *testing.T, index uint32) *model.DistKeyShare {
-	suite := model.NewSuite(model.SuiteEd25519)
+func makeTestDistKeyShare(t *testing.T, index uint32) *dkgtypes.DistKeyShare {
+	suite := crypto.NewSuite(crypto.SuiteEd25519)
 	scalar := suite.Scalar().Pick(suite.RandomStream())
 	point := suite.Point().Mul(scalar, nil)
 
-	return &model.DistKeyShare{
-		CommitsWrap: model.KyberPoints{
+	return &dkgtypes.DistKeyShare{
+		CommitsWrap: dkgtypes.KyberPoints{
 			Public: []kyber.Point{point},
 			Suite:  "ed25519",
 		},
-		PriShareWrap: model.PriShareWithSuite{
+		PriShareWrap: dkgtypes.PriShareWithSuite{
 			PriShare: &share.PriShare{
 				I: index,
 				V: scalar,
@@ -36,9 +37,9 @@ func TestToStore_FromStore_RoundTrip(t *testing.T) {
 	share0 := makeTestDistKeyShare(t, 0)
 	share1 := makeTestDistKeyShare(t, 1)
 
-	original := map[model.SuiteType]*model.DistKeyShare{
-		model.SuiteEd25519:  share0,
-		model.SuiteBLS12381: share1,
+	original := map[crypto.SuiteType]*dkgtypes.DistKeyShare{
+		crypto.SuiteEd25519:  share0,
+		crypto.SuiteBLS12381: share1,
 	}
 
 	stored := toStore(original)
@@ -48,12 +49,12 @@ func TestToStore_FromStore_RoundTrip(t *testing.T) {
 	require.Len(t, restored, 2)
 
 	// Verify ed25519 share restored correctly
-	require.NotNil(t, restored[model.SuiteEd25519])
-	assert.Equal(t, share0.PriShareWrap.I, restored[model.SuiteEd25519].PriShareWrap.I)
+	require.NotNil(t, restored[crypto.SuiteEd25519])
+	assert.Equal(t, share0.PriShareWrap.I, restored[crypto.SuiteEd25519].PriShareWrap.I)
 
 	// Verify bls12381 share restored correctly
-	require.NotNil(t, restored[model.SuiteBLS12381])
-	assert.Equal(t, share1.PriShareWrap.I, restored[model.SuiteBLS12381].PriShareWrap.I)
+	require.NotNil(t, restored[crypto.SuiteBLS12381])
+	assert.Equal(t, share1.PriShareWrap.I, restored[crypto.SuiteBLS12381].PriShareWrap.I)
 }
 
 func TestToStore_NilMap(t *testing.T) {
@@ -68,7 +69,7 @@ func TestFromStore_NilSlice(t *testing.T) {
 
 func TestFromStore_UnknownSuite(t *testing.T) {
 	stored := []distKeyShareStore{
-		{Suite: "unknown_suite", Commits: model.KyberPoints{Suite: "unknown_suite"}},
+		{Suite: "unknown_suite", Commits: dkgtypes.KyberPoints{Suite: "unknown_suite"}},
 	}
 	restored := fromStore(stored)
 	assert.Empty(t, restored)
@@ -81,9 +82,9 @@ func TestFromStore_EmptySlice(t *testing.T) {
 
 func TestToStore_SkipsNilValues(t *testing.T) {
 	share0 := makeTestDistKeyShare(t, 0)
-	original := map[model.SuiteType]*model.DistKeyShare{
-		model.SuiteEd25519: share0,
-		model.SuiteBLS12381: nil,
+	original := map[crypto.SuiteType]*dkgtypes.DistKeyShare{
+		crypto.SuiteEd25519:  share0,
+		crypto.SuiteBLS12381: nil,
 	}
 
 	stored := toStore(original)
@@ -92,12 +93,12 @@ func TestToStore_SkipsNilValues(t *testing.T) {
 }
 
 func TestPubKeysToStringMap_RoundTrip(t *testing.T) {
-	pub0 := &model.PubKey{}
-	pub1 := &model.PubKey{}
+	pub0 := &crypto.PubKey{}
+	pub1 := &crypto.PubKey{}
 
-	original := map[model.SuiteType]*model.PubKey{
-		model.SuiteEd25519:  pub0,
-		model.SuiteBLS12381: pub1,
+	original := map[crypto.SuiteType]*crypto.PubKey{
+		crypto.SuiteEd25519:  pub0,
+		crypto.SuiteBLS12381: pub1,
 	}
 
 	strMap := pubKeysToStringMap(original)
@@ -107,8 +108,8 @@ func TestPubKeysToStringMap_RoundTrip(t *testing.T) {
 
 	restored := pubKeysFromStringMap(strMap)
 	require.Len(t, restored, 2)
-	assert.Equal(t, pub0, restored[model.SuiteEd25519])
-	assert.Equal(t, pub1, restored[model.SuiteBLS12381])
+	assert.Equal(t, pub0, restored[crypto.SuiteEd25519])
+	assert.Equal(t, pub1, restored[crypto.SuiteBLS12381])
 }
 
 func TestPubKeysToStringMap_Nil(t *testing.T) {
@@ -120,13 +121,13 @@ func TestPubKeysFromStringMap_Nil(t *testing.T) {
 }
 
 func TestPubKeysFromStringMap_UnknownKey(t *testing.T) {
-	m := map[string]*model.PubKey{
+	m := map[string]*crypto.PubKey{
 		"ed25519": {},
 		"unknown": {},
 	}
 	restored := pubKeysFromStringMap(m)
 	assert.Len(t, restored, 1)
-	assert.Contains(t, restored, model.SuiteEd25519)
+	assert.Contains(t, restored, crypto.SuiteEd25519)
 }
 
 func TestDistKeyShareStore_JSONRoundTrip(t *testing.T) {

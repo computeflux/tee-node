@@ -10,9 +10,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/computeflux/tee-provider/pkg/store"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-
-	"github.com/computeflux/tee-provider/pkg/model"
 )
 
 // EncryptPrivateKey 用用户密码加密私钥（存储到 Pebble）
@@ -38,7 +37,7 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 	}
 	ciphertext := gcm.Seal(nonce, nonce, keyBytes, nil)
 
-	return model.PutEncryptedKey(&model.EncryptedKey{
+	return store.PutEncryptedKey(&store.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString(ciphertext),
 		BlobType: "aes-256-gcm",
@@ -47,7 +46,7 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 
 // DecryptPrivateKey 用用户密码解密私钥
 func (s *WalletService) DecryptPrivateKey(email, passwordHash string) (*ecdsa.PrivateKey, error) {
-	record, err := model.GetEncryptedKey(email)
+	record, err := store.GetEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no encrypted key found — set a transaction password first")
 	}

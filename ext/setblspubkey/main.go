@@ -1,14 +1,16 @@
 // setblspubkey sets the aggregated BLS public key on the BLS gateway contract.
 //
 // Usage:
-//   go run ./ext/setblspubkey \
-//     --rpc https://eth-rpc-testnet.polkadot.io \
-//     --bls 0x... \
-//     --key  0x... \
-//     --pubkey 0x...   # 96-byte compressed G2 public key in hex
+//
+//	go run ./ext/setblspubkey \
+//	  --rpc https://eth-rpc-testnet.polkadot.io \
+//	  --bls 0x... \
+//	  --key  0x... \
+//	  --pubkey 0x...   # 96-byte compressed G2 public key in hex
 //
 // Environment variables (fallback):
-//   RPC_URL, BLS_CONTRACT_ADDRESS, PRIVATE_KEY, BLS_PUBKEY
+//
+//	RPC_URL, BLS_CONTRACT_ADDRESS, PRIVATE_KEY, BLS_PUBKEY
 package main
 
 import (
@@ -25,7 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/model"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
 )
 
@@ -93,7 +95,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	pubKey := model.PubKeyFromBLS12381Byte(pubBytes)
+	pubKey := teecrypto.PubKeyFromBLS12381Byte(pubBytes)
 	if pubKey == nil {
 		fmt.Fprintln(os.Stderr, "Error: failed to parse BLS public key")
 		os.Exit(1)

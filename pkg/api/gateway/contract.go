@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/store"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
@@ -39,7 +40,7 @@ func hashAPIKey(key string) []byte {
 }
 
 // LookupAPIKeyViaContract 通过合约查询 API Key 信息（exported for graph/auth_helpers.go）。
-func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
+func LookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
 	bridge := getBridge()
 	hash := hashAPIKey(key)
 	hexHash := hex.EncodeToString(hash)
@@ -58,7 +59,7 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 		return nil
 	}
 
-	return &model.GatewayTokenInfo{
+	return &store.GatewayTokenInfo{
 		Owner:     fmt.Sprintf("%x", info.Owner.V),
 		Addr:      info.Owner,
 		Key:       key,
@@ -68,7 +69,7 @@ func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
 }
 
 // lookupAPIKeyViaContract 是内部使用的别名。
-func lookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
+func lookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
 	return LookupAPIKeyViaContract(key)
 }
 
@@ -170,7 +171,7 @@ func findProviderName(name string) *cgateway.ProviderInfoWithID {
 }
 
 // buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表
-func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
+func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 	url := m.URI
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
@@ -180,12 +181,12 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*model.GatewayEndpoint {
 		return nil
 	}
 
-	eps := make([]*model.GatewayEndpoint, 0, len(m.APIKeys))
+	eps := make([]*store.GatewayEndpoint, 0, len(m.APIKeys))
 	for i, apiKey := range m.APIKeys {
 		if apiKey == "" {
 			continue
 		}
-		eps = append(eps, &model.GatewayEndpoint{
+		eps = append(eps, &store.GatewayEndpoint{
 			ID:         uint64(i) + 1,
 			ProviderID: m.ProviderID,
 			URL:        url,
@@ -315,7 +316,7 @@ func GatewayGetProviderByName(chain *teechain.TeeChain, name string) (*cgateway.
 }
 
 // GatewayGetCredit 查询用户剩余积分（credits - credit_useds）。
-func GatewayGetCredit(chain *teechain.TeeChain, user model.UniAddr) (int64, error) {
+func GatewayGetCredit(chain *teechain.TeeChain, user chaintypes.UniAddr) (int64, error) {
 	runtime, err := contractRuntime(chain)
 	if err != nil {
 		return 0, err
@@ -328,15 +329,15 @@ func GatewayGetCredit(chain *teechain.TeeChain, user model.UniAddr) (int64, erro
 // ── Testable function pointers ───────────────────────────
 
 var (
-	findProviderNameFn       func(string) *cgateway.ProviderInfoWithID               = findProviderName
-	findGatewayModelByNameFn func(uint64, string) *cgateway.ModelInfoWithID            = findGatewayModelByName
-	getCachedGatewayModelsFn func() []cgateway.ModelInfo                               = getCachedGatewayModels
-	getBridgeFn              func() *teechain.TeeChain                                 = getBridge
-	gatewayGetCreditFn       func(*teechain.TeeChain, model.UniAddr) (int64, error)    = GatewayGetCredit
+	findProviderNameFn       func(string) *cgateway.ProviderInfoWithID                   = findProviderName
+	findGatewayModelByNameFn func(uint64, string) *cgateway.ModelInfoWithID              = findGatewayModelByName
+	getCachedGatewayModelsFn func() []cgateway.ModelInfo                                 = getCachedGatewayModels
+	getBridgeFn              func() *teechain.TeeChain                                   = getBridge
+	gatewayGetCreditFn       func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) = GatewayGetCredit
 )
 
 // GatewayGetRechargeHistory 查询用户充值历史。
-func GatewayGetRechargeHistory(chain *teechain.TeeChain, user model.UniAddr, offset uint64, limit uint32) ([]cgateway.RechargeRecord, error) {
+func GatewayGetRechargeHistory(chain *teechain.TeeChain, user chaintypes.UniAddr, offset uint64, limit uint32) ([]cgateway.RechargeRecord, error) {
 	runtime, err := contractRuntime(chain)
 	if err != nil {
 		return nil, err

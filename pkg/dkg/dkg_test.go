@@ -9,8 +9,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/network/local"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -25,11 +28,11 @@ var newPeerSecret = []string{
 	"66dfdf585852c8aa4b111c15b69d4b40ad6db7cfabd7ae0b25384c950f5018cb2b4c0a71a9d97d6eb9bfcb29acc0d71df41015c5c5cc697d9471728a2a508a8a",
 }
 
-func runEpoch(t *testing.T, dkgs []*DKG, validators []*model.Validator, epoch uint32, tag string) (*model.PubKey, *model.PubKey) {
+func runEpoch(t *testing.T, dkgs []*DKG, validators []*chaintypes.Validator, epoch uint32, tag string) (*crypto.PubKey, *crypto.PubKey) {
 	t.Helper()
 
 	done := make(chan struct{})
-	err := dkgs[0].TryEpochConsensus(model.ConsensusMsg{
+	err := dkgs[0].TryEpochConsensus(dkgtypes.ConsensusMsg{
 		Validators: validators,
 		Epoch:      epoch,
 	}, func(signer *DssSigner, nodeId uint64) {
@@ -52,15 +55,15 @@ func runEpoch(t *testing.T, dkgs []*DKG, validators []*model.Validator, epoch ui
 		t.Fatal("DKG consensus timeout for " + tag)
 	}
 
-	edPub := dkgs[0].GetDkgPubKey(model.SuiteEd25519)
-	blsPub := dkgs[0].GetDkgPubKey(model.SuiteBLS12381)
+	edPub := dkgs[0].GetDkgPubKey(crypto.SuiteEd25519)
+	blsPub := dkgs[0].GetDkgPubKey(crypto.SuiteBLS12381)
 	return edPub, blsPub
 }
 
 func TestNetwork(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
-	db, err := model.NewDB()
+	db, err := store.NewDB()
 	if err != nil {
 		require.NoErrorf(t, err, "failed store.InitDB")
 		os.Exit(1)
@@ -69,21 +72,21 @@ func TestNetwork(t *testing.T) {
 
 	skipPartialSign = true
 
-	nodes := []*model.PubKey{}
-	validators := []*model.Validator{}
+	nodes := []*crypto.PubKey{}
+	validators := []*chaintypes.Validator{}
 	for _, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
-		validators = append(validators, &model.Validator{
-			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(crypto.SuiteEd25519))
+		validators = append(validators, &chaintypes.Validator{
+			ValidatorId:    *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(crypto.SuiteBLS12381),
 		})
 	}
 
 	dkgs := make([]*DKG, 0, len(nodes))
 	for i, s := range peerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
 		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
 		require.NoErrorf(t, err, "failed peer.NewNetwork")
 		dkg, err := NewDKG(nodeSecret, peer, Logger{NodeTag: "NODE " + fmt.Sprint(i)})
@@ -100,17 +103,17 @@ func TestNetwork(t *testing.T) {
 
 	// Epoch 2 — add 2 new peers
 	for _, s := range newPeerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
-		nodes = append(nodes, nodeSecret.GetPublicForSuite(model.SuiteEd25519))
-		validators = append(validators, &model.Validator{
-			ValidatorId:    *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			P2pId:          *nodeSecret.GetPublicForSuite(model.SuiteEd25519),
-			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(model.SuiteBLS12381),
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
+		nodes = append(nodes, nodeSecret.GetPublicForSuite(crypto.SuiteEd25519))
+		validators = append(validators, &chaintypes.Validator{
+			ValidatorId:    *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			P2pId:          *nodeSecret.GetPublicForSuite(crypto.SuiteEd25519),
+			ValidatorIdBLS: *nodeSecret.GetPublicForSuite(crypto.SuiteBLS12381),
 		})
 	}
 
 	for i, s := range newPeerSecret {
-		nodeSecret, _ := model.PrivateKeyFromHex(s)
+		nodeSecret, _ := crypto.PrivateKeyFromHex(s)
 		peer, err := local.NewNetwork(nodeSecret, []string{}, nodes, uint32(0), uint32(0))
 		require.NoErrorf(t, err, "failed peer.NewNetwork")
 		dkg, err := NewDKG(nodeSecret, peer, Logger{NodeTag: "NODE " + fmt.Sprint(3+i)})

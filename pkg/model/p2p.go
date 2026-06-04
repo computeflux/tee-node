@@ -2,6 +2,8 @@ package model
 
 import (
 	"bytes"
+
+	"github.com/computeflux/tee-provider/pkg/crypto"
 )
 
 // p2p send msg to all node
@@ -14,7 +16,7 @@ func SendBroadcast() *To {
 }
 
 // p2p send msg to modes
-func SendToNodes(ids []*PubKey) *To {
+func SendToNodes(ids []*crypto.PubKey) *To {
 	keys := make([][]byte, len(ids))
 	for i, id := range ids {
 		keys[i] = id.Byte()
@@ -29,7 +31,7 @@ func SendToNodes(ids []*PubKey) *To {
 }
 
 // p2p send msg to node
-func SendToNode(id *PubKey) *To {
+func SendToNode(id *crypto.PubKey) *To {
 	return &To{
 		Payload: &To_Node{
 			Node: id.Byte(),
@@ -37,7 +39,7 @@ func SendToNode(id *PubKey) *To {
 	}
 }
 
-func (s *To) Check(id *PubKey) bool {
+func (s *To) Check(id *crypto.PubKey) bool {
 	switch to := s.Payload.(type) {
 	case *To_Broadcast:
 		return true

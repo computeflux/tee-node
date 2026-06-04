@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/sign/dss"
 	"golang.org/x/crypto/blake2b"
 )
 
-func (d *DssSigner) signEd25519(suite dss.Suite, pubs []kyber.Point, long, random *model.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
+func (d *DssSigner) signEd25519(suite dss.Suite, pubs []kyber.Point, long, random *dkgtypes.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
 	if len(msg) > 256 {
 		h := blake2b.Sum256(msg)
 		msg = h[:]
@@ -32,7 +32,7 @@ func (d *DssSigner) signEd25519(suite dss.Suite, pubs []kyber.Point, long, rando
 	}
 
 	for _, bt := range d.sigs {
-		sig := &model.PartialSigWrap{}
+		sig := &dkgtypes.PartialSigWrap{}
 		if err := json.Unmarshal(bt, sig); err != nil {
 			util.LogWithRed("DSS Sign: err", err.Error())
 			continue
@@ -51,7 +51,7 @@ func (d *DssSigner) signEd25519(suite dss.Suite, pubs []kyber.Point, long, rando
 	return dssInst.Signature()
 }
 
-func (d *DssSigner) partialSignEd25519(suite dss.Suite, pubs []kyber.Point, long, random *model.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
+func (d *DssSigner) partialSignEd25519(suite dss.Suite, pubs []kyber.Point, long, random *dkgtypes.DistKeyShare, threshold int, msg []byte) ([]byte, error) {
 	if len(msg) > 256 {
 		h := blake2b.Sum256(msg)
 		msg = h[:]
@@ -75,8 +75,8 @@ func (d *DssSigner) partialSignEd25519(suite dss.Suite, pubs []kyber.Point, long
 		return nil, errors.New("dss.PartialSig failed")
 	}
 
-	sigWrap := model.PartialSigWrap{
-		Partial:   model.PriShareWithSuite{PriShare: sig.Partial, Suite: "ed25519"},
+	sigWrap := dkgtypes.PartialSigWrap{
+		Partial:   dkgtypes.PriShareWithSuite{PriShare: sig.Partial, Suite: "ed25519"},
 		SessionID: sig.SessionID,
 		Signature: sig.Signature,
 	}

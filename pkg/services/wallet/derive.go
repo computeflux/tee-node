@@ -14,7 +14,7 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -77,7 +77,7 @@ func (s *WalletService) encryptWithServerKey(email string, keyBytes []byte) erro
 	io.ReadFull(rand.Reader, nonce)
 	ciphertext := gcm.Seal(nonce, nonce, keyBytes, nil)
 
-	return model.PutEncryptedKey(&model.EncryptedKey{
+	return store.PutEncryptedKey(&store.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString(ciphertext),
 		BlobType: "aes-256-gcm-server",
@@ -86,7 +86,7 @@ func (s *WalletService) encryptWithServerKey(email string, keyBytes []byte) erro
 
 // DecryptWithServerKey 用服务端密钥解密私钥
 func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
-	record, err := model.GetEncryptedKey(email)
+	record, err := store.GetEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no stored key for %s", email)
 	}
@@ -102,13 +102,13 @@ func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
 
 // HasEncryptedKey 检查用户是否已有加密存储的密钥
 func (s *WalletService) HasEncryptedKey(email string) bool {
-	record, err := model.GetEncryptedKey(email)
+	record, err := store.GetEncryptedKey(email)
 	return err == nil && record != nil
 }
 
 // decryptKeyByType 根据 BlobType 选择正确的解密方式
 func (s *WalletService) decryptKeyByType(email, passwordHash string) (*ecdsa.PrivateKey, error) {
-	record, err := model.GetEncryptedKey(email)
+	record, err := store.GetEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no stored key for %s", email)
 	}

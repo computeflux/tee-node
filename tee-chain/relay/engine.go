@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -173,7 +174,7 @@ func dispatch(ev SyncEvent, api store.ContractApi) error {
 
 // getLastNonce 读取 nonce (txn 内, FinalizeTx 用) | Read nonce (within txn, for FinalizeTx)
 func getLastNonce(txn store.StoreTx, chainID uint32) (uint64, error) {
-	n, err := model.TxnGetCodec[uint64](txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
+	n, err := dbstore.TxnGetCodec[uint64](txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
 	}
@@ -186,12 +187,12 @@ func getLastNonce(txn store.StoreTx, chainID uint32) (uint64, error) {
 
 // setLastNonce 写入 nonce (txn 内, 原子提交) | Write nonce (within txn, atomic commit)
 func setLastNonce(txn store.StoreTx, chainID uint32, v uint64) error {
-	return model.TxnSetCodec(txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID), v)
+	return dbstore.TxnSetCodec(txn, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID), v)
 }
 
 // getLastNonceBg 读取 nonce (直接读 DB, CheckTx/ProcessProposal 用) | Read nonce (direct DB read, for CheckTx/ProcessProposal)
 func getLastNonceBg(chainID uint32) (uint64, error) {
-	n, err := model.GetCodec[uint64](RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
+	n, err := dbstore.GetCodec[uint64](RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
 	}

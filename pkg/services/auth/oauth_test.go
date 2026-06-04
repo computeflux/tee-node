@@ -301,9 +301,9 @@ func TestOAuthService_ExchangeXCode_Success(t *testing.T) {
 			assert.Equal(t, "Bearer x-token-123", authz)
 			json.NewEncoder(w).Encode(map[string]any{
 				"data": map[string]any{
-					"id":               "98765",
-					"name":             "Alice X",
-					"username":         "alice_x",
+					"id":                "98765",
+					"name":              "Alice X",
+					"username":          "alice_x",
 					"profile_image_url": "https://x.com/pic.jpg",
 				},
 			})

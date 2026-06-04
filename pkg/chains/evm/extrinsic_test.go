@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
@@ -26,7 +28,7 @@ func TestEvmChain_TEECallToCall(t *testing.T) {
 
 func TestEvmChain_TxCallOfSetNextEpoch(t *testing.T) {
 	e := &EvmChain{}
-	call, err := e.TxCallOfSetNextEpoch(42, model.PubKey{})
+	call, err := e.TxCallOfSetNextEpoch(42, crypto.PubKey{})
 	require.NoError(t, err)
 	assert.Equal(t, "setNextEpoch", call.EVM.Method)
 	assert.NotEmpty(t, call.EVM.Data)
@@ -36,9 +38,9 @@ func TestEvmChain_TxCallOfSetNextEpoch(t *testing.T) {
 
 func TestEvmChain_BatchCall(t *testing.T) {
 	e := &EvmChain{}
-	calls := []model.ChainCall{
-		{EVM: model.EvmCall{Data: []byte{0x01}}},
-		{EVM: model.EvmCall{Data: []byte{0x02}}},
+	calls := []chaintypes.ChainCall{
+		{EVM: chaintypes.EvmCall{Data: []byte{0x01}}},
+		{EVM: chaintypes.EvmCall{Data: []byte{0x02}}},
 	}
 	call, err := e.BatchCall("batch", calls)
 	require.NoError(t, err)
@@ -48,7 +50,7 @@ func TestEvmChain_BatchCall(t *testing.T) {
 
 func TestEvmChain_BatchCall_Empty(t *testing.T) {
 	e := &EvmChain{}
-	call, err := e.BatchCall("batch_all", []model.ChainCall{})
+	call, err := e.BatchCall("batch_all", []chaintypes.ChainCall{})
 	require.NoError(t, err)
 	assert.NotEmpty(t, call.EVM.Data)
 }
@@ -57,7 +59,7 @@ func TestEvmChain_BatchCall_Empty(t *testing.T) {
 
 func TestEvmChain_CallOfMapAccount(t *testing.T) {
 	e := &EvmChain{}
-	call, err := e.CallOfMapAccount(model.PubKey{})
+	call, err := e.CallOfMapAccount(crypto.PubKey{})
 	// mapAccount method is not present in the Subnet ABI
 	assert.Error(t, err)
 	assert.Nil(t, call)
@@ -125,10 +127,10 @@ func TestBuildValidators(t *testing.T) {
 	assert.Equal(t, uint64(1), vals[0].NodeID)
 	assert.Equal(t, []byte{1}, vals[0].ValidatorId.Byte()[:1])
 	assert.Equal(t, []byte{2}, vals[0].P2pId.Byte()[:1])
-	assert.NotEqual(t, model.PubKey{}, vals[0].ValidatorIdBLS)
+	assert.NotEqual(t, crypto.PubKey{}, vals[0].ValidatorIdBLS)
 
 	// second node has invalid BLS length
-	assert.Equal(t, model.PubKey{}, vals[1].ValidatorIdBLS)
+	assert.Equal(t, crypto.PubKey{}, vals[1].ValidatorIdBLS)
 }
 
 func TestBuildValidators_Empty(t *testing.T) {
@@ -153,18 +155,18 @@ func TestBuildValidators_MoreIDsThanNodes(t *testing.T) {
 // mockNonBLSSigner implements chain.SignerType but NOT blsEIP2537Signer
 type mockNonBLSSigner struct{}
 
-func (m *mockNonBLSSigner) Public() []byte                       { return nil }
-func (m *mockNonBLSSigner) AccountID() types.AccountID             { return types.AccountID{} }
-func (m *mockNonBLSSigner) Sign([]byte) ([]byte, error)            { return nil, nil }
-func (m *mockNonBLSSigner) Verify([]byte, []byte) bool             { return false }
-func (m *mockNonBLSSigner) SignType() uint8                        { return 0 }
+func (m *mockNonBLSSigner) Public() []byte              { return nil }
+func (m *mockNonBLSSigner) AccountID() types.AccountID  { return types.AccountID{} }
+func (m *mockNonBLSSigner) Sign([]byte) ([]byte, error) { return nil, nil }
+func (m *mockNonBLSSigner) Verify([]byte, []byte) bool  { return false }
+func (m *mockNonBLSSigner) SignType() uint8             { return 0 }
 
 // mockWrongSuiteSigner implements blsEIP2537Signer but with wrong suite
 type mockWrongSuiteSigner struct {
 	mockNonBLSSigner
 }
 
-func (m *mockWrongSuiteSigner) Suite() model.SuiteType { return model.SuiteEd25519 }
+func (m *mockWrongSuiteSigner) Suite() crypto.SuiteType { return crypto.SuiteEd25519 }
 func (m *mockWrongSuiteSigner) BLSSignEIP2537(msg []byte) (signature []byte, negSigEIP []byte, hmG1EIP []byte, err error) {
 	return nil, nil, nil, nil
 }
@@ -186,12 +188,12 @@ func TestEvmChain_GetBLSSigner_WrongSuite(t *testing.T) {
 func TestEvmChain_Identity(t *testing.T) {
 	e := &EvmChain{
 		chainId:    1,
-		cipher:     model.SuiteEd25519,
+		cipher:     crypto.SuiteEd25519,
 		urls:       []string{"http://localhost"},
 		signerAddr: "0x1234",
 	}
 	assert.Equal(t, "evm", e.ChainType())
-	assert.Equal(t, model.SuiteEd25519, e.GetCipher())
+	assert.Equal(t, crypto.SuiteEd25519, e.GetCipher())
 	assert.Equal(t, []string{"http://localhost"}, e.GetChainUrls())
 	assert.Equal(t, "0x1234", e.GetSignerAddress())
 	assert.Equal(t, uint32(1), e.ChainId())
@@ -201,7 +203,7 @@ func TestEvmChain_Identity(t *testing.T) {
 
 func TestEvmChain_CheckMapAccount(t *testing.T) {
 	e := &EvmChain{}
-	ok, err := e.CheckMapAccount(model.PubKey{})
+	ok, err := e.CheckMapAccount(crypto.PubKey{})
 	require.NoError(t, err)
 	assert.True(t, ok)
 }

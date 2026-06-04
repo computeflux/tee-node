@@ -16,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	chain "github.com/wetee-dao/ink.go"
@@ -23,11 +25,11 @@ import (
 
 // ── Extrinsic helpers ──────────────────────────────────────
 
-func (e *EvmChain) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*model.ChainCall, error) {
-	return &model.ChainCall{EVM: model.EvmCall{Method: "tee_attest"}}, nil
+func (e *EvmChain) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error) {
+	return &chaintypes.ChainCall{EVM: chaintypes.EvmCall{Method: "tee_attest"}}, nil
 }
 
-func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*model.ChainCall, error) {
+func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer crypto.PubKey) (*chaintypes.ChainCall, error) {
 	abi, err := bindings.SubnetMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("get ABI: %w", err)
@@ -36,10 +38,10 @@ func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer model.PubKey) (*mo
 	if err != nil {
 		return nil, fmt.Errorf("pack setNextEpoch: %w", err)
 	}
-	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: "setNextEpoch"}}, nil
+	return &chaintypes.ChainCall{EVM: chaintypes.EvmCall{Data: data, Method: "setNextEpoch"}}, nil
 }
 
-func (e *EvmChain) BatchCall(method string, calls []model.ChainCall) (*model.ChainCall, error) {
+func (e *EvmChain) BatchCall(method string, calls []chaintypes.ChainCall) (*chaintypes.ChainCall, error) {
 	datas := make([][]byte, len(calls))
 	for i, c := range calls {
 		datas[i] = c.EVM.Data
@@ -53,10 +55,10 @@ func (e *EvmChain) BatchCall(method string, calls []model.ChainCall) (*model.Cha
 	if err != nil {
 		return nil, fmt.Errorf("pack batch: %w", err)
 	}
-	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: method}}, nil
+	return &chaintypes.ChainCall{EVM: chaintypes.EvmCall{Data: data, Method: method}}, nil
 }
 
-func (e *EvmChain) CallOfMapAccount(signer model.PubKey) (*model.ChainCall, error) {
+func (e *EvmChain) CallOfMapAccount(signer crypto.PubKey) (*chaintypes.ChainCall, error) {
 	abi, err := bindings.SubnetMetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("get ABI: %w", err)
@@ -65,7 +67,7 @@ func (e *EvmChain) CallOfMapAccount(signer model.PubKey) (*model.ChainCall, erro
 	if err != nil {
 		return nil, fmt.Errorf("pack mapAccount: %w", err)
 	}
-	return &model.ChainCall{EVM: model.EvmCall{Data: data, Method: "mapAccount"}}, nil
+	return &chaintypes.ChainCall{EVM: chaintypes.EvmCall{Data: data, Method: "mapAccount"}}, nil
 }
 
 // ── Signing ────────────────────────────────────────────────
@@ -153,7 +155,7 @@ func isHex(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
 
-func (e *EvmChain) PartialSign(signer chain.PartialSignerType, call model.ChainCall) ([]byte, error) {
+func (e *EvmChain) PartialSign(signer chain.PartialSignerType, call chaintypes.ChainCall) ([]byte, error) {
 	return signer.PartialSign(call.EVM.Data)
 }
 
@@ -161,7 +163,7 @@ func (e *EvmChain) PartialSign(signer chain.PartialSignerType, call model.ChainC
 // (which would create an import cycle).
 type blsEIP2537Signer interface {
 	chain.SignerType
-	Suite() model.SuiteType
+	Suite() crypto.SuiteType
 	BLSSignEIP2537(msg []byte) (signature []byte, negSigEIP []byte, hmG1EIP []byte, err error)
 }
 
@@ -170,7 +172,7 @@ func (e *EvmChain) getBLSSigner(signer chain.SignerType) (blsEIP2537Signer, erro
 	if !ok {
 		return nil, errors.New("signer does not support BLS EIP-2537")
 	}
-	if blsSigner.Suite() != model.SuiteBLS12381 {
+	if blsSigner.Suite() != crypto.SuiteBLS12381 {
 		return nil, errors.New("signer suite is not BLS12381")
 	}
 	return blsSigner, nil
@@ -246,7 +248,7 @@ func (e *EvmChain) sendBLSTx(submitData []byte, untilFinalized bool, nonce uint6
 // SignAndSubmit submits a transaction (single or batch) to the chain via the BLS gateway contract.
 // If call.Data was produced by BatchCall, it is decoded as bytes[] and routed to BLS.batchSubmit;
 // otherwise it is treated as a single call and routed to BLS.submit.
-func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call model.ChainCall, untilFinalized bool, nonce uint64) error {
+func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error {
 	if e.bls == nil {
 		return errors.New("BLS contract not configured")
 	}

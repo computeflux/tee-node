@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/model"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
@@ -12,16 +14,16 @@ import (
 // ContractRuntime 构造一个新的合约运行时上下文，供外部包（gateway、graph 等）使用。
 // 调用者负责 defer runtime.GetTxn().Rollback()。
 func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
-	if model.DBINS == nil {
+	if dbstore.DBINS == nil {
 		return nil, fmt.Errorf("DBINS is nil")
 	}
-	txn := model.DBINS.NewTransaction()
+	txn := dbstore.DBINS.NewTransaction()
 	// NOTE: caller does NOT call txn.Commit() for read-only queries.
 	// The caller must defer txn.Rollback().
 
-	var sudo model.UniAddr
+	var sudo chaintypes.UniAddr
 	if app.dkg != nil && app.dkg.SystemPubKey() != nil {
-		sudo = model.UniAddr{V: app.dkg.SystemPubKey().Byte()}
+		sudo = chaintypes.UniAddr{V: app.dkg.SystemPubKey().Byte()}
 	}
 
 	version, err := GetRuntimeVersionAtHeight(app.state.Height)
@@ -30,11 +32,11 @@ func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
 		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
 
-	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, model.UniAddr{}, sudo, version), nil
+	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, chaintypes.UniAddr{}, sudo, version), nil
 }
 
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。
-func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *model.Txn, t time.Time, height int64, call store.ContractCall) error {
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -42,7 +44,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *mod
 		}
 	}()
 
-	address := model.UniAddr{
+	address := chaintypes.UniAddr{
 		T: callerType,
 		V: caller,
 	}
@@ -60,7 +62,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *mod
 		return fmt.Errorf("get runtime version: %w", err)
 	}
 
-	runtime := contracts.NewRuntimeWithVersion(height, t, txn, address, model.UniAddr{
+	runtime := contracts.NewRuntimeWithVersion(height, t, txn, address, chaintypes.UniAddr{
 		V: pub.ToBytes(),
 	}, version)
 
@@ -78,10 +80,10 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 	}()
 
 	height := app.state.Height
-	txn := model.DBINS.NewTransaction()
+	txn := dbstore.DBINS.NewTransaction()
 	defer txn.Rollback()
 
-	address := model.UniAddr{
+	address := chaintypes.UniAddr{
 		T: callerType,
 		V: caller,
 	}
@@ -91,7 +93,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
 
-	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, model.UniAddr{
+	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
 	}, version)
 
@@ -114,10 +116,10 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 	}()
 
 	height := app.state.Height
-	txn := model.DBINS.NewTransaction()
+	txn := dbstore.DBINS.NewTransaction()
 	defer txn.Rollback()
 
-	address := model.UniAddr{
+	address := chaintypes.UniAddr{
 		T: callerType,
 		V: caller,
 	}
@@ -127,7 +129,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 		return fmt.Errorf("get runtime version: %w", err)
 	}
 
-	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, model.UniAddr{
+	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
 	}, version)
 

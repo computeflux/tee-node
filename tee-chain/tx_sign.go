@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"fmt"
 
+	"crypto/sha256"
+
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/mempool"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/wetee-dao/ink.go"
-	"crypto/sha256"
 )
 
 // TxHash 计算交易唯一标识（sha256，与 CometBFT 一致）
@@ -72,7 +74,7 @@ func (s *TeeChain) SubmitCallFromNode(call *model.SysCall) error {
 	if s.NodePriv == nil {
 		return fmt.Errorf("node private key not initialized")
 	}
-	signer := s.NodePriv.ToSigner(model.SuiteEd25519)
+	signer := s.NodePriv.ToSigner(teecrypto.SuiteEd25519)
 	tx, err := signTx(call, signer)
 	if err != nil {
 		return err
@@ -86,7 +88,7 @@ func (s *TeeChain) GetCallBytesFromNode(call *model.SysCall) ([]byte, error) {
 	if dkg == nil || dkg.Signer == nil {
 		return nil, errors.New("DKG signer not initialized")
 	}
-	tx, err := signTx(call, dkg.Signer.ToSigner(model.SuiteEd25519))
+	tx, err := signTx(call, dkg.Signer.ToSigner(teecrypto.SuiteEd25519))
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +101,7 @@ func (s *TeeChain) SignAndBuildRelayTx(call *model.SysCall) ([]byte, error) {
 	if dkg == nil || dkg.Signer == nil {
 		return nil, errors.New("DKG signer not initialized")
 	}
-	tx, err := signTx(call, dkg.Signer.ToSigner(model.SuiteEd25519))
+	tx, err := signTx(call, dkg.Signer.ToSigner(teecrypto.SuiteEd25519))
 	if err != nil {
 		return nil, err
 	}

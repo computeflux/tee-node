@@ -7,15 +7,18 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	abci "github.com/cometbft/cometbft/abci/types"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 	"github.com/pkg/errors"
 )
 
-func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
+func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
 	hubCalls := make([]*model.HubCall, 0, len(txs))
 	var txIndex int64 = 0
@@ -28,7 +31,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 		}
 
 		// 所有交易必须验证签名
-		call, err := model.VerifyTxSigner(tx)
+		call, err := domain.VerifyTxSigner(tx)
 		if err != nil {
 			return nil, errors.Wrap(err, "verify tx signer")
 		}
@@ -75,7 +78,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 
 			// 从存储加载该交易的 hubCalls
 			baseKey := TxIndexPrefix + fmt.Sprint(p.SyncTxRetry)
-			stored, err := model.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+			stored, err := dbstore.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
 			if err != nil || stored == nil || len(stored.HubCalls) == 0 {
 				LogWithTime("SyncTxRetry", "hubCalls not found for txIndex:", p.SyncTxRetry)
 				break
@@ -134,9 +137,9 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 			if app.relay != nil {
 				pub, _ := app.GetDkgPubkey()
 				version, _ := GetRuntimeVersionAtHeight(height)
-				runtime := contracts.NewRuntimeWithVersion(height, ts, txn, model.UniAddr{
+				runtime := contracts.NewRuntimeWithVersion(height, ts, txn, chaintypes.UniAddr{
 					V: pub.ToBytes(),
-				}, model.UniAddr{
+				}, chaintypes.UniAddr{
 					V: pub.ToBytes(),
 				}, version)
 
@@ -154,13 +157,13 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 			// 权限校验：仅 system account 可提交 runtime upgrade
 			caller := tx.GetCaller()
 			callerType := tx.GetCallerType()
-			address := model.UniAddr{T: callerType, V: caller}
+			address := chaintypes.UniAddr{T: callerType, V: caller}
 
 			pub, err := app.GetDkgPubkey()
 			if err != nil {
 				return nil, errors.Wrap(err, "get dkg pubkey for runtime upgrade")
 			}
-			sudo := model.UniAddr{V: pub.ToBytes()}
+			sudo := chaintypes.UniAddr{V: pub.ToBytes()}
 			if !bytes.Equal(address.V, sudo.V) || address.T != sudo.T {
 				return nil, errors.New("runtime upgrade: caller is not system account")
 			}
@@ -182,7 +185,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 				return nil, errors.New("runtime upgrade: wasm_bytes is empty")
 			}
 
-			info := &model.RuntimeVersionInfo{
+			info := &domain.RuntimeVersionInfo{
 				Version:          upgrade.Version,
 				ActivationHeight: height,
 				CodeHash:         upgrade.CodeHash,
@@ -217,7 +220,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *model.Txn, height int64, ts t
 	return res, nil
 }
 
-func (app *TeeChain) finalizeHubCall(hub *model.HubCall, txn *model.Txn) error {
+func (app *TeeChain) finalizeHubCall(hub *model.HubCall, txn *dbstore.Txn) error {
 	for _, callWrap := range hub.Call {
 		switch tx := callWrap.Tx.(type) {
 		case *model.TeeCall_PodStart:

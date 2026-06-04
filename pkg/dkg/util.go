@@ -1,14 +1,12 @@
 package dkg
 
-import (
-	"github.com/computeflux/tee-provider/pkg/model"
-)
+import "github.com/computeflux/tee-provider/pkg/dkgtypes"
 
 // skipPartialSign is a test-only flag that skips chain-level partial signing.
 var skipPartialSign = false
 
 // SaveSponsor persists the consensus sponsor and epoch time from a ConsensusMsg.
-func (dkg *DKG) SaveSponsor(newMsg *model.ConsensusMsg) {
+func (dkg *DKG) SaveSponsor(newMsg *dkgtypes.ConsensusMsg) {
 	if newMsg.Sponsor != nil {
 		dkg.mu.Lock()
 		dkg.NewEpochSponsor = newMsg.Sponsor

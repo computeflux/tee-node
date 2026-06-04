@@ -3,9 +3,6 @@
 // 支持 insert/get/update 和分页 list/desc_list。
 package store
 
-import (
-)
-
 // ListIndex 约束列表索引类型：支持自增/自减。
 // 用于 StoreList 的 id 类型。
 type ListIndex interface {

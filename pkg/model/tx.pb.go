@@ -5,10 +5,11 @@ package model
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	io "io"
 	math "math"
 	math_bits "math/bits"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -2432,8 +2433,8 @@ func init() {
 	proto.RegisterType((*To)(nil), "model.To")
 	proto.RegisterType((*Nodes)(nil), "model.Nodes")
 	proto.RegisterType((*TeeCall)(nil), "model.TeeCall")
-	proto.RegisterType((*PodStart)(nil), "model.PodStart")
-	proto.RegisterType((*PodMint)(nil), "model.PodMint")
+	proto.RegisterType((*PodStart)(nil), "domain.PodStart")
+	proto.RegisterType((*PodMint)(nil), "domain.PodMint")
 	proto.RegisterType((*BridgeCall)(nil), "model.BridgeCall")
 	proto.RegisterType((*TeeVerifyResult)(nil), "model.TeeVerifyResult")
 	proto.RegisterType((*UploadSecret)(nil), "model.UploadSecret")

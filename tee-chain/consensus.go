@@ -12,8 +12,11 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/version"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/teetypes"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
 
@@ -31,12 +34,12 @@ type TeeChain struct {
 
 	dkg      *dkg.DKG
 	p2p      *bftbrigde.BTFReactor
-	NodePriv *model.PrivKey
+	NodePriv *teecrypto.PrivKey
 
-	txCh      *model.PersistChan[*model.BlockPartialSign]
+	txCh      *store.PersistChan[*model.BlockPartialSign]
 	txReadyCh chan struct{} // 通知 ApplyToChain 可以提交新交易到区块
 
-	onGoingBlock        *model.Txn
+	onGoingBlock        *store.Txn
 	onGoingValidators   []abci.ValidatorUpdate
 	currProposerAddress []byte
 	lastCommitAt        time.Time // 上次 Commit 的时间
@@ -52,7 +55,7 @@ func (app *TeeChain) myProposerAddress() []byte {
 	if app.NodePriv == nil {
 		return nil
 	}
-	pub := app.NodePriv.GetPublicForSuite(model.SuiteEd25519)
+	pub := app.NodePriv.GetPublicForSuite(teecrypto.SuiteEd25519)
 	return crypto.AddressHash(pub.PublicKey)
 }
 
@@ -71,7 +74,7 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 	}
 
 	if !light {
-		txCh, err := model.NewPersistChan[*model.BlockPartialSign]("back_tx", 1000)
+		txCh, err := store.NewPersistChan[*model.BlockPartialSign]("back_tx", 1000)
 		if err != nil {
 			return nil, err
 		}
@@ -251,7 +254,7 @@ func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64)
 
 func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	// Iterate over Tx in current block
-	app.onGoingBlock = model.DBINS.NewTransaction()
+	app.onGoingBlock = store.DBINS.NewTransaction()
 	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.Time, req.ProposerAddress)
 	if err != nil {
 		app.onGoingBlock.Rollback()
@@ -265,7 +268,7 @@ func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeB
 		validatorUpdates = app.onGoingValidators
 		ss58 := []string{}
 		for _, v := range app.onGoingValidators {
-			ss58 = append(ss58, model.PubKeyFromByte(v.PubKey.GetEd25519()).SS58())
+			ss58 = append(ss58, teecrypto.PubKeyFromByte(v.PubKey.GetEd25519()).SS58())
 		}
 		util.LogWithPurple("Validator updates", ss58)
 	}
@@ -329,8 +332,8 @@ func (app *TeeChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) 
 	}
 
 	// 生成 TEE 证明
-	signer := app.dkg.Signer.ToSigner(model.SuiteEd25519)
-	if err := model.IssueReport(signer, teeCall); err != nil {
+	signer := app.dkg.Signer.ToSigner(teecrypto.SuiteEd25519)
+	if err := teetypes.IssueReport(signer, teeCall); err != nil {
 		LogWithTime("💊 ExtendVote: IssueReport error: " + err.Error())
 		return &abci.ResponseExtendVote{VoteExtension: []byte("")}, nil
 	}
@@ -355,7 +358,7 @@ func (app *TeeChain) VerifyVoteExtension(_ context.Context, req *abci.RequestVer
 	}
 
 	// 验证 TEE 证明
-	result, err := model.VerifyReport(teeCall)
+	result, err := teetypes.VerifyReport(teeCall)
 	if err != nil {
 		LogWithTime("💊 VerifyVoteExtension: VerifyReport error: " + err.Error())
 		return &abci.ResponseVerifyVoteExtension{Status: abci.ResponseVerifyVoteExtension_REJECT}, nil

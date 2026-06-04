@@ -13,6 +13,8 @@ import (
 	"go.dedis.ch/kyber/v4/suites"
 	"go.dedis.ch/kyber/v4/util/random"
 
+	crypto "github.com/computeflux/tee-provider/pkg/crypto"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 )
 
@@ -23,7 +25,7 @@ func setupReencTest(t *testing.T) (
 	dkgCommit kyber.Point,
 	clientPriv kyber.Scalar,
 	clientPub kyber.Point,
-	clientPubKey *model.PubKey,
+	clientPubKey *crypto.PubKey,
 ) {
 	suite = suites.MustFind("Ed25519")
 
@@ -36,7 +38,7 @@ func setupReencTest(t *testing.T) (
 	clientPub = suite.Point().Mul(clientPriv, nil)
 
 	var err error
-	clientPubKey, err = model.PubKeyFromPoint(clientPub)
+	clientPubKey, err = crypto.PubKeyFromPoint(clientPub)
 	require.NoError(t, err)
 
 	return
@@ -48,12 +50,12 @@ func makeSecretStore(t *testing.T, encCmt kyber.Point) *model.SecretStore {
 	return &model.SecretStore{RawEncCmt: rawEncCmt}
 }
 
-func makeDistKeyShare(t *testing.T, suite suites.Suite, idx uint32, priPoly *share.PriPoly, pubPoly *share.PubPoly) model.DistKeyShare {
-	return model.DistKeyShare{
-		CommitsWrap: model.KyberPoints{
+func makeDistKeyShare(t *testing.T, suite suites.Suite, idx uint32, priPoly *share.PriPoly, pubPoly *share.PubPoly) dkgtypes.DistKeyShare {
+	return dkgtypes.DistKeyShare{
+		CommitsWrap: dkgtypes.KyberPoints{
 			Public: []kyber.Point{pubPoly.Eval(idx).V},
 		},
-		PriShareWrap: model.PriShareWithSuite{
+		PriShareWrap: dkgtypes.PriShareWithSuite{
 			PriShare: &share.PriShare{
 				I: idx,
 				V: priPoly.Eval(idx).V,
@@ -133,7 +135,7 @@ func TestReencryptAndVerify(t *testing.T) {
 
 	var pubShares []*share.PubShare
 
-	clientPubKey, _ := model.PubKeyFromPoint(clientPub)
+	clientPubKey, _ := crypto.PubKeyFromPoint(clientPub)
 
 	// Generate a random secret.
 	scrt := make([]byte, 32)
@@ -166,11 +168,11 @@ func TestReencryptAndVerify(t *testing.T) {
 		dkgSki := priPoly.Eval(uint32(idx)).V
 		dkgCmt := pubPoly.Eval(uint32(idx)).V
 
-		distKeyShare := model.DistKeyShare{
-			CommitsWrap: model.KyberPoints{
+		distKeyShare := dkgtypes.DistKeyShare{
+			CommitsWrap: dkgtypes.KyberPoints{
 				Public: []kyber.Point{dkgCmt},
 			},
-			PriShareWrap: model.PriShareWithSuite{
+			PriShareWrap: dkgtypes.PriShareWithSuite{
 				PriShare: &share.PriShare{
 					I: uint32(idx),
 					V: dkgSki,
@@ -344,7 +346,7 @@ func TestVerify_WrongClientPubKey(t *testing.T) {
 	// Wrong client public key
 	wrongPriv := suite.Scalar().Pick(suite.RandomStream())
 	wrongPub := suite.Point().Mul(wrongPriv, nil)
-	wrongPubKey, err := model.PubKeyFromPoint(wrongPub)
+	wrongPubKey, err := crypto.PubKeyFromPoint(wrongPub)
 	require.NoError(t, err)
 
 	scrt := []byte("wrong-client")

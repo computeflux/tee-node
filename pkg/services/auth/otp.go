@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -85,7 +85,7 @@ func (s *OTPService) Generate(email, clientID string) (string, error) {
 
 	// 5. 存储到 Pebble（带过期时间戳前缀）
 	data := fmt.Sprintf("%d:%s:%s", time.Now().Add(s.ttl).Unix(), otp, clientID)
-	if err := model.PutOTP(key, data); err != nil {
+	if err := store.PutOTP(key, data); err != nil {
 		return "", fmt.Errorf("store otp: %w", err)
 	}
 
@@ -111,7 +111,7 @@ func (s *OTPService) Verify(email, otp string) error {
 		return fmt.Errorf("account locked due to too many failed attempts, please request a new OTP")
 	}
 
-	stored, err := model.GetOTP(key)
+	stored, err := store.GetOTP(key)
 	if err != nil {
 		return fmt.Errorf("no OTP requested for this email")
 	}
@@ -129,7 +129,7 @@ func (s *OTPService) Verify(email, otp string) error {
 	}
 
 	if time.Now().Unix() > expiresAt && expiresAt > 0 {
-		model.DeleteOTP(key)
+		store.DeleteOTP(key)
 		delete(s.verifyFailCount, key)
 		return fmt.Errorf("OTP expired")
 	}
@@ -138,14 +138,14 @@ func (s *OTPService) Verify(email, otp string) error {
 		s.verifyFailCount[key]++
 		remaining := s.maxVerifyFails - s.verifyFailCount[key]
 		if remaining <= 0 {
-			model.DeleteOTP(key)
+			store.DeleteOTP(key)
 			return fmt.Errorf("too many failed attempts, OTP has been invalidated, please request a new one")
 		}
 		return fmt.Errorf("invalid OTP, %d attempts remaining", remaining)
 	}
 
 	// 验证成功，清理
-	model.DeleteOTP(key)
+	store.DeleteOTP(key)
 	delete(s.verifyFailCount, key)
 	delete(s.sendRecords, key)
 	return nil
@@ -160,7 +160,7 @@ func (s *OTPService) dailyCountKey(email string) string {
 
 func (s *OTPService) getDailySendCount(email string) (int, error) {
 	key := s.dailyCountKey(email)
-	b, err := model.GetKey("WEB3AUTH", key)
+	b, err := store.GetKey("WEB3AUTH", key)
 	if err != nil {
 		return 0, nil
 	}
@@ -172,7 +172,7 @@ func (s *OTPService) incrementDailySendCount(email string) {
 	key := s.dailyCountKey(email)
 	count, _ := s.getDailySendCount(email)
 	count++
-	model.SetKey("WEB3AUTH", key, []byte(strconv.Itoa(count)))
+	store.SetKey("WEB3AUTH", key, []byte(strconv.Itoa(count)))
 }
 
 // cleanup 清理过期的内存记录

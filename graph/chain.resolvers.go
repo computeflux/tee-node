@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/config"
+	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
@@ -59,7 +60,7 @@ func (r *queryResolver) Validators(ctx context.Context) ([]string, error) {
 
 	list := make([]string, 0, len(validators))
 	for _, v := range validators {
-		pub := model.PubKeyFromByte(v.Pubkey)
+		pub := crypto.PubKeyFromByte(v.Pubkey)
 		list = append(list, pub.SS58())
 	}
 	return list, nil

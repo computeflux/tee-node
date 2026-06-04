@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/cockroachdb/pebble"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func setupTestOTP(t *testing.T) *OTPService {
 	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
-	model.DBINS = &model.DB{DB: db}
+	store.DBINS = &store.DB{DB: db}
 
 	return NewOTPService(5)
 }
@@ -56,7 +56,7 @@ func TestOTPService_Verify_Expired(t *testing.T) {
 
 	// 篡改存储的数据使其过期
 	past := time.Now().Add(-10 * time.Minute).Unix()
-	model.PutOTP(normalizeEmail(email), formatOTPData(past, otp, "web"))
+	store.PutOTP(normalizeEmail(email), formatOTPData(past, otp, "web"))
 
 	err = svc.Verify(email, otp)
 	require.Error(t, err)

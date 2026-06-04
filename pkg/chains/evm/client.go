@@ -13,13 +13,14 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 )
 
 // EvmChain implements ChainApi + MainChainApi for EVM chains.
 type EvmChain struct {
 	chainId    uint32
-	cipher     model.SuiteType
+	cipher     teecrypto.SuiteType
 	urls       []string
 	mu         sync.RWMutex
 	client     *ethclient.Client
@@ -38,7 +39,7 @@ type EvmChain struct {
 
 // ── Constructor ───────────────────────────────────────────
 
-func NewContract(config *model.ChainConfigType, pk *model.PrivKey) (*EvmChain, error) {
+func NewContract(config *chaintypes.ChainConfigType, pk *teecrypto.PrivKey) (*EvmChain, error) {
 	if len(config.Urls) == 0 {
 		return nil, fmt.Errorf("no RPC URLs configured")
 	}
@@ -165,16 +166,16 @@ func (e *EvmChain) reconnect() error {
 
 // ── Identity ──────────────────────────────────────────────
 
-func (e *EvmChain) ChainType() string          { return "evm" }
-func (e *EvmChain) GetCipher() model.SuiteType { return e.cipher }
-func (e *EvmChain) GetChainUrls() []string     { return e.urls }
-func (e *EvmChain) GetSignerAddress() string   { return e.signerAddr }
+func (e *EvmChain) ChainType() string              { return "evm" }
+func (e *EvmChain) GetCipher() teecrypto.SuiteType { return e.cipher }
+func (e *EvmChain) GetChainUrls() []string         { return e.urls }
+func (e *EvmChain) GetSignerAddress() string       { return e.signerAddr }
 func (c *EvmChain) ChainId() uint32 {
 	return c.chainId
 }
 
-func (e *EvmChain) GetClient() *model.ChainClient {
+func (e *EvmChain) GetClient() *chaintypes.ChainClient {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return &model.ChainClient{EVM: e.client}
+	return &chaintypes.ChainClient{EVM: e.client}
 }

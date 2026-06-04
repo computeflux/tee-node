@@ -6,8 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/dkgtypes"
 	"github.com/computeflux/tee-provider/pkg/model"
 	p2peer "github.com/computeflux/tee-provider/pkg/network"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"go.dedis.ch/kyber/v4"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
@@ -19,44 +23,44 @@ type DKG struct {
 	// Host 是 P2P 网络主机
 	Peer p2peer.Peer
 	// Suites 加密套件集合
-	Suites map[model.SuiteType]suites.Suite
+	Suites map[crypto.SuiteType]suites.Suite
 	// Signer 是用于签名的私钥
-	Signer *model.PrivKey
+	Signer *crypto.PrivKey
 	// DistKeyGenerators 各 suite 的分布式密钥生成器
-	DistKeyGens map[model.SuiteType]*pedersen.DistKeyGenerator
+	DistKeyGens map[crypto.SuiteType]*pedersen.DistKeyGenerator
 
 	// Threshold 是密钥重建所需的最小份额数量
 	Threshold int
 
 	// epoch data
-	Nodes        []*model.Validator
+	Nodes        []*chaintypes.Validator
 	Epoch        uint32
-	DkgPubKeys   map[model.SuiteType]*model.PubKey
-	DkgKeyShares map[model.SuiteType]*model.DistKeyShare
+	DkgPubKeys   map[crypto.SuiteType]*crypto.PubKey
+	DkgKeyShares map[crypto.SuiteType]*dkgtypes.DistKeyShare
 
 	// next epoch data
-	NewNodes        []*model.Validator
+	NewNodes        []*chaintypes.Validator
 	NewEpoch        uint32
-	NewDkgPubKeys   map[model.SuiteType]*model.PubKey
-	NewDkgKeyShares map[model.SuiteType]*model.DistKeyShare
-	NewEpochSponsor *model.Validator
+	NewDkgPubKeys   map[crypto.SuiteType]*crypto.PubKey
+	NewDkgKeyShares map[crypto.SuiteType]*dkgtypes.DistKeyShare
+	NewEpochSponsor *chaintypes.Validator
 	NewEpochTime    int64
 
 	// cache the deal, response, justification, result
-	deals     map[model.SuiteType]map[string]*model.DealBundle
-	responses map[model.SuiteType]map[string]*pedersen.ResponseBundle
+	deals     map[crypto.SuiteType]map[string]*dkgtypes.DealBundle
+	responses map[crypto.SuiteType]map[string]*pedersen.ResponseBundle
 	justifs   []*pedersen.JustificationBundle
 	mu        sync.RWMutex
 
 	// RandomPools holds pre-generated independent random shares for DSS signing.
-	RandomPools map[model.SuiteType]*RandomSharePool
+	RandomPools map[crypto.SuiteType]*RandomSharePool
 
 	// randomDkgStates tracks in-flight random DKG sessions (randomIndex -> state).
 	randomDkgStates map[uint32]*randomDkgState
 	randomDkgMu     sync.Mutex
 
 	// mainChan is the channel to receive out message
-	mainChain *model.PersistChan[*model.DkgMessage]
+	mainChain *store.PersistChan[*model.DkgMessage]
 
 	// Consensus is running
 	lastConsensusTime    int64
@@ -66,7 +70,7 @@ type DKG struct {
 
 	// cache
 	NewEpochPartialSigTime int64
-	NewEpochPartialSigs    map[string]*model.NewEpochMsg
+	NewEpochPartialSigs    map[string]*dkgtypes.NewEpochMsg
 
 	// 未初始化状态 => 0 | 初始化成功 => 1
 	status uint8
@@ -76,7 +80,7 @@ type DKG struct {
 
 // NewDKG 创建一个新的  DKG 实例
 func NewDKG(
-	NodeSecret *model.PrivKey,
+	NodeSecret *crypto.PrivKey,
 	peer p2peer.Peer,
 	log pedersen.Logger,
 ) (*DKG, error) {
@@ -84,9 +88,9 @@ func NewDKG(
 		log = NoLogger{}
 	}
 
-	suitesMap := make(map[model.SuiteType]suites.Suite)
-	for _, st := range model.AllSuites() {
-		suitesMap[st] = model.NewSuite(st)
+	suitesMap := make(map[crypto.SuiteType]suites.Suite)
+	for _, st := range crypto.AllSuites() {
+		suitesMap[st] = crypto.NewSuite(st)
 	}
 
 	// 创建 DKG 对象
@@ -95,18 +99,18 @@ func NewDKG(
 		Signer:          NodeSecret,
 		Peer:            peer,
 		log:             log,
-		deals:           make(map[model.SuiteType]map[string]*model.DealBundle),
-		responses:       make(map[model.SuiteType]map[string]*pedersen.ResponseBundle),
-		DkgPubKeys:      make(map[model.SuiteType]*model.PubKey),
-		DkgKeyShares:    make(map[model.SuiteType]*model.DistKeyShare),
-		NewDkgPubKeys:   make(map[model.SuiteType]*model.PubKey),
-		NewDkgKeyShares: make(map[model.SuiteType]*model.DistKeyShare),
-		DistKeyGens:     make(map[model.SuiteType]*pedersen.DistKeyGenerator),
-		RandomPools:     make(map[model.SuiteType]*RandomSharePool),
+		deals:           make(map[crypto.SuiteType]map[string]*dkgtypes.DealBundle),
+		responses:       make(map[crypto.SuiteType]map[string]*pedersen.ResponseBundle),
+		DkgPubKeys:      make(map[crypto.SuiteType]*crypto.PubKey),
+		DkgKeyShares:    make(map[crypto.SuiteType]*dkgtypes.DistKeyShare),
+		NewDkgPubKeys:   make(map[crypto.SuiteType]*crypto.PubKey),
+		NewDkgKeyShares: make(map[crypto.SuiteType]*dkgtypes.DistKeyShare),
+		DistKeyGens:     make(map[crypto.SuiteType]*pedersen.DistKeyGenerator),
+		RandomPools:     make(map[crypto.SuiteType]*RandomSharePool),
 	}
 
-	for _, st := range model.AllSuites() {
-		dkg.deals[st] = make(map[string]*model.DealBundle)
+	for _, st := range crypto.AllSuites() {
+		dkg.deals[st] = make(map[string]*dkgtypes.DealBundle)
 		dkg.responses[st] = make(map[string]*pedersen.ResponseBundle)
 	}
 
@@ -118,21 +122,21 @@ func NewDKG(
 		return nil, fmt.Errorf("restore dkg: %w", err)
 	}
 
-	dkg.mainChain, err = model.NewPersistChan[*model.DkgMessage]("dkg", 1000)
+	dkg.mainChain, err = store.NewPersistChan[*model.DkgMessage]("dkg", 1000)
 	if err != nil {
 		return nil, fmt.Errorf("create dkg persist chan: %w", err)
 	}
 
 	// Initialize random share pools for each suite.
-	for _, st := range model.AllSuites() {
+	for _, st := range crypto.AllSuites() {
 		dkg.RandomPools[st] = NewRandomSharePool(NodeSecret, DefaultRandomSharePoolCapacity)
 	}
 
 	return dkg, nil
 }
 
-func (dkg *DKG) SystemPubKey() *model.PubKey {
-	return dkg.DkgPubKeys[model.SuiteEd25519]
+func (dkg *DKG) SystemPubKey() *crypto.PubKey {
+	return dkg.DkgPubKeys[crypto.SuiteEd25519]
 }
 
 // out dkg event Handler
@@ -164,7 +168,7 @@ func (dkg *DKG) AvailableNodeLen() int {
 
 	// Count self only if we are in the validator set.
 	var count int
-	selfPub := dkg.Signer.GetPublicForSuite(model.SuiteEd25519)
+	selfPub := dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519)
 	if selfPub != nil {
 		for _, node := range dkg.Nodes {
 			if node.ValidatorId.String() == selfPub.String() {
@@ -186,11 +190,11 @@ func (dkg *DKG) AvailableNodeLen() int {
 }
 
 // Share returns the Ed25519 key share (for backward compatibility).
-func (d *DKG) Share() (*model.DistKeyShare, error) {
+func (d *DKG) Share() (*dkgtypes.DistKeyShare, error) {
 	if d.DkgKeyShares == nil {
 		return nil, errors.New("DKG key shares is nil")
 	}
-	share, ok := d.DkgKeyShares[model.SuiteEd25519]
+	share, ok := d.DkgKeyShares[crypto.SuiteEd25519]
 	if !ok || share == nil {
 		return nil, errors.New("DKG Ed25519 key share is nil")
 	}
@@ -198,24 +202,24 @@ func (d *DKG) Share() (*model.DistKeyShare, error) {
 }
 
 // GetDkgKeyShare returns the key share for a specific suite.
-func (d *DKG) GetDkgKeyShare(st model.SuiteType) *model.DistKeyShare {
+func (d *DKG) GetDkgKeyShare(st crypto.SuiteType) *dkgtypes.DistKeyShare {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.DkgKeyShares[st]
 }
 
 // GetDkgPubKey returns the public key for a specific suite.
-func (d *DKG) GetDkgPubKey(st model.SuiteType) *model.PubKey {
+func (d *DKG) GetDkgPubKey(st crypto.SuiteType) *crypto.PubKey {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.DkgPubKeys[st]
 }
 
 // P2PId returns the p2p id of self node.
-func (dkg *DKG) P2PId() *model.PubKey {
+func (dkg *DKG) P2PId() *crypto.PubKey {
 	dkg.mu.RLock()
 	defer dkg.mu.RUnlock()
-	pub := dkg.Signer.GetPublicForSuite(model.SuiteEd25519)
+	pub := dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519)
 	for _, p := range dkg.Nodes {
 		if p.ValidatorId.String() == pub.String() {
 			return &p.P2pId
@@ -227,7 +231,7 @@ func (dkg *DKG) P2PId() *model.PubKey {
 		}
 	}
 
-	util.LogError("P2P 404 ", dkg.Signer.GetPublicForSuite(model.SuiteEd25519).SS58())
+	util.LogError("P2P 404 ", dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 	return nil
 }
 
@@ -251,7 +255,7 @@ func (dkg *DKG) sendToNode(to *model.To, message *model.DkgMessage) error {
 	})
 }
 
-func (dkg *DKG) longtermForSuite(st model.SuiteType) kyber.Scalar {
+func (dkg *DKG) longtermForSuite(st crypto.SuiteType) kyber.Scalar {
 	return dkg.Signer.Scalar(st)
 }
 

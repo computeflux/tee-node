@@ -48,8 +48,6 @@ type RecoveryResult struct {
 	Error         string `json:"error,omitempty"`
 }
 
-
-
 // ── GraphQL 输入类型 ─────────────────────────────────────
 
 // TxInput 交易签名输入

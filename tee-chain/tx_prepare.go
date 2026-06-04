@@ -7,6 +7,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -41,7 +42,7 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 	}
 
 	// 使用临时 txn 累积 nonce 状态，确保同区块内多笔同 caller 合约交易的 nonce 连续
-	txn := model.DBINS.NewTransaction()
+	txn := dbstore.DBINS.NewTransaction()
 	defer txn.Rollback()
 
 	// 同一区块内每个 caller 只允许一笔交易（含合约和HubCall）

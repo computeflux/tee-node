@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -16,13 +18,13 @@ import (
 // Submit sync tx to polkadot hub
 func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex)
-	call, err := model.GetCodec[model.ChainCall](GLOABL_STATE, baseKey+TxIndexCallSuffix)
+	call, err := store.GetCodec[chaintypes.ChainCall](GLOABL_STATE, baseKey+TxIndexCallSuffix)
 	if err != nil || call == nil {
 		util.LogWithRed("Sync to polkadot hub", "error: call not found call data")
 		return errors.New("sync to polkadot hub error: call not found call data")
 	}
 
-	stored, err := model.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+	stored, err := store.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
 	if err != nil || stored == nil || len(stored.HubCalls) == 0 {
 		LogWithTime("SyncToHub", "hubCalls not found for txIndex:", txIndex)
 		return errors.New("sync to polkadot hub error: hubCalls not found")
@@ -72,7 +74,7 @@ func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
 
 // deleteTxIndexStore 删除 tx_index_<id> 相关储存（call + hubCalls）。应在所有节点共识到提交成功（即处理 SyncTxEnd）时调用。
 func deleteTxIndexStore(txIndex int64) {
-	_ = model.DeletekeysByPrefix(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_")
+	_ = store.DeletekeysByPrefix(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_")
 }
 
 // sync transaction index
@@ -86,7 +88,7 @@ type AsyncBatchState struct {
 
 // check sync is running
 func IsHubSyncRuning() bool {
-	tx, err := model.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
+	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
 	if err != nil {
 		// Fail open: on DB error, allow hub calls to be processed.
 		LogWithTime("IsHubSyncRuning get error: " + err.Error())
@@ -104,7 +106,7 @@ func IsHubSyncRuning() bool {
 
 // sync transaction step1
 func HubSyncStep1(s *TeeChain) ([]byte, error) {
-	tx, err := model.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
+	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +132,8 @@ func HubSyncStep1(s *TeeChain) ([]byte, error) {
 }
 
 // sync transaction step2
-func HubSyncStep2(i int64, txn *model.Txn) error {
-	tx, err := model.TxnGetJson[AsyncBatchState](txn, model.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
+func HubSyncStep2(i int64, txn *store.Txn) error {
+	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
 	if err != nil {
 		return err
 	}
@@ -149,12 +151,12 @@ func HubSyncStep2(i int64, txn *model.Txn) error {
 
 	tx.Going = i
 	tx.Done = i - 1
-	return model.TxnSetJson(txn, model.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
+	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
 }
 
 // sync transaction step3
-func HubSyncEnd(i int64, txn *model.Txn) error {
-	tx, err := model.TxnGetJson[AsyncBatchState](txn, model.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
+func HubSyncEnd(i int64, txn *store.Txn) error {
+	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
 	if err != nil {
 		return err
 	}
@@ -165,5 +167,5 @@ func HubSyncEnd(i int64, txn *model.Txn) error {
 
 	tx.Done = tx.Going
 	tx.LastSync = time.Now().Unix()
-	return model.TxnSetJson(txn, model.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
+	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
 }

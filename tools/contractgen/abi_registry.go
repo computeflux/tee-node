@@ -59,7 +59,7 @@ func newInkRegistry(errVariants []errorVariant, structTypes map[string]structTyp
 
 	// ID 11: Address（UniAddr）
 	r.addressID = r.appendType(r.buildUniAddrType())
-	r.goTypeToID["model.UniAddr"] = r.addressID
+	r.goTypeToID["chaintypes.UniAddr"] = r.addressID
 	r.goTypeToID["store.UniAddr"] = r.addressID
 
 	// 注册更多类型将按需动态添加
@@ -318,7 +318,7 @@ func (r *inkRegistry) ensureInnerQueryReturn(goType string) (int, error) {
 			return r.goTypeToID["u64"], nil
 		case "model.Amount":
 			return r.u256ID, nil
-		case "model.UniAddr":
+		case "chaintypes.UniAddr":
 			return r.addressID, nil
 		}
 		// 尝试动态注册未知的命名类型
@@ -595,7 +595,7 @@ func (r *inkRegistry) goTypeToABIRefNamed(goType string) (abiTypeRef, error) {
 		return abiTypeRef{Display: []string{"u64"}, TypeID: r.goTypeToID["u64"]}, nil
 	case "model.Amount", "store.Amount":
 		return abiTypeRef{Display: []string{"U256"}, TypeID: r.u256ID}, nil
-	case "model.UniAddr", "store.UniAddr":
+	case "chaintypes.UniAddr", "store.UniAddr":
 		return abiTypeRef{Display: []string{"UniAddr"}, TypeID: r.addressID}, nil
 	}
 
@@ -630,7 +630,7 @@ func (r *inkRegistry) goTypeToABIRefNamed(goType string) (abiTypeRef, error) {
 		switch goType {
 		case "model.Amount":
 			displayName = "U256"
-		case "model.UniAddr":
+		case "chaintypes.UniAddr":
 			displayName = "UniAddr"
 		}
 		return abiTypeRef{Display: []string{displayName}, TypeID: id}, nil
