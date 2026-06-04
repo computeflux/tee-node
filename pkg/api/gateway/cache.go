@@ -34,3 +34,6 @@ func FindTokenByKey(key string) *model.GatewayTokenInfo {
 func findTokenCached(key string) *model.GatewayTokenInfo {
 	return FindTokenByKey(key)
 }
+
+// findTokenCachedFn 可被测试替换为 mock。
+var findTokenCachedFn func(string) *model.GatewayTokenInfo = findTokenCached

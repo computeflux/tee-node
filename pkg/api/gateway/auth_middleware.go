@@ -29,7 +29,7 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		token := findTokenCached(key)
+		token := findTokenCachedFn(key)
 		if token == nil {
 			GATEWAYLOG().Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
 			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
@@ -81,7 +81,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		}
 
 		// 用 ProviderID 查询 Provider，验证名称与活跃状态
-		provider := findProviderName(providerName)
+		provider := findProviderNameFn(providerName)
 		if provider == nil || !provider.Data.IsActive {
 			writeError(w, http.StatusServiceUnavailable,
 				"provider not available for model "+modelName, "server_error")
@@ -94,7 +94,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		}
 
 		// 1. 从合约查询模型（必须存在且活跃）
-		model := findGatewayModelByName(provider.ID, modelName)
+		model := findGatewayModelByNameFn(provider.ID, modelName)
 		if model == nil {
 			writeError(w, http.StatusNotFound, "model not found: "+modelName, "not_found")
 			return
@@ -112,8 +112,8 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		token := GetTokenFromContext(r)
 
 		// 5. 检查用户积分
-		if bridge := getBridge(); bridge != nil {
-			credit, err := GatewayGetCredit(bridge, token.Addr)
+		if bridge := getBridgeFn(); bridge != nil {
+			credit, err := gatewayGetCreditFn(bridge, token.Addr)
 			if err != nil {
 				GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
 			} else if credit <= 0 {

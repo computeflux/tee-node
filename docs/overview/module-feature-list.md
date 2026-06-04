@@ -52,6 +52,8 @@
 
 #### 2.3 代理重加密（`pkg/proxy-reenc/`）
 
+> ✅ 测试覆盖：`mod_test.go`（11 个）— 完整重加密流程、Recover threshold 边界、空/长 secret 分片、Verify 失败场景（篡改 challenge/proof/wrong key）、无效 encCmt、hashPoints
+
 | 功能项 | 说明 |
 |--------|------|
 | **加密** | `EncryptSecret` — 使用 DKG 聚合公钥加密秘密（ElGamal） |
@@ -65,8 +67,10 @@
 
 | 子模块 | 功能 |
 |--------|------|
-| **数据库** | `db.go` — PebbleDB 封装（`DBINS` 单例），所有 value 经 TEE `SealWithProductKey` 密封；提供 JSON / Protobuf / SCALE 编解码辅助 |
+| **数据库** | `db.go` / `db_txn.go` — PebbleDB 封装（`DBINS` 单例），所有 value 经 TEE `SealWithProductKey` 密封；提供 JSON / Protobuf / SCALE 编解码辅助；事务 Set/Get/Delete、前缀扫描（ListByPrefix / ListByPrefixLimit）、Rollback / Commit |
 | **密钥管理** | `key_*.go` — Ed25519 / secp256k1 / BLS12-381 私钥/公钥封装、SS58 编码、H160 / AccountID 转换 |
+
+> ✅ 测试覆盖：`key_pub_test.go`（26 个）— SuiteType 检测、Point 转换、TeeChainNodeID、SS58/H160/AccountID round-trip、JSON marshal/unmarshal、全部构造器
 | **签名** | `sig.go` — 签名类型与验证辅助 |
 | **TEE 远程证明** | `tee.go` / `tee_sgx.go` / `tee_snp.go` / `tee_tdx.go` — 平台检测（SGX via EGO / SEV-SNP / TDX），`IssueReport()` / `VerifyReport()` |
 | **P2P 消息** | `p2p.go` / `message.go` — 广播/定向发送辅助、KVS 结构 |
@@ -128,6 +132,8 @@
 |--------|------|
 | **Auth 桥接** | `pkg/api/auth/` — `AuthConfig` 加载（优先链上合约，回退环境变量，内存缓存）；桥接 `tee-chain/contracts/module/auth` 的查询/存储/配置方法 |
 | **Gateway 桥接** | `pkg/api/gateway/` — OpenAI 兼容 REST 路由注册 (`RegisterGatewayRoutes`)、`HandleRelay` 转发编排、`HandleListModels`；中间件链（Recovery / RequestID / Logger / GzipDecode / RateLimit / Cache / TokenAuth / Distribute）；Endpoint 并发限流 (`EndpointRateLimiter`)；链上合约查询桥接 + 模型缓存 |
+
+> ✅ 测试覆盖：`middleware_test.go`（26 个）、`rate_limit_test.go`（9 个）、`auth_relay_test.go`（20 个）— Recovery/RequestID/Logger/GzipDecode/RateLimit/Cache、ProviderMetric、EndpointRateLimiter、parseProviderModel、TokenAuth/Distribute/HandleListModels/HandleRelay
 
 #### 2.10 工具库（`pkg/util/`）
 

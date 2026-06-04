@@ -325,6 +325,16 @@ func GatewayGetCredit(chain *teechain.TeeChain, user model.UniAddr) (int64, erro
 	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetCredit(user)
 }
 
+// ── Testable function pointers ───────────────────────────
+
+var (
+	findProviderNameFn       func(string) *cgateway.ProviderInfoWithID               = findProviderName
+	findGatewayModelByNameFn func(uint64, string) *cgateway.ModelInfoWithID            = findGatewayModelByName
+	getCachedGatewayModelsFn func() []cgateway.ModelInfo                               = getCachedGatewayModels
+	getBridgeFn              func() *teechain.TeeChain                                 = getBridge
+	gatewayGetCreditFn       func(*teechain.TeeChain, model.UniAddr) (int64, error)    = GatewayGetCredit
+)
+
 // GatewayGetRechargeHistory 查询用户充值历史。
 func GatewayGetRechargeHistory(chain *teechain.TeeChain, user model.UniAddr, offset uint64, limit uint32) ([]cgateway.RechargeRecord, error) {
 	runtime, err := contractRuntime(chain)

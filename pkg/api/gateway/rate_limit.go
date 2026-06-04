@@ -50,7 +50,12 @@ func (l *EndpointRateLimiter) Allow() bool {
 	if l == nil {
 		return true
 	}
-	return atomic.AddInt64(&l.inflight, 1) <= atomic.LoadInt64(&l.maxConc)
+	if atomic.AddInt64(&l.inflight, 1) <= atomic.LoadInt64(&l.maxConc) {
+		return true
+	}
+	// Rejected: decrement so inflight doesn't leak
+	atomic.AddInt64(&l.inflight, -1)
+	return false
 }
 
 // Done decrements inflight

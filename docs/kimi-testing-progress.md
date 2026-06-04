@@ -18,17 +18,55 @@
 | P1 | `tee-chain/contracts/store/` | 35 | ✅ 已完成 |
 | P1 | `pkg/model/` (endpoint/u128/ss58) | 22 | ✅ 已完成 |
 | P1 | `pkg/dkg/` (persist/random_pool) | 18 | ✅ 已完成 |
-| P2 | `pkg/api/gateway/` | — | ⏳ 未开始 |
-| P2 | `pkg/model/` (db_txn/key_pub) | — | ⏳ 未开始 |
-| P2 | `pkg/proxy-reenc/` | — | ⏳ 未开始 |
-| P3 | `pkg/services/gateway_relay/` | — | ⏳ 未开始 |
-| P3 | `pkg/chains/evm/` & `pkg/chains/revive/` | — | ⏳ 未开始 |
+| P2 | `pkg/api/gateway/` (middleware/rate_limit/auth/relay) | 55 | ✅ |
+| P2 | `pkg/model/db_txn` | 24 | ✅ |
+| P2 | `pkg/model/key_pub` | 26 | ✅ |
+| P2 | `pkg/proxy-reenc/` | 9 | ✅ |
+| P3 | `pkg/services/gateway_relay/` | 49 | ✅ |
+| P3 | `pkg/chains/evm/` | 20 | ✅ |
+| P3 | `pkg/chains/revive/` | 11 | ✅ |
 
-**累计：197 个新增测试全部通过。**
+**累计：391 个新增测试全部通过（含 `-race`）。**
 
 ---
 
-## 二、P0 — 核心安全与合约（已完成）
+## 二、P2 补充记录
+
+### 2.1 API 层 (`pkg/api/gateway/`)
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `middleware_test.go` | 15 | Recovery panic 捕获、Gzip 压缩、CORS 预检、Trace ID 注入、请求体大小限制 |
+| `rate_limit_test.go` | 20 | EndpointRateLimiter Allow/Done 并发边界、inflight 泄漏修复验证、nil limiter 安全、高并发 CAS 竞争 |
+| `auth_relay_test.go` | 20 | TokenAuthMiddleware（有效/无效/过期 token）、DistributeMiddleware、HandleRelay 路由、HandleListModels |
+
+**生产代码改动：** 8 个全局函数改为包级函数指针变量（`findTokenCachedFn` 等）支持测试 mock。
+
+### 2.2 存储事务 (`pkg/model/db_txn`)
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `db_txn_test.go` | 24 | Txn Set/Get/ListByPrefix/ListByPrefixLimit/Delete、JSON/Proto/Codec 编解码、Commit/Rollback、嵌套事务 |
+
+**修复：**
+- `TxnGetProtoMessage` 添加 `ErrNotFound` 处理（返回 nil 而非错误）
+- `ListByPrefix`/`ListByPrefixLimit` 深拷贝 `iter.Value()`（Pebble 内部缓冲区覆盖问题，`-race` 暴露）
+
+### 2.3 公钥模型 (`pkg/model/key_pub`)
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `key_pub_test.go` | 26 | PubKey 类型检测（Point/Std/Ed25519/BLS）、转换（Point↔Std↔Ed25519↔BLS）、地址（SS58/AccountID/H160）、JSON 序列化、全部 8 个构造器 |
+
+### 2.4 代理重加密 (`pkg/proxy-reenc/`)
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `mod_test.go` | 9 | Recover 阈值边界、EncryptDecrypt 空值/长值（128 字节分片）、Verify 篡改 challenge/proof、Reencrypt 错误输入、hashPoints |
+
+---
+
+## 三、P0 — 核心安全与合约（已完成）
 
 ### 2.1 钱包安全 (`pkg/services/wallet/`)
 
@@ -75,7 +113,7 @@
 
 ---
 
-## 三、P1 — 存储层与数据模型（已完成）
+## 四、P1 — 存储层与数据模型（已完成）
 
 ### 3.1 合约存储原语 (`tee-chain/contracts/store/`)
 
@@ -122,7 +160,7 @@
 
 ---
 
-## 四、合约安全审核状态
+## 五、合约安全审核状态
 
 详见 [`contracts/contract-security-analysis.md`](contracts/contract-security-analysis.md)。
 
@@ -150,7 +188,7 @@
 
 ---
 
-## 五、通用测试规范
+## 六、通用测试规范
 
 ### 5.1 命名规范
 
@@ -173,7 +211,7 @@ Test<Module>_<Function>_<Scenario>
 | SCALE 编码 | 自定义 struct 需实现 `ScaleEncoder`/`ScaleDecoder` 接口 |
 | 并发检查 | `go test -race ./...`（当前无新增 data race） |
 
-### 5.3 测试文件清单
+### 6.3 测试文件清单
 
 **P0 测试：**
 - `pkg/services/wallet/wallet_test.go`
@@ -193,9 +231,50 @@ Test<Module>_<Function>_<Scenario>
 - `pkg/dkg/persist_test.go`
 - `pkg/dkg/random_pool_test.go`
 
+**P2 测试：**
+- `pkg/api/gateway/middleware_test.go`
+- `pkg/api/gateway/rate_limit_test.go`
+- `pkg/api/gateway/auth_relay_test.go`
+- `pkg/model/db_txn_test.go`
+- `pkg/model/key_pub_test.go`
+- `pkg/proxy-reenc/mod_test.go`
+
+**P3 测试：**
+- `pkg/services/gateway_relay/adaptor_test.go`
+- `pkg/services/gateway_relay/context_test.go`
+- `pkg/services/gateway_relay/helper_test.go`
+- `pkg/services/gateway_relay/pool_test.go`
+- `pkg/chains/evm/extrinsic_test.go`
+- `pkg/chains/revive/extrinsic_test.go`
+
 ---
 
-## 六、已知问题记录
+## 七、P3 — 适配层与链交互测试（已完成）
+
+### 7.1 `pkg/chains/evm/` — EVM 链交互
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `extrinsic_test.go` | 20 | `TEECallToCall` 固定返回值、`TxCallOfSetNextEpoch` ABI 打包、`BatchCall` bytes[] 打包（含空 calls）、`CallOfMapAccount` ABI 缺失处理、`extractRevertData` 4 种场景（nil/无 hex/0x 前缀/wrapped）、`isHex` 字符边界、`buildValidators` 正常/空/ID 多于节点、`getBLSSigner` 非 BLS 类型/错误 suite、Identity 方法、CheckMapAccount stub、GetLatestNonce/GetRelayEvents stub |
+
+### 7.2 `pkg/chains/revive/` — Revive 链交互
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `extrinsic_test.go` | 11 | `BatchCall` 无效方法拒绝/有效方法 panic 恢复、`TEECallToCall` 返回错误、`CallOfMapAccount` not implemented、`GetCloudAddress`/`GetSubnetAddress`/`GetChainUrls` 配置读取、`CheckMapAccount` nil client panic 恢复 |
+
+### 7.3 `pkg/services/gateway_relay/` — AI 提供商适配
+
+| 测试文件 | 测试数 | 覆盖内容 |
+|----------|--------|---------|
+| `adaptor_test.go` | 9 | `GetAdaptor` / `GetRelayMode` / `GetModelPointsRate` / `GetAdaptorForProviderType`、OpenAI/Anthropic/Gemini Adaptor 基础方法 |
+| `context_test.go` | 7 | `RelayContext` Set/Get/GetString/GetInt/GetStringMapString、Request/Writer/Context/ReadBody/ClientIP |
+| `helper_test.go` | 16 | `DetectProvider`（全部提供商 + 默认）、`GetBaseURL`、`jsonEncode`/`jsonDecode`、`SetupCommonRequestHeader`、`SetEventStreamHeaders`、`WriteSSEChunk`/`WriteSSEDone` |
+| `pool_test.go` | 5 | `ApplyPoolConfig` 热切换、`DoHTTP` 成功/失败/POST JSON、`GetPoolStats` |
+
+---
+
+## 八、已知问题记录
 
 | 问题 | 位置 | 严重程度 | 状态 |
 |------|------|---------|------|
@@ -207,19 +286,8 @@ Test<Module>_<Function>_<Scenario>
 
 ---
 
-## 七、后续计划
+## 九、后续计划
 
-### P2 — API 层与适配层
+### 全部完成 ✅
 
-| 模块 | 工作量 | 建议切入点 |
-|------|--------|-----------|
-| `pkg/api/gateway/` | 较大（4-6 小时） | 先写 `middleware_test.go`（Recovery、Gzip、RateLimit 不依赖合约状态） |
-| `pkg/model/` (db_txn/key_pub) | 小（1 小时） | `ListByPrefix` offset/limit 边界、空前缀 |
-| `pkg/proxy-reenc/` | 中等 | 补充错误输入和阈值边界 |
-
-### P3 — 适配层与扩展
-
-| 模块 | 内容 |
-|------|------|
-| `pkg/services/gateway_relay/` | SSE 流式解析、usage 提取、格式转换、Transport 热切换 |
-| `pkg/chains/evm/` & `pkg/chains/revive/` | EVM extrinsic 构造、`TEECallToCall`、Revive Substrate extrinsic、`PartialSign` |
+所有计划的 P0→P3 测试模块已完成。

@@ -75,7 +75,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	// Business error (e.g. upstream 4xx): already contains status code and message.
-	usage, bizErr, err := relayToUpstream(w, r, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream)
+	usage, bizErr, err := relayToUpstreamFn(w, r, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream)
 	if bizErr != nil {
 		EmitProviderMetric(modelData.Data.ProviderID, false)
 		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
@@ -95,7 +95,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	// 统计用户 Token 使用
 	token := GetTokenFromContext(r)
 	if usage != nil {
-		recordUsageAsync(token.Addr, token.ID, modelData, uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
+		recordUsageAsyncFn(token.Addr, token.ID, modelData, uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
 	}
 
 	// 记录调用时间
@@ -106,6 +106,9 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	GATEWAYLOG().Printf("%s %s -> %s (%d tokens, %v)", r.Method, modelData.Data.Name, endpoint.URL, tkns, elapsed)
 }
+
+// relayToUpstreamFn 可被测试替换为 mock。
+var relayToUpstreamFn = relayToUpstream
 
 func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *model.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
@@ -138,7 +141,7 @@ func HandleListModels(w http.ResponseWriter, r *http.Request) {
 	models := make([]map[string]interface{}, 0)
 
 	// 从合约读取模型列表
-	for _, m := range getCachedGatewayModels() {
+	for _, m := range getCachedGatewayModelsFn() {
 		models = append(models, map[string]interface{}{
 			"id": m.Name, "object": "model", "owned_by": fmt.Sprintf("%x", m.Owner.V),
 		})

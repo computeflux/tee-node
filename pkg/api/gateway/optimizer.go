@@ -97,6 +97,9 @@ func StopUsageWriter() {
 	usageWg.Wait()
 }
 
+// recordUsageAsyncFn 可被测试替换为 mock。
+var recordUsageAsyncFn = recordUsageAsync
+
 func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
 	initUsageWriter()
 	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)

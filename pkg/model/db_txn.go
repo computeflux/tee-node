@@ -64,9 +64,11 @@ func (txn *Txn) ListByPrefix(prefix []byte) ([][]byte, [][]byte, error) {
 		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
 		keyCopy := copyIterKey(iter.Key())
 
-		// 解密数据
+		// 解密数据（深拷贝 value，避免 iter.Next() 覆盖内部缓冲区）
 		v := iter.Value()
-		decrypted, err := util.Unseal(v, nil)
+		valueCopy := make([]byte, len(v))
+		copy(valueCopy, v)
+		decrypted, err := util.Unseal(valueCopy, nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -106,8 +108,11 @@ func (txn *Txn) ListByPrefixLimit(prefix []byte, offset, limit uint64) ([][]byte
 		// iter.Key() 指向内部缓冲区，需深拷贝后再保存
 		keyCopy := copyIterKey(iter.Key())
 
+		// 解密数据（深拷贝 value，避免 iter.Next() 覆盖内部缓冲区）
 		v := iter.Value()
-		decrypted, err := util.Unseal(v, nil)
+		valueCopy := make([]byte, len(v))
+		copy(valueCopy, v)
+		decrypted, err := util.Unseal(valueCopy, nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -199,6 +204,9 @@ func TxnGetProtoMessageList[T any](txn *Txn, key []byte) (list []*T, err error) 
 func TxnGetProtoMessage[T any](txn *Txn, key []byte) (*T, error) {
 	v, err := txn.Get(key)
 	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
