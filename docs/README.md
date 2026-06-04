@@ -13,6 +13,7 @@
 | [`contracts/`](contracts/) | 智能合约系统（存储、安全、WASM 运行时） |
 | [`gateway/`](gateway/) | AI API 网关（路由、计费、结算、API Key） |
 | [`auth/`](auth/) | Web3Auth 与统一鉴权 |
+| [`kimi-testing-progress.md`](kimi-testing-progress.md) | 单元测试与合约审核进度报告 |
 | [`plans/`](plans/) | 历史重构与规划文档 |
 
 ---

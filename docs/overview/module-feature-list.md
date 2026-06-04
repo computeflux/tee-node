@@ -10,6 +10,7 @@
 - **项目名称**：TEE Provider Node（`github.com/computeflux/tee-provider`）
 - **技术栈**：Go 1.26 / CometBFT v0.39.3 / WASM (wazero) / GraphQL (gqlgen)
 - **定位**：基于可信执行环境（TEE）的去中心化子网节点，提供安全链下计算、Web3 身份认证、AI API 网关和阈值密码学服务。
+- **测试进度**：详见 [`../kimi-testing-progress.md`](../kimi-testing-progress.md)（197 个新增测试，P0/P1 已完成）
 
 ---
 
@@ -36,6 +37,8 @@
 
 #### 2.2 分布式密钥生成（`pkg/dkg/`）
 
+> ✅ 测试覆盖：`persist_test.go`（11 个）、`random_pool_test.go`（7 个）
+
 | 功能项 | 说明 |
 |--------|------|
 | **Pedersen DKG** | 基于 `go.dedis.ch/kyber/v4` 的分布式密钥生成，支持 Ed25519 + BLS12-381 双套件 |
@@ -57,6 +60,8 @@
 | **恢复与解密** | `Recover` + `DecryptSecret` — Lagrange 插值恢复重加密承诺，目标用户最终解密 |
 
 #### 2.4 数据模型与存储（`pkg/model/`）
+
+> ✅ 测试覆盖：`gateway_endpoint_test.go`（9 个）、`u128_test.go`（10 个）、`key_ss58_test.go`（6 个）
 
 | 子模块 | 功能 |
 |--------|------|
@@ -83,6 +88,8 @@
 
 #### 2.6 Web3 认证服务（`pkg/services/auth/`）
 
+> ✅ 测试覆盖：`jwt_test.go`（8 个）、`otp_test.go`（10+ 个）、`oauth_test.go`（14 个）
+
 | 功能项 | 说明 |
 |--------|------|
 | **JWT 服务** | `jwt.go` — 签发/验证 JWT（标准 24h，恢复 10min），使用 `jwt/v5` |
@@ -91,6 +98,8 @@
 | **邮件服务** | `email.go` — SMTP 邮件发送，支持 TLS/STARTTLS |
 
 #### 2.7 钱包服务（`pkg/services/wallet/`）
+
+> ✅ 测试覆盖：`wallet_test.go`（25 个）
 
 | 功能项 | 说明 |
 |--------|------|
@@ -153,6 +162,8 @@
 ---
 
 ### 4. 智能合约系统（`tee-chain/contracts/`）
+
+> ✅ 测试覆盖：`store_primitive_test.go`（35 个）、`batch_test.go`（7 个）、`auth_test.go`（17 个）、`gateway_test.go`（21 个）、`gov_test.go`（20 个）
 
 | 模块 | 功能 |
 |------|------|

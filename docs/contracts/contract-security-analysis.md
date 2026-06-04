@@ -492,12 +492,12 @@ func (g GatewayMutation) SettleUsage(batchNonce uint64, records []Settlement) er
 
 | 阶段 | 内容 | 优先级 | 状态 |
 |---|---|---|---|
-| P0 | 立即在 `SettleUsage` 增加 `batchNonce` + 合约维护 `usedBatchNonces` | Critical | 🔲 待实施 |
-| P1 | 为所有合约增加用户级 `nonce` 机制（方案 A） | High | 🔲 待实施 |
-| P2 | `SettleUsage` 增加 TEE 签名验证，确保用量数据真实 | High | 🔲 待实施 |
-| P3 | 增加链上结算频率限制（`lastSettleBlock`） | Medium | 🔲 待实施 |
-| P4 | 增加 `RateLimit` 网关层执行 | Medium | 🔲 待实施 |
-| P5 | 修复 `UpdateModel` 不应覆盖 `CreatedAt` | Low | 🔲 待实施 |
+| P0 | 立即在 `SettleUsage` 增加 `batchNonce` + 合约维护 `usedBatchNonces` | Critical | ✅ 已实施（per-record nonce 方案） |
+| P1 | 为所有合约增加用户级 `nonce` 机制（方案 A） | High | ✅ 已实施（Tx 级严格递增 nonce） |
+| P2 | `SettleUsage` 增加 TEE 签名验证，确保用量数据真实 | High | ✅ 已实施（CallbySystem + DKG 阈值签名） |
+| P3 | 增加链上结算频率限制（`lastSettleBlock`） | Medium | ✅ 已缓解（CallbySystem 控制，TEE 节点定时驱动） |
+| P4 | 增加 `RateLimit` 网关层执行 | Medium | ⚠️ 待实施 |
+| P5 | 修复 `UpdateModel` 不应覆盖 `CreatedAt` | Low | ✅ 已修复 |
 
 ---
 
