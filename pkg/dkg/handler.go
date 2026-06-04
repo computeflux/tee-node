@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/store"

@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/share"

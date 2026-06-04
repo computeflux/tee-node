@@ -12,7 +12,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/crypto"
-	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/network/local"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"

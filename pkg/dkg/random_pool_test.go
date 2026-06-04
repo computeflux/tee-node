@@ -5,7 +5,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	crypto "github.com/computeflux/tee-provider/pkg/crypto"
-	dkgtypes "github.com/computeflux/tee-provider/pkg/dkgtypes"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

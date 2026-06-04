@@ -11,7 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
-	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/store"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"

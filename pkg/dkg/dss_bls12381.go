@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.dedis.ch/kyber/v4"

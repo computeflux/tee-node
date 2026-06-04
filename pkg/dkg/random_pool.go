@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkgtypes"
+	"github.com/computeflux/tee-provider/pkg/dkg/types"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"
 )
 

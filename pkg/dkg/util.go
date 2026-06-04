@@ -1,6 +1,6 @@
 package dkg
 
-import "github.com/computeflux/tee-provider/pkg/dkgtypes"
+import "github.com/computeflux/tee-provider/pkg/dkg/types"
 
 // skipPartialSign is a test-only flag that skips chain-level partial signing.
 var skipPartialSign = false
