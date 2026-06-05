@@ -3,6 +3,7 @@ type EarlyAccessUser {
   joinedAt: String
   referrer: String
   referralCode: String
+  email: String
 }
 
 type EarlyAccessPoints {
@@ -62,6 +63,7 @@ type ClaimTaskResult {
 
 extend type Query {
   earlyAccessUser(user: String!): EarlyAccessUser!
+  earlyAccessUserByEmail(email: String!): EarlyAccessUser!
   earlyAccessPoints(user: String!): EarlyAccessPoints!
   earlyAccessReferral(user: String!): ReferralInfo!
   earlyAccessPointsHistory(user: String!, offset: Int, limit: Int): PointsHistory!
@@ -70,6 +72,6 @@ extend type Query {
 }
 
 extend type Mutation {
-  joinEarlyAccess(wallet: String!, referralCode: String): JoinEarlyAccessResult!
+  joinEarlyAccess(wallet: String!, email: String, referralCode: String): JoinEarlyAccessResult!
   claimEarlyAccessTask(wallet: String!, task: EarlyAccessTaskType!): ClaimTaskResult!
 }

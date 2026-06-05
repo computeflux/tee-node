@@ -3,7 +3,6 @@ package dkg
 import (
 	"crypto/ed25519"
 	"errors"
-	"os"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
@@ -87,7 +86,10 @@ func (d *DssSigner) PubList() ([]kyber.Point, *dkgtypes.DistKeyShare, *dkgtypes.
 
 	var pubs []kyber.Point
 	for _, k := range d.dkg.Nodes {
-		pubs = append(pubs, validatorPubForSuite(k, d.suite))
+		pub := validatorPubForSuite(k, d.suite)
+		if pub != nil {
+			pubs = append(pubs, pub)
+		}
 	}
 
 	var longShare *dkgtypes.DistKeyShare
@@ -109,12 +111,12 @@ func validatorPubForSuite(v *chaintypes.Validator, st crypto.SuiteType) kyber.Po
 		if p := v.ValidatorIdBLS.Point(); p != nil {
 			return p
 		}
+		return nil
 	case crypto.SuiteEd25519:
 		return v.ValidatorId.Point()
 	}
 
 	util.LogError("DKG", "validatorPubForSuite: failed to get pub for validator", st.String())
-	os.Exit(1)
 	return nil
 }
 

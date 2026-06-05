@@ -11,7 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/store"
 )
 
-const eaNamespace = "EARLY_ACCESS"
+const eaNamespace = "EARLY_WAITLIST"
 
 // EarlyAccessStore 基于 Pebble 的持久化存储。
 type EarlyAccessStore struct {
@@ -27,6 +27,7 @@ type dbEarlyAccessUser struct {
 	JoinedAt     string `json:"joinedAt"`
 	Referrer     string `json:"referrer"`
 	ReferralCode string `json:"referralCode"`
+	Email        string `json:"email"`
 }
 
 type dbPointsHistoryRecord struct {
@@ -73,7 +74,7 @@ func generateReferralCode(wallet string) string {
 	return "ref_" + hex.EncodeToString(h[:])[:8]
 }
 
-func (s *EarlyAccessStore) join(wallet string, referralCode *string) (bool, error) {
+func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,6 +89,18 @@ func (s *EarlyAccessStore) join(wallet string, referralCode *string) (bool, erro
 		return false, nil
 	}
 
+	// 检查邮箱是否已被其他钱包使用
+	email = strings.ToLower(email)
+	if email != "" {
+		existingWallet, err := s.loadEmailToWallet(email)
+		if err != nil {
+			return false, err
+		}
+		if existingWallet != "" && existingWallet != wallet {
+			return false, fmt.Errorf("email already registered by another wallet")
+		}
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 	code := generateReferralCode(wallet)
 
@@ -95,6 +108,7 @@ func (s *EarlyAccessStore) join(wallet string, referralCode *string) (bool, erro
 		Wallet:       wallet,
 		JoinedAt:     now,
 		ReferralCode: code,
+		Email:        strings.ToLower(email),
 	}
 
 	// 初始积分 100
@@ -153,12 +167,17 @@ func (s *EarlyAccessStore) join(wallet string, referralCode *string) (bool, erro
 		}
 	}
 
-	// 写入用户、码映射、统计
+	// 写入用户、码映射、邮箱映射、统计
 	if err := store.SetJson(eaNamespace, "user:"+wallet, user); err != nil {
 		return false, err
 	}
 	if err := s.saveCodeToWallet(code, wallet); err != nil {
 		return false, err
+	}
+	if email != "" {
+		if err := s.saveEmailToWallet(email, wallet); err != nil {
+			return false, err
+		}
 	}
 	if err := s.saveStats(stats); err != nil {
 		return false, err
@@ -325,6 +344,21 @@ func (s *EarlyAccessStore) saveCodeToWallet(code, wallet string) error {
 	return store.SetJson(eaNamespace, "code:"+code, &wallet)
 }
 
+func (s *EarlyAccessStore) loadEmailToWallet(email string) (string, error) {
+	v, err := store.GetJson[string](eaNamespace, "email:"+email)
+	if err != nil {
+		return "", err
+	}
+	if v == nil {
+		return "", nil
+	}
+	return *v, nil
+}
+
+func (s *EarlyAccessStore) saveEmailToWallet(email, wallet string) error {
+	return store.SetJson(eaNamespace, "email:"+email, &wallet)
+}
+
 func (s *EarlyAccessStore) loadReferrals(code string) ([]string, error) {
 	v, err := store.GetJson[[]string](eaNamespace, "referrals:"+code)
 	if err != nil {
@@ -362,6 +396,15 @@ func (s *EarlyAccessStore) saveTasks(wallet string, tasks map[string]string) err
 
 // ── Read-only accessors ──────────────────────────────────
 
+func (s *EarlyAccessStore) getUserByEmail(email string) *earlyAccessUserRecord {
+	email = strings.ToLower(email)
+	wallet, err := s.loadEmailToWallet(email)
+	if err != nil || wallet == "" {
+		return nil
+	}
+	return s.getUser(wallet)
+}
+
 func (s *EarlyAccessStore) getUser(wallet string) *earlyAccessUserRecord {
 	wallet = strings.ToLower(wallet)
 	v, err := store.GetJson[dbEarlyAccessUser](eaNamespace, "user:"+wallet)
@@ -373,6 +416,7 @@ func (s *EarlyAccessStore) getUser(wallet string) *earlyAccessUserRecord {
 		joinedAt:     v.JoinedAt,
 		referrer:     v.Referrer,
 		referralCode: v.ReferralCode,
+		email:        v.Email,
 	}
 }
 
@@ -456,6 +500,7 @@ type earlyAccessUserRecord struct {
 	joinedAt     string
 	referrer     string
 	referralCode string
+	email        string
 }
 
 type pointsHistoryRecord struct {

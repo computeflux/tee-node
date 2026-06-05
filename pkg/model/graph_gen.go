@@ -90,6 +90,7 @@ type EarlyAccessUser struct {
 	JoinedAt     *string `json:"joinedAt,omitempty"`
 	Referrer     *string `json:"referrer,omitempty"`
 	ReferralCode *string `json:"referralCode,omitempty"`
+	Email        *string `json:"email,omitempty"`
 }
 
 type JoinEarlyAccessResult struct {

@@ -47,7 +47,10 @@ func TestDssSigner_BLS12381(t *testing.T) {
 		Threshold: threshold,
 	}
 	for i := 0; i < n; i++ {
-		dkgInst.Nodes[i] = &chaintypes.Validator{}
+		nodePub := pubPoly.Eval(uint32(i))
+		dkgInst.Nodes[i] = &chaintypes.Validator{
+			ValidatorIdBLS: *mustPubKeyFromPoint(nodePub.V, crypto.SuiteBLS12381),
+		}
 	}
 
 	msg := []byte("hello BLS12381")
@@ -95,7 +98,10 @@ func TestDssSigner_BLS12381(t *testing.T) {
 	pubkeyCompressed, err := groupPub.MarshalBinary()
 	require.NoError(t, err)
 
-	hmCompressed, err := bls12381.HashToG1(msg)
+	// Use the same hash-to-curve method as signBLS12381/partialSignBLS12381
+	hmG1, err := hashToG1BLS12381(suite, msg)
+	require.NoError(t, err)
+	hmCompressed, err := hmG1.MarshalBinary()
 	require.NoError(t, err)
 
 	err = bls12381.VerifyLocal(hmCompressed, sigCompressed, pubkeyCompressed)

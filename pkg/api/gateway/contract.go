@@ -76,14 +76,14 @@ func lookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
 // providerDefaultURL 返回各供应商的默认官方地址。
 func providerDefaultURL(providerType uint16) string {
 	switch providerType {
-	case 1:
+	case 1: // openai
 		return "https://api.openai.com"
-	case 2:
+	case 2: // anthropic
 		return "https://api.anthropic.com"
-	case 3:
+	case 3: // googleapis
 		return "https://generativelanguage.googleapis.com"
 	default:
-		return "https://api.openai.com"
+		return ""
 	}
 }
 

@@ -32,11 +32,10 @@ func getWasmEngine() *wasm.Engine {
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
 	if version == module.NativeVersion {
-		util.LogWithGray("CONTRACT", "NATIVE QUERY")
 		return module.Query(call, runtime)
 	}
 
-	util.LogWithYellow("CONTRACT", "WASM QUERY")
+	util.LogWithRed("CONTRACT VESION", "Query with WASM")
 	return getWasmEngine().ExecuteQuery(version, call, runtime)
 }
 
@@ -51,7 +50,6 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 	}
 
 	if version == module.NativeVersion {
-		util.LogWithGray("CONTRACT", "NATIVE Mutation")
 		err := module.Mutation(call, runtime)
 		if selector == store.MethodToSelector("Init") && err == nil {
 			return SetContractInited(runtime.GetTxn(), string(call.GetName()))
@@ -59,7 +57,7 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 		return err
 	}
 
-	util.LogWithYellow("CONTRACT", "WASM Mutation")
+	util.LogWithYellow("CONTRACT VESION", "Mutation with WASM")
 	err := getWasmEngine().ExecuteMutation(version, call, runtime)
 	if selector == store.MethodToSelector("Init") && err == nil {
 		return SetContractInited(runtime.GetTxn(), string(call.GetName()))

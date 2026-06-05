@@ -34,15 +34,6 @@ func TestDetectProvider(t *testing.T) {
 	}
 }
 
-// ── GetBaseURL ─────────────────────────────────────────────
-
-func TestGetBaseURL(t *testing.T) {
-	assert.Equal(t, "https://api.openai.com", GetBaseURL("openai"))
-	assert.Equal(t, "https://api.anthropic.com", GetBaseURL("anthropic"))
-	assert.Equal(t, "", GetBaseURL("azure")) // empty in map
-	assert.Equal(t, "", GetBaseURL("unknown"))
-}
-
 // ── jsonEncode / jsonDecode ────────────────────────────────
 
 func TestJsonEncode(t *testing.T) {

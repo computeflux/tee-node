@@ -37,20 +37,28 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 	provider := "email_passwordless"
-	address := r.WalletSvc.DeriveAddress(email)
-	apiKey := createUserAPIKey(email, address)
 
-	// 仅从合约读取用户，避免本地读取
-	if existing, _ := getAuthUserFromContract(r.TeeChain, email); existing == nil {
-		store.PutAuthUser(&store.AuthUser{
-			Email:   email,
-			Address: address,
-		})
+	// 优先使用链上/本地已记录的地址，保证同一邮箱跨节点地址一致
+	existing, _ := getAuthUserFromContract(r.TeeChain, email)
+	var address string
+	if existing != nil && existing.Address != "" {
+		address = existing.Address
 	} else {
-		// 更新地址（可能因恢复等原因变化）
+		address = r.WalletSvc.DeriveAddress(email)
+		if existing == nil {
+			existing = &store.AuthUser{Email: email}
+		}
 		existing.Address = address
 		store.PutAuthUser(existing)
 	}
+
+	// 异步上链：确保跨节点能读取到统一的地址
+	go func(u *store.AuthUser) {
+		plain, _ := json.Marshal(u)
+		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
+	}(existing)
+
+	apiKey := createUserAPIKey(email, address)
 
 	return &auth.AuthResponse{
 		Success:  true,
@@ -99,7 +107,26 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	address := r.WalletSvc.DeriveAddress(oauthUser.Email)
+	// 优先使用链上/本地已记录的地址，保证同一邮箱跨节点地址一致
+	existing, _ := getAuthUserFromContract(r.TeeChain, oauthUser.Email)
+	var address string
+	if existing != nil && existing.Address != "" {
+		address = existing.Address
+	} else {
+		address = r.WalletSvc.DeriveAddress(oauthUser.Email)
+		if existing == nil {
+			existing = &store.AuthUser{Email: oauthUser.Email}
+		}
+		existing.Address = address
+		store.PutAuthUser(existing)
+	}
+
+	// 异步上链：确保跨节点能读取到统一的地址
+	go func(u *store.AuthUser) {
+		plain, _ := json.Marshal(u)
+		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
+	}(existing)
+
 	apiKey := createUserAPIKey(oauthUser.Email, address)
 	userInfo := &auth.UserInfo{
 		Email:        oauthUser.Email,
@@ -108,16 +135,6 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		TypeOfLogin:  provider,
 		Verifier:     provider,
 		VerifierID:   oauthUser.ProviderID,
-	}
-
-	// 仅从合约读取用户，避免本地读取
-	if existing, _ := getAuthUserFromContract(r.TeeChain, oauthUser.Email); existing == nil {
-		store.PutAuthUser(&store.AuthUser{
-			Email: oauthUser.Email, Address: address,
-		})
-	} else {
-		existing.Address = address
-		store.PutAuthUser(existing)
 	}
 
 	return &auth.AuthResponse{
@@ -407,7 +424,15 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
 
-	address := r.WalletSvc.DeriveAddress(email)
+	// 优先使用已有地址，保证跨节点一致性
+	existing, _ := getAuthUserFromContract(r.TeeChain, email)
+	var address string
+	if existing != nil && existing.Address != "" {
+		address = existing.Address
+	} else {
+		address = r.WalletSvc.DeriveAddress(email)
+	}
+
 	apiKey := createUserAPIKey(email, address)
 	return &auth.RecoveryResult{
 		Status: "ok", Token: apiKey, Address: address, Email: email,

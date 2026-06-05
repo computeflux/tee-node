@@ -42,33 +42,6 @@ func WriteSSEDone(ctx *RelayContext) {
 	}
 }
 
-// ── Model name helpers ───────────────────────────────────
-
-// ProviderBaseURLs maps provider type to default base URL
-var ProviderBaseURLs = map[string]string{
-	"openai":    "https://api.openai.com",
-	"anthropic": "https://api.anthropic.com",
-	"gemini":    "https://generativelanguage.googleapis.com",
-	"azure":     "",
-	"baidu":     "https://aip.baidubce.com",
-	"zhipu":     "https://open.bigmodel.cn",
-	"ali":       "https://dashscope.aliyuncs.com",
-	"deepseek":  "https://api.deepseek.com",
-	"groq":      "https://api.groq.com/openai",
-	"ollama":    "http://localhost:11434",
-	"mistral":   "https://api.mistral.ai",
-	"cohere":    "https://api.cohere.ai",
-	"xai":       "https://api.x.ai",
-}
-
-// GetBaseURL returns the default base URL for a provider
-func GetBaseURL(provider string) string {
-	if url, ok := ProviderBaseURLs[provider]; ok && url != "" {
-		return url
-	}
-	return ""
-}
-
 // ── JSON helpers ─────────────────────────────────────────
 
 func jsonEncode(v interface{}) []byte {
@@ -90,18 +63,6 @@ func DetectProvider(baseURL string) string {
 		return "openai"
 	case strings.Contains(lower, "anthropic.com"):
 		return "anthropic"
-	case strings.Contains(lower, "googleapis.com"):
-		return "gemini"
-	case strings.Contains(lower, "deepseek.com"):
-		return "deepseek"
-	case strings.Contains(lower, "groq.com"):
-		return "groq"
-	case strings.Contains(lower, "mistral.ai"):
-		return "mistral"
-	case strings.Contains(lower, "cohere.ai"):
-		return "cohere"
-	case strings.Contains(lower, "x.ai"):
-		return "xai"
 	default:
 		return "openai" // default to OpenAI-compatible
 	}

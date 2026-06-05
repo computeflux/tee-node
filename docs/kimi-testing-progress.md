@@ -280,7 +280,7 @@ Test<Module>_<Function>_<Scenario>
 |------|------|---------|------|
 | SS58 format=16383 编码后首字节为 63，解码器误判为 1-byte prefix | `pkg/model/key_ss58.go` | 低（极罕见边界） | 已记录，测试中回避 |
 | `RegisterModel` 无 provider 时返回 nil 而非错误 | `gateway/model.go` | 低 | 已记录，测试中接受实际行为 |
-| DKG epoch 3 bls12381 共识失败 | `pkg/dkg/dkg_test.go` | 中 | 已有失败，未修复 |
+| DKG epoch 3 bls12381 共识失败 | `pkg/dkg/dkg_test.go` | 中 | ✅ 已修复（`TestNetwork` 已通过；`TestDssSigner_BLS12381` 修复了 hash-to-curve 方法不一致 + `validatorPubForSuite` 的 `os.Exit(1)` 改为返回 nil） |
 | gov Transfer 默认禁用且无启用方法 | `gov/token.go` | 低 | 已记录，测试中验证禁用行为 |
 | `APIKeyInfo.RateLimit` 未在网关层执行 | `pkg/api/gateway/` | 中 | 待修复 |
 

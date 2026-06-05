@@ -12,8 +12,12 @@ import (
 )
 
 // JoinEarlyAccess is the resolver for the joinEarlyAccess field.
-func (r *mutationResolver) JoinEarlyAccess(ctx context.Context, wallet string, referralCode *string) (*model.JoinEarlyAccessResult, error) {
-	joined, err := earlyAccessStore.join(wallet, referralCode)
+func (r *mutationResolver) JoinEarlyAccess(ctx context.Context, wallet string, email *string, referralCode *string) (*model.JoinEarlyAccessResult, error) {
+	emailStr := ""
+	if email != nil {
+		emailStr = *email
+	}
+	joined, err := earlyAccessStore.join(wallet, emailStr, referralCode)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +56,33 @@ func (r *queryResolver) EarlyAccessUser(ctx context.Context, user string) (*mode
 	}
 	if record.referralCode != "" {
 		res.ReferralCode = &record.referralCode
+	}
+	if record.email != "" {
+		res.Email = &record.email
+	}
+	return res, nil
+}
+
+// EarlyAccessUserByEmail is the resolver for the earlyAccessUserByEmail field.
+func (r *queryResolver) EarlyAccessUserByEmail(ctx context.Context, email string) (*model.EarlyAccessUser, error) {
+	record := earlyAccessStore.getUserByEmail(email)
+	if record == nil {
+		return &model.EarlyAccessUser{
+			IsUser: false,
+		}, nil
+	}
+	res := &model.EarlyAccessUser{
+		IsUser:   true,
+		JoinedAt: &record.joinedAt,
+	}
+	if record.referrer != "" {
+		res.Referrer = &record.referrer
+	}
+	if record.referralCode != "" {
+		res.ReferralCode = &record.referralCode
+	}
+	if record.email != "" {
+		res.Email = &record.email
 	}
 	return res, nil
 }

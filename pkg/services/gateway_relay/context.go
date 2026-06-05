@@ -12,7 +12,7 @@ import (
 type RelayContext struct {
 	W      http.ResponseWriter
 	R      *http.Request
-	values map[string]interface{}
+	values map[string]any
 	mu     sync.RWMutex
 }
 
@@ -21,19 +21,19 @@ func NewRelayContext(w http.ResponseWriter, r *http.Request) *RelayContext {
 	return &RelayContext{
 		W:      w,
 		R:      r,
-		values: make(map[string]interface{}),
+		values: make(map[string]any),
 	}
 }
 
 // ── mimic gin.Context methods ────────────────────────────
 
-func (c *RelayContext) Set(key string, value interface{}) {
+func (c *RelayContext) Set(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.values[key] = value
 }
 
-func (c *RelayContext) Get(key string) (interface{}, bool) {
+func (c *RelayContext) Get(key string) (any, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	v, ok := c.values[key]
