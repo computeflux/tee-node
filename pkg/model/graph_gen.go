@@ -2,6 +2,13 @@
 
 package model
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 type AuthConfig struct {
 	CorsOrigins         string `json:"corsOrigins"`
 	SMTPHost            string `json:"smtpHost"`
@@ -62,6 +69,34 @@ type ChallengeResult struct {
 	Error     *string `json:"error,omitempty"`
 }
 
+type ClaimTaskResult struct {
+	Success       bool   `json:"success"`
+	PointsAwarded string `json:"pointsAwarded"`
+	TotalPoints   string `json:"totalPoints"`
+}
+
+type EarlyAccessPoints struct {
+	Total string `json:"total"`
+}
+
+type EarlyAccessStats struct {
+	UserCount              int    `json:"userCount"`
+	TotalPointsDistributed string `json:"totalPointsDistributed"`
+	TotalReferrals         int    `json:"totalReferrals"`
+}
+
+type EarlyAccessUser struct {
+	IsUser       bool    `json:"isUser"`
+	JoinedAt     *string `json:"joinedAt,omitempty"`
+	Referrer     *string `json:"referrer,omitempty"`
+	ReferralCode *string `json:"referralCode,omitempty"`
+}
+
+type JoinEarlyAccessResult struct {
+	Success bool    `json:"success"`
+	TxHash  *string `json:"txHash,omitempty"`
+}
+
 // 环境变量
 // Environments
 type Kvalue struct {
@@ -79,7 +114,26 @@ type LenValue struct {
 type Mutation struct {
 }
 
+type PointsHistory struct {
+	Items []*PointsHistoryItem `json:"items"`
+	Total int                  `json:"total"`
+}
+
+type PointsHistoryItem struct {
+	Amount      string  `json:"amount"`
+	Reason      string  `json:"reason"`
+	Timestamp   string  `json:"timestamp"`
+	RelatedUser *string `json:"relatedUser,omitempty"`
+}
+
 type Query struct {
+}
+
+type ReferralInfo struct {
+	Code      *string  `json:"code,omitempty"`
+	Referrer  *string  `json:"referrer,omitempty"`
+	Earnings  string   `json:"earnings"`
+	Referrals []string `json:"referrals"`
 }
 
 // 加密环境变量
@@ -99,4 +153,73 @@ type SignSessionResult struct {
 	SignToken *string `json:"signToken,omitempty"`
 	ExpiresAt *int    `json:"expiresAt,omitempty"`
 	Error     *string `json:"error,omitempty"`
+}
+
+type TaskStatus struct {
+	Task      EarlyAccessTaskType `json:"task"`
+	Completed bool                `json:"completed"`
+	ClaimedAt *string             `json:"claimedAt,omitempty"`
+}
+
+type EarlyAccessTaskType string
+
+const (
+	EarlyAccessTaskTypeJoinEarlyAccess EarlyAccessTaskType = "JOIN_EARLY_ACCESS"
+	EarlyAccessTaskTypeVerifyEmail     EarlyAccessTaskType = "VERIFY_EMAIL"
+	EarlyAccessTaskTypeConnectWallet   EarlyAccessTaskType = "CONNECT_WALLET"
+	EarlyAccessTaskTypeJoinDiscord     EarlyAccessTaskType = "JOIN_DISCORD"
+	EarlyAccessTaskTypeJoinTelegram    EarlyAccessTaskType = "JOIN_TELEGRAM"
+	EarlyAccessTaskTypeInviteFriend    EarlyAccessTaskType = "INVITE_FRIEND"
+)
+
+var AllEarlyAccessTaskType = []EarlyAccessTaskType{
+	EarlyAccessTaskTypeJoinEarlyAccess,
+	EarlyAccessTaskTypeVerifyEmail,
+	EarlyAccessTaskTypeConnectWallet,
+	EarlyAccessTaskTypeJoinDiscord,
+	EarlyAccessTaskTypeJoinTelegram,
+	EarlyAccessTaskTypeInviteFriend,
+}
+
+func (e EarlyAccessTaskType) IsValid() bool {
+	switch e {
+	case EarlyAccessTaskTypeJoinEarlyAccess, EarlyAccessTaskTypeVerifyEmail, EarlyAccessTaskTypeConnectWallet, EarlyAccessTaskTypeJoinDiscord, EarlyAccessTaskTypeJoinTelegram, EarlyAccessTaskTypeInviteFriend:
+		return true
+	}
+	return false
+}
+
+func (e EarlyAccessTaskType) String() string {
+	return string(e)
+}
+
+func (e *EarlyAccessTaskType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = EarlyAccessTaskType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid EarlyAccessTaskType", str)
+	}
+	return nil
+}
+
+func (e EarlyAccessTaskType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *EarlyAccessTaskType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e EarlyAccessTaskType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

@@ -53,7 +53,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 func TestOAuthService_GoogleAuthURL(t *testing.T) {
 	svc := newTestOAuthService(nil)
-	u := svc.GoogleAuthURL("state-123")
+	u := svc.GoogleAuthURL("state-123", "")
 	require.NotEmpty(t, u)
 	parsed, err := url.Parse(u)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestOAuthService_GoogleAuthURL(t *testing.T) {
 
 func TestOAuthService_GitHubAuthURL(t *testing.T) {
 	svc := newTestOAuthService(nil)
-	u := svc.GitHubAuthURL("state-456")
+	u := svc.GitHubAuthURL("state-456", "")
 	require.NotEmpty(t, u)
 	parsed, err := url.Parse(u)
 	require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestOAuthService_ExchangeGoogleCode_WithIDToken(t *testing.T) {
 	defer mock.Close()
 
 	svc := newTestOAuthService(&http.Client{Transport: newMockRoundTripper(mock.URL)})
-	info, err := svc.ExchangeGoogleCode("auth-code-123")
+	info, err := svc.ExchangeGoogleCode("auth-code-123", "")
 	require.NoError(t, err)
 	assert.Equal(t, "alice@gmail.com", info.Email)
 }
@@ -201,7 +201,7 @@ func TestOAuthService_ExchangeGoogleCode_WithUserInfo(t *testing.T) {
 	defer mock.Close()
 
 	svc := newTestOAuthService(&http.Client{Transport: newMockRoundTripper(mock.URL)})
-	info, err := svc.ExchangeGoogleCode("auth-code-123")
+	info, err := svc.ExchangeGoogleCode("auth-code-123", "")
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", info.Name)
 }
@@ -314,7 +314,7 @@ func TestOAuthService_ExchangeXCode_Success(t *testing.T) {
 	defer mock.Close()
 
 	svc := newTestOAuthService(&http.Client{Transport: newMockRoundTripper(mock.URL)})
-	info, err := svc.ExchangeXCode("x-code-123", "verifier-123")
+	info, err := svc.ExchangeXCode("x-code-123", "verifier-123", "")
 	require.NoError(t, err)
 	assert.Equal(t, "alice_x@twitter.local", info.Email)
 	assert.Equal(t, "Alice X", info.Name)
@@ -339,7 +339,7 @@ func TestOAuthService_ExchangeXCode_NoUserData(t *testing.T) {
 	defer mock.Close()
 
 	svc := newTestOAuthService(&http.Client{Transport: newMockRoundTripper(mock.URL)})
-	_, err := svc.ExchangeXCode("x-code-123", "verifier-123")
+	_, err := svc.ExchangeXCode("x-code-123", "verifier-123", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "did not return user data")
 }

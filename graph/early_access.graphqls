@@ -1,0 +1,75 @@
+type EarlyAccessUser {
+  isUser: Boolean!
+  joinedAt: String
+  referrer: String
+  referralCode: String
+}
+
+type EarlyAccessPoints {
+  total: String!
+}
+
+type ReferralInfo {
+  code: String
+  referrer: String
+  earnings: String!
+  referrals: [String!]!
+}
+
+type PointsHistoryItem {
+  amount: String!
+  reason: String!
+  timestamp: String!
+  relatedUser: String
+}
+
+type PointsHistory {
+  items: [PointsHistoryItem!]!
+  total: Int!
+}
+
+type EarlyAccessStats {
+  userCount: Int!
+  totalPointsDistributed: String!
+  totalReferrals: Int!
+}
+
+type JoinEarlyAccessResult {
+  success: Boolean!
+  txHash: String
+}
+
+enum EarlyAccessTaskType {
+  JOIN_EARLY_ACCESS
+  VERIFY_EMAIL
+  CONNECT_WALLET
+  JOIN_DISCORD
+  JOIN_TELEGRAM
+  INVITE_FRIEND
+}
+
+type TaskStatus {
+  task: EarlyAccessTaskType!
+  completed: Boolean!
+  claimedAt: String
+}
+
+type ClaimTaskResult {
+  success: Boolean!
+  pointsAwarded: String!
+  totalPoints: String!
+}
+
+extend type Query {
+  earlyAccessUser(user: String!): EarlyAccessUser!
+  earlyAccessPoints(user: String!): EarlyAccessPoints!
+  earlyAccessReferral(user: String!): ReferralInfo!
+  earlyAccessPointsHistory(user: String!, offset: Int, limit: Int): PointsHistory!
+  earlyAccessStats: EarlyAccessStats!
+  earlyAccessTasks(wallet: String!): [TaskStatus!]!
+}
+
+extend type Mutation {
+  joinEarlyAccess(wallet: String!, referralCode: String): JoinEarlyAccessResult!
+  claimEarlyAccessTask(wallet: String!, task: EarlyAccessTaskType!): ClaimTaskResult!
+}

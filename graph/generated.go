@@ -95,49 +95,97 @@ type ComplexityRoot struct {
 		Status    func(childComplexity int) int
 	}
 
+	ClaimTaskResult struct {
+		PointsAwarded func(childComplexity int) int
+		Success       func(childComplexity int) int
+		TotalPoints   func(childComplexity int) int
+	}
+
+	EarlyAccessPoints struct {
+		Total func(childComplexity int) int
+	}
+
+	EarlyAccessStats struct {
+		TotalPointsDistributed func(childComplexity int) int
+		TotalReferrals         func(childComplexity int) int
+		UserCount              func(childComplexity int) int
+	}
+
+	EarlyAccessUser struct {
+		IsUser       func(childComplexity int) int
+		JoinedAt     func(childComplexity int) int
+		ReferralCode func(childComplexity int) int
+		Referrer     func(childComplexity int) int
+	}
+
+	JoinEarlyAccessResult struct {
+		Success func(childComplexity int) int
+		TxHash  func(childComplexity int) int
+	}
+
 	LenValue struct {
 		K func(childComplexity int) int
 		V func(childComplexity int) int
 	}
 
 	Mutation struct {
-		ClaimOrderToken    func(childComplexity int, address string, signature string, timestamp int, orderID int) int
-		CompleteRecovery   func(childComplexity int, recoveryToken string, passwordHash string) int
-		ContractCall       func(childComplexity int, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) int
-		Faucet             func(childComplexity int, caller string, callerType int) int
-		InitDiskKey        func(childComplexity int, index string, user string) int
-		LoginWithWallet    func(childComplexity int, address string, signature string, message string) int
-		RequestOtp         func(childComplexity int, email string, clientID string) int
-		RequestRecovery    func(childComplexity int, recoveryEmail string) int
-		SetAuthConfig      func(childComplexity int, cfg model.AuthConfigInput) int
-		SetPassword        func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
-		SignMessage        func(childComplexity int, token string, message string, from string, passwordHash *string) int
-		SignTransaction    func(childComplexity int, token string, tx auth.TxInput) int
-		SocialLogin        func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string) int
-		StartEpoch         func(childComplexity int) int
-		SystemContractInit func(childComplexity int, contract string) int
-		UploadSecret       func(childComplexity int, index string, secret string, hash string, user string) int
-		VerifyOtp          func(childComplexity int, email string, otp string, clientID string) int
-		VerifyPassword     func(childComplexity int, token string, passwordHash string) int
-		VerifyRecovery     func(childComplexity int, recoveryEmail string, otp string) int
-		VerifyResponse     func(childComplexity int, token string, challenge string, response string) int
+		ClaimEarlyAccessTask func(childComplexity int, wallet string, task model.EarlyAccessTaskType) int
+		ClaimOrderToken      func(childComplexity int, address string, signature string, timestamp int, orderID int) int
+		CompleteRecovery     func(childComplexity int, recoveryToken string, passwordHash string) int
+		ContractCall         func(childComplexity int, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) int
+		Faucet               func(childComplexity int, caller string, callerType int) int
+		InitDiskKey          func(childComplexity int, index string, user string) int
+		JoinEarlyAccess      func(childComplexity int, wallet string, referralCode *string) int
+		LoginWithWallet      func(childComplexity int, address string, signature string, message string) int
+		RequestOtp           func(childComplexity int, email string, clientID string) int
+		RequestRecovery      func(childComplexity int, recoveryEmail string) int
+		SetAuthConfig        func(childComplexity int, cfg model.AuthConfigInput) int
+		SetPassword          func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
+		SignMessage          func(childComplexity int, token string, message string, from string, passwordHash *string) int
+		SignTransaction      func(childComplexity int, token string, tx auth.TxInput) int
+		SocialLogin          func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) int
+		StartEpoch           func(childComplexity int) int
+		SystemContractInit   func(childComplexity int, contract string) int
+		UploadSecret         func(childComplexity int, index string, secret string, hash string, user string) int
+		VerifyOtp            func(childComplexity int, email string, otp string, clientID string) int
+		VerifyPassword       func(childComplexity int, token string, passwordHash string) int
+		VerifyRecovery       func(childComplexity int, recoveryEmail string, otp string) int
+		VerifyResponse       func(childComplexity int, token string, challenge string, response string) int
 	}
 
 	OAuthURL struct {
 		AuthUrl func(childComplexity int) int
 	}
 
+	PointsHistory struct {
+		Items func(childComplexity int) int
+		Total func(childComplexity int) int
+	}
+
+	PointsHistoryItem struct {
+		Amount      func(childComplexity int) int
+		Reason      func(childComplexity int) int
+		RelatedUser func(childComplexity int) int
+		Timestamp   func(childComplexity int) int
+	}
+
 	Query struct {
-		AuthConfig     func(childComplexity int) int
-		AuthHealth     func(childComplexity int) int
-		ChainInfo      func(childComplexity int) int
-		ContractDryRun func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
-		ContractNonce  func(childComplexity int, caller string, callerType int) int
-		GetChallenge   func(childComplexity int, token string) int
-		OauthURL       func(childComplexity int, provider string) int
-		SecretRsa      func(childComplexity int) int
-		TeeReport      func(childComplexity int, hash string) int
-		Validators     func(childComplexity int) int
+		AuthConfig               func(childComplexity int) int
+		AuthHealth               func(childComplexity int) int
+		ChainInfo                func(childComplexity int) int
+		ContractDryRun           func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
+		ContractNonce            func(childComplexity int, caller string, callerType int) int
+		EarlyAccessPoints        func(childComplexity int, user string) int
+		EarlyAccessPointsHistory func(childComplexity int, user string, offset *int, limit *int) int
+		EarlyAccessReferral      func(childComplexity int, user string) int
+		EarlyAccessStats         func(childComplexity int) int
+		EarlyAccessTasks         func(childComplexity int, wallet string) int
+		EarlyAccessUser          func(childComplexity int, user string) int
+		GetChallenge             func(childComplexity int, token string) int
+		OauthURL                 func(childComplexity int, provider string, redirectURI *string) int
+		SecretRsa                func(childComplexity int) int
+		TeeReport                func(childComplexity int, hash string) int
+		Validators               func(childComplexity int) int
 	}
 
 	RecoveryResult struct {
@@ -147,6 +195,13 @@ type ComplexityRoot struct {
 		RecoveryToken func(childComplexity int) int
 		Status        func(childComplexity int) int
 		Token         func(childComplexity int) int
+	}
+
+	ReferralInfo struct {
+		Code      func(childComplexity int) int
+		Earnings  func(childComplexity int) int
+		Referrals func(childComplexity int) int
+		Referrer  func(childComplexity int) int
 	}
 
 	SecretEnv struct {
@@ -164,6 +219,12 @@ type ComplexityRoot struct {
 		ExpiresAt func(childComplexity int) int
 		SignToken func(childComplexity int) int
 		Status    func(childComplexity int) int
+	}
+
+	TaskStatus struct {
+		ClaimedAt func(childComplexity int) int
+		Completed func(childComplexity int) int
+		Task      func(childComplexity int) int
 	}
 
 	UserInfo struct {
@@ -188,7 +249,7 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	RequestOtp(ctx context.Context, email string, clientID string) (*auth.AuthResponse, error)
 	VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error)
-	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string) (*auth.AuthResponse, error)
+	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*auth.AuthResponse, error)
 	SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error)
 	VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error)
 	VerifyResponse(ctx context.Context, token string, challenge string, response string) (*model.SignSessionResult, error)
@@ -204,11 +265,13 @@ type MutationResolver interface {
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
 	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (string, error)
+	JoinEarlyAccess(ctx context.Context, wallet string, referralCode *string) (*model.JoinEarlyAccessResult, error)
+	ClaimEarlyAccessTask(ctx context.Context, wallet string, task model.EarlyAccessTaskType) (*model.ClaimTaskResult, error)
 	UploadSecret(ctx context.Context, index string, secret string, hash string, user string) (bool, error)
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
 }
 type QueryResolver interface {
-	OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error)
+	OauthURL(ctx context.Context, provider string, redirectURI *string) (*auth.OAuthURL, error)
 	AuthHealth(ctx context.Context) (string, error)
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
 	AuthConfig(ctx context.Context) (*model.AuthConfig, error)
@@ -216,6 +279,12 @@ type QueryResolver interface {
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
 	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
+	EarlyAccessUser(ctx context.Context, user string) (*model.EarlyAccessUser, error)
+	EarlyAccessPoints(ctx context.Context, user string) (*model.EarlyAccessPoints, error)
+	EarlyAccessReferral(ctx context.Context, user string) (*model.ReferralInfo, error)
+	EarlyAccessPointsHistory(ctx context.Context, user string, offset *int, limit *int) (*model.PointsHistory, error)
+	EarlyAccessStats(ctx context.Context) (*model.EarlyAccessStats, error)
+	EarlyAccessTasks(ctx context.Context, wallet string) ([]*model.TaskStatus, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -477,6 +546,97 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ChallengeResult.Status(childComplexity), true
 
+	case "ClaimTaskResult.pointsAwarded":
+		if e.complexity.ClaimTaskResult.PointsAwarded == nil {
+			break
+		}
+
+		return e.complexity.ClaimTaskResult.PointsAwarded(childComplexity), true
+
+	case "ClaimTaskResult.success":
+		if e.complexity.ClaimTaskResult.Success == nil {
+			break
+		}
+
+		return e.complexity.ClaimTaskResult.Success(childComplexity), true
+
+	case "ClaimTaskResult.totalPoints":
+		if e.complexity.ClaimTaskResult.TotalPoints == nil {
+			break
+		}
+
+		return e.complexity.ClaimTaskResult.TotalPoints(childComplexity), true
+
+	case "EarlyAccessPoints.total":
+		if e.complexity.EarlyAccessPoints.Total == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessPoints.Total(childComplexity), true
+
+	case "EarlyAccessStats.totalPointsDistributed":
+		if e.complexity.EarlyAccessStats.TotalPointsDistributed == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessStats.TotalPointsDistributed(childComplexity), true
+
+	case "EarlyAccessStats.totalReferrals":
+		if e.complexity.EarlyAccessStats.TotalReferrals == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessStats.TotalReferrals(childComplexity), true
+
+	case "EarlyAccessStats.userCount":
+		if e.complexity.EarlyAccessStats.UserCount == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessStats.UserCount(childComplexity), true
+
+	case "EarlyAccessUser.isUser":
+		if e.complexity.EarlyAccessUser.IsUser == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessUser.IsUser(childComplexity), true
+
+	case "EarlyAccessUser.joinedAt":
+		if e.complexity.EarlyAccessUser.JoinedAt == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessUser.JoinedAt(childComplexity), true
+
+	case "EarlyAccessUser.referralCode":
+		if e.complexity.EarlyAccessUser.ReferralCode == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessUser.ReferralCode(childComplexity), true
+
+	case "EarlyAccessUser.referrer":
+		if e.complexity.EarlyAccessUser.Referrer == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessUser.Referrer(childComplexity), true
+
+	case "JoinEarlyAccessResult.success":
+		if e.complexity.JoinEarlyAccessResult.Success == nil {
+			break
+		}
+
+		return e.complexity.JoinEarlyAccessResult.Success(childComplexity), true
+
+	case "JoinEarlyAccessResult.txHash":
+		if e.complexity.JoinEarlyAccessResult.TxHash == nil {
+			break
+		}
+
+		return e.complexity.JoinEarlyAccessResult.TxHash(childComplexity), true
+
 	case "LenValue.k":
 		if e.complexity.LenValue.K == nil {
 			break
@@ -490,6 +650,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.LenValue.V(childComplexity), true
+
+	case "Mutation.claimEarlyAccessTask":
+		if e.complexity.Mutation.ClaimEarlyAccessTask == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_claimEarlyAccessTask_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ClaimEarlyAccessTask(childComplexity, args["wallet"].(string), args["task"].(model.EarlyAccessTaskType)), true
 
 	case "Mutation.claimOrderToken":
 		if e.complexity.Mutation.ClaimOrderToken == nil {
@@ -550,6 +722,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.InitDiskKey(childComplexity, args["index"].(string), args["user"].(string)), true
+
+	case "Mutation.joinEarlyAccess":
+		if e.complexity.Mutation.JoinEarlyAccess == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_joinEarlyAccess_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.JoinEarlyAccess(childComplexity, args["wallet"].(string), args["referralCode"].(*string)), true
 
 	case "Mutation.loginWithWallet":
 		if e.complexity.Mutation.LoginWithWallet == nil {
@@ -645,7 +829,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SocialLogin(childComplexity, args["provider"].(string), args["idToken"].(*string), args["code"].(*string), args["codeVerifier"].(*string)), true
+		return e.complexity.Mutation.SocialLogin(childComplexity, args["provider"].(string), args["idToken"].(*string), args["code"].(*string), args["codeVerifier"].(*string), args["redirectUri"].(*string)), true
 
 	case "Mutation.start_epoch":
 		if e.complexity.Mutation.StartEpoch == nil {
@@ -733,6 +917,48 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.OAuthURL.AuthUrl(childComplexity), true
 
+	case "PointsHistory.items":
+		if e.complexity.PointsHistory.Items == nil {
+			break
+		}
+
+		return e.complexity.PointsHistory.Items(childComplexity), true
+
+	case "PointsHistory.total":
+		if e.complexity.PointsHistory.Total == nil {
+			break
+		}
+
+		return e.complexity.PointsHistory.Total(childComplexity), true
+
+	case "PointsHistoryItem.amount":
+		if e.complexity.PointsHistoryItem.Amount == nil {
+			break
+		}
+
+		return e.complexity.PointsHistoryItem.Amount(childComplexity), true
+
+	case "PointsHistoryItem.reason":
+		if e.complexity.PointsHistoryItem.Reason == nil {
+			break
+		}
+
+		return e.complexity.PointsHistoryItem.Reason(childComplexity), true
+
+	case "PointsHistoryItem.relatedUser":
+		if e.complexity.PointsHistoryItem.RelatedUser == nil {
+			break
+		}
+
+		return e.complexity.PointsHistoryItem.RelatedUser(childComplexity), true
+
+	case "PointsHistoryItem.timestamp":
+		if e.complexity.PointsHistoryItem.Timestamp == nil {
+			break
+		}
+
+		return e.complexity.PointsHistoryItem.Timestamp(childComplexity), true
+
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -778,6 +1004,73 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.ContractNonce(childComplexity, args["caller"].(string), args["callerType"].(int)), true
 
+	case "Query.earlyAccessPoints":
+		if e.complexity.Query.EarlyAccessPoints == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessPoints_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessPoints(childComplexity, args["user"].(string)), true
+
+	case "Query.earlyAccessPointsHistory":
+		if e.complexity.Query.EarlyAccessPointsHistory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessPointsHistory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessPointsHistory(childComplexity, args["user"].(string), args["offset"].(*int), args["limit"].(*int)), true
+
+	case "Query.earlyAccessReferral":
+		if e.complexity.Query.EarlyAccessReferral == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessReferral_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessReferral(childComplexity, args["user"].(string)), true
+
+	case "Query.earlyAccessStats":
+		if e.complexity.Query.EarlyAccessStats == nil {
+			break
+		}
+
+		return e.complexity.Query.EarlyAccessStats(childComplexity), true
+
+	case "Query.earlyAccessTasks":
+		if e.complexity.Query.EarlyAccessTasks == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessTasks_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessTasks(childComplexity, args["wallet"].(string)), true
+
+	case "Query.earlyAccessUser":
+		if e.complexity.Query.EarlyAccessUser == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessUser(childComplexity, args["user"].(string)), true
+
 	case "Query.getChallenge":
 		if e.complexity.Query.GetChallenge == nil {
 			break
@@ -800,7 +1093,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.OauthURL(childComplexity, args["provider"].(string)), true
+		return e.complexity.Query.OauthURL(childComplexity, args["provider"].(string), args["redirectUri"].(*string)), true
 
 	case "Query.secret_rsa":
 		if e.complexity.Query.SecretRsa == nil {
@@ -870,6 +1163,34 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.RecoveryResult.Token(childComplexity), true
 
+	case "ReferralInfo.code":
+		if e.complexity.ReferralInfo.Code == nil {
+			break
+		}
+
+		return e.complexity.ReferralInfo.Code(childComplexity), true
+
+	case "ReferralInfo.earnings":
+		if e.complexity.ReferralInfo.Earnings == nil {
+			break
+		}
+
+		return e.complexity.ReferralInfo.Earnings(childComplexity), true
+
+	case "ReferralInfo.referrals":
+		if e.complexity.ReferralInfo.Referrals == nil {
+			break
+		}
+
+		return e.complexity.ReferralInfo.Referrals(childComplexity), true
+
+	case "ReferralInfo.referrer":
+		if e.complexity.ReferralInfo.Referrer == nil {
+			break
+		}
+
+		return e.complexity.ReferralInfo.Referrer(childComplexity), true
+
 	case "SecretEnv.envs":
 		if e.complexity.SecretEnv.Envs == nil {
 			break
@@ -925,6 +1246,27 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.SignSessionResult.Status(childComplexity), true
+
+	case "TaskStatus.claimedAt":
+		if e.complexity.TaskStatus.ClaimedAt == nil {
+			break
+		}
+
+		return e.complexity.TaskStatus.ClaimedAt(childComplexity), true
+
+	case "TaskStatus.completed":
+		if e.complexity.TaskStatus.Completed == nil {
+			break
+		}
+
+		return e.complexity.TaskStatus.Completed(childComplexity), true
+
+	case "TaskStatus.task":
+		if e.complexity.TaskStatus.Task == nil {
+			break
+		}
+
+		return e.complexity.TaskStatus.Task(childComplexity), true
 
 	case "UserInfo.aggregateVerifier":
 		if e.complexity.UserInfo.AggregateVerifier == nil {
@@ -1121,7 +1463,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "secret.graphqls"
+//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "early_access.graphqls" "secret.graphqls"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -1136,6 +1478,7 @@ var sources = []*ast.Source{
 	{Name: "auth.graphqls", Input: sourceData("auth.graphqls"), BuiltIn: false},
 	{Name: "chain.graphqls", Input: sourceData("chain.graphqls"), BuiltIn: false},
 	{Name: "contract.graphqls", Input: sourceData("contract.graphqls"), BuiltIn: false},
+	{Name: "early_access.graphqls", Input: sourceData("early_access.graphqls"), BuiltIn: false},
 	{Name: "secret.graphqls", Input: sourceData("secret.graphqls"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -1143,6 +1486,57 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_claimEarlyAccessTask_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_claimEarlyAccessTask_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := ec.field_Mutation_claimEarlyAccessTask_argsTask(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["task"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_claimEarlyAccessTask_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_claimEarlyAccessTask_argsTask(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (model.EarlyAccessTaskType, error) {
+	if _, ok := rawArgs["task"]; !ok {
+		var zeroVal model.EarlyAccessTaskType
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("task"))
+	if tmp, ok := rawArgs["task"]; ok {
+		return ec.unmarshalNEarlyAccessTaskType2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessTaskType(ctx, tmp)
+	}
+
+	var zeroVal model.EarlyAccessTaskType
+	return zeroVal, nil
+}
 
 func (ec *executionContext) field_Mutation_claimOrderToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1557,6 +1951,57 @@ func (ec *executionContext) field_Mutation_init_disk_key_argsUser(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinEarlyAccess_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_joinEarlyAccess_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := ec.field_Mutation_joinEarlyAccess_argsReferralCode(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["referralCode"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_joinEarlyAccess_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinEarlyAccess_argsReferralCode(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["referralCode"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("referralCode"))
+	if tmp, ok := rawArgs["referralCode"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
 	return zeroVal, nil
 }
 
@@ -2009,6 +2454,11 @@ func (ec *executionContext) field_Mutation_socialLogin_args(ctx context.Context,
 		return nil, err
 	}
 	args["codeVerifier"] = arg3
+	arg4, err := ec.field_Mutation_socialLogin_argsRedirectURI(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["redirectUri"] = arg4
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_socialLogin_argsProvider(
@@ -2076,6 +2526,24 @@ func (ec *executionContext) field_Mutation_socialLogin_argsCodeVerifier(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("codeVerifier"))
 	if tmp, ok := rawArgs["codeVerifier"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_socialLogin_argsRedirectURI(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["redirectUri"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("redirectUri"))
+	if tmp, ok := rawArgs["redirectUri"]; ok {
 		return ec.unmarshalOString2ᚖstring(ctx, tmp)
 	}
 
@@ -2680,6 +3148,192 @@ func (ec *executionContext) field_Query_contractNonce_argsCallerType(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Query_earlyAccessPointsHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessPointsHistory_argsUser(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["user"] = arg0
+	arg1, err := ec.field_Query_earlyAccessPointsHistory_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
+	arg2, err := ec.field_Query_earlyAccessPointsHistory_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg2
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessPointsHistory_argsUser(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["user"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+	if tmp, ok := rawArgs["user"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessPointsHistory_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessPointsHistory_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessPoints_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessPoints_argsUser(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["user"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessPoints_argsUser(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["user"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+	if tmp, ok := rawArgs["user"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessReferral_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessReferral_argsUser(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["user"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessReferral_argsUser(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["user"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+	if tmp, ok := rawArgs["user"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessTasks_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessTasks_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessTasks_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessUser_argsUser(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["user"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessUser_argsUser(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["user"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+	if tmp, ok := rawArgs["user"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query_getChallenge_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2716,6 +3370,11 @@ func (ec *executionContext) field_Query_oauthURL_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["provider"] = arg0
+	arg1, err := ec.field_Query_oauthURL_argsRedirectURI(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["redirectUri"] = arg1
 	return args, nil
 }
 func (ec *executionContext) field_Query_oauthURL_argsProvider(
@@ -2733,6 +3392,24 @@ func (ec *executionContext) field_Query_oauthURL_argsProvider(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_oauthURL_argsRedirectURI(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["redirectUri"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("redirectUri"))
+	if tmp, ok := rawArgs["redirectUri"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
 	return zeroVal, nil
 }
 
@@ -4430,6 +5107,566 @@ func (ec *executionContext) fieldContext_ChallengeResult_error(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _ClaimTaskResult_success(ctx context.Context, field graphql.CollectedField, obj *model.ClaimTaskResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ClaimTaskResult_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ClaimTaskResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClaimTaskResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ClaimTaskResult_pointsAwarded(ctx context.Context, field graphql.CollectedField, obj *model.ClaimTaskResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ClaimTaskResult_pointsAwarded(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PointsAwarded, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ClaimTaskResult_pointsAwarded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClaimTaskResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ClaimTaskResult_totalPoints(ctx context.Context, field graphql.CollectedField, obj *model.ClaimTaskResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ClaimTaskResult_totalPoints(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalPoints, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ClaimTaskResult_totalPoints(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ClaimTaskResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessPoints_total(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessPoints) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessPoints_total(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Total, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessPoints_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessPoints",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessStats_userCount(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessStats) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessStats_userCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessStats_userCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessStats_totalPointsDistributed(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessStats) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessStats_totalPointsDistributed(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalPointsDistributed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessStats_totalPointsDistributed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessStats_totalReferrals(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessStats) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessStats_totalReferrals(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalReferrals, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessStats_totalReferrals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessUser_isUser(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessUser_isUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsUser, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessUser_isUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessUser_joinedAt(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.JoinedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessUser_joinedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessUser_referrer(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessUser_referrer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Referrer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessUser_referrer(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EarlyAccessUser_referralCode(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessUser_referralCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ReferralCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessUser_referralCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JoinEarlyAccessResult_success(ctx context.Context, field graphql.CollectedField, obj *model.JoinEarlyAccessResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_JoinEarlyAccessResult_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_JoinEarlyAccessResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JoinEarlyAccessResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _JoinEarlyAccessResult_txHash(ctx context.Context, field graphql.CollectedField, obj *model.JoinEarlyAccessResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_JoinEarlyAccessResult_txHash(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TxHash, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_JoinEarlyAccessResult_txHash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "JoinEarlyAccessResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _LenValue_k(ctx context.Context, field graphql.CollectedField, obj *model.LenValue) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_LenValue_k(ctx, field)
 	if err != nil {
@@ -4666,7 +5903,7 @@ func (ec *executionContext) _Mutation_socialLogin(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SocialLogin(rctx, fc.Args["provider"].(string), fc.Args["idToken"].(*string), fc.Args["code"].(*string), fc.Args["codeVerifier"].(*string))
+		return ec.resolvers.Mutation().SocialLogin(rctx, fc.Args["provider"].(string), fc.Args["idToken"].(*string), fc.Args["code"].(*string), fc.Args["codeVerifier"].(*string), fc.Args["redirectUri"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5665,6 +6902,130 @@ func (ec *executionContext) fieldContext_Mutation_contractCall(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_joinEarlyAccess(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_joinEarlyAccess(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().JoinEarlyAccess(rctx, fc.Args["wallet"].(string), fc.Args["referralCode"].(*string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.JoinEarlyAccessResult)
+	fc.Result = res
+	return ec.marshalNJoinEarlyAccessResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐJoinEarlyAccessResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_joinEarlyAccess(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_JoinEarlyAccessResult_success(ctx, field)
+			case "txHash":
+				return ec.fieldContext_JoinEarlyAccessResult_txHash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type JoinEarlyAccessResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_joinEarlyAccess_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_claimEarlyAccessTask(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_claimEarlyAccessTask(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ClaimEarlyAccessTask(rctx, fc.Args["wallet"].(string), fc.Args["task"].(model.EarlyAccessTaskType))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ClaimTaskResult)
+	fc.Result = res
+	return ec.marshalNClaimTaskResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐClaimTaskResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_claimEarlyAccessTask(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_ClaimTaskResult_success(ctx, field)
+			case "pointsAwarded":
+				return ec.fieldContext_ClaimTaskResult_pointsAwarded(ctx, field)
+			case "totalPoints":
+				return ec.fieldContext_ClaimTaskResult_totalPoints(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ClaimTaskResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_claimEarlyAccessTask_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_upload_secret(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_upload_secret(ctx, field)
 	if err != nil {
@@ -5863,6 +7224,277 @@ func (ec *executionContext) fieldContext_OAuthURL_authUrl(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _PointsHistory_items(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistory_items(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Items, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.PointsHistoryItem)
+	fc.Result = res
+	return ec.marshalNPointsHistoryItem2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistoryItemᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistory_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "amount":
+				return ec.fieldContext_PointsHistoryItem_amount(ctx, field)
+			case "reason":
+				return ec.fieldContext_PointsHistoryItem_reason(ctx, field)
+			case "timestamp":
+				return ec.fieldContext_PointsHistoryItem_timestamp(ctx, field)
+			case "relatedUser":
+				return ec.fieldContext_PointsHistoryItem_relatedUser(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PointsHistoryItem", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistory_total(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistory_total(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Total, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistory_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistory",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistoryItem_amount(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistoryItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistoryItem_amount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Amount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistoryItem_amount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistoryItem_reason(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistoryItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistoryItem_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistoryItem_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistoryItem_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistoryItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistoryItem_timestamp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timestamp, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistoryItem_timestamp(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistoryItem_relatedUser(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistoryItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistoryItem_relatedUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RelatedUser, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistoryItem_relatedUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_oauthURL(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_oauthURL(ctx, field)
 	if err != nil {
@@ -5877,7 +7509,7 @@ func (ec *executionContext) _Query_oauthURL(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().OauthURL(rctx, fc.Args["provider"].(string))
+		return ec.resolvers.Query().OauthURL(rctx, fc.Args["provider"].(string), fc.Args["redirectUri"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6318,6 +7950,371 @@ func (ec *executionContext) fieldContext_Query_contractNonce(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_contractNonce_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessUser(rctx, fc.Args["user"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.EarlyAccessUser)
+	fc.Result = res
+	return ec.marshalNEarlyAccessUser2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "isUser":
+				return ec.fieldContext_EarlyAccessUser_isUser(ctx, field)
+			case "joinedAt":
+				return ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
+			case "referrer":
+				return ec.fieldContext_EarlyAccessUser_referrer(ctx, field)
+			case "referralCode":
+				return ec.fieldContext_EarlyAccessUser_referralCode(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EarlyAccessUser", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessPoints(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessPoints(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessPoints(rctx, fc.Args["user"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.EarlyAccessPoints)
+	fc.Result = res
+	return ec.marshalNEarlyAccessPoints2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessPoints(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessPoints(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "total":
+				return ec.fieldContext_EarlyAccessPoints_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EarlyAccessPoints", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessPoints_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessReferral(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessReferral(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessReferral(rctx, fc.Args["user"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ReferralInfo)
+	fc.Result = res
+	return ec.marshalNReferralInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐReferralInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessReferral(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "code":
+				return ec.fieldContext_ReferralInfo_code(ctx, field)
+			case "referrer":
+				return ec.fieldContext_ReferralInfo_referrer(ctx, field)
+			case "earnings":
+				return ec.fieldContext_ReferralInfo_earnings(ctx, field)
+			case "referrals":
+				return ec.fieldContext_ReferralInfo_referrals(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ReferralInfo", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessReferral_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessPointsHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessPointsHistory(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessPointsHistory(rctx, fc.Args["user"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.PointsHistory)
+	fc.Result = res
+	return ec.marshalNPointsHistory2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistory(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessPointsHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "items":
+				return ec.fieldContext_PointsHistory_items(ctx, field)
+			case "total":
+				return ec.fieldContext_PointsHistory_total(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PointsHistory", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessPointsHistory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessStats(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessStats(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.EarlyAccessStats)
+	fc.Result = res
+	return ec.marshalNEarlyAccessStats2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessStats(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userCount":
+				return ec.fieldContext_EarlyAccessStats_userCount(ctx, field)
+			case "totalPointsDistributed":
+				return ec.fieldContext_EarlyAccessStats_totalPointsDistributed(ctx, field)
+			case "totalReferrals":
+				return ec.fieldContext_EarlyAccessStats_totalReferrals(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EarlyAccessStats", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessTasks(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessTasks(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessTasks(rctx, fc.Args["wallet"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.TaskStatus)
+	fc.Result = res
+	return ec.marshalNTaskStatus2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐTaskStatusᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessTasks(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "task":
+				return ec.fieldContext_TaskStatus_task(ctx, field)
+			case "completed":
+				return ec.fieldContext_TaskStatus_completed(ctx, field)
+			case "claimedAt":
+				return ec.fieldContext_TaskStatus_claimedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TaskStatus", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessTasks_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6803,6 +8800,176 @@ func (ec *executionContext) fieldContext_RecoveryResult_error(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _ReferralInfo_code(ctx context.Context, field graphql.CollectedField, obj *model.ReferralInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralInfo_code(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Code, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReferralInfo_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReferralInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReferralInfo_referrer(ctx context.Context, field graphql.CollectedField, obj *model.ReferralInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralInfo_referrer(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Referrer, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReferralInfo_referrer(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReferralInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReferralInfo_earnings(ctx context.Context, field graphql.CollectedField, obj *model.ReferralInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralInfo_earnings(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Earnings, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReferralInfo_earnings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReferralInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ReferralInfo_referrals(ctx context.Context, field graphql.CollectedField, obj *model.ReferralInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ReferralInfo_referrals(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Referrals, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ReferralInfo_referrals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ReferralInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SecretEnv_envs(ctx context.Context, field graphql.CollectedField, obj *model.SecretEnv) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SecretEnv_envs(ctx, field)
 	if err != nil {
@@ -7154,6 +9321,135 @@ func (ec *executionContext) _SignSessionResult_error(ctx context.Context, field 
 func (ec *executionContext) fieldContext_SignSessionResult_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SignSessionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskStatus_task(ctx context.Context, field graphql.CollectedField, obj *model.TaskStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskStatus_task(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Task, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.EarlyAccessTaskType)
+	fc.Result = res
+	return ec.marshalNEarlyAccessTaskType2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessTaskType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskStatus_task(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type EarlyAccessTaskType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskStatus_completed(ctx context.Context, field graphql.CollectedField, obj *model.TaskStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskStatus_completed(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Completed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskStatus_completed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TaskStatus_claimedAt(ctx context.Context, field graphql.CollectedField, obj *model.TaskStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TaskStatus_claimedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ClaimedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TaskStatus_claimedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TaskStatus",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -10152,6 +12448,229 @@ func (ec *executionContext) _ChallengeResult(ctx context.Context, sel ast.Select
 	return out
 }
 
+var claimTaskResultImplementors = []string{"ClaimTaskResult"}
+
+func (ec *executionContext) _ClaimTaskResult(ctx context.Context, sel ast.SelectionSet, obj *model.ClaimTaskResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, claimTaskResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ClaimTaskResult")
+		case "success":
+			out.Values[i] = ec._ClaimTaskResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pointsAwarded":
+			out.Values[i] = ec._ClaimTaskResult_pointsAwarded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPoints":
+			out.Values[i] = ec._ClaimTaskResult_totalPoints(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var earlyAccessPointsImplementors = []string{"EarlyAccessPoints"}
+
+func (ec *executionContext) _EarlyAccessPoints(ctx context.Context, sel ast.SelectionSet, obj *model.EarlyAccessPoints) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, earlyAccessPointsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EarlyAccessPoints")
+		case "total":
+			out.Values[i] = ec._EarlyAccessPoints_total(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var earlyAccessStatsImplementors = []string{"EarlyAccessStats"}
+
+func (ec *executionContext) _EarlyAccessStats(ctx context.Context, sel ast.SelectionSet, obj *model.EarlyAccessStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, earlyAccessStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EarlyAccessStats")
+		case "userCount":
+			out.Values[i] = ec._EarlyAccessStats_userCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalPointsDistributed":
+			out.Values[i] = ec._EarlyAccessStats_totalPointsDistributed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalReferrals":
+			out.Values[i] = ec._EarlyAccessStats_totalReferrals(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var earlyAccessUserImplementors = []string{"EarlyAccessUser"}
+
+func (ec *executionContext) _EarlyAccessUser(ctx context.Context, sel ast.SelectionSet, obj *model.EarlyAccessUser) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, earlyAccessUserImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EarlyAccessUser")
+		case "isUser":
+			out.Values[i] = ec._EarlyAccessUser_isUser(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "joinedAt":
+			out.Values[i] = ec._EarlyAccessUser_joinedAt(ctx, field, obj)
+		case "referrer":
+			out.Values[i] = ec._EarlyAccessUser_referrer(ctx, field, obj)
+		case "referralCode":
+			out.Values[i] = ec._EarlyAccessUser_referralCode(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var joinEarlyAccessResultImplementors = []string{"JoinEarlyAccessResult"}
+
+func (ec *executionContext) _JoinEarlyAccessResult(ctx context.Context, sel ast.SelectionSet, obj *model.JoinEarlyAccessResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, joinEarlyAccessResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("JoinEarlyAccessResult")
+		case "success":
+			out.Values[i] = ec._JoinEarlyAccessResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "txHash":
+			out.Values[i] = ec._JoinEarlyAccessResult_txHash(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var lenValueImplementors = []string{"LenValue"}
 
 func (ec *executionContext) _LenValue(ctx context.Context, sel ast.SelectionSet, obj *model.LenValue) graphql.Marshaler {
@@ -10341,6 +12860,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "joinEarlyAccess":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_joinEarlyAccess(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "claimEarlyAccessTask":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_claimEarlyAccessTask(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "upload_secret":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_upload_secret(ctx, field)
@@ -10394,6 +12927,101 @@ func (ec *executionContext) _OAuthURL(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pointsHistoryImplementors = []string{"PointsHistory"}
+
+func (ec *executionContext) _PointsHistory(ctx context.Context, sel ast.SelectionSet, obj *model.PointsHistory) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pointsHistoryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PointsHistory")
+		case "items":
+			out.Values[i] = ec._PointsHistory_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total":
+			out.Values[i] = ec._PointsHistory_total(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var pointsHistoryItemImplementors = []string{"PointsHistoryItem"}
+
+func (ec *executionContext) _PointsHistoryItem(ctx context.Context, sel ast.SelectionSet, obj *model.PointsHistoryItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pointsHistoryItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PointsHistoryItem")
+		case "amount":
+			out.Values[i] = ec._PointsHistoryItem_amount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._PointsHistoryItem_reason(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timestamp":
+			out.Values[i] = ec._PointsHistoryItem_timestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "relatedUser":
+			out.Values[i] = ec._PointsHistoryItem_relatedUser(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10609,6 +13237,138 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessUser":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessUser(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessPoints":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessPoints(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessReferral":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessReferral(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessPointsHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessPointsHistory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessTasks":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessTasks(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "tee_report":
 			field := field
 
@@ -10710,6 +13470,54 @@ func (ec *executionContext) _RecoveryResult(ctx context.Context, sel ast.Selecti
 			out.Values[i] = ec._RecoveryResult_email(ctx, field, obj)
 		case "error":
 			out.Values[i] = ec._RecoveryResult_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var referralInfoImplementors = []string{"ReferralInfo"}
+
+func (ec *executionContext) _ReferralInfo(ctx context.Context, sel ast.SelectionSet, obj *model.ReferralInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReferralInfo")
+		case "code":
+			out.Values[i] = ec._ReferralInfo_code(ctx, field, obj)
+		case "referrer":
+			out.Values[i] = ec._ReferralInfo_referrer(ctx, field, obj)
+		case "earnings":
+			out.Values[i] = ec._ReferralInfo_earnings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "referrals":
+			out.Values[i] = ec._ReferralInfo_referrals(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10843,6 +13651,52 @@ func (ec *executionContext) _SignSessionResult(ctx context.Context, sel ast.Sele
 			out.Values[i] = ec._SignSessionResult_expiresAt(ctx, field, obj)
 		case "error":
 			out.Values[i] = ec._SignSessionResult_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var taskStatusImplementors = []string{"TaskStatus"}
+
+func (ec *executionContext) _TaskStatus(ctx context.Context, sel ast.SelectionSet, obj *model.TaskStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, taskStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TaskStatus")
+		case "task":
+			out.Values[i] = ec._TaskStatus_task(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "completed":
+			out.Values[i] = ec._TaskStatus_completed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "claimedAt":
+			out.Values[i] = ec._TaskStatus_claimedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11402,6 +14256,72 @@ func (ec *executionContext) marshalNChallengeResult2ᚖgithubᚗcomᚋcomputeflu
 	return ec._ChallengeResult(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNClaimTaskResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐClaimTaskResult(ctx context.Context, sel ast.SelectionSet, v model.ClaimTaskResult) graphql.Marshaler {
+	return ec._ClaimTaskResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNClaimTaskResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐClaimTaskResult(ctx context.Context, sel ast.SelectionSet, v *model.ClaimTaskResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ClaimTaskResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNEarlyAccessPoints2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessPoints(ctx context.Context, sel ast.SelectionSet, v model.EarlyAccessPoints) graphql.Marshaler {
+	return ec._EarlyAccessPoints(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNEarlyAccessPoints2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessPoints(ctx context.Context, sel ast.SelectionSet, v *model.EarlyAccessPoints) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._EarlyAccessPoints(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNEarlyAccessStats2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessStats(ctx context.Context, sel ast.SelectionSet, v model.EarlyAccessStats) graphql.Marshaler {
+	return ec._EarlyAccessStats(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNEarlyAccessStats2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessStats(ctx context.Context, sel ast.SelectionSet, v *model.EarlyAccessStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._EarlyAccessStats(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNEarlyAccessTaskType2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessTaskType(ctx context.Context, v any) (model.EarlyAccessTaskType, error) {
+	var res model.EarlyAccessTaskType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNEarlyAccessTaskType2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessTaskType(ctx context.Context, sel ast.SelectionSet, v model.EarlyAccessTaskType) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNEarlyAccessUser2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessUser(ctx context.Context, sel ast.SelectionSet, v model.EarlyAccessUser) graphql.Marshaler {
+	return ec._EarlyAccessUser(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNEarlyAccessUser2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessUser(ctx context.Context, sel ast.SelectionSet, v *model.EarlyAccessUser) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._EarlyAccessUser(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -11416,6 +14336,20 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNJoinEarlyAccessResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐJoinEarlyAccessResult(ctx context.Context, sel ast.SelectionSet, v model.JoinEarlyAccessResult) graphql.Marshaler {
+	return ec._JoinEarlyAccessResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNJoinEarlyAccessResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐJoinEarlyAccessResult(ctx context.Context, sel ast.SelectionSet, v *model.JoinEarlyAccessResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._JoinEarlyAccessResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNLenValue2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐLenValueᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.LenValue) graphql.Marshaler {
@@ -11486,6 +14420,74 @@ func (ec *executionContext) marshalNOAuthURL2ᚖgithubᚗcomᚋcomputefluxᚋtee
 	return ec._OAuthURL(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPointsHistory2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistory(ctx context.Context, sel ast.SelectionSet, v model.PointsHistory) graphql.Marshaler {
+	return ec._PointsHistory(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPointsHistory2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistory(ctx context.Context, sel ast.SelectionSet, v *model.PointsHistory) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PointsHistory(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPointsHistoryItem2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistoryItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.PointsHistoryItem) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPointsHistoryItem2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistoryItem(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPointsHistoryItem2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐPointsHistoryItem(ctx context.Context, sel ast.SelectionSet, v *model.PointsHistoryItem) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PointsHistoryItem(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNRecoveryResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v auth.RecoveryResult) graphql.Marshaler {
 	return ec._RecoveryResult(ctx, sel, &v)
 }
@@ -11498,6 +14500,20 @@ func (ec *executionContext) marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputeflux
 		return graphql.Null
 	}
 	return ec._RecoveryResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNReferralInfo2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐReferralInfo(ctx context.Context, sel ast.SelectionSet, v model.ReferralInfo) graphql.Marshaler {
+	return ec._ReferralInfo(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNReferralInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐReferralInfo(ctx context.Context, sel ast.SelectionSet, v *model.ReferralInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReferralInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNSecretEnv2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐSecretEnv(ctx context.Context, sel ast.SelectionSet, v *model.SecretEnv) graphql.Marshaler {
@@ -11568,6 +14584,60 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalNTaskStatus2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐTaskStatusᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TaskStatus) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTaskStatus2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐTaskStatus(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTaskStatus2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐTaskStatus(ctx context.Context, sel ast.SelectionSet, v *model.TaskStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TaskStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNTxInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐTxInput(ctx context.Context, v any) (auth.TxInput, error) {

@@ -35,23 +35,89 @@ func (s *OAuthService) cfg() *auth.AuthConfig {
 
 // ── Auth URLs ─────────────────────────────────────────────
 
-func (s *OAuthService) GoogleAuthURL(state string) string {
+func (s *OAuthService) GoogleAuthURL(state, redirectUri string) string {
+	redirect := s.pickRedirectURI(redirectUri)
 	q := url.Values{}
 	q.Set("client_id", s.cfg().GoogleClientID)
-	q.Set("redirect_uri", s.cfg().GoogleRedirectURL)
+	q.Set("redirect_uri", redirect)
 	q.Set("response_type", "code")
 	q.Set("scope", "openid email profile")
 	q.Set("state", state)
 	return "https://accounts.google.com/o/oauth2/v2/auth?" + q.Encode()
 }
 
-func (s *OAuthService) GitHubAuthURL(state string) string {
+func (s *OAuthService) GitHubAuthURL(state, redirectUri string) string {
+	redirect := redirectUri
+	if redirect == "" {
+		redirect = s.cfg().GitHubRedirectURL
+	}
 	q := url.Values{}
 	q.Set("client_id", s.cfg().GitHubClientID)
-	q.Set("redirect_uri", s.cfg().GitHubRedirectURL)
+	q.Set("redirect_uri", redirect)
 	q.Set("scope", "user:email")
 	q.Set("state", state)
 	return "https://github.com/login/oauth/authorize?" + q.Encode()
+}
+
+func (s *OAuthService) XAuthURL(state, codeChallenge, redirectUri string) string {
+	redirect := redirectUri
+	if redirect == "" {
+		redirect = s.cfg().TwitterRedirectURL
+	}
+	q := url.Values{}
+	q.Set("response_type", "code")
+	q.Set("client_id", s.cfg().TwitterClientID)
+	q.Set("redirect_uri", redirect)
+	q.Set("scope", "tweet.read users.read")
+	q.Set("state", state)
+	q.Set("code_challenge", codeChallenge)
+	q.Set("code_challenge_method", "S256")
+	return "https://twitter.com/i/oauth2/authorize?" + q.Encode()
+}
+
+// ── Domain matching helpers ───────────────────────────────
+
+// extractHost 从 URL 中提取 hostname（去掉 scheme 和 path）。
+func extractHost(raw string) string {
+	u, err := url.Parse(raw)
+	if err == nil && u.Host != "" {
+		return u.Host
+	}
+	//  fallback：手动去掉 scheme
+	s := strings.TrimSpace(raw)
+	s = strings.TrimPrefix(s, "http://")
+	s = strings.TrimPrefix(s, "https://")
+	if idx := strings.Index(s, "/"); idx != -1 {
+		s = s[:idx]
+	}
+	if idx := strings.Index(s, ":"); idx != -1 {
+		s = s[:idx]
+	}
+	return s
+}
+
+// sameMainDomain 判断两个 URL 是否属于同一主域名。
+// 例如 https://app.example.com 和 https://example.com 返回 true。
+func sameMainDomain(a, b string) bool {
+	aHost := extractHost(a)
+	bHost := extractHost(b)
+	if aHost == "" || bHost == "" {
+		return false
+	}
+	return aHost == bHost ||
+		strings.HasSuffix(aHost, "."+bHost) ||
+		strings.HasSuffix(bHost, "."+aHost)
+}
+
+// pickRedirectURI 根据前端传入的 redirectUri 选择最终使用的 redirect_uri。
+// 如果传入的 uri 非空且与配置的域名属于同一主域名，则使用传入的 uri；
+// 否则回退到配置中的 GoogleRedirectURL。
+func (s *OAuthService) pickRedirectURI(redirectUri string) string {
+	cfgURI := s.cfg().GoogleRedirectURL
+	if redirectUri != "" && sameMainDomain(redirectUri, cfgURI) {
+		return redirectUri
+	}
+	return cfgURI
 }
 
 // ── Google ────────────────────────────────────────────────
@@ -94,12 +160,14 @@ func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*auth.OAuthUserInfo,
 	}, nil
 }
 
-func (s *OAuthService) ExchangeGoogleCode(code string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) ExchangeGoogleCode(code, redirectUri string) (*auth.OAuthUserInfo, error) {
+	redirect := s.pickRedirectURI(redirectUri)
+
 	data := url.Values{}
 	data.Set("code", code)
 	data.Set("client_id", s.cfg().GoogleClientID)
 	data.Set("client_secret", s.cfg().GoogleClientSecret)
-	data.Set("redirect_uri", s.cfg().GoogleRedirectURL)
+	data.Set("redirect_uri", redirect)
 	data.Set("grant_type", "authorization_code")
 
 	resp, err := s.httpClient().Post("https://oauth2.googleapis.com/token",
@@ -243,12 +311,16 @@ func (s *OAuthService) getGitHubEmails(accessToken string) []string {
 
 // ── X/Twitter ─────────────────────────────────────────────
 
-func (s *OAuthService) ExchangeXCode(code, codeVerifier string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) ExchangeXCode(code, codeVerifier, redirectUri string) (*auth.OAuthUserInfo, error) {
+	redirect := redirectUri
+	if redirect == "" {
+		redirect = s.cfg().TwitterRedirectURL
+	}
 	data := url.Values{}
 	data.Set("code", code)
 	data.Set("grant_type", "authorization_code")
 	data.Set("client_id", s.cfg().TwitterClientID)
-	data.Set("redirect_uri", s.cfg().TwitterRedirectURL)
+	data.Set("redirect_uri", redirect)
 	data.Set("code_verifier", codeVerifier)
 
 	req, _ := http.NewRequest("POST", "https://api.twitter.com/2/oauth2/token",

@@ -61,16 +61,21 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 }
 
 // SocialLogin is the resolver for the socialLogin field.
-func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string) (*auth.AuthResponse, error) {
+func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*auth.AuthResponse, error) {
 	var oauthUser *auth.OAuthUserInfo
 	var err error
+
+	redirect := ""
+	if redirectURI != nil {
+		redirect = *redirectURI
+	}
 
 	switch provider {
 	case "google":
 		if idToken != nil && *idToken != "" {
 			oauthUser, err = r.OAuthSvc.VerifyGoogleIDToken(*idToken)
 		} else if code != nil && *code != "" {
-			oauthUser, err = r.OAuthSvc.ExchangeGoogleCode(*code)
+			oauthUser, err = r.OAuthSvc.ExchangeGoogleCode(*code, redirect)
 		}
 	case "github":
 		if code != nil && *code != "" {
@@ -85,7 +90,7 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		if code != nil {
 			c = *code
 		}
-		oauthUser, err = r.OAuthSvc.ExchangeXCode(c, v)
+		oauthUser, err = r.OAuthSvc.ExchangeXCode(c, v, redirect)
 	default:
 		return &auth.AuthResponse{Success: false, Error: "unsupported provider: " + provider}, nil
 	}
@@ -462,12 +467,18 @@ func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConf
 }
 
 // OauthURL is the resolver for the oauthURL field.
-func (r *queryResolver) OauthURL(ctx context.Context, provider string) (*auth.OAuthURL, error) {
+func (r *queryResolver) OauthURL(ctx context.Context, provider string, redirectURI *string) (*auth.OAuthURL, error) {
+	redirect := ""
+	if redirectURI != nil {
+		redirect = *redirectURI
+	}
 	switch provider {
 	case "google":
-		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GoogleAuthURL("")}, nil
+		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GoogleAuthURL("", redirect)}, nil
 	case "github":
-		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GitHubAuthURL("")}, nil
+		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GitHubAuthURL("", redirect)}, nil
+	case "twitter", "x":
+		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.XAuthURL("", "", redirect)}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}

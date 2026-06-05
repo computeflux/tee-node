@@ -102,6 +102,7 @@ extend type Mutation {
     idToken: String
     code: String
     codeVerifier: String
+    redirectUri: String
   ): AuthResponse!
 
   """设置交易密码（同时传入 passwordHash 用于加密私钥，以及 salt + dkHash 用于 challenge-response）"""
@@ -166,7 +167,7 @@ type AuthConfig {
 
 extend type Query {
   """获取 OAuth 授权 URL"""
-  oauthURL(provider: String!): OAuthURL!
+  oauthURL(provider: String!, redirectUri: String): OAuthURL!
 
   """认证服务健康检查"""
   authHealth: String!
