@@ -37,7 +37,7 @@ var (
 	cachedCfg *AuthConfig
 )
 
-// LoadConfig 优先从链上合约读取配置；未设置时回退到环境变量。
+// LoadConfig 优先从链上合约读取配置；合约未配置时返回零值 AuthConfig。
 // 首次从合约读取成功后缓存到内存，后续调用直接返回缓存。
 func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 	// 0. 命中缓存直接返回

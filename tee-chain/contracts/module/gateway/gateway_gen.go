@@ -88,7 +88,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
-		if err := store.RequireArgLen(args, 2, "recharge"); err != nil {
+		if err := store.RequireArgLen(args, 3, "recharge"); err != nil {
 			return err
 		}
 		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
@@ -99,7 +99,11 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("recharge: amount: %w", err)
 		}
-		return m.Recharge(user, amount)
+		nonce, err := store.DecodeScaleArgBytes[[]byte](args[2])
+		if err != nil {
+			return fmt.Errorf("recharge: nonce: %w", err)
+		}
+		return m.Recharge(user, amount, nonce)
 	case [4]byte{0xf8, 0xea, 0x1a, 0x7b}:
 		if err := store.RequireArgLen(args, 2, "register_a_p_i_key"); err != nil {
 			return err
@@ -683,6 +687,7 @@ func NewGateway(api store.ContractApi) *Gateway {
 		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "v9_recharge_history_k1_to_id_", "v9_recharge_history_k1_length_", "v9_recharge_history_k2_next_", "v9_recharge_history_store_"),
 		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v9_settlement_history_k1_to_id_", "v9_settlement_history_k1_length_", "v9_settlement_history_k2_next_", "v9_settlement_history_store_"),
 		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v9_user_settlement_history_k1_to_id_", "v9_user_settlement_history_k1_length_", "v9_user_settlement_history_k2_next_", "v9_user_settlement_history_store_"),
+		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_recharge_nonces_"},
 		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_settled_nonces_"},
 	}
 }

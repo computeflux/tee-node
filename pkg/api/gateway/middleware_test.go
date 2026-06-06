@@ -28,7 +28,8 @@ func TestRecoveryMiddleware_RecoversPanic(t *testing.T) {
 	mw.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	assert.Contains(t, w.Body.String(), "panic: something went wrong")
+	assert.Contains(t, w.Body.String(), "internal server error")
+	assert.NotContains(t, w.Body.String(), "panic:", "panic 详情不应泄露给客户端")
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 }
 
@@ -440,4 +441,74 @@ func TestMin(t *testing.T) {
 	assert.Equal(t, 3, min(3, 5))
 	assert.Equal(t, 5, min(10, 5))
 	assert.Equal(t, 0, min(0, 100))
+}
+
+// ── DistributeMiddleware ───────────────────────────────────
+
+func TestMaxBodySizeMiddleware_BlocksOversizedBody(t *testing.T) {
+	var readErr error
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, readErr = io.ReadAll(r.Body)
+		if readErr != nil {
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := MaxBodySizeMiddleware(1024)(next) // 1 KiB limit
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("x", 2048)))
+
+	mw.ServeHTTP(w, req)
+	assert.Error(t, readErr, "超出限制的 body 应导致读取错误")
+	assert.Contains(t, readErr.Error(), "too large")
+	// 注意：httptest.ResponseRecorder 不实现 requestTooLarger 接口，
+	// http.MaxBytesReader 不会自动写入 413。生产环境使用真实 http.response 时会写入 413。
+	// 这里仅验证 body 读取被限制。
+}
+
+func TestMaxBodySizeMiddleware_AllowsSmallBody(t *testing.T) {
+	var receivedBody []byte
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := MaxBodySizeMiddleware(1024)(next)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("small body"))
+
+	mw.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "small body", string(receivedBody))
+}
+
+func TestDistributeMiddleware_ModelNumeric_400(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := DistributeMiddleware(next)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"model":123}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	mw.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "model must be a string")
+}
+
+func TestDistributeMiddleware_ModelObject_400(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := DistributeMiddleware(next)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"model":{"name":"gpt-4"}}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	mw.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "model must be a string")
 }

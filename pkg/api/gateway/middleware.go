@@ -16,17 +16,30 @@ import (
 
 // ── Panic Recovery ───────────────────────────────────────
 
+const defaultMaxBodySize = 8 * 1024 * 1024 // 8 MiB
+
 func RecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				GATEWAYLOG().Printf("[PANIC] %v\n%s", err, debug.Stack())
+				// 不将 panic 详情泄露给客户端，返回通用 500
 				writeError(w, http.StatusInternalServerError,
-					fmt.Sprintf("panic: %v", err), "server_error")
+					"internal server error", "server_error")
 			}
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// MaxBodySizeMiddleware 限制请求体大小，防止超大请求导致内存压力/DoS
+func MaxBodySizeMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // ── Request ID ───────────────────────────────────────────
@@ -233,4 +246,8 @@ func readRequestBody(r *http.Request) ([]byte, error) {
 	}
 	r.Body = io.NopCloser(bytes.NewBuffer(body))
 	return body, nil
+}
+
+func init() {
+	// 预留：若后续需要在 init 中注册全局中间件顺序，可在此扩展
 }

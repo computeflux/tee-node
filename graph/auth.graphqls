@@ -132,6 +132,9 @@ extend type Mutation {
   """领取订单 API Token"""
   claimOrderToken(address: String!, signature: String!, timestamp: Int!, orderId: Int!): AuthResponse!
 
+  """请求钱包登录 nonce（一次性，5分钟有效）"""
+  requestWalletNonce(address: String!): String!
+
   """外部钱包登录（MetaMask 等），通过签名验证身份后返回 API Token"""
   loginWithWallet(address: String!, signature: String!, message: String!): AuthResponse!
 

@@ -39,9 +39,10 @@ func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
 		return session.Email, nil
 	}
 
-	// 尝试作为 API Key 解析
+	// 尝试作为 API Key 解析（FindGatewayTokenByKey 内部已检查 IsActive + IsExpired，
+	// 这里显式再检查一次过期，消除与 resolveEmailFromToken 的验证漂移）
 	tk := store.FindGatewayTokenByKey(token)
-	if tk != nil && tk.IsActive {
+	if tk != nil && tk.IsActive && !tk.IsExpired() {
 		return tk.Owner, nil
 	}
 

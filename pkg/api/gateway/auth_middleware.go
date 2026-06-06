@@ -61,8 +61,13 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		var bodyMap map[string]any
 		modelNameArg := r.URL.Query().Get("model")
 		if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
-			if bodyMap["model"] != nil {
-				modelNameArg = bodyMap["model"].(string)
+			if v := bodyMap["model"]; v != nil {
+				if s, ok := v.(string); ok {
+					modelNameArg = s
+				} else {
+					writeError(w, http.StatusBadRequest, "model must be a string", "invalid_request")
+					return
+				}
 			}
 		}
 		if modelNameArg == "" {

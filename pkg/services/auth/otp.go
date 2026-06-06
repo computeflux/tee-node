@@ -99,8 +99,8 @@ func (s *OTPService) Generate(email, clientID string) (string, error) {
 	return otp, nil
 }
 
-// Verify 验证 OTP
-func (s *OTPService) Verify(email, otp string) error {
+// Verify 验证 OTP，可选绑定 clientID 防止跨客户端重放
+func (s *OTPService) Verify(email, otp, clientID string) error {
 	key := normalizeEmail(email)
 
 	s.mu.Lock()
@@ -118,9 +118,13 @@ func (s *OTPService) Verify(email, otp string) error {
 
 	// 解析: expiresAt:otp:clientID
 	var expiresAt int64
-	var storedOTP string
+	var storedOTP, storedClientID string
 	parts := strings.SplitN(stored, ":", 3)
-	if len(parts) >= 2 {
+	if len(parts) >= 3 {
+		expiresAt, _ = strconv.ParseInt(parts[0], 10, 64)
+		storedOTP = parts[1]
+		storedClientID = parts[2]
+	} else if len(parts) == 2 {
 		expiresAt, _ = strconv.ParseInt(parts[0], 10, 64)
 		storedOTP = parts[1]
 	} else {
@@ -142,6 +146,11 @@ func (s *OTPService) Verify(email, otp string) error {
 			return fmt.Errorf("too many failed attempts, OTP has been invalidated, please request a new one")
 		}
 		return fmt.Errorf("invalid OTP, %d attempts remaining", remaining)
+	}
+
+	// 若生成时绑定了 clientID，则验证必须匹配
+	if storedClientID != "" && storedClientID != clientID {
+		return fmt.Errorf("OTP client mismatch")
 	}
 
 	// 验证成功，清理
@@ -192,6 +201,11 @@ func (s *OTPService) cleanup() {
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+// GenerateNumericOTP 生成指定长度的数字 OTP（公开，供外部调用）
+func GenerateNumericOTP(length int) (string, error) {
+	return generateNumericOTP(length)
 }
 
 func generateNumericOTP(length int) (string, error) {

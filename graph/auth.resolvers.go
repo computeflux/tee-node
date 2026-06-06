@@ -15,6 +15,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
+	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
 )
@@ -33,7 +34,7 @@ func (r *mutationResolver) RequestOtp(ctx context.Context, email string, clientI
 
 // VerifyOtp is the resolver for the verifyOTP field.
 func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error) {
-	if err := r.OTPSvc.Verify(email, otp); err != nil {
+	if err := r.OTPSvc.Verify(email, otp, clientID); err != nil {
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 	provider := "email_passwordless"
@@ -53,10 +54,12 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	}
 
 	// 异步上链：确保跨节点能读取到统一的地址
-	go func(u *store.AuthUser) {
-		plain, _ := json.Marshal(u)
-		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
-	}(existing)
+	if r.TeeChain != nil {
+		go func(u *store.AuthUser) {
+			plain, _ := json.Marshal(u)
+			_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
+		}(existing)
+	}
 
 	apiKey := createUserAPIKey(email, address)
 
@@ -122,10 +125,12 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	}
 
 	// 异步上链：确保跨节点能读取到统一的地址
-	go func(u *store.AuthUser) {
-		plain, _ := json.Marshal(u)
-		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
-	}(existing)
+	if r.TeeChain != nil {
+		go func(u *store.AuthUser) {
+			plain, _ := json.Marshal(u)
+			_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
+		}(existing)
+	}
 
 	apiKey := createUserAPIKey(oauthUser.Email, address)
 	userInfo := &auth.UserInfo{
@@ -381,8 +386,22 @@ func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail st
 		return &auth.RecoveryResult{Status: "error", Error: "no recovery config for this email"}, nil
 	}
 
-	otp := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
-	store.PutRecoveryOTP(rec.UserEmail, otp)
+	// 使用加密安全的随机数生成 OTP
+	otp, err := authsvc.GenerateNumericOTP(6)
+	if err != nil {
+		return &auth.RecoveryResult{Status: "error", Error: "failed to generate OTP"}, nil
+	}
+
+	// 存储并设置 10 分钟过期
+	if err := store.PutRecoveryOTP(rec.UserEmail, otp, 600); err != nil {
+		return &auth.RecoveryResult{Status: "error", Error: "failed to store OTP"}, nil
+	}
+
+	// 实际投递 OTP 到恢复邮箱
+	if err := r.EmailSvc.SendOTP(recoveryEmail, otp); err != nil {
+		return &auth.RecoveryResult{Status: "error", Error: "failed to send recovery email"}, nil
+	}
+
 	return &auth.RecoveryResult{Status: "ok"}, nil
 }
 
@@ -448,14 +467,40 @@ func (r *mutationResolver) ClaimOrderToken(ctx context.Context, address string, 
 	}, nil
 }
 
+// RequestWalletNonce is the resolver for the requestWalletNonce field.
+func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address string) (string, error) {
+	nonce := generateWalletNonce()
+	if err := store.PutWalletNonce(address, nonce, 300); err != nil {
+		return "", err
+	}
+	return nonce, nil
+}
+
 // LoginWithWallet is the resolver for the loginWithWallet field.
 // 外部钱包（MetaMask 等）通过 EIP-191 personal_sign 签名验证身份，返回 API Token。
+// message 必须为服务器颁发的 nonce（通过 requestWalletNonce 获取）。
 func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error) {
+	// 1. 验证 nonce 存在、未过期、未使用
+	rec, err := store.GetWalletNonce(address, message)
+	if err != nil || rec == nil {
+		return &auth.AuthResponse{Success: false, Error: "invalid or expired nonce"}, nil
+	}
+	if rec.Used {
+		return &auth.AuthResponse{Success: false, Error: "nonce already used"}, nil
+	}
+	if time.Now().Unix()-rec.CreatedAt > 300 {
+		return &auth.AuthResponse{Success: false, Error: "nonce expired"}, nil
+	}
+
+	// 2. 验证 EIP-191 签名
 	if !verifyEIP191Signature(address, signature, message) {
 		return &auth.AuthResponse{Success: false, Error: "invalid signature"}, nil
 	}
 
-	// 以 address 作为 owner 标识生成 API Key
+	// 3. 标记 nonce 为已使用（防重放）
+	_ = store.MarkWalletNonceUsed(address, message)
+
+	// 4. 生成 API Key
 	apiKey := createUserAPIKey(address, address)
 	return &auth.AuthResponse{
 		Success: true,

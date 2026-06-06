@@ -9,9 +9,22 @@ import (
 
 // ── Points ───────────────────────────────────────────────
 
-func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64) error {
+func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, nonce []byte) error {
 	if !g.api.CallbySystem() {
 		return fmt.Errorf("Recharge: caller is not sudo account")
+	}
+
+	// 防重放检查：nonce 必须非空且未使用过
+	nonceHex := hex.EncodeToString(nonce)
+	if nonceHex == "" {
+		fmt.Println("Recharge: empty nonce")
+		return nil
+	}
+
+	exists, _ := g.rechargeNonces.Get(g.api.GetTxn(), nonceHex)
+	if exists != nil && *exists {
+		fmt.Println("Recharge: duplicate nonce")
+		return nil
 	}
 
 	bal, _ := g.credits.Get(g.api.GetTxn(), user)
@@ -29,6 +42,11 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64) error {
 		Amount: amount,
 		Time:   g.api.GetBlockTime(),
 	})
+
+	// 标记 nonce 已使用（防重放永久拒绝）
+	if err := g.rechargeNonces.Set(g.api.GetTxn(), nonceHex, true); err != nil {
+		return fmt.Errorf("Recharge: store nonce failed: %w", err)
+	}
 	return nil
 }
 

@@ -26,6 +26,13 @@ func generateAPIKey() string {
 	return "auth_tee_" + hex.EncodeToString(b)
 }
 
+// generateWalletNonce generates a random nonce for wallet login.
+func generateWalletNonce() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 // createUserAPIKey creates and stores a new API Key for the given user.
 // addrHex 为 Ethereum 地址 hex 字符串（如 "0xabc..."），用于结算时构造 UniAddr。
 func createUserAPIKey(owner string, addrHex string) string {
@@ -73,6 +80,10 @@ func resolveEmailFromToken(token string) (string, error) {
 
 	// 优先从合约查询 API Key
 	if tk := gateway.LookupAPIKeyViaContract(token); tk != nil && tk.IsActive {
+		// 合约查询不携带过期时间，补充本地过期检查确保一致性
+		if localTk, _ := store.GetGatewayTokenByKey(token); localTk != nil && localTk.IsExpired() {
+			return "", fmt.Errorf("token expired")
+		}
 		return tk.Owner, nil
 	}
 

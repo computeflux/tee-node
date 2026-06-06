@@ -250,7 +250,7 @@ func TestGateway_Recharge_Success(t *testing.T) {
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
 
-	err := m.Recharge(user, 1000)
+	err := m.Recharge(user, 1000, []byte("nonce1"))
 	require.NoError(t, err)
 
 	credit, err := q.GetCredit(user)
@@ -263,8 +263,24 @@ func TestGateway_Recharge_RequiresSystem(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
-	err := m.Recharge(user, 1000)
+	err := m.Recharge(user, 1000, []byte("nonce1"))
 	assert.ErrorContains(t, err, "not sudo")
+}
+
+func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.System = true
+
+	require.NoError(t, m.Recharge(user, 1000, []byte("nonce1")))
+	// 相同 nonce 再次充值应被拒绝
+	err := m.Recharge(user, 2000, []byte("nonce1"))
+	assert.ErrorContains(t, err, "duplicate nonce")
+
+	// 不同 nonce 可以正常充值
+	require.NoError(t, m.Recharge(user, 3000, []byte("nonce2")))
 }
 
 func TestGateway_SettleUsage_Success(t *testing.T) {
@@ -278,10 +294,10 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000))
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
-	// Settle: in=1000 tokens, out=500 tokens → cost = (1000*1000000 + 500*2000000) / 1000000 = 2000
+	// Settle: in=1000 tokens, out=500 tokens → cost = (1000*1000000 + 500*2000000) / 1000000 = 2002
 	err := m.SettleUsage([]Settlement{
 		{
 			User:       user,
@@ -315,7 +331,7 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000))
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
 	nonce := []byte{0x01, 0x02, 0x03, 0x04}
@@ -330,9 +346,9 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	}
 
 	require.NoError(t, m.SettleUsage([]Settlement{record}))
-	// Duplicate nonce should be silently ignored (returns nil)
+	// Duplicate record nonce should return error
 	err := m.SettleUsage([]Settlement{record})
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrDuplicateNonce)
 }
 
 func TestGateway_Withdraw_Success(t *testing.T) {
@@ -345,7 +361,7 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000))
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
 	require.NoError(t, m.SettleUsage([]Settlement{
@@ -379,7 +395,7 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000))
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
 	// Settle a small amount first

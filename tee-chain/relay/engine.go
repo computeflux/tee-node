@@ -153,13 +153,21 @@ func dispatch(ev SyncEvent, api store.ContractApi) error {
 	target := string(ev.TargetContract) + "." + string(ev.EventType)
 	if target != "gateway.Recharge" && target != "gateway.Withdraw" {
 		util.LogWithGray(RELAY_KEY, fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
+		return nil
 	}
 
-	// return nil
+	args := ev.EventData
+	// Recharge 增加 nonce 防重放：使用 chainID + nonce 组合作为唯一标识
+	if target == "gateway.Recharge" {
+		nonce := fmt.Sprintf("%d:%d", ev.ChainID, ev.Nonce)
+		nonceBytes, _ := store.ScaleEncode([]byte(nonce))
+		args = append(args, nonceBytes)
+	}
+
 	_, err := api.Call(api.GetSystemAccount(), &model.ContractCall{
 		Name:   ev.TargetContract,
 		Method: store.MethodToSelectorBytes(string(ev.EventType)),
-		Args:   ev.EventData,
+		Args:   args,
 	})
 
 	if err != nil {

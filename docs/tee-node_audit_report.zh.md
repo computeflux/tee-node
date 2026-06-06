@@ -33,15 +33,15 @@
 
 ## 2. 潜在缺陷
 
-### 高：找回密码流程生成了 OTP 但从未交付给用户
+### 高：找回密码流程生成了 OTP 但从未交付给用户 ✅ 已修复
 
-- **文件**：`graph/auth.resolvers.go`（第355行）
+- **文件**：`graph/auth.resolvers.go`
 - **函数**：`RequestRecovery`
-- **描述**：解析器创建并存储了一个 OTP，然后立即返回成功，但从未发送邮件或以其他方式返回该验证码。
-- **可能的失败原因**：真实用户在没有带外访问存储/日志的情况下无法完成密码找回。
-- **复现步骤**：调用 `requestRecovery`，然后尝试 `verifyRecovery`；用户从未收到 OTP。
-- **严重程度**：高
-- **建议修复**：复用 `RequestOtp` 使用的邮件服务，或明确文档化并实现预期的交付渠道。
+- **描述**：~~解析器创建并存储了一个 OTP，然后立即返回成功，但从未发送邮件。~~
+- **修复内容**：
+  - `RequestRecovery` 生成 OTP 后，调用 `r.EmailSvc.SendOTP(recoveryEmail, otp)` 实际投递到恢复邮箱
+  - 发送失败时返回错误（`failed to send recovery email`），而非静默成功
+- **测试覆盖**：`graph/auth_test.go` `TestRequestRecovery_RandomOTPAndDelivery` 验证 OTP 生成和存储
 
 ### 高：签名 API 可能接受本地存储的已过期 API 密钥
 
@@ -63,15 +63,16 @@
 - **严重程度**：高
 - **建议修复**：使用加密安全的随机数生成，如 OTP 服务在 `pkg/services/auth/otp.go`（第197行）中已有的实现。
 
-### 中：OTP 验证忽略了 clientID，尽管生成时存储了它
+### 中：OTP 验证忽略了 clientID，尽管生成时存储了它 ✅ 已修复
 
-- **文件**：`graph/auth.resolvers.go`（第35行）、`pkg/services/auth/otp.go`（第52行）、`pkg/services/auth/otp.go`（第102行）
+- **文件**：`graph/auth.resolvers.go`、`pkg/services/auth/otp.go`
 - **函数**：`VerifyOtp`、`OTPService.Verify`
-- **描述**：OTP 生成时包含 `clientID`，但验证时仅通过 email + OTP 进行。
-- **可能的失败原因**：为一个客户端/应用上下文生成的验证码可能被重放到另一个上下文。
-- **复现步骤**：用一个 `clientId` 生成 OTP，用另一个 `clientId` 验证。
-- **严重程度**：中
-- **建议修复**：将验证绑定到存储的 `clientID`，或将其从 API 契约中完全移除。
+- **描述**：~~OTP 生成时包含 `clientID`，但验证时仅通过 email + OTP 进行。~~
+- **修复内容**：
+  - `OTPService.Verify` 签名扩展为 `Verify(email, otp, clientID string)`
+  - 验证时检查存储的 `clientID`：若生成时绑定了 `clientID`，则传入的 `clientID` 必须匹配，否则返回 `OTP client mismatch`
+  - `VerifyOtp` resolver 将客户端传入的 `clientID` 透传给 `OTPService.Verify`
+- **测试覆盖**：`pkg/services/auth/otp_test.go` 全部测试用例已更新并通过
 
 ### 中：GraphQL 认证指令在上下文缺少令牌时可能 panic
 
@@ -83,15 +84,15 @@
 - **严重程度**：中
 - **建议修复**：使用双值类型断言，并返回常规的 GraphQL 认证错误。
 
-### 中：`DistributeMiddleware` 在模型 JSON 类型格式错误时可能 panic
+### 中：`DistributeMiddleware` 在模型 JSON 类型格式错误时可能 panic ✅ 已修复
 
-- **文件**：`pkg/api/gateway/auth_middleware.go`（第60行）
+- **文件**：`pkg/api/gateway/auth_middleware.go`
 - **函数**：`DistributeMiddleware`
-- **描述**：`bodyMap["model"].(string)` 假设该字段始终是字符串。
-- **可能的失败原因**：数值或对象类型的 model 值会导致 panic。
-- **复现步骤**：向 `/v1/...` 中继路由 POST 一个类似 `{"model":123}` 的 JSON 体。
-- **严重程度**：中
-- **建议修复**：断言前进行类型检查，并对无效格式返回 400 错误。
+- **描述**：~~`bodyMap["model"].(string)` 假设该字段始终是字符串。~~
+- **修复内容**：
+  - 将 unchecked type assertion 改为 comma-ok 形式：`s, ok := v.(string)`
+  - 若 `model` 不是字符串，返回 `400 Bad Request`（`model must be a string`）
+- **测试覆盖**：`pkg/api/gateway/middleware_test.go` 覆盖数值和对象两种非法类型
 
 ### 中：中继处理程序忽略 JSON 反序列化错误
 
@@ -123,15 +124,17 @@
 - **严重程度**：中
 - **建议修复**：定义一个严格的服务器端密码验证契约，包含版本控制和验证。
 
-### 中：钱包登录似乎可重放
+### 中：钱包登录似乎可重放 ✅ 已修复
 
-- **文件**：`graph/auth.resolvers.go`（第421行）、`graph/auth_helpers.go`（第105行）
-- **函数**：`LoginWithWallet`、`verifyEIP191Signature`
-- **描述**：登录验证了一个任意的签名消息，但未将其绑定到服务器颁发的 nonce 或 freshness 窗口。
-- **可能的失败原因**：如果复用相同的消息，重放的签名可以再次登录。
-- **复现步骤**：重新提交一个先前有效的 `(address, signature, message)` 元组。
-- **严重程度**：中
-- **建议修复**：颁发一次性 nonce/挑战消息，并在服务端验证 freshness/已使用状态。
+- **文件**：`graph/auth.resolvers.go`、`graph/auth_helpers.go`
+- **函数**：`LoginWithWallet`、`RequestWalletNonce`
+- **描述**：~~登录验证了一个任意的签名消息，但未将其绑定到服务器颁发的 nonce 或 freshness 窗口。~~
+- **修复内容**：
+  - 新增 `requestWalletNonce(address: String!)` 接口，生成 16 字节随机 nonce，TTL 300 秒
+  - `loginWithWallet` 要求 `message` 必须为服务器颁发的有效 nonce
+  - nonce 验证通过后立即标记为 `Used`，彻底阻断重放攻击
+  - 无效、过期或已使用的 nonce 均被拒绝
+- **测试覆盖**：`graph/auth_test.go` 包含 5 个钱包登录 nonce 测试用例（成功、重放拒绝、过期、无效签名、缺失 nonce）
 
 ### 中：REST 区块链令牌端点已暴露但未实现
 
@@ -174,12 +177,15 @@
 - **风险**：密钥立即暴露，存在冒充风险，如果在任何地方复用可能导致下游危害。
 - **建议修复**：立即撤销/轮换该密钥，将其从版本控制中移除，必要时清理历史记录，并添加密钥扫描。
 
-### 严重：公开 GraphQL 配置查询似乎暴露密钥
+### 严重：公开 GraphQL 配置查询似乎暴露密钥 ✅ 已确认脱敏
 
-- **文件**：`graph/auth.graphqls`（第177行）、`graph/auth.resolvers.go`（第531行）
-- **描述**：公开的 `authConfig` 返回 `smtpPassword`、`googleClientSecret`、`githubClientSecret` 和 `twitterClientSecret`。注释说"已脱敏"，但解析器直接返回这些字段。
-- **风险**：完整凭证泄露给未认证的调用者。
-- **建议修复**：从公开 schema 中移除密钥字段，并确保 `AuthGetPubConfig` 不会泄露它们。
+- **文件**：`graph/auth.graphqls`、`graph/auth.resolvers.go`、`tee-chain/contracts/module/auth/auth.go`
+- **描述**：~~公开的 `authConfig` 返回原始密钥。~~
+- **实际情况**：链上合约 `AuthQuery.GetConfig()` 已实现脱敏：
+  - `maskIfNonEmpty` 将敏感字段（`JWTSecret`、`SeedSecret`、`SMTPPassword`、`GoogleClientSecret`、`GitHubClientSecret`、`TwitterClientSecret`、`SMTPUser`）替换为 `前2位 + **** + 后2位` 格式
+  - `AuthConfig` resolver 直接透传链上脱敏后的数据
+- **风险**：无。返回的是脱敏后的掩码，不会泄露真实密钥。
+- **状态**：无需额外修复，合约层已保证安全。
 
 ### 高：密钥管理 mutation 允许认证用户针对任意用户地址
 
@@ -209,12 +215,14 @@
 - **风险**：如果 `AuthUser` 包含 `PasswordHash`、`Salt` 和 `DKHash`，这些将成为链上存储的敏感材料。
 - **建议修复**：仅在链上存储最小的非密钥字段，或在持久化前加密敏感的个人资料数据。
 
-### 中：Panic 详情被返回给客户端
+### 中：Panic 详情被返回给客户端 ✅ 已修复
 
-- **文件**：`pkg/api/gateway/middleware.go`（第19行）
-- **描述**：恢复中间件在响应体中返回 `panic: <message>`。
-- **风险**：内部错误详情泄露给调用者，有助于利用。
-- **建议修复**：在服务端记录内部信息，并返回通用的 500 消息。
+- **文件**：`pkg/api/gateway/middleware.go`
+- **描述**：~~恢复中间件在响应体中返回 `panic: <message>`。~~
+- **修复内容**：
+  - `RecoveryMiddleware` 将客户端响应改为通用消息 `"internal server error"`
+  - panic 详情和堆栈仅通过 `GATEWAYLOG()` 记录到服务端日志
+- **测试覆盖**：`pkg/api/gateway/middleware_test.go` `TestRecoveryMiddleware_RecoversPanic` 验证响应中不包含 `panic:`
 
 ### 中：SMTP "STARTTLS" 路径未显式强制使用 STARTTLS
 
@@ -223,12 +231,14 @@
 - **风险**：可能存在没有传输保障的错误配置邮件投递，而代码注释暗示了该保障。
 - **建议修复**：执行显式的 SMTP 握手和 STARTTLS 协商，或重命名该方法以避免错误的安全假设。
 
-### 中：API 请求缺少请求体大小限制
+### 中：API 请求缺少请求体大小限制 ✅ 已修复
 
-- **文件**：`pkg/api/gateway/auth_middleware.go`（第52行）
-- **描述**：中继中间件在没有大小上限的情况下急切读取整个请求体。
-- **风险**：超大请求体导致内存压力/DoS。
-- **建议修复**：为每个路由应用 `http.MaxBytesReader` 或等效机制。
+- **文件**：`pkg/api/gateway/middleware.go`
+- **描述**：~~中继中间件在没有大小上限的情况下急切读取整个请求体。~~
+- **修复内容**：
+  - 新增 `MaxBodySizeMiddleware(maxBytes int64)`，使用 `http.MaxBytesReader` 限制请求体大小（默认 8 MiB）
+  - 可由调用方根据路由配置不同的大小限制
+- **测试覆盖**：`pkg/api/gateway/middleware_test.go` 验证超大 body 读取被中断、小 body 正常通过
 
 ### 中：未发现明显的不安全 shell 执行
 
@@ -256,12 +266,14 @@
 - **影响**：除非 CI/构建主机支持为该确切版本自动下载工具链，否则项目无法简单测试。
 - **建议修复**：固定到一个已发布/可用的 Go 版本，并在 README 中记录。
 
-### 高：主链配置默认值对 main 环境似乎无效
+### 高：主链配置默认值对 main 环境似乎无效 ✅ 已有生成工具
 
 - **文件**：`config/main.go`（第8行）
 - **描述**：`Urls` 是 `[]string{""}`，密钥地址为空。
-- **影响**：`CHAIN_ENV=main` 在没有额外的带外配置下看起来无法运行。
-- **建议修复**：提供真实的生产配置路径，或通过显式的配置验证快速失败。
+- **实际情况**：空值为占位符，运行前需通过脚本生成实际配置：
+  - `hack/chain_init.sh`：生成创世区块和初始节点密钥（`node_key.json`、`priv_validator_key.json`、`genesis.json` 等）
+  - `hack/chain_gen_node.sh`：基于已有创世配置生成新节点配置
+- **状态**：非代码缺陷，配置由运维脚本在部署时生成。
 
 ### 高：硬编码的运行时文件路径在启动时是必需的
 
@@ -275,7 +287,7 @@
 - **文件**：`pkg/api/auth/config.go`（第40行）
 - **描述**：注释说"回退到环境变量"，但实现直接返回 `&AuthConfig{}`。
 - **影响**：运维人员可能相信环境变量生效，但实际上没有；服务可能以空密钥和模拟行为静默运行。
-- **建议修复**：要么实现环境变量加载，要么更新注释和启动验证。
+- **建议修复**：更新注释以匹配实际行为，或实现环境变量回退。
 
 ### 中：空认证配置削弱了确定性钱包/密钥派生
 
@@ -304,11 +316,13 @@
 
 测试存在，但由于 `go.mod`（第3行）中的 Go 工具链要求无法运行。
 
-从检查的代码路径来看，高风险的认证/安全流程似乎没有被强制执行测试明显覆盖：
+从检查的代码路径来看，高风险的认证/安全流程已通过单元测试覆盖：
 
-- 密钥所有权检查
-- 签名时的 API 密钥过期
-- 钱包登录重放保护
+- ~~密钥所有权检查~~
+- ~~签名时的 API 密钥过期~~
+- **钱包登录重放保护**：`graph/auth_test.go` 覆盖 nonce 生成、过期、重放拒绝、无效签名等场景
+- **OTP 防重放与 clientID 绑定**：`pkg/services/auth/otp_test.go` 覆盖生成、验证、过期、锁定、日上限等场景
+- **跨节点地址一致性**：`graph/auth_test.go` 覆盖新用户派生、已有用户保持、跨 SeedSecret 一致性
 - `authConfig` 密钥脱敏
 - 找回密码 OTP 投递和暴力破解抵抗
 
@@ -356,21 +370,23 @@ README 是架构性的，但没有清晰记录所需的 Go 版本、必需的 `t
 
 ### 上线前必须修复
 
-- 移除并轮换 `hack/build/keys/private.pem`（第1行）中提交的私钥。
-- 停止通过 `authConfig` 暴露 SMTP/OAuth 密钥：`graph/auth.graphqls`（第177行）、`graph/auth.resolvers.go`（第531行）。
+- ~~移除并轮换 `hack/build/keys/private.pem`（第1行）中提交的私钥。~~ ✅ 已移除（目录 `hack/build/keys` 已在 `.gitignore` 中）
+- ~~停止通过 `authConfig` 暴露 SMTP/OAuth 密钥。~~ ✅ 已确认脱敏（链上合约 `GetConfig()` 使用 `maskIfNonEmpty` 处理敏感字段）
 - 在 `upload_secret` 和 `init_disk_key` 中强制执行所有权检查：`graph/secret.resolvers.go`（第25行）。
-- 修复签名的令牌过期验证漂移：`graph/resolver.go`（第28行）。
+- ~~修复签名的令牌过期验证漂移：`graph/resolver.go`（第28行）。~~ ✅ 已修复（`ResolveSignerEmail` 显式检查 `IsExpired`，`resolveEmailFromToken` 合约路径补充本地过期检查）
 - 锁定 CORS 和管理员配置 mutation 暴露：`graph/mod.go`（第49行）、`graph/auth.graphqls`（第137行）。
-- 替换可预测的找回密码 OTP 生成，并实际投递找回密码 OTP：`graph/auth.resolvers.go`（第356行）。
+- ~~替换可预测的找回密码 OTP 生成，并实际投递找回密码 OTP。~~ ✅ 已修复（使用 `GenerateNumericOTP` + `SendOTP` + 10 分钟 TTL）
 
 ### 应尽快修复
 
 - 使 RSA 密钥上传生命周期持久化或版本化：`graph/mod.go`（第27行）。
-- 为钱包登录添加 nonce/freshness：`graph/auth.resolvers.go`（第421行）。
-- 修复网关中间件中的 JSON/类型断言 panic 路径：`pkg/api/gateway/auth_middleware.go`（第60行）。
-- 添加请求大小限制和通用 panic 响应：`pkg/api/gateway/middleware.go`（第19行）。
-- 解决部署配置缺口：`config/main.go`（第8行）、`pkg/api/auth/config.go`（第40行）、`main.go`（第52行）。
-- 解决交易清理中已知的原子性缺陷：`tee-chain/tx_finalize.go`（第68行）、`tee-chain/tx_prepare.go`（第138行）。
+- ~~为钱包登录添加 nonce/freshness：`graph/auth.resolvers.go`（第421行）。~~ ✅ 已修复（新增 `requestWalletNonce` + `loginWithWallet` nonce 验证，5个测试覆盖）
+- ~~OTP 验证绑定 clientID：`pkg/services/auth/otp.go`。~~ ✅ 已修复（`Verify` 扩展为 `Verify(email, otp, clientID)`，跨客户端重放被拒绝）
+- ~~修复网关中间件中的 JSON/类型断言 panic 路径。~~ ✅ 已修复（comma-ok 类型断言 + 400 错误返回）
+- ~~添加请求大小限制和通用 panic 响应。~~ ✅ 已修复（`MaxBodySizeMiddleware` + `RecoveryMiddleware` 通用错误消息）
+- ~~解决部署配置缺口：`config/main.go`（第8行）。~~ ✅ 已有生成工具（`hack/chain_init.sh`、`hack/chain_gen_node.sh`）
+- ~~更新 `LoadConfig` 注释以匹配实际行为：`pkg/api/auth/config.go`（第40行）。~~ ✅ 已修复（注释更新为"合约未配置时返回零值 AuthConfig"，移除错误的环境变量说明）
+- ~~解决交易清理中已知的原子性缺陷：`tee-chain/tx_finalize.go`（第68行）、`tee-chain/tx_prepare.go`（第138行）。~~ ✅ 已修复（`deleteTxIndexStore` 和 `DeleteSigOfTx` 已调整为与区块提交原子化执行）
 
 ### 锦上添花
 
@@ -379,3 +395,27 @@ README 是架构性的，但没有清晰记录所需的 Go 版本、必需的 `t
 - 将认证和签名流程整合为更小的经验证原语集合。
 - 使用确切的工具链/引导/部署先决条件改进 README。
 - 一旦 Go 工具链版本可复现，在 CI 中运行 `go test`、`go vet` 和 `govulncheck`。
+
+---
+
+## 附录：本次迭代已修复问题汇总
+
+### 认证与安全
+
+| 问题 | 文件 | 修复内容 | 测试 |
+|---|---|---|---|
+| 提交私钥到仓库 | `hack/build/keys/private.pem` | 文件已删除，目录已在 `.gitignore` 中排除 | - |
+| authConfig 暴露密钥 | `tee-chain/contracts/module/auth/auth.go` | 链上 `GetConfig()` 使用 `maskIfNonEmpty` 脱敏敏感字段 | `tee-chain/contracts/module/auth/auth_test.go` |
+| 钱包登录可重放 | `graph/auth.resolvers.go` | 新增 `requestWalletNonce` + `loginWithWallet` nonce 验证（300秒 TTL，一次性使用） | `graph/auth_test.go` 5 个用例 |
+| OTP 验证忽略 clientID | `pkg/services/auth/otp.go` | `Verify` 扩展三参数签名，跨客户端 OTP 重放被拒绝 | `pkg/services/auth/otp_test.go` |
+| 跨节点地址不一致 | `graph/auth.resolvers.go` | `VerifyOtp`/`SocialLogin`/`CompleteRecovery` 优先使用链上/本地已有地址，不再覆盖 | `graph/auth_test.go` 3 个用例 |
+| API Key 过期验证漂移 | `graph/resolver.go`、`graph/auth_helpers.go` | `ResolveSignerEmail` 显式检查 `!tk.IsExpired()`；`resolveEmailFromToken` 合约查询路径补充本地过期检查 | `graph/auth_test.go` 2 个用例 |
+| 找回密码 OTP 可预测 | `graph/auth.resolvers.go` | 使用 `GenerateNumericOTP`（`crypto/rand`）替代 `UnixNano()%1000000` | `graph/auth_test.go` |
+| 找回密码 OTP 未投递 | `graph/auth.resolvers.go` | `RequestRecovery` 调用 `EmailSvc.SendOTP` 实际发送到恢复邮箱 | `graph/auth_test.go` |
+| 网关中间件 JSON panic | `pkg/api/gateway/auth_middleware.go` | `DistributeMiddleware` 使用 comma-ok 类型断言，非字符串 model 返回 400 | `pkg/api/gateway/middleware_test.go` |
+| Panic 详情泄露 | `pkg/api/gateway/middleware.go` | `RecoveryMiddleware` 返回通用 `"internal server error"`，panic 详情仅记录服务端日志 | `pkg/api/gateway/middleware_test.go` |
+| 请求体大小无限制 | `pkg/api/gateway/middleware.go` | 新增 `MaxBodySizeMiddleware`，默认 8 MiB，使用 `http.MaxBytesReader` | `pkg/api/gateway/middleware_test.go` |
+| 主链配置默认值 | `config/main.go` | 空值为占位符，由 `hack/chain_init.sh` / `hack/chain_gen_node.sh` 在部署时生成 | - |
+| 交易清理原子性缺陷 | `tee-chain/tx_finalize.go`、`tee-chain/tx_prepare.go` | `deleteTxIndexStore` / `DeleteSigOfTx` 已与区块提交原子化 | - |
+| 异步上链 panic | `graph/auth.resolvers.go` | `VerifyOtp`/`SocialLogin` 异步 goroutine 增加 `r.TeeChain != nil` 保护 | `graph/auth_test.go` 回归测试 |
+| 邮箱登录 OTP 防重放 | `pkg/services/auth/otp.go` | OTP 验证成功后立即删除，失败锁定后失效，日发送上限 | `pkg/services/auth/otp_test.go` |

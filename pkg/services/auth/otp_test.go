@@ -30,7 +30,7 @@ func TestOTPService_GenerateAndVerify(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, otp, 6)
 
-	err = svc.Verify(email, otp)
+	err = svc.Verify(email, otp, "web")
 	assert.NoError(t, err)
 }
 
@@ -41,7 +41,7 @@ func TestOTPService_Verify_WrongOTP(t *testing.T) {
 	_, err := svc.Generate(email, "web")
 	require.NoError(t, err)
 
-	err = svc.Verify(email, "000000")
+	err = svc.Verify(email, "000000", "web")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid OTP")
 }
@@ -58,7 +58,7 @@ func TestOTPService_Verify_Expired(t *testing.T) {
 	past := time.Now().Add(-10 * time.Minute).Unix()
 	store.PutOTP(normalizeEmail(email), formatOTPData(past, otp, "web"))
 
-	err = svc.Verify(email, otp)
+	err = svc.Verify(email, otp, "web")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "expired")
 }
@@ -66,7 +66,7 @@ func TestOTPService_Verify_Expired(t *testing.T) {
 func TestOTPService_Verify_NoOTPRequested(t *testing.T) {
 	svc := setupTestOTP(t)
 
-	err := svc.Verify("nobody@example.com", "123456")
+	err := svc.Verify("nobody@example.com", "123456", "web")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no OTP requested")
 }
@@ -94,12 +94,12 @@ func TestOTPService_Verify_LockAfterMaxFails(t *testing.T) {
 
 	// 连续错误 3 次
 	for i := 0; i < 3; i++ {
-		err = svc.Verify(email, "000000")
+		err = svc.Verify(email, "000000", "web")
 		require.Error(t, err)
 	}
 
 	// 第 4 次即使正确也应被锁定
-	err = svc.Verify(email, otp)
+	err = svc.Verify(email, otp, "web")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "locked")
 }
@@ -131,8 +131,8 @@ func TestOTPService_Generate_UnlocksAfterNewOTP(t *testing.T) {
 	require.NoError(t, err)
 
 	// 验证失败 2 次（未达到阈值）
-	svc.Verify(email, "wrong1")
-	svc.Verify(email, "wrong2")
+	svc.Verify(email, "wrong1", "web")
+	svc.Verify(email, "wrong2", "web")
 
 	// 等待发送间隔后生成新 OTP（内部会清除失败次数）
 	time.Sleep(svc.sendInterval + 50*time.Millisecond)
@@ -142,7 +142,7 @@ func TestOTPService_Generate_UnlocksAfterNewOTP(t *testing.T) {
 	require.NotEqual(t, otp1, otp2)
 
 	// 新 OTP 应该可以验证
-	err = svc.Verify(email, otp2)
+	err = svc.Verify(email, otp2, "web")
 	assert.NoError(t, err)
 }
 
@@ -153,11 +153,11 @@ func TestOTPService_Verify_CleansAfterSuccess(t *testing.T) {
 	otp, err := svc.Generate(email, "web")
 	require.NoError(t, err)
 
-	err = svc.Verify(email, otp)
+	err = svc.Verify(email, otp, "web")
 	require.NoError(t, err)
 
 	// 验证成功后 OTP 应被删除
-	err = svc.Verify(email, otp)
+	err = svc.Verify(email, otp, "web")
 	require.Error(t, err)
 }
 

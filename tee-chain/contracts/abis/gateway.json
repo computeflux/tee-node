@@ -1036,6 +1036,16 @@
               ],
               "type": 3
             }
+          },
+          {
+            "docs": [],
+            "label": "nonce",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 15
+            }
           }
         ],
         "default": false,

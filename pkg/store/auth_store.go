@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -317,8 +318,9 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 	return nil, errors.New("not found")
 }
 
-func PutRecoveryOTP(userEmail, otp string) error {
-	return SetKey("WEB3AUTH", "ro:"+userEmail, []byte(otp))
+func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
+	data := fmt.Sprintf("%d:%s", time.Now().Add(time.Duration(ttlSeconds)*time.Second).Unix(), otp)
+	return SetKey("WEB3AUTH", "ro:"+userEmail, []byte(data))
 }
 
 func GetRecoveryOTP(userEmail string) (string, error) {
@@ -326,9 +328,83 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	// 解析: expiresAt:otp
+	parts := strings.SplitN(string(b), ":", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid recovery otp format")
+	}
+	expiresAt, _ := strconv.ParseInt(parts[0], 10, 64)
+	if time.Now().Unix() > expiresAt {
+		_ = DeleteRecoveryOTP(userEmail)
+		return "", fmt.Errorf("recovery otp expired")
+	}
+	return parts[1], nil
 }
 
 func DeleteRecoveryOTP(userEmail string) error {
 	return DeleteKey("WEB3AUTH", "ro:"+userEmail)
+}
+
+// ── Wallet Login Nonce ────────────────────────────────────
+
+// WalletNonceRecord 钱包登录一次性 nonce 记录
+type WalletNonceRecord struct {
+	Address   string `json:"address"`
+	Nonce     string `json:"nonce"`
+	CreatedAt int64  `json:"createdAt"`
+	Used      bool   `json:"used"`
+}
+
+func PutWalletNonce(address, nonce string, ttlSeconds int) error {
+	rec := &WalletNonceRecord{
+		Address:   address,
+		Nonce:     nonce,
+		CreatedAt: time.Now().Unix(),
+		Used:      false,
+	}
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	return SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
+}
+
+func GetWalletNonce(address, nonce string) (*WalletNonceRecord, error) {
+	return GetJson[WalletNonceRecord]("WEB3AUTH", "wn:"+address+":"+nonce)
+}
+
+func MarkWalletNonceUsed(address, nonce string) error {
+	rec, err := GetWalletNonce(address, nonce)
+	if err != nil {
+		return err
+	}
+	if rec == nil {
+		return fmt.Errorf("nonce not found")
+	}
+	rec.Used = true
+	b, _ := json.Marshal(rec)
+	return SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
+}
+
+// CleanupWalletNonces 清理某地址下已过期的 nonce（由外部定时任务调用）
+func CleanupWalletNonces(address string, maxAgeSeconds int) error {
+	prefix := []byte(comboKey("WEB3AUTH", "wn:"+address+":"))
+	iter, err := DBINS.NewIter(&pebble.IterOptions{})
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	cutoff := time.Now().Unix() - int64(maxAgeSeconds)
+	for iter.SeekGE(prefix); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
+		raw, err := util.Unseal(iter.Value(), nil)
+		if err != nil {
+			continue
+		}
+		var rec WalletNonceRecord
+		if json.Unmarshal(raw, &rec) == nil && rec.CreatedAt < cutoff {
+			_ = DeleteKey("WEB3AUTH", "wn:"+address+":"+rec.Nonce)
+		}
+	}
+	return nil
 }
