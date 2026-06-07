@@ -95,7 +95,14 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	// 统计用户 Token 使用
 	token := GetTokenFromContext(r)
 	if usage != nil {
-		recordUsageAsyncFn(token.Addr, token.ID, modelData, uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
+		recordUsageAsyncFn(
+			token.Addr,
+			token.ID,
+			modelData,
+			uint64(usage.PromptTokens),     // 总输入token
+			uint64(usage.CompletionTokens), // 命中缓存折扣token
+			uint64(usage.PromptTokensDetails.CachedTokens), // CompletionTokens
+		)
 	}
 
 	// 记录调用时间

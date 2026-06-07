@@ -90,6 +90,10 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 		case *model.SysCall_HubCall:
 			if addMainChainTx {
 				hubCall := tx.GetHubCall()
+				if hubCall == nil {
+					util.LogWithGray("PrepareTx", "Skip nil HubCall")
+					continue
+				}
 				hubCalls = append(hubCalls, hubCall)
 				hubtx = append(hubtx, txbt)
 			}
@@ -117,26 +121,42 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 		}
 	}
 
-	// 第二步：HubCall 同步到主链
+	// 第二步：HubCall 同步到主链（按 chainId 分组，每组独立 SyncTxStart）
 	if len(hubtx) > 0 {
-		tx, err := HubSyncStep1(s)
-		if err != nil {
-			util.LogWithRed("PrepareTx", "TryTxStart err:", err)
-			time.Sleep(time.Second * 2)
+		if s.dkg == nil {
+			util.LogWithRed("PrepareTx", "dkg is nil, cannot prepare hub sync txs")
 			return
 		}
-
 		if s.dkg.AvailableNodeLen() < s.dkg.Threshold+1 {
-			util.LogWithRed("PrepareTx", "exapect validator node:", s.dkg.Threshold+1, ", got:", s.dkg.AvailableNodeLen())
-			time.Sleep(time.Second * 2)
+			util.LogWithRed("PrepareTx", "expect validator node:", s.dkg.Threshold+1, ", got:", s.dkg.AvailableNodeLen())
 			return
 		}
 
-		*finaltx = append(*finaltx, tx)
-		*finaltx = append(*finaltx, hubtx...)
+		// Group by chainId
+		chainGroups := make(map[uint32]struct {
+			calls []*model.HubCall
+			txs   [][]byte
+		})
+		for i, hc := range hubCalls {
+			if len(hc.Call) == 0 {
+				continue
+			}
+			cid := hc.Call[0].ChainId
+			g := chainGroups[cid]
+			g.calls = append(g.calls, hc)
+			g.txs = append(g.txs, hubtx[i])
+			chainGroups[cid] = g
+		}
 
-		// TODO: DeleteSigOfTx should be moved to FinalizeTx or Commit to ensure
-		// it only runs after the block is actually committed.
-		s.DeleteSigOfTx(height)
+		for cid, group := range chainGroups {
+			tx, err := HubSyncStep1(s, cid)
+			if err != nil {
+				util.LogWithRed("PrepareTx", "TryTxStart err for chainId", cid, ":", err)
+				continue
+			}
+
+			*finaltx = append(*finaltx, tx)
+			*finaltx = append(*finaltx, group.txs...)
+		}
 	}
 }

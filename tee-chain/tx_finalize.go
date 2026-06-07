@@ -20,8 +20,10 @@ import (
 
 func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
-	hubCalls := make([]*model.HubCall, 0, len(txs))
-	var txIndex int64 = 0
+
+	// Per-chain grouping for multi-main-chain async sync.
+	chainHubCalls := make(map[uint32][]*model.HubCall)
+	chainTxIndex := make(map[uint32]int64)
 
 	for _, txbt := range txs {
 		tx := new(model.Tx)
@@ -55,88 +57,85 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				return nil, err
 			}
 		case *model.SysCall_SyncTxStart: // start hub sync tx
-			txIndex = p.SyncTxStart
-			err = HubSyncStep2(p.SyncTxStart, txn)
+			chainTxIndex[p.SyncTxStart.ChainId] = p.SyncTxStart.TxIndex
+			err = HubSyncStep2(p.SyncTxStart.TxIndex, p.SyncTxStart.ChainId, txn)
 			if err != nil {
 				return nil, err
 			}
 		case *model.SysCall_SyncTxEnd: // end hub sync tx
-			err = HubSyncEnd(p.SyncTxEnd, txn)
+			err = HubSyncEnd(p.SyncTxEnd.TxIndex, p.SyncTxEnd.ChainId, txn)
 			if err != nil {
 				return nil, err
 			}
-			// TODO: deleteTxIndexStore currently runs outside the block transaction.
-			// If FinalizeBlock rolls back, the tx_index store is already deleted,
-			// leaving state inconsistent. It should be performed through `txn`
-			// so it is atomic with the block.
-			deleteTxIndexStore(p.SyncTxEnd)
+			err = markChainDone(p.SyncTxEnd.TxIndex, p.SyncTxEnd.ChainId, txn)
+			if err != nil {
+				return nil, err
+			}
+			// Only delete tx_index storage when ALL chains for this txIndex are done.
+			allDone, err := checkAllChainsDone(p.SyncTxEnd.TxIndex, txn)
+			if err != nil {
+				return nil, err
+			}
+			if allDone {
+				if err := deleteTxIndexStore(p.SyncTxEnd.TxIndex, txn); err != nil {
+					return nil, err
+				}
+				// 同步成功后清理部分签名（不是共识状态，直接删全局 DB 即可）
+				_ = app.DeleteSigOfTx(p.SyncTxEnd.TxIndex)
+			}
 		case *model.SysCall_SyncTxRetry: // retry hub sync tx，重新收集签名
 			if app.dkg == nil {
-				LogWithTime("SyncTxRetry", "dkg is nil, skipping retry for txIndex:", p.SyncTxRetry)
+				LogWithTime("SyncTxRetry", "dkg is nil, skipping retry for txIndex:", p.SyncTxRetry.TxIndex, "chainId:", p.SyncTxRetry.ChainId)
 				break
 			}
 
-			// 从存储加载该交易的 hubCalls
-			baseKey := TxIndexPrefix + fmt.Sprint(p.SyncTxRetry)
+			// 从存储加载该交易的 hubCalls（按 chain 隔离）
+			baseKey := TxIndexPrefix + fmt.Sprint(p.SyncTxRetry.TxIndex) + "_" + fmt.Sprint(p.SyncTxRetry.ChainId)
 			stored, err := dbstore.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
 			if err != nil || stored == nil || len(stored.HubCalls) == 0 {
-				LogWithTime("SyncTxRetry", "hubCalls not found for txIndex:", p.SyncTxRetry)
+				LogWithTime("SyncTxRetry", "hubCalls not found for txIndex:", p.SyncTxRetry.TxIndex, "chainId:", p.SyncTxRetry.ChainId)
 				break
 			}
 
 			// 清除旧的部分签名，以便重新收集
-			_ = app.DeleteSigOfTx(p.SyncTxRetry)
+			_ = app.DeleteSigOfTxChain(p.SyncTxRetry.TxIndex, p.SyncTxRetry.ChainId)
 
 			// 重新发起部分签名收集：本节点向当前 proposer 发送部分签名，其他节点同样会在 FinalizeTx 中发送
 			propNode, err := app.ProposerAddressToNodeKey(proposer)
 			if err != nil {
-				return nil, errors.Wrap(err, "SyncTxRetry: ProposerAddressToNodeKey")
+				util.LogWithRed("SyncTxRetry", "ProposerAddressToNodeKey error:", err)
+				break
 			}
-			err = app.sendPartialSign(stored.HubCalls[0].ChainId, p.SyncTxRetry, stored.HubCalls, propNode)
+			err = app.sendPartialSign(p.SyncTxRetry.ChainId, p.SyncTxRetry.TxIndex, stored.HubCalls, propNode, txn)
 			if err != nil {
-				return nil, errors.Wrap(err, "SyncTxRetry: sendPartialSign")
+				util.LogWithRed("SyncTxRetry", "sendPartialSign error:", err)
+				break
 			}
 		case *model.SysCall_HubCall: // add hub call
+			if p.HubCall == nil {
+				return nil, errors.New("HubCall payload is nil")
+			}
 			err := app.finalizeHubCall(p.HubCall, txn)
 			if err != nil {
 				return nil, err
 			}
 
-			hubCalls = append(hubCalls, p.HubCall)
-		case *model.SysCall_Contract:
-			caller := tx.GetCaller()
-			callerType := tx.GetCallerType()
-			txNonce := p.Contract.GetNonce()
-
-			currentNonce, err := TxnGetCurrentCallerNonce(txn, caller, callerType)
-			if err != nil {
-				return nil, errors.Wrap(err, "get caller nonce")
-			}
-
-			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce {
-				return nil, errors.Errorf(
-					"invalid nonce: expected %d, got %d (caller %x, type %d)",
-					expectedNonce, txNonce, caller, callerType,
-				)
-			}
-
-			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
-			if err != nil {
-				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
-				return nil, errors.Wrap(err, "contract mutation error")
-			}
-
-			// 合约执行成功后，原子更新 nonce
-			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
-				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))
-				return nil, errors.Wrap(err, "contract mutation error")
+			// Group hubCalls by chainId (extracted from the first TeeCall).
+			if len(p.HubCall.Call) > 0 {
+				cid := p.HubCall.Call[0].ChainId
+				chainHubCalls[cid] = append(chainHubCalls[cid], p.HubCall)
 			}
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				pub, _ := app.GetDkgPubkey()
-				version, _ := GetRuntimeVersionAtHeight(height)
+				pub, err := app.GetDkgPubkey()
+				if err != nil || pub == nil {
+					return nil, errors.Wrap(err, "get dkg pubkey for relay sync")
+				}
+				version, err := GetRuntimeVersionAtHeight(height)
+				if err != nil {
+					return nil, errors.Wrap(err, "get runtime version for relay sync")
+				}
 				runtime := contracts.NewRuntimeWithVersion(height, ts, txn, chaintypes.UniAddr{
 					V: pub.ToBytes(),
 				}, chaintypes.UniAddr{
@@ -198,7 +197,35 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 
 			// 更新内存中的当前版本
 			app.state.RuntimeVersion = upgrade.Version
+		case *model.SysCall_Contract:
+			caller := tx.GetCaller()
+			callerType := tx.GetCallerType()
+			txNonce := p.Contract.GetNonce()
 
+			currentNonce, err := TxnGetCurrentCallerNonce(txn, caller, callerType)
+			if err != nil {
+				return nil, errors.Wrap(err, "get caller nonce")
+			}
+
+			expectedNonce := currentNonce + 1
+			if txNonce != expectedNonce {
+				return nil, errors.Errorf(
+					"invalid nonce: expected %d, got %d (caller %x, type %d)",
+					expectedNonce, txNonce, caller, callerType,
+				)
+			}
+
+			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
+			if err != nil {
+				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
+				return nil, errors.Wrap(err, "contract mutation error")
+			}
+
+			// 合约执行成功后，原子更新 nonce
+			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
+				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))
+				return nil, errors.Wrap(err, "contract mutation error")
+			}
 		default:
 			return nil, errors.New("invalid tx type")
 		}
@@ -206,17 +233,45 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 		res = append(res, &abci.ExecTxResult{Code: uint32(abci.CodeTypeOK)})
 	}
 
-	// if hub tx, send partial sign
-	if txIndex > 0 && len(hubCalls) > 0 && hubCalls[0] != nil && app.dkg != nil {
-		propNode, err := app.ProposerAddressToNodeKey(proposer)
-		if err != nil {
-			return nil, err
+	// Send partial signs per chain.
+	// Build txIndex -> []chainId mapping and persist it atomically via txn
+	// so that SyncTxEnd knows when all chains are done.
+	txIndexChains := make(map[int64][]uint32)
+	for cid := range chainHubCalls {
+		txIdx, ok := chainTxIndex[cid]
+		if !ok || txIdx <= 0 {
+			// Fallback: if no SyncTxStart for this chain, skip (should not happen in normal flow).
+			continue
 		}
-		err = app.sendPartialSign(hubCalls[0].ChainId, txIndex, hubCalls, propNode)
-		if err != nil {
-			return nil, err
+		txIndexChains[txIdx] = append(txIndexChains[txIdx], cid)
+	}
+
+	for txIdx, cids := range txIndexChains {
+		if err := saveTxIndexChains(txIdx, cids, txn); err != nil {
+			return nil, errors.Wrap(err, "saveTxIndexChains")
 		}
 	}
+
+	if app.dkg != nil {
+		propNode, err := app.ProposerAddressToNodeKey(proposer)
+		if err != nil {
+			util.LogWithRed("FinalizeTx", "ProposerAddressToNodeKey error:", err)
+		} else {
+			for cid, calls := range chainHubCalls {
+				txIdx, ok := chainTxIndex[cid]
+				if !ok || txIdx <= 0 {
+					continue
+				}
+				if len(calls) == 0 || calls[0] == nil {
+					continue
+				}
+				if err := app.sendPartialSign(cid, txIdx, calls, propNode, txn); err != nil {
+					util.LogWithRed("FinalizeTx", "sendPartialSign error for chain", cid, ":", err)
+				}
+			}
+		}
+	}
+
 	return res, nil
 }
 

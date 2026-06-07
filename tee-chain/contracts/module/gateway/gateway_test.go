@@ -270,17 +270,23 @@ func TestGateway_Recharge_RequiresSystem(t *testing.T) {
 func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
 
 	require.NoError(t, m.Recharge(user, 1000, []byte("nonce1")))
-	// 相同 nonce 再次充值应被拒绝
-	err := m.Recharge(user, 2000, []byte("nonce1"))
-	assert.ErrorContains(t, err, "duplicate nonce")
+	credit1, _ := q.GetCredit(user)
+
+	// 相同 nonce 再次充值应被静默跳过（return nil），余额不变
+	require.NoError(t, m.Recharge(user, 2000, []byte("nonce1")))
+	credit2, _ := q.GetCredit(user)
+	assert.Equal(t, credit1, credit2)
 
 	// 不同 nonce 可以正常充值
 	require.NoError(t, m.Recharge(user, 3000, []byte("nonce2")))
+	credit3, _ := q.GetCredit(user)
+	assert.Equal(t, credit1+3000, credit3)
 }
 
 func TestGateway_SettleUsage_Success(t *testing.T) {
@@ -346,9 +352,8 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	}
 
 	require.NoError(t, m.SettleUsage([]Settlement{record}))
-	// Duplicate record nonce should return error
-	err := m.SettleUsage([]Settlement{record})
-	require.ErrorIs(t, err, ErrDuplicateNonce)
+	// Duplicate record nonce should be silently skipped (return nil), no double charge
+	require.NoError(t, m.SettleUsage([]Settlement{record}))
 }
 
 func TestGateway_Withdraw_Success(t *testing.T) {
@@ -372,7 +377,7 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 	require.Greater(t, provCredit, uint64(0))
 
 	rt.System = true
-	require.NoError(t, m.Withdraw(0, provCredit))
+	require.NoError(t, m.ApplyWithdraw(0, []byte{}, 0, provCredit, []byte("nonce1")))
 
 	provCreditAfter, _ := q.GetProviderCredit(0)
 	assert.Equal(t, uint64(0), provCreditAfter)
@@ -382,7 +387,7 @@ func TestGateway_Withdraw_RequiresSystem(t *testing.T) {
 	gw, _ := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	err := m.Withdraw(0, 100)
+	err := m.ApplyWithdraw(0, []byte{}, 0, 100, []byte("nonce1"))
 	assert.ErrorContains(t, err, "not sudo")
 }
 
@@ -405,6 +410,6 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 
 	// Try to withdraw more than earned
 	rt.System = true
-	err := m.Withdraw(0, 1_000_000)
+	err := m.ApplyWithdraw(0, []byte{}, 0, 1_000_000, []byte("nonce1"))
 	assert.ErrorIs(t, err, ErrLowCredit)
 }

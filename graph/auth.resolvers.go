@@ -478,27 +478,30 @@ func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address strin
 
 // LoginWithWallet is the resolver for the loginWithWallet field.
 // 外部钱包（MetaMask 等）通过 EIP-191 personal_sign 签名验证身份，返回 API Token。
-// message 必须为服务器颁发的 nonce（通过 requestWalletNonce 获取）。
-func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error) {
+// 签名内容为 message + nonce（nonce 通过 requestWalletNonce 获取）。
+func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error) {
 	// 1. 验证 nonce 存在、未过期、未使用
-	rec, err := store.GetWalletNonce(address, message)
+	rec, err := store.GetWalletNonce(address, nonce)
 	if err != nil || rec == nil {
 		return &auth.AuthResponse{Success: false, Error: "invalid or expired nonce"}, nil
 	}
+
 	if rec.Used {
 		return &auth.AuthResponse{Success: false, Error: "nonce already used"}, nil
 	}
+
 	if time.Now().Unix()-rec.CreatedAt > 300 {
 		return &auth.AuthResponse{Success: false, Error: "nonce expired"}, nil
 	}
 
-	// 2. 验证 EIP-191 签名
-	if !verifyEIP191Signature(address, signature, message) {
+	// 2. 验证 EIP-191 签名（签名内容为 message + nonce）
+	signedMessage := message + nonce
+	if !verifyEIP191Signature(address, signature, signedMessage) {
 		return &auth.AuthResponse{Success: false, Error: "invalid signature"}, nil
 	}
 
 	// 3. 标记 nonce 为已使用（防重放）
-	_ = store.MarkWalletNonceUsed(address, message)
+	_ = store.MarkWalletNonceUsed(address, nonce)
 
 	// 4. 生成 API Key
 	apiKey := createUserAPIKey(address, address)
@@ -638,6 +641,26 @@ func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, erro
 		TwitterClientID:     cfg.TwitterClientID,
 		TwitterClientSecret: cfg.TwitterClientSecret,
 		TwitterRedirectURL:  cfg.TwitterRedirectURL,
+	}, nil
+}
+
+// CheckSession is the resolver for the checkSession field.
+func (r *queryResolver) CheckSession(ctx context.Context, token string) (*auth.AuthResponse, error) {
+	email, err := resolveEmailFromToken(token)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	// 尝试获取用户地址（链上或本地）
+	var address string
+	if existing, _ := getAuthUserFromContract(r.TeeChain, email); existing != nil {
+		address = existing.Address
+	}
+
+	return &auth.AuthResponse{
+		Success:  true,
+		UserInfo: &auth.UserInfo{Email: email},
+		Address:  address,
 	}, nil
 }
 

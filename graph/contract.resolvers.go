@@ -50,6 +50,10 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 		return false, gqlerror.Errorf("Faucet is disabled on main environment")
 	}
 
+	if callerType == 0 {
+		return false, gqlerror.Errorf("ContractCall: only caller type >0 is supported")
+	}
+
 	callerBytes, err := DecodeCaller(caller)
 	if err != nil {
 		return false, gqlerror.Errorf("ContractCall DecodeCaller: %v", err)

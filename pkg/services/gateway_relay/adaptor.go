@@ -58,7 +58,6 @@ type Adaptor interface {
 	SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error
 	DoRequest(ctx *RelayContext, meta *Meta, requestBody io.Reader) (*http.Response, error)
 	DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (usage *Usage, err *ErrorWithStatusCode)
-	GetModelList() []string
 	GetProviderName() string
 }
 

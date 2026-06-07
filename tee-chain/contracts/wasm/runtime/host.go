@@ -53,7 +53,7 @@ func isSystem() int32
 //
 // 与宿主函数交互的共享缓冲区。
 // 布局: 前 64KB 存放 key/prefix，后 64KB 存放 value。
-const txnBufSize = 128 * 1024 // 128KB
+const txnBufSize = 256 * 1024 // 256KB
 
 var txnBuf [txnBufSize]byte
 

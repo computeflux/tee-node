@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -47,7 +49,11 @@ type TeeChain struct {
 	relay      *relay.Engine
 	relayCache *relayCache
 
-	lastProposerWasMe bool // 上一个区块是否由本节点出块
+	lastProposerWasMe atomic.Bool // 上一个区块是否由本节点出块
+	relayWorkerOnce   sync.Once   // 保证 relay worker 只启动一次
+
+	syncMu         sync.Mutex
+	syncInProgress map[string]bool // key: "{txIndex}_{chainId}"，防止重复提交主链
 }
 
 // myProposerAddress 返回本节点对应的 CometBFT proposer address
@@ -66,7 +72,8 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 	}
 
 	c := &TeeChain{
-		state: state,
+		state:          state,
+		syncInProgress: make(map[string]bool),
 	}
 
 	if err := CheckRuntimeV0(); err != nil {
@@ -231,6 +238,10 @@ func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64)
 	if !ok {
 		return true // 非 relay tx, 放行
 	}
+	if rs.RelaySync == nil {
+		LogWithTime("Relay reject: nil RelaySync payload")
+		return false
+	}
 
 	ev := relay.FromRelaySysCall(rs.RelaySync)
 	// 获取已提交 DB 的 last + 区块内预期值取最大
@@ -275,7 +286,7 @@ func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeB
 
 	// save proposer of currut block
 	app.currProposerAddress = req.ProposerAddress
-	app.lastProposerWasMe = bytes.Equal(req.ProposerAddress, app.myProposerAddress())
+	app.lastProposerWasMe.Store(bytes.Equal(req.ProposerAddress, app.myProposerAddress()))
 
 	app.state.Height = req.Height
 	response := &abci.ResponseFinalizeBlock{
@@ -350,6 +361,10 @@ func (app *TeeChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) 
 }
 
 func (app *TeeChain) VerifyVoteExtension(_ context.Context, req *abci.RequestVerifyVoteExtension) (*abci.ResponseVerifyVoteExtension, error) {
+	if len(req.VoteExtension) == 0 {
+		return &abci.ResponseVerifyVoteExtension{Status: abci.ResponseVerifyVoteExtension_ACCEPT}, nil
+	}
+
 	// 解析 TEE 证明
 	teeCall := &model.TeeCall{}
 	if err := proto.Unmarshal(req.VoteExtension, teeCall); err != nil {

@@ -57,6 +57,11 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			return CodeInvalidNode
 		}
 
+		if chains.MainChain == nil {
+			// Main chain not connected yet — cannot verify validator list.
+			// Allow the tx to pass pre-check; final validation happens in FinalizeTx.
+			return CodeTypeOK
+		}
 		keys, err := chains.MainChain.GetValidatorList()
 		if err != nil {
 			fmt.Println("invalid node: get validator list error", err)

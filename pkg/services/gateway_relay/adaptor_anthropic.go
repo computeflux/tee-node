@@ -242,10 +242,6 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 	}, nil
 }
 
-func (a *AnthropicAdaptor) GetModelList() []string {
-	return []string{"claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3-5-sonnet"}
-}
-
 func (a *AnthropicAdaptor) GetProviderName() string {
 	return "anthropic"
 }

@@ -75,6 +75,7 @@ func (e *Engine) ApplyRelayEvent(ev SyncEvent, api store.ContractApi) error {
 		util.LogWithRed(RELAY_KEY, "ApplyRelayEvent: getLastNonce failed, chain", ev.ChainID, "err:", err)
 		return err
 	}
+
 	if ev.Nonce != last+1 {
 		util.LogWithRed(RELAY_KEY, fmt.Sprintf("ApplyRelayEvent: bad nonce, chain=%d expected=%d got=%d", ev.ChainID, last+1, ev.Nonce))
 		return fmt.Errorf("relay: expected nonce %d, got %d", last+1, ev.Nonce)

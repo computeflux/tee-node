@@ -8,77 +8,177 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/pkg/errors"
 )
 
-// Submit sync tx to polkadot hub
-func (s *TeeChain) SyncToHub(txIndex int64, sigs [][]byte) error {
-	baseKey := TxIndexPrefix + fmt.Sprint(txIndex)
+// SyncToHub submits the aggregated threshold signature to a specific main-chain.
+// The call and hubCalls are now isolated per chain under tx_index_<id>_<chainId>.
+func (s *TeeChain) SyncToHub(txIndex int64, chainId uint32, sigs [][]byte) error {
+	if s.dkg == nil {
+		return errors.New("SyncToHub: dkg is nil")
+	}
+
+	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
 	call, err := store.GetCodec[chaintypes.ChainCall](GLOABL_STATE, baseKey+TxIndexCallSuffix)
 	if err != nil || call == nil {
-		util.LogWithRed("Sync to polkadot hub", "error: call not found call data")
-		return errors.New("sync to polkadot hub error: call not found call data")
+		util.LogWithRed("SyncToHub", "error: call not found for txIndex:", txIndex, "chainId:", chainId)
+		return errors.New("sync to hub error: call not found")
 	}
 
-	stored, err := store.GetJson[hubCallsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
-	if err != nil || stored == nil || len(stored.HubCalls) == 0 {
-		LogWithTime("SyncToHub", "hubCalls not found for txIndex:", txIndex)
-		return errors.New("sync to polkadot hub error: hubCalls not found")
-	}
-
-	chainId := stored.HubCalls[0].ChainId
 	chain, err := chains.GetChainByID(chainId)
 	if err != nil {
 		return errors.Wrap(err, "getChain error")
 	}
 
 	// Aggregate signature
-	util.LogWithGray("Sync to polkadot hub", "sync sigs = ", len(sigs))
+	util.LogWithGray("SyncToHub", "chainId:", chainId, "sync sigs =", len(sigs))
 	signer := dkg.NewDssSigner(s.dkg, txIndex, chain.GetCipher())
 	signer.SetSigs(sigs)
 
-	// submit sync tx to polkadot hub
+	// Submit sync tx to the main-chain
 	err = chain.SignAndSubmit(signer, *call, false, 0)
 	if err != nil {
-		util.LogWithRed("Sync to polkadot hub", "error => ", err.Error())
+		util.LogWithRed("SyncToHub", "chainId:", chainId, "error =>", err.Error())
 		fmt.Println("                    ", " SS58 => ", s.dkg.DkgPubKeys[chain.GetCipher()])
-		fmt.Println("                    ", " SYNC at batch tx id", txIndex)
-		// 提交失败时，将 SyncTxRetry 提交到 mempool，由下一轮 proposer 打包进块
-		// （只有本节点会执行 SyncToHub，故只提交一次；mempool 会广播给其他节点）
-		util.LogWithYellow("Sync to polkadot hub", "submitting SyncTxRetry to mempool", "txIndex:", txIndex)
+		fmt.Println("                    ", " SYNC at batch tx id", txIndex, "chainId", chainId)
 
+		// On failure, submit SyncTxRetry so that the next proposer can retry.
+		util.LogWithYellow("SyncToHub", "submitting SyncTxRetry to mempool", "txIndex:", txIndex, "chainId:", chainId)
 		tx := &model.SysCall{
 			Payload: &model.SysCall_SyncTxRetry{
-				SyncTxRetry: txIndex,
+				SyncTxRetry: &model.SyncTxRetry{
+					TxIndex: txIndex,
+					ChainId: chainId,
+				},
 			},
 		}
-
 		return s.SubmitCallFromNode(tx)
 	}
 
-	util.LogWithGreen("Sync to polkadot hub", "success at batch tx id", fmt.Sprint(txIndex))
-	// 仅成功后提交 SyncHubEnd，使所有节点在 FinalizeTx 处理时统一清理 tx_index_ 储存
+	util.LogWithGreen("SyncToHub", "success at batch tx id", fmt.Sprint(txIndex), "chainId", chainId)
 
+	// On success, submit SyncTxEnd so all nodes clean up per-chain state.
 	tx := &model.SysCall{
 		Payload: &model.SysCall_SyncTxEnd{
-			SyncTxEnd: txIndex,
+			SyncTxEnd: &model.SyncTxEnd{
+				TxIndex: txIndex,
+				ChainId: chainId,
+			},
 		},
 	}
-
 	return s.SubmitCallFromNode(tx)
 }
 
-// deleteTxIndexStore 删除 tx_index_<id> 相关储存（call + hubCalls）。应在所有节点共识到提交成功（即处理 SyncTxEnd）时调用。
-func deleteTxIndexStore(txIndex int64) {
-	_ = store.DeletekeysByPrefix(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_")
+// deleteTxIndexStore deletes all tx_index_<id>_ keys atomically through the given txn.
+func deleteTxIndexStore(txIndex int64, txn *store.Txn) error {
+	prefix := store.ComboNamespaceKey(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_")
+	return txn.DeletekeysByPrefix(prefix)
 }
 
-// sync transaction index
-var HubSyncIndexKey = "tx_sync_transaction"
+// saveTxIndexChains persists the list of chainIds involved in a given txIndex (atomic via txn).
+func saveTxIndexChains(txIndex int64, chainIds []uint32, txn *store.Txn) error {
+	key := store.ComboNamespaceKey(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_chains")
+	return store.TxnSetJson(txn, key, &chainIds)
+}
+
+// getTxIndexChains retrieves the list of chainIds involved in a given txIndex, reading from txn first.
+func getTxIndexChains(txIndex int64, txn *store.Txn) ([]uint32, error) {
+	key := store.ComboNamespaceKey(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_chains")
+	chains, err := store.TxnGetJson[[]uint32](txn, key)
+	if err != nil {
+		return nil, err
+	}
+	if chains == nil {
+		return []uint32{}, nil
+	}
+	return *chains, nil
+}
+
+// markChainDone records that a specific chain has finished syncing for the given txIndex.
+func markChainDone(txIndex int64, chainId uint32, txn *store.Txn) error {
+	key := store.ComboNamespaceKey(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_done")
+	done, err := store.TxnGetJson[[]uint32](txn, key)
+	if err != nil {
+		return err
+	}
+	var list []uint32
+	if done != nil {
+		list = *done
+	}
+	// Avoid duplicates
+	for _, cid := range list {
+		if cid == chainId {
+			return nil
+		}
+	}
+	list = append(list, chainId)
+	return store.TxnSetJson(txn, key, &list)
+}
+
+// checkAllChainsDone checks whether every chain involved in txIndex has been marked done.
+func checkAllChainsDone(txIndex int64, txn *store.Txn) (bool, error) {
+	chains, err := getTxIndexChains(txIndex, txn)
+	if err != nil {
+		return false, err
+	}
+	if len(chains) == 0 {
+		return true, nil
+	}
+
+	key := store.ComboNamespaceKey(GLOABL_STATE, TxIndexPrefix+fmt.Sprint(txIndex)+"_done")
+	done, err := store.TxnGetJson[[]uint32](txn, key)
+	if err != nil {
+		return false, err
+	}
+	if done == nil {
+		return false, nil
+	}
+
+	doneMap := make(map[uint32]bool)
+	for _, cid := range *done {
+		doneMap[cid] = true
+	}
+	for _, cid := range chains {
+		if !doneMap[cid] {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// ── Global txIndex generator ──────────────────────────────
+
+const globalTxIndexKey = "tx_sync_global_index"
+
+func nextGlobalTxIndex() (int64, error) {
+	v, err := store.GetJson[int64](GLOABL_STATE, globalTxIndexKey)
+	if err != nil {
+		return 0, err
+	}
+	var next int64
+	if v == nil {
+		next = 1
+	} else {
+		next = *v + 1
+	}
+	return next, store.SetJson(GLOABL_STATE, globalTxIndexKey, &next)
+}
+
+// ── Per-chain AsyncBatchState ──────────────────────────────
+
+// hubSyncIndexKey returns the DB key for a given chain's sync state.
+func hubSyncIndexKey(chainId uint32) string {
+	return fmt.Sprintf("tx_sync_transaction_%d", chainId)
+}
 
 type AsyncBatchState struct {
 	Going    int64
@@ -86,86 +186,164 @@ type AsyncBatchState struct {
 	LastSync int64
 }
 
-// check sync is running
+// IsHubSyncRuning checks whether ANY chain has an in-flight sync batch.
+// Used by epoch/PrepareTx for global coordination.
 func IsHubSyncRuning() bool {
-	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
+	for _, chain := range chains.Chains {
+		if isHubSyncRuningForChain(chain.ChainId()) {
+			return true
+		}
+	}
+	return false
+}
+
+func isHubSyncRuningForChain(chainId uint32) bool {
+	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, hubSyncIndexKey(chainId))
 	if err != nil {
-		// Fail open: on DB error, allow hub calls to be processed.
 		LogWithTime("IsHubSyncRuning get error: " + err.Error())
 		return false
 	}
 	if tx == nil {
-		tx = &AsyncBatchState{
-			Going: 0,
-			Done:  0,
-		}
+		tx = &AsyncBatchState{Going: 0, Done: 0}
 	}
-
 	return tx.Going > tx.Done && time.Now().Unix()-tx.LastSync <= 360
 }
 
-// sync transaction step1
-func HubSyncStep1(s *TeeChain) ([]byte, error) {
-	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, HubSyncIndexKey)
+// HubSyncStep1 creates a new SyncTxStart for the given chain if no batch is in progress.
+// The returned txIndex is globally unique across all chains.
+func HubSyncStep1(s *TeeChain, chainId uint32) ([]byte, error) {
+	if s.dkg == nil {
+		return nil, errors.New("HubSyncStep1: dkg is nil")
+	}
+
+	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, hubSyncIndexKey(chainId))
 	if err != nil {
 		return nil, err
 	}
-
 	if tx == nil {
-		tx = &AsyncBatchState{
-			Going: 0,
-			Done:  0,
-		}
+		tx = &AsyncBatchState{Going: 0, Done: 0}
+	}
+	if tx.Going > tx.Done && time.Now().Unix()-tx.LastSync <= 360 {
+		return nil, errors.New("sync step1 one transaction is running")
 	}
 
-	if tx.Going > tx.Done && time.Now().Unix()-tx.LastSync <= 360 {
-		return nil, errors.New("sync step1 one transaction is runing")
+	globalIdx, err := nextGlobalTxIndex()
+	if err != nil {
+		return nil, errors.Wrap(err, "nextGlobalTxIndex")
 	}
 
 	ntx := &model.SysCall{
 		Payload: &model.SysCall_SyncTxStart{
-			SyncTxStart: tx.Going + 1,
+			SyncTxStart: &model.SyncTxStart{
+				TxIndex: globalIdx,
+				ChainId: chainId,
+			},
 		},
 	}
-
 	return s.GetCallBytesFromNode(ntx)
 }
 
-// sync transaction step2
-func HubSyncStep2(i int64, txn *store.Txn) error {
-	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
+// HubSyncStep2 records that a sync batch has started for the given chain.
+func HubSyncStep2(i int64, chainId uint32, txn *store.Txn) error {
+	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)))
 	if err != nil {
 		return err
 	}
-
 	if tx == nil {
-		tx = &AsyncBatchState{
-			Going: 0,
-			Done:  0,
+		tx = &AsyncBatchState{Going: 0, Done: 0}
+	}
+	if tx.Going > tx.Done && time.Now().Unix()-tx.LastSync <= 360 {
+		// Allow overlapping start for robustness
+	}
+	tx.Going = i
+	tx.Done = i - 1
+	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)), tx)
+}
+
+// HubSyncEnd records that a sync batch has completed for the given chain.
+func HubSyncEnd(i int64, chainId uint32, txn *store.Txn) error {
+	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)))
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return errors.Errorf("HubSyncEnd: no active sync for chain %d", chainId)
+	}
+	if i != tx.Going {
+		return errors.Errorf("HubSyncEnd: txIndex mismatch for chain %d, expected %d, got %d", chainId, tx.Going, i)
+	}
+	tx.Done = tx.Going
+	tx.LastSync = time.Now().Unix()
+	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)), tx)
+}
+
+// 判断是否需要提交 tee-chain => main-chain 的交易
+func (app *TeeChain) TargetSync() bool {
+	if IsHubSyncRuning() {
+		return false
+	}
+	if app.dkg == nil || app.dkg.SystemPubKey() == nil {
+		return false
+	}
+	if app.NodePriv == nil {
+		return false
+	}
+
+	height := app.state.Height
+	txn := dbstore.DBINS.NewTransaction()
+	defer txn.Rollback()
+	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, chaintypes.UniAddr{
+		T: 0,
+		V: []byte{},
+	}, chaintypes.UniAddr{
+		V: app.dkg.SystemPubKey().Byte(),
+	}, module.NativeVersion)
+
+	ins := gateway.NewGateway(runtime)
+	if ins == nil {
+		return false
+	}
+	list, _ := gateway.GatewayQuery{Gateway: *ins}.WithdrawTodo()
+	if len(list) == 0 {
+		return false
+	}
+
+	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
+
+	ts := make([]*model.TeeCall, len(list))
+	for i, l := range list {
+		ts[i] = &model.TeeCall{
+			ChainId: l.ChainID,
+			Tx: &model.TeeCall_WithdrawApply{
+				WithdrawApply: &model.WithdrawApply{
+					User:     l.User.V,
+					UserType: l.User.T,
+					Contract: l.Contract,
+					Credit:   l.Credit.Int.Uint64(),
+					Nonce:    l.Nonce,
+				},
+			},
 		}
 	}
 
-	if tx.Going > tx.Done && time.Now().Unix()-tx.LastSync <= 360 {
-		// return errors.New("sync step2 one transaction is runing")
-	}
+	tx, err := signTx(&model.SysCall{
+		Payload: &model.SysCall_HubCall{
+			HubCall: &model.HubCall{
+				Call: ts,
+			},
+		},
+	}, signer)
 
-	tx.Going = i
-	tx.Done = i - 1
-	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
-}
-
-// sync transaction step3
-func HubSyncEnd(i int64, txn *store.Txn) error {
-	tx, err := store.TxnGetJson[AsyncBatchState](txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey))
 	if err != nil {
-		return err
+		util.LogWithRed("RELAY-WORKER", "sign tx failed:", err)
+		return false
 	}
 
-	if i != tx.Going && time.Now().Unix()-tx.LastSync <= 360 {
-		util.LogWithRed("SyncEnd", "i is not equal to tx.Going")
+	if err := SubmitTx(tx); err != nil {
+		util.LogWithRed("RELAY-WORKER", "submit tx failed:", err)
+		return false
 	}
 
-	tx.Done = tx.Going
-	tx.LastSync = time.Now().Unix()
-	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, HubSyncIndexKey), tx)
+	util.LogWithYellow("RELAY-WORKER", "submitted Withdraw tx to main chains")
+	return true
 }

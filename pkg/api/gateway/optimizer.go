@@ -155,7 +155,7 @@ func initRateLimiterCleanup() {
 // ── Body buffer pool ─────────────────────────────────────
 
 var bufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return make([]byte, 0, 64*1024)
 	},
 }

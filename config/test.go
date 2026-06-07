@@ -6,13 +6,11 @@ import (
 )
 
 var TestChainConfig = chaintypes.ChainConfigType{
-	ChainID:       0,
+	ChainID:       420420417,
 	ChainType:     "substrate",
 	Cipher:        crypto.SuiteEd25519,
 	Urls:          []string{"wss://asset-hub-paseo.ibp.network", "wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://asset-hub-paseo.dotters.network"},
-	SubnetAddress: "0x8201d6ce5abdbf8b4bfabdbf4e19df7459519265",
-	TokenAddress:  "0xebc1e9a1860741849c75496f8a49c2f166df7978",
+	SubnetAddress: "0xf8e6c4dec077b148b55e31533efea751c91f25e4",
+	TokenAddress:  "0xc0849f08bd8f1028a499d6e689f3431c0730a582",
 	NetworkLabel:  "Paseo (Asset Hub)",
 }
-
-// var TestChainList = []chaintypes.ChainConfigType{}

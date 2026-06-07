@@ -82,13 +82,6 @@ func TestOpenAIAdaptor_GetRequestURL(t *testing.T) {
 	assert.Equal(t, "https://api.openai.com", url)
 }
 
-func TestOpenAIAdaptor_GetModelList(t *testing.T) {
-	a := &OpenAIAdaptor{}
-	models := a.GetModelList()
-	assert.Contains(t, models, "gpt-4")
-	assert.Contains(t, models, "gpt-3.5-turbo")
-}
-
 func TestOpenAIAdaptor_GetProviderName(t *testing.T) {
 	a := &OpenAIAdaptor{}
 	assert.Equal(t, "openai", a.GetProviderName())

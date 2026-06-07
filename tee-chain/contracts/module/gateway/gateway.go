@@ -43,6 +43,9 @@ type Gateway struct {
 	userSettlementHistory *store.StoreList2D[store.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:v9_user_settlement_history"` // user → []SettlementRecord
 	rechargeNonces        *store.StoreMapping[string, bool]                               `store:"keyPfx:v9_recharge_nonces"`         // hex(nonce) → true，充值防重放
 	settledNonces         *store.StoreMapping[string, bool]                               `store:"keyPfx:v9_settled_nonces"`          // hex(nonce) → true，防重放
+	withdrawNonces        *store.StoreMapping[uint64, store.WithdrawApply]                `store:"keyPfx:v9_withdraw_nonces"`
+	nonce                 *store.StoreValue[uint64]                                       `store:"keyPfx:v9_nonce"`
+	currNonce             *store.StoreValue[uint64]                                       `store:"keyPfx:v9_curr_nonce"`
 }
 
 type GatewayQuery struct{ Gateway }

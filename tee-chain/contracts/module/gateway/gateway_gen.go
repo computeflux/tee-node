@@ -38,6 +38,31 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("add_model_a_p_i_key_ref: apiKey: %w", err)
 		}
 		return m.AddModelAPIKeyRef(modelID, apiKey)
+	case [4]byte{0x0e, 0x41, 0xe1, 0x1e}:
+		if err := store.RequireArgLen(args, 5, "apply_withdraw"); err != nil {
+			return err
+		}
+		chainID, err := store.DecodeScaleArgBytes[uint32](args[0])
+		if err != nil {
+			return fmt.Errorf("apply_withdraw: chainID: %w", err)
+		}
+		token, err := store.DecodeScaleArgBytes[[]byte](args[1])
+		if err != nil {
+			return fmt.Errorf("apply_withdraw: token: %w", err)
+		}
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return fmt.Errorf("apply_withdraw: providerID: %w", err)
+		}
+		amount, err := store.DecodeScaleArgBytes[uint64](args[3])
+		if err != nil {
+			return fmt.Errorf("apply_withdraw: amount: %w", err)
+		}
+		nonce, err := store.DecodeScaleArgBytes[[]byte](args[4])
+		if err != nil {
+			return fmt.Errorf("apply_withdraw: nonce: %w", err)
+		}
+		return m.ApplyWithdraw(chainID, token, providerID, amount, nonce)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
 		if err := store.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err
@@ -284,19 +309,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("update_provider: uptimeSLA: %w", err)
 		}
 		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)
-	case [4]byte{0x11, 0xb2, 0xf8, 0x54}:
-		if err := store.RequireArgLen(args, 2, "withdraw"); err != nil {
+	case [4]byte{0x8b, 0x2d, 0xb8, 0xad}:
+		if err := store.RequireArgLen(args, 1, "update_withdraw_pointer"); err != nil {
 			return err
 		}
-		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		end, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
-			return fmt.Errorf("withdraw: providerID: %w", err)
+			return fmt.Errorf("update_withdraw_pointer: end: %w", err)
 		}
-		amount, err := store.DecodeScaleArgBytes[uint64](args[1])
-		if err != nil {
-			return fmt.Errorf("withdraw: amount: %w", err)
-		}
-		return m.Withdraw(providerID, amount)
+		return m.UpdateWithdrawPointer(end)
 	default:
 		return fmt.Errorf("gateway: unknown method %q", methodSel)
 	}
@@ -669,6 +690,12 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0xd0, 0x75, 0xfb, 0x38}:
+		out, err := q.WithdrawTodo()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("gateway: unknown query method %q", methodSel)
 	}
@@ -689,6 +716,9 @@ func NewGateway(api store.ContractApi) *Gateway {
 		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v9_user_settlement_history_k1_to_id_", "v9_user_settlement_history_k1_length_", "v9_user_settlement_history_k2_next_", "v9_user_settlement_history_store_"),
 		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_recharge_nonces_"},
 		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_settled_nonces_"},
+		withdrawNonces:        &store.StoreMapping[uint64, store.WithdrawApply]{Namespace: "gateway", KeyPrefix: "v9_withdraw_nonces_"},
+		nonce:                 &store.StoreValue[uint64]{Namespace: "gateway", Key: "v9_nonce"},
+		currNonce:             &store.StoreValue[uint64]{Namespace: "gateway", Key: "v9_curr_nonce"},
 	}
 }
 
@@ -716,4 +746,5 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
+	[4]byte{0xd0, 0x75, 0xfb, 0x38}: "withdraw_todo",
 }

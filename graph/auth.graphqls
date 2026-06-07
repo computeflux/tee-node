@@ -135,8 +135,8 @@ extend type Mutation {
   """请求钱包登录 nonce（一次性，5分钟有效）"""
   requestWalletNonce(address: String!): String!
 
-  """外部钱包登录（MetaMask 等），通过签名验证身份后返回 API Token"""
-  loginWithWallet(address: String!, signature: String!, message: String!): AuthResponse!
+  """外部钱包登录（MetaMask 等），通过签名验证身份后返回 API Token。签名内容为 message + nonce"""
+  loginWithWallet(address: String!, signature: String!, message: String!, nonce: String!): AuthResponse!
 
   """设置 Auth 合约配置（节点管理员调用）"""
   setAuthConfig(cfg: AuthConfigInput!): Boolean!
@@ -180,4 +180,7 @@ extend type Query {
 
   """获取 Auth 配置（对外公开，已脱敏）"""
   authConfig: AuthConfig
+
+  """验证 token 是否有效（检查 session/API key 是否过期）"""
+  checkSession(token: String!): AuthResponse!
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/scale"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/wetee-dao/ink.go/util"
 )
 
 type Error struct { // Enum
@@ -17,6 +18,7 @@ type Error struct { // Enum
 	ERC20NotSupported           *bool // 6
 	ERC20Inactive               *bool // 7
 	ERC20TransferFailed         *bool // 8
+	NativeDisabled              *bool // 9
 }
 
 func (ty Error) Encode(encoder scale.Encoder) (err error) {
@@ -91,6 +93,14 @@ func (ty Error) Encode(encoder scale.Encoder) (err error) {
 		}
 		return nil
 	}
+
+	if ty.NativeDisabled != nil {
+		err = encoder.PushByte(9)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	return fmt.Errorf("unrecognized enum")
 }
 
@@ -136,6 +146,10 @@ func (ty *Error) Decode(decoder scale.Decoder) (err error) {
 		t := true
 		ty.ERC20TransferFailed = &t
 		return
+	case 9: // Base
+		t := true
+		ty.NativeDisabled = &t
+		return
 	default:
 		return fmt.Errorf("unrecognized enum")
 	}
@@ -176,6 +190,10 @@ func (ty *Error) Error() string {
 	if ty.ERC20TransferFailed != nil {
 		return "ERC20TransferFailed"
 	}
+
+	if ty.NativeDisabled != nil {
+		return "NativeDisabled"
+	}
 	return "Unknown"
 }
 
@@ -184,14 +202,18 @@ type EventRecord struct { // Composite
 	EventType      []byte
 	EventData      [][]byte
 }
-type Tuple_24 struct { // Tuple
+type Tuple_25 struct { // Tuple
 	F0 bool
 	F1 types.U256
 	F2 types.U256
 }
-type Tuple_26 struct { // Tuple
+type Tuple_27 struct { // Tuple
 	F0 types.H160
 	F1 bool
 	F2 types.U256
 	F3 types.U256
+}
+type PendingWithdrawal struct { // Composite
+	Token  util.Option[types.H160]
+	Amount types.U256
 }

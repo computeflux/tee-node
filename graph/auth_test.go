@@ -390,14 +390,15 @@ func TestLoginWithWallet_Success(t *testing.T) {
 	nonce, err := m.RequestWalletNonce(context.Background(), address)
 	require.NoError(t, err)
 
-	// 2. 用测试私钥签名 nonce（message 即为 nonce）
+	// 2. 用测试私钥签名 message + nonce
 	// 该私钥对应的地址恰好是 0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B
 	privKeyHex := "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"
-	sig, err := signEIP191(privKeyHex, nonce)
+	message := "Sign in to TEE Node"
+	sig, err := signEIP191(privKeyHex, message+nonce)
 	require.NoError(t, err)
 
 	// 3. 登录
-	resp, err := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.True(t, resp.Success, "登录应成功: %s", resp.Error)
 	require.NotEmpty(t, resp.Token)
@@ -419,12 +420,13 @@ func TestLoginWithWallet_ReplayRejected(t *testing.T) {
 
 	// 第一次登录
 	nonce, _ := m.RequestWalletNonce(context.Background(), address)
-	sig, _ := signEIP191(privKeyHex, nonce)
-	resp1, _ := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	message := "Sign in to TEE Node"
+	sig, _ := signEIP191(privKeyHex, message+nonce)
+	resp1, _ := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.True(t, resp1.Success)
 
 	// 重放同一签名和 nonce
-	resp2, err := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	resp2, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.False(t, resp2.Success)
 	assert.Equal(t, "nonce already used", resp2.Error)
@@ -448,8 +450,9 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 	b, _ := json.Marshal(rec)
 	_ = store.SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
 
-	sig, _ := signEIP191(privKeyHex, nonce)
-	resp, err := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	message := "Sign in to TEE Node"
+	sig, _ := signEIP191(privKeyHex, message+nonce)
+	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.False(t, resp.Success)
 	assert.Equal(t, "nonce expired", resp.Error)
@@ -466,9 +469,10 @@ func TestLoginWithWallet_InvalidSignature(t *testing.T) {
 
 	// 使用错误私钥签名
 	wrongPrivKey := "6cbed15c793ce57650b9877cf6fa156fbef513c4e6134f022a85b1ffdd59b2a1"
-	sig, _ := signEIP191(wrongPrivKey, nonce)
+	message := "Sign in to TEE Node"
+	sig, _ := signEIP191(wrongPrivKey, message+nonce)
 
-	resp, err := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.False(t, resp.Success)
 	assert.Equal(t, "invalid signature", resp.Error)
@@ -484,9 +488,10 @@ func TestLoginWithWallet_MissingNonce(t *testing.T) {
 
 	// 未请求 nonce 直接登录
 	nonce := "i_did_not_request_this"
-	sig, _ := signEIP191(privKeyHex, nonce)
+	message := "Sign in to TEE Node"
+	sig, _ := signEIP191(privKeyHex, message+nonce)
 
-	resp, err := m.LoginWithWallet(context.Background(), address, sig, nonce)
+	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.False(t, resp.Success)
 	assert.Equal(t, "invalid or expired nonce", resp.Error)

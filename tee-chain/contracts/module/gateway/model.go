@@ -49,7 +49,7 @@ func (g GatewayMutation) RegisterModel(
 		}
 	}
 
-	_, err = g.models.Insert(txn, ModelInfo{
+	id, err := g.models.Insert(txn, ModelInfo{
 		Name:            name,
 		Owner:           owner,
 		ProviderID:      *provID,
@@ -64,7 +64,14 @@ func (g GatewayMutation) RegisterModel(
 		URI:             uri,
 		APIKeys:         keys,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 将模型 ID 加入 Provider 的 ModelIds
+	return g.providers.UpdateFn(txn, *provID, func(p *ProviderInfo) {
+		p.ModelIds = append(p.ModelIds, id)
+	})
 }
 
 func (g GatewayMutation) UpdateModel(

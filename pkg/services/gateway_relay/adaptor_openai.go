@@ -51,10 +51,10 @@ func (a *OpenAIAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 	requestBody := body
 	if meta.IsStream {
 		raw, _ := io.ReadAll(body)
-		var reqMap map[string]interface{}
+		var reqMap map[string]any
 		if json.Unmarshal(raw, &reqMap) == nil {
 			if _, ok := reqMap["stream_options"]; !ok {
-				reqMap["stream_options"] = map[string]interface{}{"include_usage": true}
+				reqMap["stream_options"] = map[string]any{"include_usage": true}
 				newRaw, _ := json.Marshal(reqMap)
 				requestBody = bytes.NewReader(newRaw)
 			} else {
@@ -160,10 +160,6 @@ func (a *OpenAIAdaptor) handleNormal(ctx *RelayContext, resp *http.Response) (*U
 	ctx.W.Write(body)
 
 	return usage, nil
-}
-
-func (a *OpenAIAdaptor) GetModelList() []string {
-	return []string{"gpt-4", "gpt-3.5-turbo"}
 }
 
 func (a *OpenAIAdaptor) GetProviderName() string {

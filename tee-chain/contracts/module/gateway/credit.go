@@ -2,10 +2,18 @@ package gateway
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"math/big"
+	"slices"
 
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
+
+// 420420417 Paseo test evm
+var UserTypeToChainID = map[uint32][]uint32{
+	2: {420420417},
+}
 
 // ── Points ───────────────────────────────────────────────
 
@@ -54,6 +62,12 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, nonce []byt
 
 // SettleUsage 批量结算（Provider Owner 或 System Account 可调用，每 5 分钟执行一次）
 func (g GatewayMutation) SettleUsage(records []Settlement) error {
+	caller := g.api.GetCaller()
+	if caller.T != 0 {
+		fmt.Println("SettleUsage must call by node")
+		return fmt.Errorf("Recharge: caller is not node")
+	}
+
 	for _, r := range records {
 		// 防重放检查：每条记录必须有唯一 Nonce，已使用的 Nonce 永久拒绝
 		nonceHex := hex.EncodeToString(r.Nonce)
@@ -80,11 +94,11 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		// 计算费用（按模型定价，向上取整，每次调用至少 1 point）
 		var cost uint64 = 0
 
-		// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（均按每千向上取整）
+		// 非缓存 token 按 InPrice 计费，缓存 token 按 CachedPrice 计费（按百万计费）
 		uncached := r.TokenIn - r.CachedToken
 		cost = (uncached*m.InPrice + r.CachedToken*m.CachedPrice + r.TokenOut*m.OutPrice) / 1_000_000
 		if cost == 0 {
-			continue
+			cost = 1
 		}
 
 		// 扣用户余额
@@ -139,12 +153,25 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 	return nil
 }
 
-func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
-	if !g.api.CallbySystem() {
-		return fmt.Errorf("Withdraw: caller is not sudo account")
+func (g GatewayMutation) ApplyWithdraw(chainID uint32, token []byte, providerID uint64, amount uint64, nonce []byte) error {
+	caller := g.api.GetCaller()
+	txn := g.api.GetTxn()
+
+	chainIds := UserTypeToChainID[caller.T]
+	if !slices.Contains(chainIds, chainID) {
+		return errors.New("chainID not allowed for user type")
 	}
 
-	pb, err := g.providerCredits.Get(g.api.GetTxn(), providerID)
+	prov, err := g.providers.Get(txn, providerID)
+	if err != nil || prov == nil {
+		return ErrProviderNotFound
+	}
+
+	if caller.String() != prov.Owner.String() {
+		return errors.New("User is not provider owner")
+	}
+
+	pb, err := g.providerCredits.Get(txn, providerID)
 	if err != nil || pb == nil {
 		return ErrProviderNotFound
 	}
@@ -152,8 +179,70 @@ func (g GatewayMutation) Withdraw(providerID uint64, amount uint64) error {
 	if *pb < amount {
 		return ErrLowCredit
 	}
+
 	*pb -= amount
-	return g.providerCredits.Set(g.api.GetTxn(), providerID, *pb)
+	if err := g.providerCredits.Set(txn, providerID, *pb); err != nil {
+		return err
+	}
+
+	nonceId, err := g.nonce.GetOrDefault(txn, 0)
+	if err != nil {
+		return fmt.Errorf("ApplyWithdraw: get nonceId: %w", err)
+	}
+
+	err = g.nonce.Set(txn, nonceId+1)
+	if err != nil {
+		return fmt.Errorf("ApplyWithdraw: get nonceId: %w", err)
+	}
+
+	// 记录 WithdrawApply
+	withdrawApply := store.WithdrawApply{
+		ChainID:  chainID,
+		Contract: token,
+		User:     prov.Owner,
+		Nonce:    nonceId,
+		Credit:   store.NewU256(new(big.Int).SetUint64(amount)),
+	}
+
+	// 标记 nonce
+	if err := g.withdrawNonces.Set(txn, nonceId, withdrawApply); err != nil {
+		return fmt.Errorf("ApplyWithdraw: store nonce failed: %w", err)
+	}
+
+	fmt.Printf("WithdrawApply: chainID=%d contract=%x user=%v credit=%d\n",
+		withdrawApply.ChainID, withdrawApply.Contract, withdrawApply.User, amount)
+	return nil
+}
+
+func (g GatewayMutation) UpdateWithdrawPointer(end uint64) error {
+	if !g.api.CallbySystem() {
+		return fmt.Errorf("Recharge: caller is not sudo account")
+	}
+	return g.currNonce.Set(g.api.GetTxn(), end)
+}
+
+func (g GatewayQuery) WithdrawTodo() ([]store.WithdrawApply, error) {
+	txn := g.api.GetTxn()
+	curr, err := g.currNonce.GetOrDefault(txn, 0)
+	if err != nil {
+		return nil, nil
+	}
+
+	nonceId, err := g.nonce.GetOrDefault(txn, 0)
+	if err != nil {
+		return nil, nil
+	}
+
+	calls := []store.WithdrawApply{}
+	for i := curr + 1; i < nonceId; i++ {
+		call, err := g.withdrawNonces.Get(txn, i)
+		if err != nil {
+			return nil, nil
+		}
+		calls = append(calls, *call)
+	}
+
+	return calls, nil
 }
 
 // ── Query: Single ────────────────────────────────────────

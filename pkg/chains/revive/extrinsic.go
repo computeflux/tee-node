@@ -3,6 +3,7 @@ package revive
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
@@ -48,6 +49,49 @@ func (c *Contract) BatchCall(callMethod string, calls []chaintypes.ChainCall) (*
 
 // TEECallToCall converts a TEE attestation into a chain call payload.
 func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error) {
+	pub, err := types.NewAccountID(dkgKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var runtimeCall *types.Call
+
+	switch call := tcall.Tx.(type) {
+	case *model.TeeCall_WithdrawApply:
+		if call.WithdrawApply.GetContract() == nil {
+			runtimeCall, err = c.token.CallOfWithdraw(
+				types.H160(call.WithdrawApply.User),
+				types.NewU256(*big.NewInt(0).SetUint64(call.WithdrawApply.Credit)),
+				call.WithdrawApply.Nonce,
+				chain.DryRunParams{
+					Origin: *pub,
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			runtimeCall, err = c.token.CallOfWithdrawErc20(
+				types.H160(call.WithdrawApply.Contract),
+				types.H160(call.WithdrawApply.User),
+				types.NewU256(*big.NewInt(0).SetUint64(call.WithdrawApply.Credit)),
+				call.WithdrawApply.Nonce,
+				chain.DryRunParams{
+					Origin: *pub,
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if runtimeCall != nil {
+		return &chaintypes.ChainCall{
+			Substrate: *runtimeCall,
+		}, nil
+	}
+
 	return nil, errors.New("invalid tee call")
 }
 

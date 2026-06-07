@@ -137,7 +137,7 @@ type ComplexityRoot struct {
 		Faucet               func(childComplexity int, caller string, callerType int) int
 		InitDiskKey          func(childComplexity int, index string, user string) int
 		JoinEarlyAccess      func(childComplexity int, wallet string, email *string, referralCode *string) int
-		LoginWithWallet      func(childComplexity int, address string, signature string, message string) int
+		LoginWithWallet      func(childComplexity int, address string, signature string, message string, nonce string) int
 		RequestOtp           func(childComplexity int, email string, clientID string) int
 		RequestRecovery      func(childComplexity int, recoveryEmail string) int
 		RequestWalletNonce   func(childComplexity int, address string) int
@@ -175,6 +175,7 @@ type ComplexityRoot struct {
 		AuthConfig               func(childComplexity int) int
 		AuthHealth               func(childComplexity int) int
 		ChainInfo                func(childComplexity int) int
+		CheckSession             func(childComplexity int, token string) int
 		ContractDryRun           func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
 		ContractNonce            func(childComplexity int, caller string, callerType int) int
 		EarlyAccessPoints        func(childComplexity int, user string) int
@@ -263,7 +264,7 @@ type MutationResolver interface {
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
 	ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error)
 	RequestWalletNonce(ctx context.Context, address string) (string, error)
-	LoginWithWallet(ctx context.Context, address string, signature string, message string) (*auth.AuthResponse, error)
+	LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error)
 	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
@@ -279,6 +280,7 @@ type QueryResolver interface {
 	AuthHealth(ctx context.Context) (string, error)
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
 	AuthConfig(ctx context.Context) (*model.AuthConfig, error)
+	CheckSession(ctx context.Context, token string) (*auth.AuthResponse, error)
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
@@ -757,7 +759,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.LoginWithWallet(childComplexity, args["address"].(string), args["signature"].(string), args["message"].(string)), true
+		return e.complexity.Mutation.LoginWithWallet(childComplexity, args["address"].(string), args["signature"].(string), args["message"].(string), args["nonce"].(string)), true
 
 	case "Mutation.requestOTP":
 		if e.complexity.Mutation.RequestOtp == nil {
@@ -1003,6 +1005,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ChainInfo(childComplexity), true
+
+	case "Query.checkSession":
+		if e.complexity.Query.CheckSession == nil {
+			break
+		}
+
+		args, err := ec.field_Query_checkSession_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.CheckSession(childComplexity, args["token"].(string)), true
 
 	case "Query.contractDryRun":
 		if e.complexity.Query.ContractDryRun == nil {
@@ -2082,6 +2096,11 @@ func (ec *executionContext) field_Mutation_loginWithWallet_args(ctx context.Cont
 		return nil, err
 	}
 	args["message"] = arg2
+	arg3, err := ec.field_Mutation_loginWithWallet_argsNonce(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["nonce"] = arg3
 	return args, nil
 }
 func (ec *executionContext) field_Mutation_loginWithWallet_argsAddress(
@@ -2131,6 +2150,24 @@ func (ec *executionContext) field_Mutation_loginWithWallet_argsMessage(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
 	if tmp, ok := rawArgs["message"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_loginWithWallet_argsNonce(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["nonce"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
+	if tmp, ok := rawArgs["nonce"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -3034,6 +3071,34 @@ func (ec *executionContext) field_Query___type_argsName(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
 	if tmp, ok := rawArgs["name"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_checkSession_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_checkSession_argsToken(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_checkSession_argsToken(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["token"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("token"))
+	if tmp, ok := rawArgs["token"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -6774,7 +6839,7 @@ func (ec *executionContext) _Mutation_loginWithWallet(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().LoginWithWallet(rctx, fc.Args["address"].(string), fc.Args["signature"].(string), fc.Args["message"].(string))
+		return ec.resolvers.Mutation().LoginWithWallet(rctx, fc.Args["address"].(string), fc.Args["signature"].(string), fc.Args["message"].(string), fc.Args["nonce"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7953,6 +8018,73 @@ func (ec *executionContext) fieldContext_Query_authConfig(_ context.Context, fie
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AuthConfig", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_checkSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_checkSession(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().CheckSession(rctx, fc.Args["token"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*auth.AuthResponse)
+	fc.Result = res
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_checkSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AuthResponse_success(ctx, field)
+			case "userInfo":
+				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
+			case "token":
+				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "address":
+				return ec.fieldContext_AuthResponse_address(ctx, field)
+			case "error":
+				return ec.fieldContext_AuthResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_checkSession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -13429,6 +13561,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_authConfig(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "checkSession":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_checkSession(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 

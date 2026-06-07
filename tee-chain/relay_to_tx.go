@@ -38,19 +38,22 @@ func newRelayCache() *relayCache {
 
 // startRelayWorker 启动后台拉取 goroutine | Start background fetch goroutine
 func (app *TeeChain) startRelayWorker() {
-	util.LogWithGreen("RELAY-WORKER", "starting background fetcher (3s interval)")
-	app.relayCache = newRelayCache()
-	go func() {
-		ticker := time.NewTicker(3 * time.Second) // 每 3 秒拉取 | fetch every 3s
-		for range ticker.C {
-			app.fetchAndCacheRelayEvents()
-		}
-	}()
+	app.relayWorkerOnce.Do(func() {
+		util.LogWithGreen("RELAY-WORKER", "starting background fetcher (3s interval)")
+		app.relayCache = newRelayCache()
+		go func() {
+			ticker := time.NewTicker(3 * time.Second) // 每 3 秒拉取 | fetch every 3s
+			defer ticker.Stop()
+			for range ticker.C {
+				app.fetchAndCacheRelayEvents()
+			}
+		}()
+	})
 }
 
 // fetchAndCacheRelayEvents 拉取主链新事件 → 缓存到内存 | Fetch new main chain events → cache in memory
 func (app *TeeChain) fetchAndCacheRelayEvents() {
-	if app.relay == nil || app.dkg == nil {
+	if app.relay == nil || app.dkg == nil || app.dkg.Signer == nil {
 		util.LogWithGray("RELAY-WORKER", "fetch skipped: chains/relay/dkg not ready")
 		return
 	}
@@ -95,6 +98,8 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 			continue
 		}
 
+		app.relayCache.mu.Unlock()
+
 		util.LogWithCyan("RELAY-WORKER", "fetching events, chain", chainID, "from", start, "to", latest)
 		var newEvents []cachedEvent
 
@@ -102,7 +107,6 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		records, err := c.GetRelayEvents(start, latest)
 		if err != nil {
 			util.LogWithRed("RELAY-WORKER", "GetRelayEvents failed, chain", chainID, "err:", err)
-			app.relayCache.mu.Unlock()
 			continue
 		}
 
@@ -112,22 +116,25 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 			sysCall := relay.MakeRelaySysCall(ev)
 			txBytes, err := app.SignAndBuildRelayTx(sysCall)
 			if err != nil {
+				util.LogWithRed("RELAY-WORKER", "SignAndBuildRelayTx failed, chain", chainID, "nonce", n, "err:", err)
 				continue
 			}
 			newEvents = append(newEvents, cachedEvent{ev: ev, cachedAt: time.Now(), txBytes: txBytes})
 		}
 
 		// 追加到缓存 (保持 nonce 递增顺序) | append to cache (maintaining nonce order)
-		app.relayCache.events[chainID] = append(cached, newEvents...)
+		app.relayCache.mu.Lock()
+		app.relayCache.events[chainID] = append(app.relayCache.events[chainID], newEvents...)
+		totalCached := len(app.relayCache.events[chainID])
 		app.relayCache.mu.Unlock()
 		if len(newEvents) > 0 {
-			util.LogOk("RELAY-WORKER", "cached", len(newEvents), "new events, chain", chainID, "total cached", len(app.relayCache.events[chainID]))
+			util.LogOk("RELAY-WORKER", "cached", len(newEvents), "new events, chain", chainID, "total cached", totalCached)
 		}
 	}
 
 	// 如果缓存中存在成熟事件且本节点是上一个出块者，提交空交易触发共识
-	if app.lastProposerWasMe && app.hasMatureRelayEvents() {
-		go app.submitEmptyTx()
+	if app.lastProposerWasMe.Load() && app.hasMatureRelayEvents() {
+		app.submitActiveTx()
 	}
 }
 
@@ -159,7 +166,7 @@ func (app *TeeChain) hasMatureRelayEvents() bool {
 }
 
 // relayMinCacheAge 事件最少缓存时间 (确保其他验证者也拿到了) | Minimum cache age (ensure other validators also fetched)
-const relayMinCacheAge = 2 * time.Second
+const relayMinCacheAge = 3 * time.Second
 
 // prepareRelayTxs 按 nonce 顺序取 >= 2s 成熟事件 (PrepareProposal 调用) | Take mature events ≥2s in nonce order (called by PrepareProposal)
 func (app *TeeChain) prepareRelayTxs() [][]byte {
@@ -197,11 +204,17 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 	return txs
 }
 
-// submitEmptyTx 提交一个空交易（SysCall_Empty）到 mempool，用于在 CreateEmptyBlocks=false 时触发共识
-func (app *TeeChain) submitEmptyTx() {
+// submitEmptyTx 提交一个交易（SysCall_Empty）到 mempool，用于在 CreateEmptyBlocks=false 时触发共识
+func (app *TeeChain) submitActiveTx() {
 	if app.NodePriv == nil {
 		return
 	}
+
+	if app.TargetSync() {
+		return
+	}
+
+	// 如果没有任何需求,以空块开启下一个区块
 	call := &model.SysCall{Payload: &model.SysCall_Empty{Empty: time.Now().Unix()}}
 	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
 	tx, err := signTx(call, signer)
