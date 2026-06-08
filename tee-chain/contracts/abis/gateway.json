@@ -1095,33 +1095,6 @@
         "args": [
           {
             "docs": [],
-            "label": "end",
-            "type": {
-              "displayName": [
-                "u64"
-              ],
-              "type": 3
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "update_withdraw_pointer",
-        "mutates": true,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "ink",
-            "MessageResult"
-          ],
-          "type": 11
-        },
-        "selector": "0x8b2db8ad"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
             "label": "user",
             "type": {
               "displayName": [

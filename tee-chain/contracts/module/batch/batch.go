@@ -12,11 +12,13 @@ import (
 type Batch struct {
 	api store.ContractApi
 
-	status *store.StoreMapping[uint64, uint16]
+	hubcalls *store.IndexedList[uint64, HubCallIndex]
+	status   *store.StoreMapping[uint64, uint16]
 }
 
 type BatchQuery struct{ Batch }
 type BatchMutation struct{ Batch }
+type BatchSecret struct{ Batch }
 
 // Init 初始化占位。
 func (b BatchMutation) Init() error { return nil }
@@ -45,4 +47,48 @@ func (b BatchMutation) ExecuteBatch(calls []BatchCall) error {
 
 func (b BatchQuery) Status(index uint64) (string, error) {
 	return "ok", nil
+}
+
+func (b BatchSecret) PackCall(hubtype uint8, chainID uint32, id uint64) error {
+	_, err := b.hubcalls.Insert(b.api.GetTxn(), HubCallIndex{
+		CallType: hubtype,
+		ChainID:  chainID,
+		CallID:   id,
+		Status:   HubCallPending,
+	})
+
+	return err
+}
+
+func (b BatchQuery) PackCallToSunc() (uint32, []HubCallIndex, error) {
+	txn := b.api.GetTxn()
+	ids, err := b.hubcalls.Query(txn, store.QueryCond{Field: "Status", Val: uint64(HubCallPending)})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if len(ids) == 0 {
+		return 0, nil, nil
+	}
+
+	last, err := b.hubcalls.Get(txn, ids[0])
+	if err != nil {
+		return 0, nil, err
+	}
+
+	ids, err = b.hubcalls.Query(txn, store.QueryAND{
+		store.QueryCond{Field: "Status", Val: uint64(HubCallPending)},
+		store.QueryCond{Field: "ChainID", Val: uint64(last.ChainID)},
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	calls := make([]HubCallIndex, 0, len(ids))
+	for _, id := range ids {
+		call, _ := b.hubcalls.Get(txn, id)
+		calls = append(calls, *call)
+	}
+
+	return last.ChainID, calls, nil
 }

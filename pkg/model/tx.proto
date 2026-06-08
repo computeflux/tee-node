@@ -25,10 +25,8 @@ message SysCall{
     int64 empty = 99;
     EpochEnd epoch_end = 1;
     int64 epoch_start = 2;
-    HubCall hub_call = 3;
     SyncTxStart sync_tx_start = 4;
     SyncTxEnd sync_tx_end = 5;
-    SyncTxRetry sync_tx_retry = 6;
     ContractCall contract = 7;
     RelaySync relay_sync = 8;
     RuntimeUpgrade runtime_upgrade = 9;
@@ -74,20 +72,6 @@ message Bridge {
   bytes payload = 2;
 }
 
-// Hub Call
-message HubCall {
-  repeated TeeCall call = 2;
-}
-
-// withdraw to chain
-message WithdrawApply{
-    bytes user = 2;
-    uint32 user_type = 3;
-    bytes contract = 4;
-	uint64 credit = 5;
-	uint64 Nonce = 6;
-}
-
 // DKG message
 message DkgMessage {
   string from = 1;
@@ -99,18 +83,14 @@ message DkgMessage {
 }
 
 message SyncTxStart {
-  int64 tx_index = 1;
   uint32 chain_id = 2;
+  repeated uint64 ids = 3;
 }
 
 message SyncTxEnd {
-  int64 tx_index = 1;
   uint32 chain_id = 2;
-}
-
-message SyncTxRetry {
-  int64 tx_index = 1;
-  uint32 chain_id = 2;
+  repeated uint64 ids = 3;
+  bool isSeccseed = 4;
 }
 
 // block partial sign
@@ -150,7 +130,6 @@ message TeeCall{
     bytes text = 8;
     UploadSecret upload_secret = 9;
     InitDisk init_disk = 10;
-    WithdrawApply withdraw_apply = 11;
   }
 }
 

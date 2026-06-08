@@ -5,12 +5,11 @@ import (
 	"os"
 
 	"github.com/computeflux/tee-provider/config"
-	"github.com/computeflux/tee-provider/pkg/chains/evm"
 	"github.com/computeflux/tee-provider/pkg/chains/revive"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/wetee-dao/ink.go"
 )
 
@@ -24,7 +23,7 @@ type ChainApi interface {
 	ChainType() string
 	ChainId() uint32
 	GetCipher() crypto.SuiteType
-	TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error)
+	TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*chaintypes.ChainCall, error)
 
 	// Relay 同步 (替代旧的 SyncRecharge/SyncWithdraw/Events)
 	// 主链合约 emit 事件 → relayer 拉取 → 侧链 relay engine 验证执行
@@ -93,8 +92,8 @@ func ConnectChain(env string, pk *crypto.PrivKey) {
 // connectMainChain creates a MainChainApi for the given config.
 func connectMainChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (MainChainApi, error) {
 	switch config.ChainType {
-	case "evm":
-		return evm.NewContract(config, pk)
+	// case "evm":
+	// 	return evm.NewContract(config, pk)
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:
@@ -116,8 +115,8 @@ func GetChainByID(chainId uint32) (ChainApi, error) {
 // connectChain creates a ChainApi for the given config.
 func connectChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (ChainApi, error) {
 	switch config.ChainType {
-	case "evm":
-		return evm.NewContract(config, pk)
+	// case "evm":
+	// 	return evm.NewContract(config, pk)
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:

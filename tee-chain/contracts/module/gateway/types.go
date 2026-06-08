@@ -201,9 +201,9 @@ type ProviderSettlementRecord struct {
 type WithdrawStatus uint8
 
 const (
-	WithdrawPending   WithdrawStatus = 0
-	WithdrawCancelled WithdrawStatus = 1
-	WithdrawDone      WithdrawStatus = 2
+	WithdrawPending   uint8 = 0
+	WithdrawCancelled uint8 = 1
+	WithdrawDone      uint8 = 2
 )
 
 // scale-codec-gen:generate
@@ -213,5 +213,5 @@ type WithdrawApply struct {
 	User     store.UniAddr
 	Credit   store.U256
 	Nonce    uint64
-	Status   WithdrawStatus
+	Status   uint8
 }

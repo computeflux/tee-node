@@ -36,9 +36,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 		case *model.SysCall_EpochEnd:
 		case *model.SysCall_SyncTxStart:
 		case *model.SysCall_SyncTxEnd:
-		case *model.SysCall_SyncTxRetry:
 		case *model.SysCall_Empty:
-		case *model.SysCall_HubCall:
 		case *model.SysCall_Contract:
 			caller := txbox.GetCaller()
 			callerType := txbox.GetCallerType()

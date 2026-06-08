@@ -8,7 +8,6 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/store"
@@ -16,8 +15,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/pkg/errors"
 )
 
@@ -284,26 +282,11 @@ func HubSyncEnd(i int64, chainId uint32, txn *store.Txn) error {
 var lastRun = time.Now().Unix()
 
 // 判断是否需要提交 tee-chain => main-chain 的交易
-func (app *TeeChain) TargetSyncFromRelay() bool {
-	if time.Now().Unix()-lastRun < 20 {
-		fmt.Println(time.Now().Unix() - lastRun)
-		return false
-	}
-
-	lastRun = time.Now().Unix()
-	if IsHubSyncRuning() {
-		fmt.Println("------------------------------------", "HubSyncRuning")
-		return false
-	}
-
-	if app.dkg == nil || app.dkg.SystemPubKey() == nil {
-		fmt.Println("------------------------------------", "DKG nil")
-		return false
-	}
-
+func (app *TeeChain) targetSync() bool {
 	height := app.state.Height
 	txn := dbstore.DBINS.NewTransaction()
 	defer txn.Rollback()
+
 	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, chaintypes.UniAddr{
 		T: 0,
 		V: []byte{},
@@ -311,64 +294,10 @@ func (app *TeeChain) TargetSyncFromRelay() bool {
 		V: app.dkg.SystemPubKey().Byte(),
 	}, module.NativeVersion)
 
-	ins := gateway.NewGateway(runtime)
-	list, _ := gateway.GatewayQuery{Gateway: *ins}.WithdrawTodo()
-	if len(list) == 0 {
+	ins := batch.NewBatch(runtime)
+	chainId, ids, _ := batch.BatchQuery{Batch: *ins}.PackCallToSunc()
+	if len(ids) == 0 {
 		fmt.Println("------------------------------------", "list 0")
-		return false
-	}
-
-	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
-	ts := make([]*model.TeeCall, len(list))
-	for i, l := range list {
-		ts[i] = &model.TeeCall{
-			ChainId: l.ChainID,
-			Tx: &model.TeeCall_WithdrawApply{
-				WithdrawApply: &model.WithdrawApply{
-					User:     l.User.V,
-					UserType: l.User.T,
-					Contract: l.Contract,
-					Credit:   l.Credit.Int.Uint64(),
-					Nonce:    l.Nonce,
-				},
-			},
-		}
-	}
-
-	// 提交交易到排队
-	wtx, err := signTx(&model.SysCall{
-		Payload: &model.SysCall_HubCall{HubCall: &model.HubCall{Call: ts}},
-	}, signer)
-
-	if err != nil {
-		util.LogWithRed("RELAY-WORKER", "sign tx failed:", err)
-		return false
-	}
-
-	if err := SubmitTx(wtx); err != nil {
-		util.LogWithRed("RELAY-WORKER", "submit tx failed:", err)
-		return false
-	}
-
-	// 更新处理指针
-	end := list[len(list)-1].Nonce
-	endbt, _ := cstore.ScaleEncode(end)
-	tx, err := signTx(&model.SysCall{
-		Payload: &model.SysCall_Contract{
-			Contract: &model.ContractCall{
-				Name:   []byte("gateway"),
-				Method: cstore.MethodToSelectorBytes("UpdateWithdrawPointer"),
-				Args:   [][]byte{endbt},
-			},
-		},
-	}, signer)
-	if err != nil {
-		util.LogWithRed("RELAY-WORKER", "sign gateway tx failed:", err)
-		return false
-	}
-
-	if err := SubmitTx(tx); err != nil {
-		util.LogWithRed("RELAY-WORKER", "submit gateway tx failed:", err)
 		return false
 	}
 

@@ -211,7 +211,7 @@ func (app *TeeChain) submitActiveTx() {
 	}
 
 	// 如果有 tee chain -> main chain, 优先执行
-	if app.TargetSyncFromRelay() {
+	if app.targetSyncFromRelay() {
 		return
 	}
 
@@ -223,6 +223,7 @@ func (app *TeeChain) submitActiveTx() {
 		util.LogWithRed("RELAY-WORKER", "submit empty tx failed:", err)
 		return
 	}
+
 	if err := SubmitTx(tx); err != nil {
 		util.LogWithRed("RELAY-WORKER", "submit empty tx failed:", err)
 		return

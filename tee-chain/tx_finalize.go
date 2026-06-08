@@ -111,20 +111,21 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				util.LogWithRed("SyncTxRetry", "sendPartialSign error:", err)
 				break
 			}
-		case *model.SysCall_HubCall: // add hub call
-			if p.HubCall == nil {
-				return nil, errors.New("HubCall payload is nil")
-			}
-			err := app.finalizeHubCall(p.HubCall, txn)
-			if err != nil {
-				return nil, err
-			}
+		// case *model.SysCall_HubCall: // add hub call
+		// 	if p.HubCall == nil {
+		// 		return nil, errors.New("HubCall payload is nil")
+		// 	}
 
-			// Group hubCalls by chainId (extracted from the first TeeCall).
-			if len(p.HubCall.Call) > 0 {
-				cid := p.HubCall.Call[0].ChainId
-				chainHubCalls[cid] = append(chainHubCalls[cid], p.HubCall)
-			}
+		// 	err := app.finalizeHubCall(p.HubCall, txn)
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+
+		// 	// Group hubCalls by chainId (extracted from the first TeeCall).
+		// 	if len(p.HubCall.Call) > 0 {
+		// 		cid := p.HubCall.Call[0].ChainId
+		// 		chainHubCalls[cid] = append(chainHubCalls[cid], p.HubCall)
+		// 	}
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {

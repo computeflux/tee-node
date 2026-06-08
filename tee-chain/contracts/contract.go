@@ -6,9 +6,13 @@ package contracts
 
 import (
 	"sync"
+	"time"
 
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/wasm"
 )
@@ -63,4 +67,14 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 		return SetContractInited(runtime.GetTxn(), string(call.GetName()))
 	}
 	return err
+}
+
+func QueryWithdrawApply(id uint64) (*gateway.WithdrawApply, error) {
+	txn := dbstore.DBINS.NewTransaction()
+	defer txn.Rollback()
+	runtime := NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion)
+
+	ins := gateway.NewGateway(runtime)
+	query := gateway.GatewayQuery{Gateway: *ins}
+	return query.Withdraw(id)
 }

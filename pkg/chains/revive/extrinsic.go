@@ -3,13 +3,13 @@ package revive
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/contracts"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/vedhavyas/go-subkey/v2"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
@@ -48,7 +48,7 @@ func (c *Contract) BatchCall(callMethod string, calls []chaintypes.ChainCall) (*
 }
 
 // TEECallToCall converts a TEE attestation into a chain call payload.
-func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error) {
+func (c *Contract) TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*chaintypes.ChainCall, error) {
 	pub, err := types.NewAccountID(dkgKey)
 	if err != nil {
 		return nil, err
@@ -56,13 +56,18 @@ func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintyp
 
 	var runtimeCall *types.Call
 
-	switch call := tcall.Tx.(type) {
-	case *model.TeeCall_WithdrawApply:
-		if call.WithdrawApply.GetContract() == nil {
+	switch tcall.CallType {
+	case 0:
+		withdrawApply, err := contracts.QueryWithdrawApply(tcall.CallID)
+		if err != nil {
+			return nil, err
+		}
+
+		if withdrawApply.Contract != nil {
 			runtimeCall, err = c.token.CallOfWithdraw(
-				types.H160(call.WithdrawApply.User),
-				types.NewU256(*big.NewInt(0).SetUint64(call.WithdrawApply.Credit)),
-				call.WithdrawApply.Nonce,
+				types.H160(withdrawApply.User.V),
+				types.NewU256(*withdrawApply.Credit.Int),
+				withdrawApply.Nonce,
 				chain.DryRunParams{
 					Origin: *pub,
 				},
@@ -72,10 +77,10 @@ func (c *Contract) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintyp
 			}
 		} else {
 			runtimeCall, err = c.token.CallOfWithdrawErc20(
-				types.H160(call.WithdrawApply.Contract),
-				types.H160(call.WithdrawApply.User),
-				types.NewU256(*big.NewInt(0).SetUint64(call.WithdrawApply.Credit)),
-				call.WithdrawApply.Nonce,
+				types.H160(withdrawApply.Contract),
+				types.H160(withdrawApply.User.V),
+				types.NewU256(*withdrawApply.Credit.Int),
+				withdrawApply.Nonce,
 				chain.DryRunParams{
 					Origin: *pub,
 				},

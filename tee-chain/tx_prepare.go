@@ -65,7 +65,7 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 
 		// 同 caller 只保留第一笔，对所有交易类型生效
 		// Dedup by caller for all tx types
-		if len(txbox.GetCaller()) > 0 {
+		if txbox.GetCallerType() > 0 {
 			callerKey := string(txbox.GetCaller())
 			if seenCallers[callerKey] {
 				util.LogWithGray("PrepareTx", "Skip duplicate tx, caller:", fmt.Sprintf("%x", txbox.GetCaller()))
@@ -85,18 +85,6 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 			*finaltx = append(*finaltx, txbt)
 		case *model.SysCall_SyncTxEnd:
 			*finaltx = append(*finaltx, txbt)
-		case *model.SysCall_SyncTxRetry:
-			*finaltx = append(*finaltx, txbt)
-		case *model.SysCall_HubCall:
-			if addMainChainTx {
-				hubCall := tx.GetHubCall()
-				if hubCall == nil {
-					util.LogWithGray("PrepareTx", "Skip nil HubCall")
-					continue
-				}
-				hubCalls = append(hubCalls, hubCall)
-				hubtx = append(hubtx, txbt)
-			}
 		case *model.SysCall_Contract:
 			contractNonce := tx.GetContract().GetNonce()
 			currentNonce, err := TxnGetCurrentCallerNonce(txn, txbox.GetCaller(), txbox.GetCallerType())
@@ -127,40 +115,12 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 	}
 
 	if s.dkg == nil {
-		util.LogWithRed("PrepareTx", "dkg is nil, cannot prepare hub sync txs")
+		util.LogWithRed("PrepareTx", "Skip hubcall dkg is nil, cannot prepare hub sync txs")
 		return
 	}
 
 	if s.dkg.AvailableNodeLen() < s.dkg.Threshold+1 {
-		util.LogWithRed("PrepareTx", "expect validator node:", s.dkg.Threshold+1, ", got:", s.dkg.AvailableNodeLen())
+		util.LogWithRed("PrepareTx", "Skip hubcall expect validator node:", s.dkg.Threshold+1, ", got:", s.dkg.AvailableNodeLen())
 		return
-	}
-
-	// Group by chainId
-	chainGroups := make(map[uint32]struct {
-		calls []*model.HubCall
-		txs   [][]byte
-	})
-
-	for i, hc := range hubCalls {
-		if len(hc.Call) == 0 {
-			continue
-		}
-		cid := hc.Call[0].ChainId
-		g := chainGroups[cid]
-		g.calls = append(g.calls, hc)
-		g.txs = append(g.txs, hubtx[i])
-		chainGroups[cid] = g
-	}
-
-	for cid, group := range chainGroups {
-		tx, err := HubSyncStep1(s, cid)
-		if err != nil {
-			util.LogWithRed("PrepareTx", "TryTxStart err for chainId", cid, ":", err)
-			continue
-		}
-
-		*finaltx = append(*finaltx, tx)
-		*finaltx = append(*finaltx, group.txs...)
 	}
 }

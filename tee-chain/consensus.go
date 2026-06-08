@@ -164,8 +164,6 @@ func (app *TeeChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abci
 }
 
 func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
-	LogWithTime("🎁 PrepareProposal")
-
 	finalProposal := make([][]byte, 0, len(req.Txs)+32)
 
 	// ── Relay: 出块节点拉取主链事件, 预置到区块头部 ──────
@@ -200,6 +198,7 @@ func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepare
 		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, false)
 	}
 
+	LogWithTime("🎁 PrepareProposal " + fmt.Sprint(len(finalProposal)) + " txs")
 	return &abci.ResponsePrepareProposal{Txs: finalProposal}, nil
 }
 

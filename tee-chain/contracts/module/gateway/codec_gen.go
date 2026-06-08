@@ -866,7 +866,7 @@ func (v *WithdrawApply) Decode(data []byte) (int, error) {
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading Status")
 	}
-	v.Status = WithdrawStatus(data[off])
+	v.Status = uint8(data[off])
 	off++
 	return off, nil
 }

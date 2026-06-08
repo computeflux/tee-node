@@ -57,8 +57,9 @@ func (q BatchQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 
 func NewBatch(api store.ContractApi) *Batch {
 	return &Batch{
-		api:    api,
-		status: &store.StoreMapping[uint64, uint16]{Namespace: "batch", KeyPrefix: "statu_"},
+		api:      api,
+		hubcalls: store.NewIndexedList[uint64, HubCallIndex]("batch", "hubcall_next_id", "hubcall_"),
+		status:   &store.StoreMapping[uint64, uint16]{Namespace: "batch", KeyPrefix: "statu_"},
 	}
 }
 

@@ -35,7 +35,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			contract := p.Contract
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
-			if txNonce != expectedNonce && txbox.CallerType != 0 {
+			if txNonce != expectedNonce {
 				util.LogWithYellow("CHECK TX", "invalid nonce: expected %d, got %d (caller %s, type %d)\n",
 					expectedNonce, txNonce, hex.EncodeToString(txbox.GetCaller()), txbox.GetCallerType())
 				return CodeInvalidNode
@@ -63,6 +63,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			// Allow the tx to pass pre-check; final validation happens in FinalizeTx.
 			return CodeTypeOK
 		}
+
 		keys, err := chains.MainChain.GetValidatorList()
 		if err != nil {
 			fmt.Println("invalid node: get validator list error", err)

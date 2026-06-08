@@ -3,6 +3,7 @@
 package batch
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
@@ -60,5 +61,41 @@ func (v *BatchCall) Decode(data []byte) (int, error) {
 			off += int(ln)
 		}
 	}
+	return off, nil
+}
+
+// Encode SCALE 编码 HubCallIndex。
+func (v *HubCallIndex) Encode() ([]byte, error) {
+	var buf []byte
+	buf = append(buf, byte(v.CallType))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CallID))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
+	buf = append(buf, byte(v.Status))
+	return buf, nil
+}
+
+// Decode SCALE 解码 HubCallIndex。
+func (v *HubCallIndex) Decode(data []byte) (int, error) {
+	off := 0
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading CallType")
+	}
+	v.CallType = uint8(data[off])
+	off++
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CallID")
+	}
+	v.CallID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ChainID")
+	}
+	v.ChainID = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading Status")
+	}
+	v.Status = uint8(data[off])
+	off++
 	return off, nil
 }
