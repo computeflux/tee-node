@@ -42,7 +42,7 @@ func (app *TeeChain) startRelayWorker() {
 		util.LogWithGreen("RELAY-WORKER", "starting background fetcher (3s interval)")
 		app.relayCache = newRelayCache()
 		go func() {
-			ticker := time.NewTicker(3 * time.Second) // 每 3 秒拉取 | fetch every 3s
+			ticker := time.NewTicker(10 * time.Second) // 每 3 秒拉取 | fetch every 3s
 			defer ticker.Stop()
 			for range ticker.C {
 				app.fetchAndCacheRelayEvents()
@@ -112,7 +112,7 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 
 		for i, rec := range records {
 			n := start + uint64(i)
-			ev := relay.BuildSyncEvent(chainID, n, 0, rec.TargetContract, rec.EventType, rec.EventData)
+			ev := relay.BuildSyncEvent(chainID, n, uint64(app.state.Height), rec.TargetContract, rec.EventType, rec.EventData)
 			sysCall := relay.MakeRelaySysCall(ev)
 			txBytes, err := app.SignAndBuildRelayTx(sysCall)
 			if err != nil {
@@ -210,7 +210,8 @@ func (app *TeeChain) submitActiveTx() {
 		return
 	}
 
-	if app.TargetSync() {
+	// 如果有 tee chain -> main chain, 优先执行
+	if app.TargetSyncFromRelay() {
 		return
 	}
 

@@ -5,7 +5,6 @@ package gov
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -80,15 +79,15 @@ func (v *Curve) Encode() ([]byte, error) {
 	var buf []byte
 	buf = store.EncodeCompact(buf, uint64(len(v.Type)))
 	buf = append(buf, v.Type...)
-	buf = binary.LittleEndian.AppendUint32(buf, v.LinearBegin)
-	buf = binary.LittleEndian.AppendUint32(buf, v.LinearEnd)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.LinearBegin))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.LinearEnd))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.LinearLength))
-	buf = binary.LittleEndian.AppendUint32(buf, v.StepBegin)
-	buf = binary.LittleEndian.AppendUint32(buf, v.StepEnd)
-	buf = binary.LittleEndian.AppendUint32(buf, v.StepSize)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.StepBegin))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.StepEnd))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.StepSize))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.StepPeriod))
-	buf = binary.LittleEndian.AppendUint32(buf, v.ReciprocalFactor)
-	buf = binary.LittleEndian.AppendUint32(buf, v.ReciprocalXScale)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ReciprocalFactor))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ReciprocalXScale))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ReciprocalXOffset))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ReciprocalYOffset))
 	return buf, nil
@@ -223,7 +222,7 @@ func (v *Proposal) Encode() ([]byte, error) {
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.LittleEndian.AppendUint32(buf, v.TrackID)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.TrackID))
 	buf = binary.LittleEndian.AppendUint32(buf, v.Caller.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.Caller.V)))
 	buf = append(buf, v.Caller.V...)
@@ -429,7 +428,7 @@ func (v *ProposalResult) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ProposalStatus。
 func (v *ProposalStatus) Encode() ([]byte, error) {
 	var buf []byte
-	buf = append(buf, v.State)
+	buf = append(buf, byte(v.State))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Block))
 	return buf, nil
 }
@@ -440,7 +439,7 @@ func (v *ProposalStatus) Decode(data []byte) (int, error) {
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading State")
 	}
-	v.State = data[off]
+	v.State = uint8(data[off])
 	off++
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading Block")
@@ -453,9 +452,9 @@ func (v *ProposalStatus) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ProposalStatusQuery。
 func (v *ProposalStatusQuery) Encode() ([]byte, error) {
 	var buf []byte
-	buf = append(buf, v.State)
+	buf = append(buf, byte(v.State))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.BlockHeight))
-	buf = binary.LittleEndian.AppendUint32(buf, v.ConfirmedNumber)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ConfirmedNumber))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.LastConfirmedBlock))
 	return buf, nil
 }
@@ -466,7 +465,7 @@ func (v *ProposalStatusQuery) Decode(data []byte) (int, error) {
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading State")
 	}
-	v.State = data[off]
+	v.State = uint8(data[off])
 	off++
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading BlockHeight")
@@ -489,7 +488,7 @@ func (v *ProposalStatusQuery) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ProposalWithID。
 func (v *ProposalWithID) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ID))
 	{
 		b, err := v.Proposal.Encode()
 		if err != nil {
@@ -521,7 +520,7 @@ func (v *ProposalWithID) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 Spend。
 func (v *Spend) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ID))
 	buf = binary.LittleEndian.AppendUint32(buf, v.Caller.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.Caller.V)))
 	buf = append(buf, v.Caller.V...)
@@ -535,7 +534,7 @@ func (v *Spend) Encode() ([]byte, error) {
 		}
 		buf = append(buf, b...)
 	}
-	buf = binary.LittleEndian.AppendUint32(buf, v.TrackID)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.TrackID))
 	if v.Payout {
 		buf = append(buf, 1)
 	} else {
@@ -607,11 +606,11 @@ func (v *TrackData) Encode() ([]byte, error) {
 	var buf []byte
 	buf = store.EncodeCompact(buf, uint64(len(v.Name)))
 	buf = append(buf, v.Name...)
-	buf = binary.LittleEndian.AppendUint32(buf, v.PreparePeriod)
-	buf = binary.LittleEndian.AppendUint32(buf, v.MaxDeciding)
-	buf = binary.LittleEndian.AppendUint32(buf, v.ConfirmPeriod)
-	buf = binary.LittleEndian.AppendUint32(buf, v.DecisionPeriod)
-	buf = binary.LittleEndian.AppendUint32(buf, v.MinEnactmentPeriod)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.PreparePeriod))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.MaxDeciding))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ConfirmPeriod))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.DecisionPeriod))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.MinEnactmentPeriod))
 	{
 		b, err := v.DecisionDeposit.Encode()
 		if err != nil {
@@ -714,7 +713,7 @@ func (v *TrackData) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 TrackWithID。
 func (v *TrackWithID) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ID))
 	{
 		b, err := v.Track.Encode()
 		if err != nil {
@@ -746,8 +745,8 @@ func (v *TrackWithID) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 Vote。
 func (v *Vote) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.Index)
-	buf = binary.LittleEndian.AppendUint32(buf, v.ProposalID)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.Index))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ProposalID))
 	buf = binary.LittleEndian.AppendUint32(buf, v.Caller.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.Caller.V)))
 	buf = append(buf, v.Caller.V...)
@@ -842,8 +841,8 @@ func (v *Vote) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 VoteRef。
 func (v *VoteRef) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.ProposalID)
-	buf = binary.LittleEndian.AppendUint32(buf, v.VoteIndex)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ProposalID))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.VoteIndex))
 	return buf, nil
 }
 

@@ -182,7 +182,7 @@ sleep 2
 if systemctl is-active --quiet tee-node0.service; then
     echo "Service started successfully."
     echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
-    journalctl -u tee-node0.service -f
+    journalctl -u tee-node0.service -f -o cat
 else
     echo "ERROR: service failed to start. Check status:"
     systemctl status tee-node0.service

@@ -17,12 +17,14 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/pkg/errors"
 )
 
 // SyncToHub submits the aggregated threshold signature to a specific main-chain.
 // The call and hubCalls are now isolated per chain under tx_index_<id>_<chainId>.
 func (s *TeeChain) SyncToHub(txIndex int64, chainId uint32, sigs [][]byte) error {
+	fmt.Println("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 	if s.dkg == nil {
 		return errors.New("SyncToHub: dkg is nil")
 	}
@@ -114,12 +116,14 @@ func markChainDone(txIndex int64, chainId uint32, txn *store.Txn) error {
 	if done != nil {
 		list = *done
 	}
+
 	// Avoid duplicates
 	for _, cid := range list {
 		if cid == chainId {
 			return nil
 		}
 	}
+
 	list = append(list, chainId)
 	return store.TxnSetJson(txn, key, &list)
 }
@@ -277,15 +281,23 @@ func HubSyncEnd(i int64, chainId uint32, txn *store.Txn) error {
 	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)), tx)
 }
 
+var lastRun = time.Now().Unix()
+
 // 判断是否需要提交 tee-chain => main-chain 的交易
-func (app *TeeChain) TargetSync() bool {
+func (app *TeeChain) TargetSyncFromRelay() bool {
+	if time.Now().Unix()-lastRun < 20 {
+		fmt.Println(time.Now().Unix() - lastRun)
+		return false
+	}
+
+	lastRun = time.Now().Unix()
 	if IsHubSyncRuning() {
+		fmt.Println("------------------------------------", "HubSyncRuning")
 		return false
 	}
+
 	if app.dkg == nil || app.dkg.SystemPubKey() == nil {
-		return false
-	}
-	if app.NodePriv == nil {
+		fmt.Println("------------------------------------", "DKG nil")
 		return false
 	}
 
@@ -300,16 +312,13 @@ func (app *TeeChain) TargetSync() bool {
 	}, module.NativeVersion)
 
 	ins := gateway.NewGateway(runtime)
-	if ins == nil {
-		return false
-	}
 	list, _ := gateway.GatewayQuery{Gateway: *ins}.WithdrawTodo()
 	if len(list) == 0 {
+		fmt.Println("------------------------------------", "list 0")
 		return false
 	}
 
 	signer := app.NodePriv.ToSigner(teecrypto.SuiteEd25519)
-
 	ts := make([]*model.TeeCall, len(list))
 	for i, l := range list {
 		ts[i] = &model.TeeCall{
@@ -326,12 +335,9 @@ func (app *TeeChain) TargetSync() bool {
 		}
 	}
 
-	tx, err := signTx(&model.SysCall{
-		Payload: &model.SysCall_HubCall{
-			HubCall: &model.HubCall{
-				Call: ts,
-			},
-		},
+	// 提交交易到排队
+	wtx, err := signTx(&model.SysCall{
+		Payload: &model.SysCall_HubCall{HubCall: &model.HubCall{Call: ts}},
 	}, signer)
 
 	if err != nil {
@@ -339,8 +345,30 @@ func (app *TeeChain) TargetSync() bool {
 		return false
 	}
 
-	if err := SubmitTx(tx); err != nil {
+	if err := SubmitTx(wtx); err != nil {
 		util.LogWithRed("RELAY-WORKER", "submit tx failed:", err)
+		return false
+	}
+
+	// 更新处理指针
+	end := list[len(list)-1].Nonce
+	endbt, _ := cstore.ScaleEncode(end)
+	tx, err := signTx(&model.SysCall{
+		Payload: &model.SysCall_Contract{
+			Contract: &model.ContractCall{
+				Name:   []byte("gateway"),
+				Method: cstore.MethodToSelectorBytes("UpdateWithdrawPointer"),
+				Args:   [][]byte{endbt},
+			},
+		},
+	}, signer)
+	if err != nil {
+		util.LogWithRed("RELAY-WORKER", "sign gateway tx failed:", err)
+		return false
+	}
+
+	if err := SubmitTx(tx); err != nil {
+		util.LogWithRed("RELAY-WORKER", "submit gateway tx failed:", err)
 		return false
 	}
 

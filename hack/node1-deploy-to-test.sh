@@ -133,7 +133,7 @@ start_and_tail_logs() {
     echo "========================================="
     echo "  实时日志输出（按 Ctrl+C 退出日志追踪，服务不会停止）"
     echo "========================================="
-    remote_exec "sudo journalctl -u $SERVICE_NAME -f --no-hostname --since '1 minute ago'"
+    remote_exec "sudo journalctl -u $SERVICE_NAME -f  -o cat --no-hostname --since '1 minute ago'"
 }
 
 # -------------------------------------------------
@@ -151,7 +151,7 @@ case "$CMD" in
 
     logs)
         echo "[remote] Tailing logs for $SERVICE_NAME ..."
-        remote_exec "sudo journalctl -u $SERVICE_NAME -f --no-hostname --since '1 minute ago'"
+        remote_exec "sudo journalctl -u $SERVICE_NAME -f  -o cat --no-hostname --since '1 minute ago'"
         ;;
 
     status)

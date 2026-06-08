@@ -5,7 +5,6 @@ package auth
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -18,7 +17,7 @@ func (v *AuthConfig) Encode() ([]byte, error) {
 	buf = append(buf, v.SeedSecret...)
 	buf = store.EncodeCompact(buf, uint64(len(v.SMTPHost)))
 	buf = append(buf, v.SMTPHost...)
-	buf = binary.LittleEndian.AppendUint32(buf, v.SMTPPort)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.SMTPPort))
 	buf = store.EncodeCompact(buf, uint64(len(v.SMTPUser)))
 	buf = append(buf, v.SMTPUser...)
 	buf = store.EncodeCompact(buf, uint64(len(v.SMTPPassword)))
@@ -32,8 +31,8 @@ func (v *AuthConfig) Encode() ([]byte, error) {
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.LittleEndian.AppendUint32(buf, v.OTPLength)
-	buf = binary.LittleEndian.AppendUint32(buf, v.OTPTTLMins)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.OTPLength))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.OTPTTLMins))
 	buf = store.EncodeCompact(buf, uint64(len(v.GoogleClientID)))
 	buf = append(buf, v.GoogleClientID...)
 	buf = store.EncodeCompact(buf, uint64(len(v.GoogleClientSecret)))
@@ -303,7 +302,7 @@ func (v *RecoveryConfig) Encode() ([]byte, error) {
 		buf = store.EncodeCompact(buf, uint64(len(item)))
 		buf = append(buf, item...)
 	}
-	buf = binary.LittleEndian.AppendUint32(buf, v.Threshold)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.Threshold))
 	buf = store.EncodeCompact(buf, uint64(len(v.RecoveryEmail)))
 	buf = append(buf, v.RecoveryEmail...)
 	return buf, nil
@@ -357,7 +356,7 @@ func (v *RecoveryRequest) Encode() ([]byte, error) {
 		buf = store.EncodeCompact(buf, uint64(len(item)))
 		buf = append(buf, item...)
 	}
-	buf = binary.LittleEndian.AppendUint64(buf, v.ExpiresAt)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ExpiresAt))
 	return buf, nil
 }
 
@@ -416,7 +415,7 @@ func (v *UserInfo) Encode() ([]byte, error) {
 	buf = append(buf, v.ShareRoot...)
 	buf = store.EncodeCompact(buf, uint64(len(v.DerivedAddress)))
 	buf = append(buf, v.DerivedAddress...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.RegisteredAt)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.RegisteredAt))
 	return buf, nil
 }
 

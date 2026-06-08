@@ -197,3 +197,21 @@ type ProviderSettlementRecord struct {
 	Count       uint16        `json:"count"`
 	Time        int64         `json:"time"`
 }
+
+type WithdrawStatus uint8
+
+const (
+	WithdrawPending   WithdrawStatus = 0
+	WithdrawCancelled WithdrawStatus = 1
+	WithdrawDone      WithdrawStatus = 2
+)
+
+// scale-codec-gen:generate
+type WithdrawApply struct {
+	ChainID  uint32
+	Contract []byte
+	User     store.UniAddr
+	Credit   store.U256
+	Nonce    uint64
+	Status   WithdrawStatus
+}

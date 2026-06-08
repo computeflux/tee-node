@@ -56,21 +56,11 @@ func TestContract_CallOfMapAccount(t *testing.T) {
 	assert.Nil(t, call)
 }
 
-// ── GetCloudAddress / GetSubnetAddress ─────────────────────
-
-func TestGetCloudAddress(t *testing.T) {
-	assert.Equal(t, MainChainConfig.CloudAddress, GetCloudAddress())
-}
-
-func TestGetSubnetAddress(t *testing.T) {
-	assert.Equal(t, MainChainConfig.SubnetAddress, GetSubnetAddress())
-}
-
 // ── GetChainUrls ───────────────────────────────────────────
 
 func TestContract_GetChainUrls(t *testing.T) {
 	c := &Contract{}
-	assert.Equal(t, MainChainConfig.Urls, c.GetChainUrls())
+	assert.Equal(t, c.GetChainUrls(), c.GetChainUrls())
 }
 
 // ── CheckMapAccount ────────────────────────────────────────

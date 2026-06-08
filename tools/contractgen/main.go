@@ -237,8 +237,9 @@ func main() {
 	if !*abiSkip {
 		// 收集错误变量定义
 		errVariants := collectErrorVariants(pkg)
-		// 收集结构体类型定义
-		structTypes := collectStructTypes(pkg, fset)
+		// 收集结构体类型定义（同时扫描 store 包以获取跨包引用的类型）
+		storeDir := filepath.Join(abs, "..", "..", "store")
+		structTypes := collectStructTypes(pkg, fset, storeDir)
 		if err := writeABI(abiOutPath, pkgName, mutMethods, qMethods, errVariants, structTypes); err != nil {
 			fmt.Fprintf(os.Stderr, "contractgen abi: %v\n", err)
 			os.Exit(1)
@@ -372,9 +373,29 @@ func collectErrorVariants(pkg *ast.Package) []errorVariant {
 	return variants
 }
 
-// collectStructTypes 从合约包中收集结构体类型定义和类型别名
-func collectStructTypes(pkg *ast.Package, fset *token.FileSet) map[string]structType {
+// collectStructTypes 从合约包中收集结构体类型定义和类型别名。
+// extraDirs 为额外的包目录，用于收集跨包引用的类型（如 store.WithdrawApply）。
+func collectStructTypes(pkg *ast.Package, fset *token.FileSet, extraDirs ...string) map[string]structType {
 	structs := make(map[string]structType)
+
+	// 扫描合约包本身
+	collectTypesFromPackage(pkg, fset, structs)
+
+	// 扫描额外的包目录
+	for _, dir := range extraDirs {
+		extraPkgs, err := parser.ParseDir(fset, dir, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+		for _, ep := range extraPkgs {
+			collectTypesFromPackage(ep, fset, structs)
+		}
+	}
+
+	return structs
+}
+
+func collectTypesFromPackage(pkg *ast.Package, fset *token.FileSet, structs map[string]structType) {
 
 	for _, f := range pkg.Files {
 		for _, decl := range f.Decls {
@@ -421,8 +442,6 @@ func collectStructTypes(pkg *ast.Package, fset *token.FileSet) map[string]struct
 			}
 		}
 	}
-
-	return structs
 }
 
 // collectType 从类型字符串中收集基础类型

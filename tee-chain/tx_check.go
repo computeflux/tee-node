@@ -2,6 +2,7 @@ package teechain
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
@@ -34,9 +35,9 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			contract := p.Contract
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
-			if txNonce != expectedNonce {
-				util.LogWithYellow("CHECK TX", "invalid nonce: expected %d, got %d (caller %x, type %d)\n",
-					expectedNonce, txNonce, txbox.GetCaller(), txbox.GetCallerType())
+			if txNonce != expectedNonce && txbox.CallerType != 0 {
+				util.LogWithYellow("CHECK TX", "invalid nonce: expected %d, got %d (caller %s, type %d)\n",
+					expectedNonce, txNonce, hex.EncodeToString(txbox.GetCaller()), txbox.GetCallerType())
 				return CodeInvalidNode
 			}
 

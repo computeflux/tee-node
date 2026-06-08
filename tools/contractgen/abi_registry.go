@@ -411,6 +411,13 @@ func (r *inkRegistry) ensureNamedType(goType string) (int, error) {
 		// 有结构体定义，生成包含字段的 composite 类型
 		return r.ensureStructType(st)
 	}
+	// 尝试短名称（如 "store.WithdrawApply" -> "WithdrawApply"）
+	if idx := strings.LastIndex(goType, "."); idx >= 0 {
+		shortName := goType[idx+1:]
+		if st, ok := r.structTypes[shortName]; ok {
+			return r.ensureStructType(st)
+		}
+	}
 
 	// 对于未知的命名类型，创建一个简单的 composite 类型
 	id := r.appendType(map[string]any{

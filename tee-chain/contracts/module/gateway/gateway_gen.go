@@ -318,6 +318,24 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("update_withdraw_pointer: end: %w", err)
 		}
 		return m.UpdateWithdrawPointer(end)
+	case [4]byte{0xc0, 0x5f, 0xd1, 0x80}:
+		if err := store.RequireArgLen(args, 1, "withdrawal_cancelled"); err != nil {
+			return err
+		}
+		nonce, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("withdrawal_cancelled: nonce: %w", err)
+		}
+		return m.WithdrawalCancelled(nonce)
+	case [4]byte{0xc8, 0xce, 0x27, 0x9e}:
+		if err := store.RequireArgLen(args, 1, "withdrawal_done"); err != nil {
+			return err
+		}
+		nonce, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("withdrawal_done: nonce: %w", err)
+		}
+		return m.WithdrawalDone(nonce)
 	default:
 		return fmt.Errorf("gateway: unknown method %q", methodSel)
 	}
@@ -696,6 +714,27 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0x85, 0x86, 0x1b, 0x7d}:
+		if err := store.RequireArgLen(args, 3, "withdrawals_by_user"); err != nil {
+			return nil, err
+		}
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("withdrawals_by_user: user: %w", err)
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("withdrawals_by_user: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("withdrawals_by_user: limit: %w", err)
+		}
+		out, err := q.WithdrawalsByUser(user, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	default:
 		return nil, fmt.Errorf("gateway: unknown query method %q", methodSel)
 	}
@@ -716,9 +755,10 @@ func NewGateway(api store.ContractApi) *Gateway {
 		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v9_user_settlement_history_k1_to_id_", "v9_user_settlement_history_k1_length_", "v9_user_settlement_history_k2_next_", "v9_user_settlement_history_store_"),
 		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_recharge_nonces_"},
 		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_settled_nonces_"},
-		withdrawNonces:        &store.StoreMapping[uint64, store.WithdrawApply]{Namespace: "gateway", KeyPrefix: "v9_withdraw_nonces_"},
-		nonce:                 &store.StoreValue[uint64]{Namespace: "gateway", Key: "v9_nonce"},
-		currNonce:             &store.StoreValue[uint64]{Namespace: "gateway", Key: "v9_curr_nonce"},
+		withdrawNonces:        &store.StoreMapping[uint64, WithdrawApply]{Namespace: "gateway", KeyPrefix: "v11_withdraw_nonces_"},
+		withdrawByUser:        store.NewStoreList2D[store.UniAddr, uint32, uint64]("gateway", "v11_withdraw_by_user_k1_to_id_", "v11_withdraw_by_user_k1_length_", "v11_withdraw_by_user_k2_next_", "v11_withdraw_by_user_store_"),
+		nonce:                 &store.StoreValue[uint64]{Namespace: "gateway", Key: "v11_nonce"},
+		currNonce:             &store.StoreValue[uint64]{Namespace: "gateway", Key: "v11_curr_nonce"},
 	}
 }
 
@@ -747,4 +787,5 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
 	[4]byte{0xd0, 0x75, 0xfb, 0x38}: "withdraw_todo",
+	[4]byte{0x85, 0x86, 0x1b, 0x7d}: "withdrawals_by_user",
 }

@@ -64,6 +64,37 @@ func processDir(dir string) {
 	}
 	var structs []structDef
 
+	// 先扫描所有类型别名，建立映射表
+	aliasMap := map[string]string{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") || strings.HasSuffix(e.Name(), "_gen.go") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+		if err != nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Type == nil {
+					continue
+				}
+				// 只记录非 struct 的类型定义（类型别名）
+				if _, isStruct := typeSpec.Type.(*ast.StructType); isStruct {
+					continue
+				}
+				aliasMap[typeSpec.Name.Name] = typeString(typeSpec.Type)
+			}
+		}
+	}
+
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") || strings.HasSuffix(e.Name(), "_gen.go") {
 			continue
@@ -98,7 +129,7 @@ func processDir(dir string) {
 				if name[0] < 'A' || name[0] > 'Z' {
 					continue
 				}
-				fields := collectFields(structType)
+				fields := collectFields(structType, aliasMap)
 				if len(fields) == 0 {
 					continue
 				}
@@ -176,13 +207,13 @@ func writeEncode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 	t := strings.Repeat("\t", indent)
 	switch f.Kind {
 	case kU8:
-		buf.WriteString(fmt.Sprintf("%sbuf = append(buf, %s)\n", t, acc))
+		buf.WriteString(fmt.Sprintf("%sbuf = append(buf, byte(%s))\n", t, acc))
 	case kU16:
-		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint16(buf, %s)\n", t, acc))
+		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint16(buf, uint16(%s))\n", t, acc))
 	case kU32:
-		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint32(buf, %s)\n", t, acc))
+		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint32(buf, uint32(%s))\n", t, acc))
 	case kU64:
-		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint64(buf, %s)\n", t, acc))
+		buf.WriteString(fmt.Sprintf("%sbuf = binary.LittleEndian.AppendUint64(buf, uint64(%s))\n", t, acc))
 	case kI8:
 		buf.WriteString(fmt.Sprintf("%sbuf = append(buf, uint8(%s))\n", t, acc))
 	case kI16:
@@ -239,7 +270,7 @@ func writeDecode(buf *bytes.Buffer, acc string, f fieldInfo, indent int) {
 	switch f.Kind {
 	case kU8:
 		buf.WriteString(fmt.Sprintf("%sif off >= len(data) { %s }\n", t, errf))
-		buf.WriteString(fmt.Sprintf("%s%s = data[off]; off++\n", t, acc))
+		buf.WriteString(fmt.Sprintf("%s%s = %s(data[off]); off++\n", t, acc, f.Type))
 	case kU16:
 		buf.WriteString(fmt.Sprintf("%sif off+2 > len(data) { %s }\n", t, errf))
 		buf.WriteString(fmt.Sprintf("%s%s = binary.LittleEndian.Uint16(data[off:]); off += 2\n", t, acc))
@@ -385,13 +416,13 @@ const (
 	kUnsupported
 )
 
-func collectFields(st *ast.StructType) []fieldInfo {
+func collectFields(st *ast.StructType, aliasMap map[string]string) []fieldInfo {
 	var fields []fieldInfo
 	for _, f := range st.Fields.List {
 		if len(f.Names) == 0 {
 			continue
 		}
-		fi := parseFieldType(f.Type)
+		fi := parseFieldType(f.Type, aliasMap)
 		for _, n := range f.Names {
 			fi.Name = n.Name
 			fields = append(fields, fi)
@@ -400,15 +431,15 @@ func collectFields(st *ast.StructType) []fieldInfo {
 	return fields
 }
 
-func parseFieldType(expr ast.Expr) fieldInfo {
+func parseFieldType(expr ast.Expr, aliasMap map[string]string) fieldInfo {
 	switch t := expr.(type) {
 	case *ast.Ident:
-		return identKind(t.Name)
+		return identKind(t.Name, aliasMap)
 	case *ast.SelectorExpr:
 		return selKind(typeString(t.X), t.Sel.Name, expr)
 	case *ast.ArrayType:
 		if t.Len == nil {
-			elem := parseFieldType(t.Elt)
+			elem := parseFieldType(t.Elt, aliasMap)
 			if elem.Kind == kU8 {
 				return fieldInfo{Type: "[]byte", Kind: kBytes}
 			}
@@ -417,7 +448,7 @@ func parseFieldType(expr ast.Expr) fieldInfo {
 			}
 			return fieldInfo{Type: typeString(expr), Kind: kSlice, Elem: &elem}
 		}
-		elem := parseFieldType(t.Elt)
+		elem := parseFieldType(t.Elt, aliasMap)
 		if bl, ok := t.Len.(*ast.BasicLit); ok {
 			n := 0
 			fmt.Sscanf(bl.Value, "%d", &n)
@@ -427,15 +458,15 @@ func parseFieldType(expr ast.Expr) fieldInfo {
 		}
 		return fieldInfo{Type: typeString(expr), Kind: kArr, Elem: &elem}
 	case *ast.StarExpr:
-		elem := parseFieldType(t.X)
+		elem := parseFieldType(t.X, aliasMap)
 		elem.Kind = kStruct
 		return elem
 	case *ast.IndexExpr:
-		fi := parseFieldType(t.X)
+		fi := parseFieldType(t.X, aliasMap)
 		fi.Type = typeString(expr)
 		if fi.Kind == kOption {
 			// extract the inner type from the Index
-			inner := parseFieldType(t.Index)
+			inner := parseFieldType(t.Index, aliasMap)
 			fi.Elem = &inner
 			return fi
 		}
@@ -446,8 +477,17 @@ func parseFieldType(expr ast.Expr) fieldInfo {
 	}
 }
 
-func identKind(name string) fieldInfo {
-	switch name {
+func identKind(name string, aliasMap map[string]string) fieldInfo {
+	// 先检查是否为类型别名，解析到基础类型（最多 10 层，防循环）
+	resolved := name
+	for i := 0; i < 10; i++ {
+		if underlying, ok := aliasMap[resolved]; ok {
+			resolved = underlying
+		} else {
+			break
+		}
+	}
+	switch resolved {
 	case "uint8", "byte":
 		return fieldInfo{Type: name, Kind: kU8}
 	case "uint16":

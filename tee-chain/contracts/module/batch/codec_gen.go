@@ -4,7 +4,6 @@ package batch
 
 import (
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 

@@ -5,26 +5,25 @@ package gateway
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // Encode SCALE 编码 APIKeyInfo。
 func (v *APIKeyInfo) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.OwnerKey)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.OwnerKey))
 	buf = binary.LittleEndian.AppendUint32(buf, v.Owner.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.Owner.V)))
 	buf = append(buf, v.Owner.V...)
 	buf = store.EncodeCompact(buf, uint64(len(v.KeyHash)))
 	buf = append(buf, v.KeyHash...)
-	buf = binary.LittleEndian.AppendUint32(buf, v.RateLimit)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.RateLimit))
 	if v.IsActive {
 		buf = append(buf, 1)
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.LittleEndian.AppendUint64(buf, v.CreatedAt)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CreatedAt))
 	return buf, nil
 }
 
@@ -85,13 +84,13 @@ func (v *DailyUsage) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
 	buf = append(buf, v.User.V...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ProviderID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ModelID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.Count)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenIn)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenOut)
-	buf = binary.LittleEndian.AppendUint64(buf, v.CachedToken)
-	buf = binary.LittleEndian.AppendUint64(buf, v.PointsUsed)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Count))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.PointsUsed))
 	return buf, nil
 }
 
@@ -159,13 +158,13 @@ func (v *ModelInfo) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.Owner.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.Owner.V)))
 	buf = append(buf, v.Owner.V...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ProviderID)
-	buf = append(buf, v.InputModalities)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ContextLength)
-	buf = binary.LittleEndian.AppendUint64(buf, v.InPrice)
-	buf = binary.LittleEndian.AppendUint64(buf, v.CachedPrice)
-	buf = binary.LittleEndian.AppendUint64(buf, v.OutPrice)
-	buf = binary.LittleEndian.AppendUint16(buf, v.ProviderType)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = append(buf, byte(v.InputModalities))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ContextLength))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.InPrice))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedPrice))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.OutPrice))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.ProviderType))
 	buf = store.EncodeCompact(buf, uint64(len(v.ModelID)))
 	buf = append(buf, v.ModelID...)
 	buf = store.EncodeCompact(buf, uint64(len(v.URI)))
@@ -180,7 +179,7 @@ func (v *ModelInfo) Encode() ([]byte, error) {
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.LittleEndian.AppendUint64(buf, v.CreatedAt)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CreatedAt))
 	return buf, nil
 }
 
@@ -219,7 +218,7 @@ func (v *ModelInfo) Decode(data []byte) (int, error) {
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading InputModalities")
 	}
-	v.InputModalities = data[off]
+	v.InputModalities = uint8(data[off])
 	off++
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading ContextLength")
@@ -296,7 +295,7 @@ func (v *ModelInfo) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ModelInfoWithID。
 func (v *ModelInfoWithID) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ID))
 	{
 		b, err := v.Data.Encode()
 		if err != nil {
@@ -328,7 +327,7 @@ func (v *ModelInfoWithID) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ModelInfoWithProvider。
 func (v *ModelInfoWithProvider) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ID))
 	{
 		b, err := v.Model.Encode()
 		if err != nil {
@@ -385,22 +384,22 @@ func (v *ProviderInfo) Encode() ([]byte, error) {
 	buf = append(buf, v.Description...)
 	buf = store.EncodeCompact(buf, uint64(len(v.ModelIds)))
 	for i := range v.ModelIds {
-		buf = binary.LittleEndian.AppendUint64(buf, v.ModelIds[i])
+		buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelIds[i]))
 	}
-	buf = append(buf, v.Region)
-	buf = binary.LittleEndian.AppendUint64(buf, v.Deposit)
-	buf = binary.LittleEndian.AppendUint32(buf, v.FeeRate)
-	buf = binary.LittleEndian.AppendUint32(buf, v.Priority)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TotalRequests)
-	buf = binary.LittleEndian.AppendUint32(buf, v.SuccessRate)
-	buf = binary.LittleEndian.AppendUint32(buf, v.AvgLatency)
-	buf = binary.LittleEndian.AppendUint32(buf, v.UptimeSLA)
+	buf = append(buf, byte(v.Region))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Deposit))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.FeeRate))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.Priority))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TotalRequests))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.SuccessRate))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.AvgLatency))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.UptimeSLA))
 	if v.IsActive {
 		buf = append(buf, 1)
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.LittleEndian.AppendUint64(buf, v.CreatedAt)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CreatedAt))
 	return buf, nil
 }
 
@@ -464,7 +463,7 @@ func (v *ProviderInfo) Decode(data []byte) (int, error) {
 	if off >= len(data) {
 		return 0, fmt.Errorf("EOF reading Region")
 	}
-	v.Region = data[off]
+	v.Region = uint8(data[off])
 	off++
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading Deposit")
@@ -517,7 +516,7 @@ func (v *ProviderInfo) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 ProviderInfoWithID。
 func (v *ProviderInfoWithID) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.ID)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ID))
 	{
 		b, err := v.Data.Encode()
 		if err != nil {
@@ -552,12 +551,12 @@ func (v *ProviderSettlementRecord) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
 	buf = append(buf, v.User.V...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ModelID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenIn)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenOut)
-	buf = binary.LittleEndian.AppendUint64(buf, v.CachedToken)
-	buf = binary.LittleEndian.AppendUint64(buf, v.Cost)
-	buf = binary.LittleEndian.AppendUint16(buf, v.Count)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Cost))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
 	return buf, nil
 }
@@ -624,7 +623,7 @@ func (v *RechargeRecord) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
 	buf = append(buf, v.User.V...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.Amount)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Amount))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
 	return buf, nil
 }
@@ -666,12 +665,12 @@ func (v *Settlement) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
 	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
 	buf = append(buf, v.User.V...)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ModelID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ProviderID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenIn)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenOut)
-	buf = binary.LittleEndian.AppendUint64(buf, v.CachedToken)
-	buf = binary.LittleEndian.AppendUint16(buf, v.Count)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
 	buf = store.EncodeCompact(buf, uint64(len(v.Nonce)))
 	buf = append(buf, v.Nonce...)
 	return buf, nil
@@ -741,13 +740,13 @@ func (v *Settlement) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 UserSettlementRecord。
 func (v *UserSettlementRecord) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint64(buf, v.ProviderID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.ModelID)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenIn)
-	buf = binary.LittleEndian.AppendUint64(buf, v.TokenOut)
-	buf = binary.LittleEndian.AppendUint64(buf, v.CachedToken)
-	buf = binary.LittleEndian.AppendUint64(buf, v.Cost)
-	buf = binary.LittleEndian.AppendUint16(buf, v.Count)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Cost))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
 	return buf, nil
 }
@@ -795,5 +794,79 @@ func (v *UserSettlementRecord) Decode(data []byte) (int, error) {
 	}
 	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
 	off += 8
+	return off, nil
+}
+
+// Encode SCALE 编码 WithdrawApply。
+func (v *WithdrawApply) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
+	buf = store.EncodeCompact(buf, uint64(len(v.Contract)))
+	buf = append(buf, v.Contract...)
+	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
+	buf = append(buf, v.User.V...)
+	{
+		b, err := v.Credit.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+	}
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Nonce))
+	buf = append(buf, byte(v.Status))
+	return buf, nil
+}
+
+// Decode SCALE 解码 WithdrawApply。
+func (v *WithdrawApply) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ChainID")
+	}
+	v.ChainID = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Contract")
+		}
+		v.Contract = make([]byte, n)
+		copy(v.Contract, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading User.T")
+	}
+	v.User.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading User.V")
+		}
+		v.User.V = make([]byte, n)
+		copy(v.User.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, err := v.Credit.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Nonce")
+	}
+	v.Nonce = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading Status")
+	}
+	v.Status = WithdrawStatus(data[off])
+	off++
 	return off, nil
 }

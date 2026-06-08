@@ -7,64 +7,6 @@ import (
 	"fmt"
 )
 
-// Encode SCALE 编码 WithdrawApply。
-func (v *WithdrawApply) Encode() ([]byte, error) {
-	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.ChainID)
-	buf = EncodeCompact(buf, uint64(len(v.Contract)))
-	buf = append(buf, v.Contract...)
-	{
-		b, err := v.User.Encode()
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, b...)
-	}
-	{
-		b, err := v.Credit.Encode()
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, b...)
-	}
-	return buf, nil
-}
-
-// Decode SCALE 解码 WithdrawApply。
-func (v *WithdrawApply) Decode(data []byte) (int, error) {
-	off := 0
-	if off+4 > len(data) {
-		return 0, fmt.Errorf("EOF reading ChainID")
-	}
-	v.ChainID = binary.LittleEndian.Uint32(data[off:])
-	off += 4
-	{
-		n, sz := DecodeCompact(data[off:])
-		off += sz
-		if off+int(n) > len(data) {
-			return 0, fmt.Errorf("EOF reading Contract")
-		}
-		v.Contract = make([]byte, n)
-		copy(v.Contract, data[off:off+int(n)])
-		off += int(n)
-	}
-	{
-		n, err := v.User.Decode(data[off:])
-		if err != nil {
-			return 0, err
-		}
-		off += n
-	}
-	{
-		n, err := v.Credit.Decode(data[off:])
-		if err != nil {
-			return 0, err
-		}
-		off += n
-	}
-	return off, nil
-}
-
 // Encode SCALE 编码 InContractCall。
 func (v *InContractCall) Encode() ([]byte, error) {
 	var buf []byte
@@ -124,7 +66,7 @@ func (v *InContractCall) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 UniAddr。
 func (v *UniAddr) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.T)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.T))
 	buf = EncodeCompact(buf, uint64(len(v.V)))
 	buf = append(buf, v.V...)
 	return buf, nil
@@ -148,5 +90,75 @@ func (v *UniAddr) Decode(data []byte) (int, error) {
 		copy(v.V, data[off:off+int(n)])
 		off += int(n)
 	}
+	return off, nil
+}
+
+// Encode SCALE 编码 WithdrawApply。
+func (v *WithdrawApply) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
+	buf = EncodeCompact(buf, uint64(len(v.Contract)))
+	buf = append(buf, v.Contract...)
+	{
+		b, err := v.User.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+	}
+	{
+		b, err := v.Credit.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+	}
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Nonce))
+	buf = append(buf, byte(v.Status))
+	return buf, nil
+}
+
+// Decode SCALE 解码 WithdrawApply。
+func (v *WithdrawApply) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ChainID")
+	}
+	v.ChainID = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Contract")
+		}
+		v.Contract = make([]byte, n)
+		copy(v.Contract, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, err := v.User.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
+	}
+	{
+		n, err := v.Credit.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Nonce")
+	}
+	v.Nonce = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading Status")
+	}
+	v.Status = WithdrawStatus(data[off])
+	off++
 	return off, nil
 }

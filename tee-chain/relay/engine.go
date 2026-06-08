@@ -172,9 +172,7 @@ func dispatch(ev SyncEvent, api store.ContractApi) error {
 	})
 
 	if err != nil {
-		util.LogWithRed(RELAY_KEY, fmt.Sprintf("dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
-	} else {
-		util.LogOk(RELAY_KEY, fmt.Sprintf("dispatch ok: %s.%s args=%d", string(ev.TargetContract), string(ev.EventType), len(ev.EventData)))
+		util.LogWithRed(RELAY_KEY, fmt.Sprintf("Relay dispatch failed: %s.%s err=%v", string(ev.TargetContract), string(ev.EventType), err))
 	}
 	return err
 }

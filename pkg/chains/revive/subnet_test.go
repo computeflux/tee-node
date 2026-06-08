@@ -3,24 +3,24 @@ package revive
 import (
 	"fmt"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
+	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/util"
 )
 
-func TestMain(m *testing.M) {
-	// 包内全局 MainChainConfig 为指针，未赋值时为 nil；集成测试需指向有效 RPC 与合约地址。
-	MainChainConfig = &config.TestChainConfig
-	os.Exit(m.Run())
+// testConfig 返回测试用的链配置。
+func testConfig() chaintypes.ChainConfigType {
+	return config.TestChainConfig
 }
 
 func TestQueryWorkers(t *testing.T) {
-	client, err := chain.InitClient(MainChainConfig.Urls, true)
+	cfg := testConfig()
+	client, err := chain.InitClient(cfg.Urls, true)
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +31,7 @@ func TestQueryWorkers(t *testing.T) {
 		panic(err)
 	}
 
-	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
+	subnetIns, err := subnet.InitSubnetContract(client, cfg.SubnetAddress)
 	if err != nil {
 		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)
@@ -46,7 +46,8 @@ func TestQueryWorkers(t *testing.T) {
 }
 
 func TestGetSecrets(t *testing.T) {
-	client, err := chain.InitClient(MainChainConfig.Urls, true)
+	cfg := testConfig()
+	client, err := chain.InitClient(cfg.Urls, true)
 	if err != nil {
 		panic(err)
 	}
@@ -57,7 +58,7 @@ func TestGetSecrets(t *testing.T) {
 		panic(err)
 	}
 
-	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
+	subnetIns, err := subnet.InitSubnetContract(client, cfg.SubnetAddress)
 	if err != nil {
 		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)
@@ -72,22 +73,18 @@ func TestGetSecrets(t *testing.T) {
 }
 
 func TestSetSubnetSolt(t *testing.T) {
-	client, err := chain.InitClient(MainChainConfig.Urls, true)
+	cfg := testConfig()
+	client, err := chain.InitClient(cfg.Urls, true)
 	if err != nil {
 		panic(err)
 	}
 
-	// pk, err := chain.Sr25519PairFromSecret("//Alice", 42)
-	// if err != nil {
-	// 	util.LogWithPurple("Sr25519PairFromSecret", err)
-	// 	panic(err)
-	// }
 	pk, err := chain.Sr25519PairFromSecret("0x43c0defe545b31e6f64ee9c17b35c6444a8c3527f0c68160203717c51367512d", uint16(42))
 	if err != nil {
 		panic(fmt.Sprintf("init signer: %v", err))
 	}
 
-	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
+	subnetIns, err := subnet.InitSubnetContract(client, cfg.SubnetAddress)
 	if err != nil {
 		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)
@@ -105,7 +102,8 @@ func TestSetSubnetSolt(t *testing.T) {
 }
 
 func TestQueryEpochInfo(t *testing.T) {
-	client, err := chain.InitClient(MainChainConfig.Urls, true)
+	cfg := testConfig()
+	client, err := chain.InitClient(cfg.Urls, true)
 	if err != nil {
 		panic(err)
 	}
@@ -116,7 +114,7 @@ func TestQueryEpochInfo(t *testing.T) {
 		panic(err)
 	}
 
-	subnetIns, err := subnet.InitSubnetContract(client, MainChainConfig.SubnetAddress)
+	subnetIns, err := subnet.InitSubnetContract(client, cfg.SubnetAddress)
 	if err != nil {
 		util.LogWithPurple("InitSubnetContract", err)
 		panic(err)

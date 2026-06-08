@@ -16,23 +16,13 @@ import (
 	"github.com/wetee-dao/ink.go/util"
 )
 
-var MainChainConfig *chaintypes.ChainConfigType
-
 // Contract
 type Contract struct {
 	*chain.ChainClient
-	chainId uint32
-	signer  chain.SignerType
-	subnet  *subnet.Subnet
-	token   *token.Token
-}
-
-func GetCloudAddress() string {
-	return MainChainConfig.CloudAddress
-}
-
-func GetSubnetAddress() string {
-	return MainChainConfig.SubnetAddress
+	config *chaintypes.ChainConfigType
+	signer chain.SignerType
+	subnet *subnet.Subnet
+	token  *token.Token
 }
 
 func NewContract(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (*Contract, error) {
@@ -85,6 +75,7 @@ func NewContract(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (*Contr
 	util.LogWithYellow("Main Chain", "block number", blockNumber)
 
 	return &Contract{
+		config:      config,
 		ChainClient: client,
 		signer:      p,
 		subnet:      subnet,
@@ -93,7 +84,7 @@ func NewContract(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (*Contr
 }
 
 func (c *Contract) GetChainUrls() []string {
-	return MainChainConfig.Urls
+	return c.config.Urls
 }
 
 func (c *Contract) GetClient() *chain.ChainClient {
@@ -110,7 +101,7 @@ func (c *Contract) ChainType() string {
 }
 
 func (c *Contract) ChainId() uint32 {
-	return c.chainId
+	return c.config.ChainID
 }
 
 // GetCipher returns the signing suite used by this chain.
