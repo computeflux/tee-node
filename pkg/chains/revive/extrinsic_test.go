@@ -8,7 +8,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 )
 
 // ── BatchCall ──────────────────────────────────────────────
@@ -25,10 +25,7 @@ func TestContract_BatchCall_ValidMethods(t *testing.T) {
 	for _, m := range validMethods {
 		t.Run(m, func(t *testing.T) {
 			c := &Contract{}
-			// ChainClient is nil, so types.NewCall will panic for valid methods.
-			// We only verify the validation logic passes for valid methods.
 			assert.NotPanics(t, func() {
-				// Wrap in recover because c.Meta will be accessed
 				defer func() {
 					_ = recover()
 				}()
@@ -42,7 +39,7 @@ func TestContract_BatchCall_ValidMethods(t *testing.T) {
 
 func TestContract_TEECallToCall(t *testing.T) {
 	c := &Contract{}
-	call, err := c.TEECallToCall(&model.TeeCall{}, nil)
+	call, err := c.TEECallToCall(&batch.HubCallIndex{}, nil)
 	assert.ErrorContains(t, err, "invalid tee call")
 	assert.Nil(t, call)
 }
@@ -67,7 +64,6 @@ func TestContract_GetChainUrls(t *testing.T) {
 
 func TestContract_CheckMapAccount_NoClient(t *testing.T) {
 	c := &Contract{}
-	// ChainClient is nil → Api() will panic
 	assert.NotPanics(t, func() {
 		defer func() { _ = recover() }()
 		_, _ = c.CheckMapAccount(crypto.PubKey{})

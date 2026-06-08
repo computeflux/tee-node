@@ -211,7 +211,7 @@ func (app *TeeChain) submitActiveTx() {
 	}
 
 	// 如果有 tee chain -> main chain, 优先执行
-	if app.targetSyncFromRelay() {
+	if app.targetSyncRelay() {
 		return
 	}
 

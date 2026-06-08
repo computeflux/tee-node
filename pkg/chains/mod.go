@@ -30,6 +30,7 @@ type ChainApi interface {
 	GetLatestNonce() (uint64, error)
 	GetRelayEvents(from, to uint64) ([]chaintypes.RelayEvent, error)
 
+	BatchCall(method string, calls []chaintypes.ChainCall) (*chaintypes.ChainCall, error)
 	PartialSign(signer ink.PartialSignerType, call chaintypes.ChainCall) ([]byte, error)
 	SignAndSubmit(signer ink.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error
 }
@@ -55,7 +56,6 @@ type MainChainApi interface {
 
 	// Extrinsic construction helpers.
 	TxCallOfSetNextEpoch(nodeId uint64, signer crypto.PubKey) (*chaintypes.ChainCall, error)
-	BatchCall(method string, calls []chaintypes.ChainCall) (*chaintypes.ChainCall, error)
 	CheckMapAccount(addr crypto.PubKey) (bool, error)
 	CallOfMapAccount(signer crypto.PubKey) (*chaintypes.ChainCall, error)
 }

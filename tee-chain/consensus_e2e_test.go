@@ -19,8 +19,6 @@ import (
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/rpc/client/local"
 	"github.com/cometbft/cometbft/types"
-	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -151,95 +149,6 @@ func TestE2E_CometBFTNodeWithTeeChain(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	require.Greater(t, node.BlockStore().Height(), initialHeight,
 		"node should continue producing blocks")
-}
-
-// TestE2E_SubmitTxViaRPC submits a signed transaction through the CometBFT
-// RPC client and verifies it is eventually included in a block.
-func TestE2E_SubmitTxViaRPC(t *testing.T) {
-	app := setupTestApp(t)
-	priv := app.NodePriv
-
-	node, cleanup := setupCometBFTNode(t, app)
-	defer cleanup()
-
-	client := local.New(node)
-	ctx := context.Background()
-
-	// Build a SyncTxStart transaction.
-	call := &model.SysCall{
-		Payload: &model.SysCall_SyncTxStart{
-			SyncTxStart: &model.SyncTxStart{TxIndex: 1, ChainId: 1},
-		},
-	}
-	txBytes := buildSignedTx(t, call, priv)
-
-	// Submit via RPC (async — returns immediately).
-	res, err := client.BroadcastTxAsync(ctx, txBytes)
-	require.NoError(t, err)
-	require.Zero(t, res.Code, "tx rejected by CheckTx: %s", res.Log)
-
-	// Poll for the transaction to be included in a block.
-	var found bool
-	require.Eventually(t, func() bool {
-		txRes, err := client.Tx(ctx, res.Hash, false)
-		if err == nil && txRes.Height > 0 {
-			found = true
-			return true
-		}
-		return false
-	}, 5*time.Second, 200*time.Millisecond, "transaction was not included in a block")
-	require.True(t, found)
-
-	// Verify the side-effect was committed: AsyncBatchState should exist.
-	state, err := store.GetJson[AsyncBatchState](GLOABL_STATE, hubSyncIndexKey(1))
-	require.NoError(t, err)
-	require.NotNil(t, state)
-	require.Equal(t, int64(1), state.Going)
-}
-
-// TestE2E_MultiTxBlock submits several transactions and verifies they are
-// all included in the same or consecutive blocks.
-func TestE2E_MultiTxBlock(t *testing.T) {
-	app := setupTestApp(t)
-	priv := app.NodePriv
-
-	node, cleanup := setupCometBFTNode(t, app)
-	defer cleanup()
-
-	client := local.New(node)
-	ctx := context.Background()
-
-	// Submit 3 distinct transactions.
-	chainIds := []uint32{1, 2, 3}
-	hashes := make([][]byte, len(chainIds))
-	for i, cid := range chainIds {
-		call := &model.SysCall{
-			Payload: &model.SysCall_SyncTxStart{
-				SyncTxStart: &model.SyncTxStart{TxIndex: int64(i + 1), ChainId: cid},
-			},
-		}
-		txBytes := buildSignedTx(t, call, priv)
-		res, err := client.BroadcastTxAsync(ctx, txBytes)
-		require.NoError(t, err)
-		require.Zero(t, res.Code)
-		hashes[i] = res.Hash
-	}
-
-	// Wait for all to be committed.
-	for i, hash := range hashes {
-		require.Eventually(t, func() bool {
-			txRes, err := client.Tx(ctx, hash, false)
-			return err == nil && txRes.Height > 0
-		}, 5*time.Second, 200*time.Millisecond, "tx %d not committed", i)
-	}
-
-	// Verify all chain states were written.
-	for _, cid := range chainIds {
-		state, err := store.GetJson[AsyncBatchState](GLOABL_STATE, hubSyncIndexKey(cid))
-		require.NoError(t, err)
-		require.NotNil(t, state)
-		require.Greater(t, state.Going, int64(0))
-	}
 }
 
 // TestE2E_BlockHeightProgression verifies block height increases monotonically

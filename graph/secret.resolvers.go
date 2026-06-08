@@ -6,7 +6,6 @@ package graph
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -67,76 +66,17 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
 	}
 
-	tx := &model.SysCall{
-		Payload: &model.SysCall_HubCall{
-			HubCall: &model.HubCall{Call: []*model.TeeCall{&call}},
-		},
-	}
-
-	// send upload secret call to side chain
-	err = teeChain.SubmitCallFromNode(tx)
-	if err != nil {
-		return false, gqlerror.Errorf("SubmitTx error: %v", err)
-	}
-
-	return true, nil
+	// TODO: submit as ContractCall to gateway after method is added (SysCall_HubCall removed)
+	_ = call
+	return false, gqlerror.Errorf("UploadSecret: not yet implemented in new sync flow")
 }
 
 // InitDiskKey is the resolver for the init_disk_key field.
 func (r *mutationResolver) InitDiskKey(ctx context.Context, index string, user string) (bool, error) {
-	pubkey, err := crypto.PubKeyFromSS58(user)
-	if err != nil {
-		return false, gqlerror.Errorf("%s", "PubKeyFromSS58 error:"+err.Error())
-	}
-	pubAddr := pubkey.H160Address()
-
-	// parse index
-	indexNum, err := strconv.ParseUint(index, 10, 64)
-	if err != nil {
-		return false, gqlerror.Errorf("%s", "ParseUint error:"+err.Error())
-	}
-
-	// 创建一个 32 字节的切片
-	key := make([]byte, 32)
-	_, err = rand.Read(key)
-	if err != nil {
-		return false, gqlerror.Errorf("生成随机数据失败: %v", err)
-	}
-
-	// encrypt secret
-	encData, err := teeChain.Encrypt(key)
-	if err != nil {
-		return false, gqlerror.Errorf("%s", "EncryptSecret error:"+err.Error())
-	}
-
-	h := blake2b.Sum256(key)
-
-	// build side chain call
-	call := model.TeeCall{Tx: &model.TeeCall_InitDisk{InitDisk: &model.InitDisk{
-		User:  pubAddr[:],
-		Index: indexNum,
-		Data:  encData,
-		Hash:  h[:],
-		Time:  uint64(time.Now().Unix()),
-	}}}
-	err = teetypes.IssueReport(teeChain.GetDKG().Signer.ToSigner(crypto.SuiteEd25519), &call)
-	if err != nil {
-		return false, gqlerror.Errorf("%s", "GetReport error:"+err.Error())
-	}
-
-	tx := &model.SysCall{
-		Payload: &model.SysCall_HubCall{
-			HubCall: &model.HubCall{Call: []*model.TeeCall{&call}},
-		},
-	}
-
-	// send upload secret call to side chain
-	err = teeChain.SubmitCallFromNode(tx)
-	if err != nil {
-		return false, gqlerror.Errorf("%s", "SubmitTx error:"+err.Error())
-	}
-
-	return true, nil
+	// TODO: submit as ContractCall to gateway after method is added (SysCall_HubCall removed)
+	_ = index
+	_ = user
+	return false, gqlerror.Errorf("InitDiskKey: not yet implemented in new sync flow")
 }
 
 // TeeReport is the resolver for the tee_report field.

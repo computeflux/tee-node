@@ -116,6 +116,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get BTF node
 	node, err := nodeFunc()
 	if err != nil {
 		log.Fatalf("failed to create BFT node: %v", err)

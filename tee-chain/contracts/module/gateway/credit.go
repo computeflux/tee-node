@@ -52,6 +52,7 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, nonce []byt
 	if err := g.rechargeNonces.Set(g.api.GetTxn(), nonceHex, true); err != nil {
 		return fmt.Errorf("Recharge: store nonce failed: %w", err)
 	}
+
 	return nil
 }
 

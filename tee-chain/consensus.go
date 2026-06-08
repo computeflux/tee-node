@@ -182,9 +182,9 @@ func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepare
 		finalProposal = append(finalProposal, epochTx)
 	}
 
-	// 如果有未提交到主链的交易（同步进行中），只打包 mempool 中的 SyncTxRetry 等非 HubCall 交易，不打包新 HubCall
+	// 如果有未提交到主链的交易（同步进行中），只打包 mempool 中的 SyncTxEnd 等系统交易
 	if IsHubSyncRuning() {
-		util.LogWithYellow("PrepareProposal", "pending sync to main chain, only pack retry/non-hub txs")
+		util.LogWithYellow("PrepareProposal", "pending sync to main chain, only pack system txs")
 		app.PrepareTx(req.Txs, &finalProposal, req.Height, req.Time, false)
 		return &abci.ResponsePrepareProposal{Txs: finalProposal}, nil
 	}

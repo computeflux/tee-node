@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 20
+        "type": 25
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 21
+        "type": 26
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -77,7 +77,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 19
+          "type": 24
         },
         "selector": "0x4aa902da"
       },
@@ -96,6 +96,84 @@
           "type": 11
         },
         "selector": "0x53e39003"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "key",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "status",
+            "type": {
+              "displayName": [
+                "u8"
+              ],
+              "type": 0
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "set_hub_call_status",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x852f826b"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "hubcalls_get",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 19
+        },
+        "selector": "0xa75e612a"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "pack_call_to_sunc",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 22
+        },
+        "selector": "0xdac65073"
       },
       {
         "args": [
@@ -404,12 +482,29 @@
       "id": 18,
       "type": {
         "def": {
-          "sequence": {
-            "type": 0
+          "composite": {
+            "fields": [
+              {
+                "name": "CallType",
+                "type": 0
+              },
+              {
+                "name": "CallID",
+                "type": 3
+              },
+              {
+                "name": "ChainID",
+                "type": 2
+              },
+              {
+                "name": "Status",
+                "type": 0
+              }
+            ]
           }
         },
         "path": [
-          "string"
+          "HubCallIndex"
         ]
       }
     },
@@ -459,6 +554,144 @@
       "id": 20,
       "type": {
         "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "ChainID",
+                "type": 2
+              },
+              {
+                "name": "IDs",
+                "type": 21
+              }
+            ]
+          }
+        },
+        "path": [
+          "HubCallBatch"
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 3
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 20
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 20
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 0
+          }
+        },
+        "path": [
+          "string"
+        ]
+      }
+    },
+    {
+      "id": 24,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 23
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 23
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": {
+        "def": {
           "primitive": "u128"
         },
         "path": [
@@ -467,7 +700,7 @@
       }
     },
     {
-      "id": 21,
+      "id": 26,
       "type": {
         "def": {
           "composite": {

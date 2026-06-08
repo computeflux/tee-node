@@ -36,3 +36,8 @@ type HubCallIndex struct {
 	ChainID  uint32 `json:"chainId" idx:"exact"`
 	Status   uint8  `json:"status" idx:"exact"`
 }
+
+type HubCallBatch struct {
+	ChainID uint32
+	IDs     []uint64
+}

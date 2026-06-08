@@ -699,8 +699,15 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
-	case [4]byte{0xd0, 0x75, 0xfb, 0x38}:
-		out, err := q.WithdrawTodo()
+	case [4]byte{0x8a, 0x76, 0x73, 0x40}:
+		if err := store.RequireArgLen(args, 1, "withdraw"); err != nil {
+			return nil, err
+		}
+		nonce, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("withdraw: nonce: %w", err)
+		}
+		out, err := q.Withdraw(nonce)
 		if err != nil {
 			return nil, err
 		}
@@ -775,6 +782,6 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
-	[4]byte{0xd0, 0x75, 0xfb, 0x38}: "withdraw_todo",
+	[4]byte{0x8a, 0x76, 0x73, 0x40}: "withdraw",
 	[4]byte{0x85, 0x86, 0x1b, 0x7d}: "withdrawals_by_user",
 }

@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 56
+        "type": 57
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 57
+        "type": 58
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -1087,9 +1087,35 @@
           "displayName": [
             "Result"
           ],
-          "type": 55
+          "type": 56
         },
         "selector": "0x85861b7d"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "nonce",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "withdraw",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 54
+        },
+        "selector": "0x8a767340"
       },
       {
         "args": [
@@ -1551,21 +1577,6 @@
           "type": 34
         },
         "selector": "0xcd2ef88d"
-      },
-      {
-        "args": [],
-        "default": false,
-        "docs": [],
-        "label": "withdraw_todo",
-        "mutates": false,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "Result"
-          ],
-          "type": 55
-        },
-        "selector": "0xd075fb38"
       },
       {
         "args": [
@@ -3345,31 +3356,12 @@
       "id": 54,
       "type": {
         "def": {
-          "sequence": {
-            "type": 52
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 52
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 55,
-      "type": {
-        "def": {
           "variant": {
             "variants": [
               {
                 "fields": [
                   {
-                    "type": 54
+                    "type": 52
                   }
                 ],
                 "index": 0,
@@ -3390,7 +3382,7 @@
         "params": [
           {
             "name": "T",
-            "type": 54
+            "type": 52
           },
           {
             "name": "E",
@@ -3403,7 +3395,68 @@
       }
     },
     {
+      "id": 55,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 52
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 52
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
       "id": 56,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 55
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 55
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 57,
       "type": {
         "def": {
           "primitive": "u128"
@@ -3414,7 +3467,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 58,
       "type": {
         "def": {
           "composite": {

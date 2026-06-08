@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"slices"
 
+	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
@@ -61,17 +62,20 @@ func (g GatewayMutation) ApplyWithdraw(chainID uint32, token []byte, providerID 
 		return fmt.Errorf("ApplyWithdraw: store nonce failed: %w", err)
 	}
 
-	var tcall uint8 = 0
-	tcallBt, _ := store.ScaleEncode(tcall)
-	chainIdBt, _ := store.ScaleEncode(chainID)
-	nonceIdBt, _ := store.ScaleEncode(nonceId)
-	g.api.Call(g.api.GetCaller(), &store.InContractCall{
-		Name:   []byte("batch"),
-		Method: store.MethodToSelector("PackCall")[:],
-		Args:   [][]byte{tcallBt, chainIdBt, nonceIdBt},
-	})
+	// var tcall uint8 = 0
+	// tcallBt, _ := store.ScaleEncode(tcall)
+	// chainIdBt, _ := store.ScaleEncode(chainID)
+	// nonceIdBt, _ := store.ScaleEncode(nonceId)
+	// _, err = g.api.Call(g.api.GetCaller(), &store.InContractCall{
+	// 	Name:   []byte("batch"),
+	// 	Method: store.MethodToSelectorBytes("PackCall"),
+	// 	Args:   [][]byte{tcallBt, chainIdBt, nonceIdBt},
+	// })
+	ins := batch.NewBatch(g.api)
+	b := batch.BatchSecret{Batch: *ins}
+	b.PackCall(0, chainID, nonceId)
 
-	return nil
+	return err
 }
 
 // WithdrawalDone 标记提现已完成。args = [nonce]

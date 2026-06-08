@@ -12,11 +12,10 @@ import (
 )
 
 func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, blockTime time.Time, addMainChainTx bool) {
-	hubtx := make([][]byte, 0, 50)
-	hubCalls := make([]*model.HubCall, 0, 50)
+	txn := dbstore.DBINS.NewTransaction()
+	defer txn.Rollback()
 
 	// RuntimeUpgrade 独占整个区块：有升级交易时忽略其他所有交易
-	// RuntimeUpgrade takes the whole block: skip all other txs when upgrade is present
 	var runtimeUpgradeTx []byte
 	hasRuntimeUpgrade := false
 	for _, txbt := range txs {
@@ -41,15 +40,9 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 		return
 	}
 
-	// 使用临时 txn 累积 nonce 状态，确保同区块内多笔同 caller 合约交易的 nonce 连续
-	txn := dbstore.DBINS.NewTransaction()
-	defer txn.Rollback()
-
-	// 同一区块内每个 caller 只允许一笔交易（含合约和HubCall）
-	// Only one tx per caller per block (contract + HubCall)
+	// 同一区块内每个 caller 只允许一笔交易
 	seenCallers := make(map[string]bool)
 
-	// 第一步：收集所有交易，同 caller 只保留第一笔
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
 		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)
@@ -63,8 +56,7 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 			continue
 		}
 
-		// 同 caller 只保留第一笔，对所有交易类型生效
-		// Dedup by caller for all tx types
+		// 同 caller 只保留第一笔
 		if txbox.GetCallerType() > 0 {
 			callerKey := string(txbox.GetCaller())
 			if seenCallers[callerKey] {
@@ -107,20 +99,5 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 		default:
 			break
 		}
-	}
-
-	// 第二步：HubCall 同步到主链（按 chainId 分组，每组独立 SyncTxStart）
-	if len(hubtx) == 0 {
-		return
-	}
-
-	if s.dkg == nil {
-		util.LogWithRed("PrepareTx", "Skip hubcall dkg is nil, cannot prepare hub sync txs")
-		return
-	}
-
-	if s.dkg.AvailableNodeLen() < s.dkg.Threshold+1 {
-		util.LogWithRed("PrepareTx", "Skip hubcall expect validator node:", s.dkg.Threshold+1, ", got:", s.dkg.AvailableNodeLen())
-		return
 	}
 }

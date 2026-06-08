@@ -19,6 +19,7 @@ DIRS=(
     "./tee-chain/contracts/module/auth"
     "./tee-chain/contracts/module/gateway"
     "./tee-chain/contracts/module/batch"
+    "./pkg/chaintypes"
 )
 
 if [ $# -gt 0 ]; then

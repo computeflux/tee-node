@@ -83,7 +83,7 @@ func (e *Engine) ApplyRelayEvent(ev SyncEvent, api store.ContractApi) error {
 
 	// 先写 nonce 再执行, 防止同一事件重复打包 | write nonce first to prevent re-packaging
 	setLastNonce(txn, ev.ChainID, ev.Nonce)
-	util.LogWithCyan(RELAY_KEY, fmt.Sprintf("ApplyRelayEvent: chain=%d nonce=%d block=%d -> %s.%s", ev.ChainID, ev.Nonce, ev.BlockNum, string(ev.TargetContract), string(ev.EventType)))
+	util.LogWithCyan(RELAY_KEY, fmt.Sprintf("ApplyRelayEvent: chain=%d nonce=%d -> %s.%s", ev.ChainID, ev.Nonce, string(ev.TargetContract), string(ev.EventType)))
 
 	// 分发到目标合约 | dispatch to target contract
 	return dispatch(ev, api)

@@ -4,17 +4,9 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
-	"github.com/ethereum/go-ethereum/ethclient"
-	chain "github.com/wetee-dao/ink.go"
 )
 
 // ── ChainClient ───────────────────────────────────────────
-
-type ChainClient struct {
-	Substrate *chain.ChainClient
-	EVM       *ethclient.Client
-}
-
 type ChainConfigType struct {
 	ChainID       uint32
 	ChainType     string
@@ -33,11 +25,14 @@ type ChainConfigType struct {
 //
 //	Substrate: Data contains SCALE-encoded (CallIndex || Args).
 //	EVM:       Data contains ABI-encoded calldata.
+//
+// scale-codec-gen:generate
 type ChainCall struct {
 	EVM       EvmCall
 	Substrate types.Call
 }
 
+// scale-codec-gen:generate
 type EvmCall struct {
 	Method string
 	Data   []byte

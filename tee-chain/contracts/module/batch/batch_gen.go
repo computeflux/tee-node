@@ -27,6 +27,19 @@ func (d BatchMutation) ExecCall(call store.ContractCall) error {
 		return m.ExecuteBatch(calls)
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
+	case [4]byte{0x85, 0x2f, 0x82, 0x6b}:
+		if err := store.RequireArgLen(args, 2, "set_hub_call_status"); err != nil {
+			return err
+		}
+		key, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("set_hub_call_status: key: %w", err)
+		}
+		status, err := store.DecodeScaleArgBytes[uint8](args[1])
+		if err != nil {
+			return fmt.Errorf("set_hub_call_status: status: %w", err)
+		}
+		return m.SetHubCallStatus(key, status)
 	default:
 		return fmt.Errorf("batch: unknown method %q", methodSel)
 	}
@@ -37,6 +50,25 @@ func (q BatchQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 	args := call.GetArgs()
 	methodSel := [4]byte(call.GetMethod()[:4])
 	switch methodSel {
+	case [4]byte{0xa7, 0x5e, 0x61, 0x2a}:
+		if err := store.RequireArgLen(args, 1, "hubcalls_get"); err != nil {
+			return nil, err
+		}
+		id, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("hubcalls_get: id: %w", err)
+		}
+		out, err := q.HubcallsGet(id)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0xda, 0xc6, 0x50, 0x73}:
+		out, err := q.PackCallToSunc()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0x4a, 0xa9, 0x02, 0xda}:
 		if err := store.RequireArgLen(args, 1, "status"); err != nil {
 			return nil, err
@@ -64,5 +96,7 @@ func NewBatch(api store.ContractApi) *Batch {
 }
 
 var MethodMap = map[[4]byte]string{
+	[4]byte{0xa7, 0x5e, 0x61, 0x2a}: "hubcalls_get",
+	[4]byte{0xda, 0xc6, 0x50, 0x73}: "pack_call_to_sunc",
 	[4]byte{0x4a, 0xa9, 0x02, 0xda}: "status",
 }

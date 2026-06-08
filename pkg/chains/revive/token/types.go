@@ -213,7 +213,65 @@ type Tuple_27 struct { // Tuple
 	F2 types.U256
 	F3 types.U256
 }
+type WithdrawalStatus struct { // Enum
+	Pending   *bool // 0
+	Done      *bool // 1
+	Cancelled *bool // 2
+}
+
+func (ty WithdrawalStatus) Encode(encoder scale.Encoder) (err error) {
+	if ty.Pending != nil {
+		err = encoder.PushByte(0)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if ty.Done != nil {
+		err = encoder.PushByte(1)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if ty.Cancelled != nil {
+		err = encoder.PushByte(2)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("unrecognized enum")
+}
+
+func (ty *WithdrawalStatus) Decode(decoder scale.Decoder) (err error) {
+	variant, err := decoder.ReadOneByte()
+	if err != nil {
+		return err
+	}
+	switch variant {
+	case 0: // Base
+		t := true
+		ty.Pending = &t
+		return
+	case 1: // Base
+		t := true
+		ty.Done = &t
+		return
+	case 2: // Base
+		t := true
+		ty.Cancelled = &t
+		return
+	default:
+		return fmt.Errorf("unrecognized enum")
+	}
+}
+
 type PendingWithdrawal struct { // Composite
+	User   types.H160
 	Token  util.Option[types.H160]
 	Amount types.U256
+	Status WithdrawalStatus
 }

@@ -38,7 +38,7 @@ func Mutation(call store.ContractCall, runtime store.ContractApi) error {
 	return err
 }
 
-// nativeQuery 原生 Go 合约查询路由。
+// Query 原生 Go 合约查询路由。
 func Query(call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
 	switch string(call.GetName()) {
 	case "gov":

@@ -3,6 +3,7 @@ package revive
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
@@ -16,12 +17,13 @@ import (
 )
 
 func (e *Contract) PartialSign(signer chain.PartialSignerType, call chaintypes.ChainCall) ([]byte, error) {
+	util.LogWithPurple("PartialSign", "signer", subkey.SS58Encode(signer.Public(), 42))
 	return e.ChainClient.PartialSign(signer, call.Substrate)
 }
 
 // SignAndSubmit signs and submits a chain call.
 func (c *Contract) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error {
-	util.LogWithPurple("Revive SignAndSubmit", "signer", subkey.SS58Encode(signer.Public(), 42))
+	util.LogWithPurple("Submit SignAndSubmit", "signer", subkey.SS58Encode(signer.Public(), 42))
 	return c.ChainClient.SignAndSubmit(signer, call.Substrate, false, 0)
 }
 
@@ -69,7 +71,8 @@ func (c *Contract) TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*cha
 				types.NewU256(*withdrawApply.Credit.Int),
 				withdrawApply.Nonce,
 				chain.DryRunParams{
-					Origin: *pub,
+					Origin:    *pub,
+					PayAmount: types.NewU128(*big.NewInt(0)),
 				},
 			)
 			if err != nil {
@@ -82,7 +85,8 @@ func (c *Contract) TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*cha
 				types.NewU256(*withdrawApply.Credit.Int),
 				withdrawApply.Nonce,
 				chain.DryRunParams{
-					Origin: *pub,
+					Origin:    *pub,
+					PayAmount: types.NewU128(*big.NewInt(0)),
 				},
 			)
 			if err != nil {

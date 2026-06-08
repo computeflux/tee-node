@@ -24,8 +24,6 @@ type BatchSecret struct{ Batch }
 func (b BatchMutation) Init() error { return nil }
 
 // ExecuteBatch 按顺序执行一组合约调用。
-// 每个子调用复用当前 Batch 的 runtime（同一 txn / caller / height）。
-// 任一子调用失败立即返回错误，之前的状态变更随 txn 回滚。
 func (b BatchMutation) ExecuteBatch(calls []BatchCall) error {
 	for i, call := range calls {
 		if len(call.Name) == 0 {
@@ -34,14 +32,11 @@ func (b BatchMutation) ExecuteBatch(calls []BatchCall) error {
 		if len(call.Method) == 0 {
 			return fmt.Errorf("batch call %d: empty method selector", i)
 		}
-
-		// 使用 runtime.Call 复用同一 txn，保持原子性
 		_, err := b.api.Call(b.api.GetCaller(), call.ToContractCall())
 		if err != nil {
 			return fmt.Errorf("batch call %d (%s): %w", i, string(call.Name), err)
 		}
 	}
-
 	return nil
 }
 
@@ -49,6 +44,7 @@ func (b BatchQuery) Status(index uint64) (string, error) {
 	return "ok", nil
 }
 
+// PackCall 内部 secret 方法：将一笔 hub call 插入待同步队列。
 func (b BatchSecret) PackCall(hubtype uint8, chainID uint32, id uint64) error {
 	_, err := b.hubcalls.Insert(b.api.GetTxn(), HubCallIndex{
 		CallType: hubtype,
@@ -56,24 +52,39 @@ func (b BatchSecret) PackCall(hubtype uint8, chainID uint32, id uint64) error {
 		CallID:   id,
 		Status:   HubCallPending,
 	})
-
 	return err
 }
 
-func (b BatchQuery) PackCallToSunc() (uint32, []HubCallIndex, error) {
+// SetHubCallStatus 更新 hub call 状态。
+func (b BatchMutation) SetHubCallStatus(key uint64, status uint8) error {
+	return b.hubcalls.UpdateFn(b.api.GetTxn(), key, func(hc *HubCallIndex) {
+		hc.Status = status
+	})
+}
+
+// ── Query operations ──
+
+// HubcallsGet 根据 IndexedList 主键获取单个 HubCallIndex。
+func (b BatchQuery) HubcallsGet(id uint64) (*HubCallIndex, error) {
+	return b.hubcalls.Get(b.api.GetTxn(), id)
+}
+
+// PackCallToSunc 查询待同步的 hub call，按 chainId 分组返回第一批。
+// 返回值: chainId, IndexedList 主键列表, error
+func (b BatchQuery) PackCallToSunc() (*HubCallBatch, error) {
 	txn := b.api.GetTxn()
 	ids, err := b.hubcalls.Query(txn, store.QueryCond{Field: "Status", Val: uint64(HubCallPending)})
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
 	if len(ids) == 0 {
-		return 0, nil, nil
+		return nil, nil
 	}
 
 	last, err := b.hubcalls.Get(txn, ids[0])
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
 	ids, err = b.hubcalls.Query(txn, store.QueryAND{
@@ -81,14 +92,11 @@ func (b BatchQuery) PackCallToSunc() (uint32, []HubCallIndex, error) {
 		store.QueryCond{Field: "ChainID", Val: uint64(last.ChainID)},
 	})
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 
-	calls := make([]HubCallIndex, 0, len(ids))
-	for _, id := range ids {
-		call, _ := b.hubcalls.Get(txn, id)
-		calls = append(calls, *call)
-	}
-
-	return last.ChainID, calls, nil
+	return &HubCallBatch{
+		ChainID: last.ChainID,
+		IDs:     ids,
+	}, nil
 }

@@ -173,9 +173,3 @@ func (e *EvmChain) GetSignerAddress() string       { return e.signerAddr }
 func (c *EvmChain) ChainId() uint32 {
 	return c.chainId
 }
-
-func (e *EvmChain) GetClient() *chaintypes.ChainClient {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	return &chaintypes.ChainClient{EVM: e.client}
-}

@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,4 +77,9 @@ func TestSS58_HashConsistency(t *testing.T) {
 	h1 := ss58hash(data)
 	h2 := ss58hash(data)
 	assert.Equal(t, h1, h2)
+}
+
+func TestSS58ToH160(t *testing.T) {
+	pub, _ := PubKeyFromSS58("5DyxQhChcTfL7JmyJ9NMznNL5fx8zHG3xDeCkxGXaiKJYyAb")
+	fmt.Println(pub.H160Address().Hex())
 }
