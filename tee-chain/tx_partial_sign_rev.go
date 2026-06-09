@@ -57,9 +57,10 @@ func (s *TeeChain) handlePartialSign(msg *model.BlockPartialSign) error {
 
 	// Check if we have collected enough signatures
 	if len(sigs) < s.dkg.Threshold {
-		util.LogWithGray("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold+1)
+		util.LogWithGray("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold)
 		return nil
 	}
+	util.LogWithGreen("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold)
 
 	// Deduplication
 	key := fmt.Sprintf("%d_%d", msg.TxIndex, msg.ChainId)

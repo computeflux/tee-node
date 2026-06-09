@@ -62,15 +62,10 @@ func (g GatewayMutation) ApplyWithdraw(chainID uint32, token []byte, providerID 
 		return fmt.Errorf("ApplyWithdraw: store nonce failed: %w", err)
 	}
 
-	// var tcall uint8 = 0
-	// tcallBt, _ := store.ScaleEncode(tcall)
-	// chainIdBt, _ := store.ScaleEncode(chainID)
-	// nonceIdBt, _ := store.ScaleEncode(nonceId)
-	// _, err = g.api.Call(g.api.GetCaller(), &store.InContractCall{
-	// 	Name:   []byte("batch"),
-	// 	Method: store.MethodToSelectorBytes("PackCall"),
-	// 	Args:   [][]byte{tcallBt, chainIdBt, nonceIdBt},
-	// })
+	if _, err := g.withdrawByUser.Insert(txn, caller, nonceId); err != nil {
+		return fmt.Errorf("withdrawByUser: store failed: %w", err)
+	}
+
 	ins := batch.NewBatch(g.api)
 	b := batch.BatchSecret{Batch: *ins}
 	b.PackCall(0, chainID, nonceId)
@@ -83,8 +78,43 @@ func (g GatewayMutation) WithdrawalDone(nonce uint64) error {
 	return g.updateWithdrawStatus(nonce, WithdrawDone)
 }
 
-// WithdrawalCancelled 标记提现已取消。args = [nonce]
+// WithdrawalCancelled 标记提现已取消，并将扣除的 credits 加回 provider。args = [nonce]
 func (g GatewayMutation) WithdrawalCancelled(nonce uint64) error {
+	caller := g.api.GetCaller()
+	if caller.T != 0 {
+		fmt.Println("WithdrawalCancelled must call by node")
+		return fmt.Errorf("WithdrawalCancelled: caller is not node")
+	}
+
+	txn := g.api.GetTxn()
+	wa, err := g.withdrawNonces.Get(txn, nonce)
+	if err != nil {
+		return fmt.Errorf("WithdrawalCancelled: get withdraw apply: %w", err)
+	}
+	if wa == nil {
+		return fmt.Errorf("WithdrawalCancelled: withdraw apply not found")
+	}
+	if wa.Status != WithdrawPending {
+		return fmt.Errorf("WithdrawalCancelled: withdraw status is not pending")
+	}
+
+	providerIDPtr, err := g.providerByOwner.Get(txn, wa.User)
+	if err != nil || providerIDPtr == nil {
+		return ErrProviderNotFound
+	}
+	providerID := *providerIDPtr
+
+	pb, err := g.providerCredits.Get(txn, providerID)
+	if err != nil || pb == nil {
+		return ErrProviderNotFound
+	}
+
+	amount := wa.Credit.Int.Uint64()
+	*pb += amount
+	if err := g.providerCredits.Set(txn, providerID, *pb); err != nil {
+		return fmt.Errorf("WithdrawalCancelled: restore provider credits: %w", err)
+	}
+
 	return g.updateWithdrawStatus(nonce, WithdrawCancelled)
 }
 

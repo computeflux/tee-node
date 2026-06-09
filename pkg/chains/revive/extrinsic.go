@@ -41,7 +41,12 @@ func (c *Contract) BatchCall(callMethod string, calls []chaintypes.ChainCall) (*
 		return nil, fmt.Errorf("callMethod %s is not in batchMethods %v", callMethod, batchMethods)
 	}
 
-	batchCall, err := types.NewCall(c.Meta, "Utility."+callMethod, calls)
+	substrateCalls := make([]types.Call, 0, len(calls))
+	for _, c := range calls {
+		substrateCalls = append(substrateCalls, c.Substrate)
+	}
+
+	batchCall, err := types.NewCall(c.Meta, "Utility."+callMethod, substrateCalls)
 	if err != nil {
 		return nil, fmt.Errorf("new BatchCall error: %w", err)
 	}

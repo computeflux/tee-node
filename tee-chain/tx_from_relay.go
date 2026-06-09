@@ -132,6 +132,18 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		}
 	}
 
+	// 至少5秒空闲才触发交易
+	if time.Now().Unix()-app.lastCommitAt.Unix() < 5 {
+		return
+	}
+
+	// 如果有需要同步到主链的交易, 直接提交
+	if app.lastProposerWasMe.Load() {
+		if app.targetSyncRelay() {
+			return
+		}
+	}
+
 	// 如果缓存中存在成熟事件且本节点是上一个出块者，提交空交易触发共识
 	if app.lastProposerWasMe.Load() && app.hasMatureRelayEvents() {
 		app.submitActiveTx()
@@ -187,14 +199,17 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 				// 已处理, 跳过 | already processed, skip
 				continue
 			}
+
 			if ce.ev.Nonce != last+1 {
 				// nonce 不连续 (前序事件未成熟), 停止等待下一轮 | nonce gap (previous event not mature), stop and wait
 				break
 			}
+
 			if now.Sub(ce.cachedAt) < relayMinCacheAge {
 				// 不成熟, 后续事件更不可能成熟 | not mature yet, later events even less likely
 				break
 			}
+
 			// 成熟 → 打包进区块 | mature → pack into block
 			txs = append(txs, ce.txBytes)
 			last = ce.ev.Nonce
@@ -207,11 +222,6 @@ func (app *TeeChain) prepareRelayTxs() [][]byte {
 // submitEmptyTx 提交一个交易（SysCall_Empty）到 mempool，用于在 CreateEmptyBlocks=false 时触发共识
 func (app *TeeChain) submitActiveTx() {
 	if app.NodePriv == nil {
-		return
-	}
-
-	// 如果有 tee chain -> main chain, 优先执行
-	if app.targetSyncRelay() {
 		return
 	}
 

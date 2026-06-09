@@ -1273,21 +1273,21 @@ func (c *Token) QueryGetErc20ListSol(
 	return v, gas, nil
 }
 
-func (c *Token) QueryGetPendingWithdrawal(
+func (c *Token) QueryGetPendingWithdrawalSol(
 	nonce uint64, __ink_params chain.DryRunParams,
-) (*util.Option[PendingWithdrawal], *chain.DryRunReturnGas, error) {
+) (*PendingWithdrawal, *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "get_pending_withdrawal")
+		util.LogWithPurple("[ DryRun   method ]", "get_pending_withdrawal_sol")
 	}
-	v, gas, err := chain.DryRunInk[util.Option[PendingWithdrawal]](
+	v, gas, err := chain.DryRunInk[PendingWithdrawal](
 		c,
 		__ink_params.Origin,
 		__ink_params.PayAmount,
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0x963ce4c2",
+			Selector: "0xbaa174cd",
 			Args:     []any{nonce},
 		},
 	)
@@ -1297,12 +1297,12 @@ func (c *Token) QueryGetPendingWithdrawal(
 	return v, gas, nil
 }
 
-func (c *Token) DryRunClaimWithdrawal(
+func (c *Token) DryRunClaimWithdrawalSol(
 	nonce uint64, __ink_params chain.DryRunParams,
 ) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "claim_withdrawal")
+		util.LogWithPurple("[ DryRun   method ]", "claim_withdrawal_sol")
 	}
 	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
 		c,
@@ -1311,7 +1311,7 @@ func (c *Token) DryRunClaimWithdrawal(
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0x421f0805",
+			Selector: "0x0d43a902",
 			Args:     []any{nonce},
 		},
 	)
@@ -1325,12 +1325,12 @@ func (c *Token) DryRunClaimWithdrawal(
 	return v, gas, nil
 }
 
-func (c *Token) ExecClaimWithdrawal(
+func (c *Token) ExecClaimWithdrawalSol(
 	nonce uint64, __ink_params chain.ExecParams,
 ) error {
 	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
 	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunClaimWithdrawal(nonce, _param)
+	_, gas, err := c.DryRunClaimWithdrawalSol(nonce, _param)
 	if err != nil {
 		return err
 	}
@@ -1339,17 +1339,17 @@ func (c *Token) ExecClaimWithdrawal(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0x421f0805",
+			Selector: "0x0d43a902",
 			Args:     []any{nonce},
 		},
 		__ink_params,
 	)
 }
 
-func (c *Token) CallOfClaimWithdrawal(
+func (c *Token) CallOfClaimWithdrawalSol(
 	nonce uint64, __ink_params chain.DryRunParams,
 ) (*types.Call, error) {
-	_, gas, err := c.DryRunClaimWithdrawal(nonce, __ink_params)
+	_, gas, err := c.DryRunClaimWithdrawalSol(nonce, __ink_params)
 	if err != nil {
 		return nil, err
 	}
@@ -1359,18 +1359,18 @@ func (c *Token) CallOfClaimWithdrawal(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0x421f0805",
+			Selector: "0x0d43a902",
 			Args:     []any{nonce},
 		},
 	)
 }
 
-func (c *Token) DryRunCancelWithdrawal(
+func (c *Token) DryRunCancelWithdrawalSol(
 	nonce uint64, __ink_params chain.DryRunParams,
 ) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
 	if c.ChainClient.Debug {
 		fmt.Println()
-		util.LogWithPurple("[ DryRun   method ]", "cancel_withdrawal")
+		util.LogWithPurple("[ DryRun   method ]", "cancel_withdrawal_sol")
 	}
 	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
 		c,
@@ -1379,7 +1379,7 @@ func (c *Token) DryRunCancelWithdrawal(
 		__ink_params.GasLimit,
 		__ink_params.StorageDepositLimit,
 		util.InkContractInput{
-			Selector: "0xaf424333",
+			Selector: "0x13164112",
 			Args:     []any{nonce},
 		},
 	)
@@ -1393,12 +1393,12 @@ func (c *Token) DryRunCancelWithdrawal(
 	return v, gas, nil
 }
 
-func (c *Token) ExecCancelWithdrawal(
+func (c *Token) ExecCancelWithdrawalSol(
 	nonce uint64, __ink_params chain.ExecParams,
 ) error {
 	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
 	_param.PayAmount = __ink_params.PayAmount
-	_, gas, err := c.DryRunCancelWithdrawal(nonce, _param)
+	_, gas, err := c.DryRunCancelWithdrawalSol(nonce, _param)
 	if err != nil {
 		return err
 	}
@@ -1407,17 +1407,17 @@ func (c *Token) ExecCancelWithdrawal(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0xaf424333",
+			Selector: "0x13164112",
 			Args:     []any{nonce},
 		},
 		__ink_params,
 	)
 }
 
-func (c *Token) CallOfCancelWithdrawal(
+func (c *Token) CallOfCancelWithdrawalSol(
 	nonce uint64, __ink_params chain.DryRunParams,
 ) (*types.Call, error) {
-	_, gas, err := c.DryRunCancelWithdrawal(nonce, __ink_params)
+	_, gas, err := c.DryRunCancelWithdrawalSol(nonce, __ink_params)
 	if err != nil {
 		return nil, err
 	}
@@ -1427,7 +1427,7 @@ func (c *Token) CallOfCancelWithdrawal(
 		gas.GasRequired,
 		gas.StorageDeposit,
 		util.InkContractInput{
-			Selector: "0xaf424333",
+			Selector: "0x13164112",
 			Args:     []any{nonce},
 		},
 	)

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/computeflux/tee-provider/pkg/dkg/types"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/sign/dss"

@@ -56,7 +56,7 @@ func (b BatchSecret) PackCall(hubtype uint8, chainID uint32, id uint64) error {
 }
 
 // SetHubCallStatus 更新 hub call 状态。
-func (b BatchMutation) SetHubCallStatus(key uint64, status uint8) error {
+func (b BatchSecret) SetHubCallStatus(key uint64, status uint8) error {
 	return b.hubcalls.UpdateFn(b.api.GetTxn(), key, func(hc *HubCallIndex) {
 		hc.Status = status
 	})

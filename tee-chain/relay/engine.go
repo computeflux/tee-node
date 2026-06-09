@@ -152,7 +152,7 @@ func BuildSyncEvent(chainID uint32, nonce, blockNum uint64, target []byte, typ [
 // dispatch 调用目标合约 | call target contract
 func dispatch(ev SyncEvent, api store.ContractApi) error {
 	target := string(ev.TargetContract) + "." + string(ev.EventType)
-	if target != "gateway.Recharge" && target != "gateway.Withdraw" {
+	if target != "gateway.Recharge" && target != "gateway.WithdrawalDone" && target != "gateway.WithdrawalCancelled" {
 		util.LogWithGray(RELAY_KEY, fmt.Sprintf("dispatch: unknown target contract %s, skipping", target))
 		return nil
 	}

@@ -27,19 +27,6 @@ func (d BatchMutation) ExecCall(call store.ContractCall) error {
 		return m.ExecuteBatch(calls)
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
-	case [4]byte{0x85, 0x2f, 0x82, 0x6b}:
-		if err := store.RequireArgLen(args, 2, "set_hub_call_status"); err != nil {
-			return err
-		}
-		key, err := store.DecodeScaleArgBytes[uint64](args[0])
-		if err != nil {
-			return fmt.Errorf("set_hub_call_status: key: %w", err)
-		}
-		status, err := store.DecodeScaleArgBytes[uint8](args[1])
-		if err != nil {
-			return fmt.Errorf("set_hub_call_status: status: %w", err)
-		}
-		return m.SetHubCallStatus(key, status)
 	default:
 		return fmt.Errorf("batch: unknown method %q", methodSel)
 	}

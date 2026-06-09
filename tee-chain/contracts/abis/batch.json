@@ -101,43 +101,6 @@
         "args": [
           {
             "docs": [],
-            "label": "key",
-            "type": {
-              "displayName": [
-                "u64"
-              ],
-              "type": 3
-            }
-          },
-          {
-            "docs": [],
-            "label": "status",
-            "type": {
-              "displayName": [
-                "u8"
-              ],
-              "type": 0
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "set_hub_call_status",
-        "mutates": true,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "ink",
-            "MessageResult"
-          ],
-          "type": 11
-        },
-        "selector": "0x852f826b"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
             "label": "id",
             "type": {
               "displayName": [

@@ -59,6 +59,12 @@ func loadHubCallIds(txIndex int64, chainId uint32) ([]uint64, error) {
 	return stored.Ids, nil
 }
 
+func deleteBatchCallStore(txIndex int64, chainId uint32) {
+	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
+	_ = store.DeleteKey(GLOABL_STATE, baseKey+TxIndexCallSuffix)
+	_ = store.DeleteKey(GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+}
+
 func saveBatchCall(txIndex int64, chainId uint32, call *chaintypes.ChainCall) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
 	bt, err := codec.Encode(call)
@@ -222,19 +228,19 @@ func (app *TeeChain) targetSyncRelay() bool {
 	}, module.NativeVersion)
 
 	ins := batch.NewBatch(runtime)
-	batch, _ := batch.BatchQuery{Batch: *ins}.PackCallToSunc()
-	if len(batch.IDs) == 0 {
+	hubBatch, err := batch.BatchQuery{Batch: *ins}.PackCallToSunc()
+	if err != nil || hubBatch == nil || len(hubBatch.IDs) == 0 {
 		return false
 	}
 
-	util.LogWithYellow("RELAY-WORKER", "found pending sync tx, chainId:", batch.ChainID, "ids:", batch.IDs)
+	util.LogWithYellow("RELAY-WORKER", "found pending sync tx, chainId:", hubBatch.ChainID, "ids:", hubBatch.IDs)
 
 	// 构建 SysCall_SyncTxStart 触发共识
 	tx := &model.SysCall{
 		Payload: &model.SysCall_SyncTxStart{
 			SyncTxStart: &model.SyncTxStart{
-				ChainId: batch.ChainID,
-				Ids:     batch.IDs,
+				ChainId: hubBatch.ChainID,
+				Ids:     hubBatch.IDs,
 			},
 		},
 	}
@@ -243,6 +249,6 @@ func (app *TeeChain) targetSyncRelay() bool {
 		return false
 	}
 
-	util.LogWithYellow("RELAY-WORKER", "submitted SyncTxStart to trigger consensus, chainId:", batch.ChainID)
+	util.LogWithYellow("RELAY-WORKER", "submitted SyncTxStart to trigger consensus, chainId:", hubBatch.ChainID)
 	return true
 }
