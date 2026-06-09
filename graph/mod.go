@@ -42,9 +42,6 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 	// 启动 Gateway 优化组件：异步用量 writer + 缓存刷新 + 限流器清理 + 用量结算
 	gateway.InitOptimizations()
 
-	// Phase 2: seed data
-	// gateway.InitSeedData()
-
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
@@ -52,7 +49,7 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
-		MaxAge:           300,
+		MaxAge:           86400,
 	}))
 	router.Use(AuthMiddleware())
 
