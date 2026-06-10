@@ -117,6 +117,7 @@ type ComplexityRoot struct {
 		JoinedAt     func(childComplexity int) int
 		ReferralCode func(childComplexity int) int
 		Referrer     func(childComplexity int) int
+		Wallet       func(childComplexity int) int
 	}
 
 	JoinEarlyAccessResult struct {
@@ -131,7 +132,6 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		ClaimEarlyAccessTask func(childComplexity int, wallet string, task model.EarlyAccessTaskType) int
-		ClaimOrderToken      func(childComplexity int, address string, signature string, timestamp int, orderID int) int
 		CompleteRecovery     func(childComplexity int, recoveryToken string, passwordHash string) int
 		ContractCall         func(childComplexity int, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) int
 		Faucet               func(childComplexity int, caller string, callerType int) int
@@ -148,6 +148,7 @@ type ComplexityRoot struct {
 		SocialLogin          func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) int
 		StartEpoch           func(childComplexity int) int
 		SystemContractInit   func(childComplexity int, contract string) int
+		UpdateReferralCode   func(childComplexity int, wallet string, referralCode string) int
 		UploadSecret         func(childComplexity int, index string, secret string, hash string, user string) int
 		VerifyOtp            func(childComplexity int, email string, otp string, clientID string) int
 		VerifyPassword       func(childComplexity int, token string, passwordHash string) int
@@ -172,24 +173,25 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		AuthConfig               func(childComplexity int) int
-		AuthHealth               func(childComplexity int) int
-		ChainInfo                func(childComplexity int) int
-		CheckSession             func(childComplexity int, token string) int
-		ContractDryRun           func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
-		ContractNonce            func(childComplexity int, caller string, callerType int) int
-		EarlyAccessPoints        func(childComplexity int, user string) int
-		EarlyAccessPointsHistory func(childComplexity int, user string, offset *int, limit *int) int
-		EarlyAccessReferral      func(childComplexity int, user string) int
-		EarlyAccessStats         func(childComplexity int) int
-		EarlyAccessTasks         func(childComplexity int, wallet string) int
-		EarlyAccessUser          func(childComplexity int, user string) int
-		EarlyAccessUserByEmail   func(childComplexity int, email string) int
-		GetChallenge             func(childComplexity int, token string) int
-		OauthURL                 func(childComplexity int, provider string, redirectURI *string) int
-		SecretRsa                func(childComplexity int) int
-		TeeReport                func(childComplexity int, hash string) int
-		Validators               func(childComplexity int) int
+		AuthConfig                    func(childComplexity int) int
+		AuthHealth                    func(childComplexity int) int
+		ChainInfo                     func(childComplexity int) int
+		CheckSession                  func(childComplexity int, token string) int
+		ContractDryRun                func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
+		ContractNonce                 func(childComplexity int, caller string, callerType int) int
+		EarlyAccessPoints             func(childComplexity int, user string) int
+		EarlyAccessPointsHistory      func(childComplexity int, user string, offset *int, limit *int) int
+		EarlyAccessReferral           func(childComplexity int, user string) int
+		EarlyAccessStats              func(childComplexity int) int
+		EarlyAccessTasks              func(childComplexity int, wallet string) int
+		EarlyAccessUser               func(childComplexity int, user string) int
+		EarlyAccessUserByEmail        func(childComplexity int, email string) int
+		EarlyAccessUserByReferralCode func(childComplexity int, referralCode string) int
+		GetChallenge                  func(childComplexity int, token string) int
+		OauthURL                      func(childComplexity int, provider string, redirectURI *string) int
+		SecretRsa                     func(childComplexity int) int
+		TeeReport                     func(childComplexity int, hash string) int
+		Validators                    func(childComplexity int) int
 	}
 
 	RecoveryResult struct {
@@ -262,7 +264,6 @@ type MutationResolver interface {
 	RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error)
 	VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error)
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
-	ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error)
 	RequestWalletNonce(ctx context.Context, address string) (string, error)
 	LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error)
 	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
@@ -271,6 +272,7 @@ type MutationResolver interface {
 	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
 	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (string, error)
 	JoinEarlyAccess(ctx context.Context, wallet string, email *string, referralCode *string) (*model.JoinEarlyAccessResult, error)
+	UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*model.JoinEarlyAccessResult, error)
 	ClaimEarlyAccessTask(ctx context.Context, wallet string, task model.EarlyAccessTaskType) (*model.ClaimTaskResult, error)
 	UploadSecret(ctx context.Context, index string, secret string, hash string, user string) (bool, error)
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
@@ -287,6 +289,7 @@ type QueryResolver interface {
 	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
 	EarlyAccessUser(ctx context.Context, user string) (*model.EarlyAccessUser, error)
 	EarlyAccessUserByEmail(ctx context.Context, email string) (*model.EarlyAccessUser, error)
+	EarlyAccessUserByReferralCode(ctx context.Context, referralCode string) (*model.EarlyAccessUser, error)
 	EarlyAccessPoints(ctx context.Context, user string) (*model.EarlyAccessPoints, error)
 	EarlyAccessReferral(ctx context.Context, user string) (*model.ReferralInfo, error)
 	EarlyAccessPointsHistory(ctx context.Context, user string, offset *int, limit *int) (*model.PointsHistory, error)
@@ -637,6 +640,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.EarlyAccessUser.Referrer(childComplexity), true
 
+	case "EarlyAccessUser.wallet":
+		if e.complexity.EarlyAccessUser.Wallet == nil {
+			break
+		}
+
+		return e.complexity.EarlyAccessUser.Wallet(childComplexity), true
+
 	case "JoinEarlyAccessResult.success":
 		if e.complexity.JoinEarlyAccessResult.Success == nil {
 			break
@@ -676,18 +686,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.ClaimEarlyAccessTask(childComplexity, args["wallet"].(string), args["task"].(model.EarlyAccessTaskType)), true
-
-	case "Mutation.claimOrderToken":
-		if e.complexity.Mutation.ClaimOrderToken == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_claimOrderToken_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.ClaimOrderToken(childComplexity, args["address"].(string), args["signature"].(string), args["timestamp"].(int), args["orderId"].(int)), true
 
 	case "Mutation.completeRecovery":
 		if e.complexity.Mutation.CompleteRecovery == nil {
@@ -875,6 +873,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.SystemContractInit(childComplexity, args["contract"].(string)), true
+
+	case "Mutation.updateReferralCode":
+		if e.complexity.Mutation.UpdateReferralCode == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateReferralCode_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateReferralCode(childComplexity, args["wallet"].(string), args["referralCode"].(string)), true
 
 	case "Mutation.upload_secret":
 		if e.complexity.Mutation.UploadSecret == nil {
@@ -1120,6 +1130,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.EarlyAccessUserByEmail(childComplexity, args["email"].(string)), true
+
+	case "Query.earlyAccessUserByReferralCode":
+		if e.complexity.Query.EarlyAccessUserByReferralCode == nil {
+			break
+		}
+
+		args, err := ec.field_Query_earlyAccessUserByReferralCode_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EarlyAccessUserByReferralCode(childComplexity, args["referralCode"].(string)), true
 
 	case "Query.getChallenge":
 		if e.complexity.Query.GetChallenge == nil {
@@ -1585,103 +1607,6 @@ func (ec *executionContext) field_Mutation_claimEarlyAccessTask_argsTask(
 	}
 
 	var zeroVal model.EarlyAccessTaskType
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_claimOrderToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_claimOrderToken_argsAddress(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["address"] = arg0
-	arg1, err := ec.field_Mutation_claimOrderToken_argsSignature(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["signature"] = arg1
-	arg2, err := ec.field_Mutation_claimOrderToken_argsTimestamp(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["timestamp"] = arg2
-	arg3, err := ec.field_Mutation_claimOrderToken_argsOrderID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["orderId"] = arg3
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_claimOrderToken_argsAddress(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["address"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-	if tmp, ok := rawArgs["address"]; ok {
-		return ec.unmarshalNString2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_claimOrderToken_argsSignature(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["signature"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
-	if tmp, ok := rawArgs["signature"]; ok {
-		return ec.unmarshalNString2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_claimOrderToken_argsTimestamp(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (int, error) {
-	if _, ok := rawArgs["timestamp"]; !ok {
-		var zeroVal int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("timestamp"))
-	if tmp, ok := rawArgs["timestamp"]; ok {
-		return ec.unmarshalNInt2int(ctx, tmp)
-	}
-
-	var zeroVal int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_claimOrderToken_argsOrderID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (int, error) {
-	if _, ok := rawArgs["orderId"]; !ok {
-		var zeroVal int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("orderId"))
-	if tmp, ok := rawArgs["orderId"]; ok {
-		return ec.unmarshalNInt2int(ctx, tmp)
-	}
-
-	var zeroVal int
 	return zeroVal, nil
 }
 
@@ -2703,6 +2628,57 @@ func (ec *executionContext) field_Mutation_systemContractInit_argsContract(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_updateReferralCode_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_updateReferralCode_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := ec.field_Mutation_updateReferralCode_argsReferralCode(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["referralCode"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_updateReferralCode_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateReferralCode_argsReferralCode(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["referralCode"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("referralCode"))
+	if tmp, ok := rawArgs["referralCode"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_upload_secret_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3479,6 +3455,34 @@ func (ec *executionContext) field_Query_earlyAccessUserByEmail_argsEmail(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
 	if tmp, ok := rawArgs["email"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_earlyAccessUserByReferralCode_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_earlyAccessUserByReferralCode_argsReferralCode(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["referralCode"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_earlyAccessUserByReferralCode_argsReferralCode(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["referralCode"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("referralCode"))
+	if tmp, ok := rawArgs["referralCode"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -5639,6 +5643,47 @@ func (ec *executionContext) fieldContext_EarlyAccessUser_isUser(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _EarlyAccessUser_wallet(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EarlyAccessUser_wallet(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Wallet, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EarlyAccessUser_wallet(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EarlyAccessUser",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _EarlyAccessUser_joinedAt(ctx context.Context, field graphql.CollectedField, obj *model.EarlyAccessUser) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
 	if err != nil {
@@ -6703,73 +6748,6 @@ func (ec *executionContext) fieldContext_Mutation_completeRecovery(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_claimOrderToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_claimOrderToken(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().ClaimOrderToken(rctx, fc.Args["address"].(string), fc.Args["signature"].(string), fc.Args["timestamp"].(int), fc.Args["orderId"].(int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*auth.AuthResponse)
-	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_claimOrderToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "success":
-				return ec.fieldContext_AuthResponse_success(ctx, field)
-			case "userInfo":
-				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
-			case "token":
-				return ec.fieldContext_AuthResponse_token(ctx, field)
-			case "address":
-				return ec.fieldContext_AuthResponse_address(ctx, field)
-			case "error":
-				return ec.fieldContext_AuthResponse_error(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type AuthResponse", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_claimOrderToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Mutation_requestWalletNonce(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_requestWalletNonce(ctx, field)
 	if err != nil {
@@ -7233,6 +7211,67 @@ func (ec *executionContext) fieldContext_Mutation_joinEarlyAccess(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_joinEarlyAccess_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateReferralCode(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateReferralCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateReferralCode(rctx, fc.Args["wallet"].(string), fc.Args["referralCode"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.JoinEarlyAccessResult)
+	fc.Result = res
+	return ec.marshalNJoinEarlyAccessResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐJoinEarlyAccessResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateReferralCode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_JoinEarlyAccessResult_success(ctx, field)
+			case "txHash":
+				return ec.fieldContext_JoinEarlyAccessResult_txHash(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type JoinEarlyAccessResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateReferralCode_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8340,6 +8379,8 @@ func (ec *executionContext) fieldContext_Query_earlyAccessUser(ctx context.Conte
 			switch field.Name {
 			case "isUser":
 				return ec.fieldContext_EarlyAccessUser_isUser(ctx, field)
+			case "wallet":
+				return ec.fieldContext_EarlyAccessUser_wallet(ctx, field)
 			case "joinedAt":
 				return ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
 			case "referrer":
@@ -8407,6 +8448,8 @@ func (ec *executionContext) fieldContext_Query_earlyAccessUserByEmail(ctx contex
 			switch field.Name {
 			case "isUser":
 				return ec.fieldContext_EarlyAccessUser_isUser(ctx, field)
+			case "wallet":
+				return ec.fieldContext_EarlyAccessUser_wallet(ctx, field)
 			case "joinedAt":
 				return ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
 			case "referrer":
@@ -8427,6 +8470,75 @@ func (ec *executionContext) fieldContext_Query_earlyAccessUserByEmail(ctx contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_earlyAccessUserByEmail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_earlyAccessUserByReferralCode(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_earlyAccessUserByReferralCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EarlyAccessUserByReferralCode(rctx, fc.Args["referralCode"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.EarlyAccessUser)
+	fc.Result = res
+	return ec.marshalNEarlyAccessUser2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐEarlyAccessUser(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_earlyAccessUserByReferralCode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "isUser":
+				return ec.fieldContext_EarlyAccessUser_isUser(ctx, field)
+			case "wallet":
+				return ec.fieldContext_EarlyAccessUser_wallet(ctx, field)
+			case "joinedAt":
+				return ec.fieldContext_EarlyAccessUser_joinedAt(ctx, field)
+			case "referrer":
+				return ec.fieldContext_EarlyAccessUser_referrer(ctx, field)
+			case "referralCode":
+				return ec.fieldContext_EarlyAccessUser_referralCode(ctx, field)
+			case "email":
+				return ec.fieldContext_EarlyAccessUser_email(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EarlyAccessUser", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_earlyAccessUserByReferralCode_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13013,6 +13125,8 @@ func (ec *executionContext) _EarlyAccessUser(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "wallet":
+			out.Values[i] = ec._EarlyAccessUser_wallet(ctx, field, obj)
 		case "joinedAt":
 			out.Values[i] = ec._EarlyAccessUser_joinedAt(ctx, field, obj)
 		case "referrer":
@@ -13225,13 +13339,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "claimOrderToken":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_claimOrderToken(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "requestWalletNonce":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_requestWalletNonce(ctx, field)
@@ -13284,6 +13391,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "joinEarlyAccess":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_joinEarlyAccess(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateReferralCode":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateReferralCode(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -13712,6 +13826,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_earlyAccessUserByEmail(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "earlyAccessUserByReferralCode":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_earlyAccessUserByReferralCode(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

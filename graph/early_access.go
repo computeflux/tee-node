@@ -252,6 +252,89 @@ func (s *EarlyAccessStore) claimTask(wallet, task string) (bool, int64, int64, e
 	return true, points, total, err
 }
 
+func (s *EarlyAccessStore) updateReferralCode(wallet, referralCode string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	wallet = strings.ToLower(wallet)
+	refCode := strings.ToLower(referralCode)
+
+	// 检查用户是否存在
+	user, err := store.GetJson[dbEarlyAccessUser](eaNamespace, "user:"+wallet)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, fmt.Errorf("user not joined early access")
+	}
+
+	// 已存在推荐人则不允许修改
+	if user.Referrer != "" {
+		return false, fmt.Errorf("referral code already set")
+	}
+
+	// 不能填写自己的推荐码
+	if user.ReferralCode == refCode {
+		return false, fmt.Errorf("cannot use your own referral code")
+	}
+
+	// 查找推荐码对应的钱包
+	referrerWallet, err := s.loadCodeToWallet(refCode)
+	if err != nil {
+		return false, err
+	}
+	if referrerWallet == "" {
+		return false, fmt.Errorf("invalid referral code")
+	}
+	if referrerWallet == wallet {
+		return false, fmt.Errorf("cannot refer yourself")
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	user.Referrer = referrerWallet
+
+	// 更新推荐人列表
+	if err := s.appendReferral(refCode, wallet); err != nil {
+		return false, err
+	}
+
+	// 被推荐人额外 50
+	bonusInvitee := int64(50)
+	if err := s.addPoints(wallet, bonusInvitee); err != nil {
+		return false, err
+	}
+	if err := s.appendHistory(wallet, "50", "referral_reward", now, &referrerWallet); err != nil {
+		return false, err
+	}
+
+	// 邀请人 200
+	bonusInviter := int64(200)
+	if err := s.addPoints(referrerWallet, bonusInviter); err != nil {
+		return false, err
+	}
+	if err := s.appendHistory(referrerWallet, "200", "referral_reward", now, &wallet); err != nil {
+		return false, err
+	}
+
+	// 更新统计
+	stats, err := s.loadStats()
+	if err != nil {
+		return false, err
+	}
+	stats.TotalPointsDistributed += bonusInvitee + bonusInviter
+	stats.TotalReferrals++
+
+	// 保存用户和统计
+	if err := store.SetJson(eaNamespace, "user:"+wallet, user); err != nil {
+		return false, err
+	}
+	if err := s.saveStats(stats); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (s *EarlyAccessStore) getTasks(wallet string) []*taskStatusRecord {
 	wallet = strings.ToLower(wallet)
 	tasks, _ := s.loadTasks(wallet)
@@ -395,6 +478,15 @@ func (s *EarlyAccessStore) saveTasks(wallet string, tasks map[string]string) err
 }
 
 // ── Read-only accessors ──────────────────────────────────
+
+func (s *EarlyAccessStore) getUserByReferralCode(code string) *earlyAccessUserRecord {
+	code = strings.ToLower(code)
+	wallet, err := s.loadCodeToWallet(code)
+	if err != nil || wallet == "" {
+		return nil
+	}
+	return s.getUser(wallet)
+}
 
 func (s *EarlyAccessStore) getUserByEmail(email string) *earlyAccessUserRecord {
 	email = strings.ToLower(email)

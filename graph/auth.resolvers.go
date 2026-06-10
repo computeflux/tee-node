@@ -9,7 +9,6 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
-	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // RequestOtp is the resolver for the requestOTP field.
@@ -455,15 +453,6 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 	}, nil
 }
 
-// ClaimOrderToken is the resolver for the claimOrderToken field.
-func (r *mutationResolver) ClaimOrderToken(ctx context.Context, address string, signature string, timestamp int, orderID int) (*auth.AuthResponse, error) {
-	// TODO: verify signature against address, check order exists, generate API key
-	return &auth.AuthResponse{
-		Success: false,
-		Error:   "not yet implemented",
-	}, nil
-}
-
 // RequestWalletNonce is the resolver for the requestWalletNonce field.
 func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address string) (string, error) {
 	nonce, err := generateWalletNonce()
@@ -676,34 +665,12 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 
-// authStoreAuthUserFn 是 auth.AuthStoreAuthUser 的可测试替换点。
-var authStoreAuthUserFn = auth.AuthStoreAuthUser
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
 
-// persistAuthUserToChain 将用户记录异步同步到链上合约。
-// 它在后台 goroutine 中运行以避免阻塞 API 响应，但会通过结构化日志
-// 和重试机制确保失败可被观测，而不是 fire-and-forget 地静默丢弃。
-func persistAuthUserToChain(chain *teechain.TeeChain, user *store.AuthUser) {
-	if chain == nil || user == nil {
-		return
-	}
-	go func(u *store.AuthUser) {
-		plain, err := json.Marshal(u)
-		if err != nil {
-			fmt.Printf("[AUTH] failed to marshal auth user %s: %v\n", u.Email, err)
-			return
-		}
-		key := "auth_user:" + u.Email
-		const maxRetries = 3
-		var lastErr error
-		for i := 0; i < maxRetries; i++ {
-			if i > 0 {
-				time.Sleep(time.Duration(i) * 500 * time.Millisecond)
-			}
-			lastErr = authStoreAuthUserFn(chain, key, plain)
-			if lastErr == nil {
-				return
-			}
-		}
-		fmt.Printf("[AUTH] failed to persist auth user %s to chain after %d retries: %v\n", u.Email, maxRetries, lastErr)
-	}(user)
-}
+*/

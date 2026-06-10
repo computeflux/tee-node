@@ -26,6 +26,17 @@ func (r *mutationResolver) JoinEarlyAccess(ctx context.Context, wallet string, e
 	}, nil
 }
 
+// UpdateReferralCode is the resolver for the updateReferralCode field.
+func (r *mutationResolver) UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*model.JoinEarlyAccessResult, error) {
+	updated, err := earlyAccessStore.updateReferralCode(wallet, referralCode)
+	if err != nil {
+		return nil, err
+	}
+	return &model.JoinEarlyAccessResult{
+		Success: updated,
+	}, nil
+}
+
 // ClaimEarlyAccessTask is the resolver for the claimEarlyAccessTask field.
 func (r *mutationResolver) ClaimEarlyAccessTask(ctx context.Context, wallet string, task model.EarlyAccessTaskType) (*model.ClaimTaskResult, error) {
 	success, awarded, total, err := earlyAccessStore.claimTask(wallet, task.String())
@@ -49,6 +60,7 @@ func (r *queryResolver) EarlyAccessUser(ctx context.Context, user string) (*mode
 	}
 	res := &model.EarlyAccessUser{
 		IsUser:   true,
+		Wallet:   &record.wallet,
 		JoinedAt: &record.joinedAt,
 	}
 	if record.referrer != "" {
@@ -73,6 +85,32 @@ func (r *queryResolver) EarlyAccessUserByEmail(ctx context.Context, email string
 	}
 	res := &model.EarlyAccessUser{
 		IsUser:   true,
+		Wallet:   &record.wallet,
+		JoinedAt: &record.joinedAt,
+	}
+	if record.referrer != "" {
+		res.Referrer = &record.referrer
+	}
+	if record.referralCode != "" {
+		res.ReferralCode = &record.referralCode
+	}
+	if record.email != "" {
+		res.Email = &record.email
+	}
+	return res, nil
+}
+
+// EarlyAccessUserByReferralCode is the resolver for the earlyAccessUserByReferralCode field.
+func (r *queryResolver) EarlyAccessUserByReferralCode(ctx context.Context, referralCode string) (*model.EarlyAccessUser, error) {
+	record := earlyAccessStore.getUserByReferralCode(referralCode)
+	if record == nil {
+		return &model.EarlyAccessUser{
+			IsUser: false,
+		}, nil
+	}
+	res := &model.EarlyAccessUser{
+		IsUser:   true,
+		Wallet:   &record.wallet,
 		JoinedAt: &record.joinedAt,
 	}
 	if record.referrer != "" {

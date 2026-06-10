@@ -2,12 +2,17 @@ package graph
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql"
+	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/store"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -76,4 +81,32 @@ func initToken(r *http.Request) *store.GatewayTokenInfo {
 
 	// Fallback: bare API Key
 	return gateway.FindTokenByKey(raw)
+}
+
+var authStoreAuthUserFn = auth.AuthStoreAuthUser
+
+func persistAuthUserToChain(chain *teechain.TeeChain, user *store.AuthUser) {
+	if chain == nil || user == nil {
+		return
+	}
+	go func(u *store.AuthUser) {
+		plain, err := json.Marshal(u)
+		if err != nil {
+			fmt.Printf("[AUTH] failed to marshal auth user %s: %v\n", u.Email, err)
+			return
+		}
+		key := "auth_user:" + u.Email
+		const maxRetries = 3
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			if i > 0 {
+				time.Sleep(time.Duration(i) * 500 * time.Millisecond)
+			}
+			lastErr = authStoreAuthUserFn(chain, key, plain)
+			if lastErr == nil {
+				return
+			}
+		}
+		fmt.Printf("[AUTH] failed to persist auth user %s to chain after %d retries: %v\n", u.Email, maxRetries, lastErr)
+	}(user)
 }

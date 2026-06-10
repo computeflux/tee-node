@@ -1,10 +1,16 @@
 package graph
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
+
+	"github.com/computeflux/tee-provider/pkg/crypto"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // rsaDecryptWithKey 直接使用 *rsa.PrivateKey 解密数据
@@ -36,4 +42,24 @@ func rsaDecryptWithKey(privateKey *rsa.PrivateKey, encryptedBase64 string) ([]by
 	}
 
 	return plaintext, nil
+}
+
+func checkSecretOwnership(ctx context.Context, user string) (*crypto.PubKey, error) {
+	token := GatewayTokenFromContext(ctx)
+	if token == nil {
+		return nil, gqlerror.Errorf("authentication required")
+	}
+
+	pubkey, err := crypto.PubKeyFromSS58(user)
+	if err != nil {
+		return nil, gqlerror.Errorf("PubKeyFromSS58 error: %s", err.Error())
+	}
+	pubAddr := pubkey.H160Address()
+
+	targetAddr := cstore.UniAddr{T: 2, V: pubAddr[:]}
+	if targetAddr.T != token.Addr.T || !bytes.Equal(targetAddr.V, token.Addr.V) {
+		return nil, gqlerror.Errorf("user address does not match authenticated token owner")
+	}
+
+	return pubkey, nil
 }

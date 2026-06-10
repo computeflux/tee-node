@@ -87,6 +87,7 @@ type EarlyAccessStats struct {
 
 type EarlyAccessUser struct {
 	IsUser       bool    `json:"isUser"`
+	Wallet       *string `json:"wallet,omitempty"`
 	JoinedAt     *string `json:"joinedAt,omitempty"`
 	Referrer     *string `json:"referrer,omitempty"`
 	ReferralCode *string `json:"referralCode,omitempty"`
