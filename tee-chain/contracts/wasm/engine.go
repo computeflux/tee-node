@@ -47,7 +47,7 @@ type hostState struct {
 
 // NewEngine creates a new WASM execution engine with interpreter mode.
 func NewEngine() *Engine {
-	rt := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter())
+	rt := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler())
 	return &Engine{rt: rt}
 }
 

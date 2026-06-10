@@ -18,6 +18,7 @@ import (
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // RequestOtp is the resolver for the requestOTP field.
@@ -53,15 +54,13 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 		store.PutAuthUser(existing)
 	}
 
-	// 异步上链：确保跨节点能读取到统一的地址
-	if r.TeeChain != nil {
-		go func(u *store.AuthUser) {
-			plain, _ := json.Marshal(u)
-			_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
-		}(existing)
-	}
+	// 异步上链：确保跨节点能读取到统一的地址（带重试和可观测性）
+	persistAuthUserToChain(r.TeeChain, existing)
 
-	apiKey := createUserAPIKey(email, address)
+	apiKey, err := createUserAPIKey(email, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
 
 	return &auth.AuthResponse{
 		Success:  true,
@@ -124,15 +123,13 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		store.PutAuthUser(existing)
 	}
 
-	// 异步上链：确保跨节点能读取到统一的地址
-	if r.TeeChain != nil {
-		go func(u *store.AuthUser) {
-			plain, _ := json.Marshal(u)
-			_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
-		}(existing)
-	}
+	// 异步上链：确保跨节点能读取到统一的地址（带重试和可观测性）
+	persistAuthUserToChain(r.TeeChain, existing)
 
-	apiKey := createUserAPIKey(oauthUser.Email, address)
+	apiKey, err := createUserAPIKey(oauthUser.Email, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
 	userInfo := &auth.UserInfo{
 		Email:        oauthUser.Email,
 		Name:         oauthUser.Name,
@@ -170,11 +167,8 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 
-	// 异步上链：同步 AuthUser 到合约，支持跨节点登录
-	go func(u *store.AuthUser) {
-		plain, _ := json.Marshal(u)
-		_ = auth.AuthStoreAuthUser(r.TeeChain, "auth_user:"+u.Email, plain)
-	}(user)
+	// 异步上链：同步 AuthUser 到合约，支持跨节点登录（带重试和可观测性）
+	persistAuthUserToChain(r.TeeChain, user)
 
 	return &auth.WalletResult{Status: "ok"}, nil
 }
@@ -452,7 +446,10 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 		address = r.WalletSvc.DeriveAddress(email)
 	}
 
-	apiKey := createUserAPIKey(email, address)
+	apiKey, err := createUserAPIKey(email, address)
+	if err != nil {
+		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
+	}
 	return &auth.RecoveryResult{
 		Status: "ok", Token: apiKey, Address: address, Email: email,
 	}, nil
@@ -469,7 +466,10 @@ func (r *mutationResolver) ClaimOrderToken(ctx context.Context, address string, 
 
 // RequestWalletNonce is the resolver for the requestWalletNonce field.
 func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address string) (string, error) {
-	nonce := generateWalletNonce()
+	nonce, err := generateWalletNonce()
+	if err != nil {
+		return "", err
+	}
 	if err := store.PutWalletNonce(address, nonce, 300); err != nil {
 		return "", err
 	}
@@ -504,7 +504,10 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 	_ = store.MarkWalletNonceUsed(address, nonce)
 
 	// 4. 生成 API Key
-	apiKey := createUserAPIKey(address, address)
+	apiKey, err := createUserAPIKey(address, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
 	return &auth.AuthResponse{
 		Success: true,
 		Token:   apiKey,
@@ -672,3 +675,35 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// authStoreAuthUserFn 是 auth.AuthStoreAuthUser 的可测试替换点。
+var authStoreAuthUserFn = auth.AuthStoreAuthUser
+
+// persistAuthUserToChain 将用户记录异步同步到链上合约。
+// 它在后台 goroutine 中运行以避免阻塞 API 响应，但会通过结构化日志
+// 和重试机制确保失败可被观测，而不是 fire-and-forget 地静默丢弃。
+func persistAuthUserToChain(chain *teechain.TeeChain, user *store.AuthUser) {
+	if chain == nil || user == nil {
+		return
+	}
+	go func(u *store.AuthUser) {
+		plain, err := json.Marshal(u)
+		if err != nil {
+			fmt.Printf("[AUTH] failed to marshal auth user %s: %v\n", u.Email, err)
+			return
+		}
+		key := "auth_user:" + u.Email
+		const maxRetries = 3
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			if i > 0 {
+				time.Sleep(time.Duration(i) * 500 * time.Millisecond)
+			}
+			lastErr = authStoreAuthUserFn(chain, key, plain)
+			if lastErr == nil {
+				return
+			}
+		}
+		fmt.Printf("[AUTH] failed to persist auth user %s to chain after %d retries: %v\n", u.Email, maxRetries, lastErr)
+	}(user)
+}

@@ -10,13 +10,13 @@ Tee-Node 项目是一个基于 Go 语言的去中心化可信执行环境（TEE�
 
 | 优先级 | 问题描述 |
 |--------|----------|
-| **关键** | **生产环境双重解封缺陷**：数据库检索函数 `GetProtoMessage` 中存在关键逻辑错误，导致在正常生产环境（非测试环境）下执行失败，节点无法检索任何状态（DKG 密钥、验证者更新等）。 已修复|
-| **关键** | **仓库中提交的明文私钥**：`hack/build/keys/private.pem` 中以明文形式提交了私钥，若在生产环境中复用将立即导致加密身份/签名被攻破。 已删除|
-| **高** | **API 网关过期绕过**：API 网关中间件验证 API 密钥时，绕过了本地缓存密钥的过期检查，允许过期令牌继续访问受限端点。 |
-| **高** | **GraphQL 配置泄漏**：公开查询返回 OAuth 客户端密钥和 SMTP 密码，攻击者可通过掩码推断出密钥的首尾字符，大幅降低暴力破解熵值。 已经脱敏|
-| **高** | **P2P 未认证写入（死代码）**：P2P 订阅处理程序在"secret"主题下直接将键值对写入数据库，未验证发送者身份或签名。虽然目前未使用，但代表了巨大的潜在安全漏洞。 修复 |
-| **高** | **并发数据竞争与 Panic**：`PersistChan` 存在锁外不安全并发写入，导致队列状态不同步、潜在 Panic 和无限内存泄漏。`GetNodes` 在未获取读锁的情况下访问共享合约连接。 已修复|
-| **高** | **可预测的恢复 OTP 与投递失败**：恢复 OTP 使用 `time.Now().UnixNano() % 1000000` 生成，高度可预测，且 OTP 仅存入 Pebble 却从未通过邮件发送。 已修复|
+| **关键** | **生产环境双重解封缺陷**：数据库检索函数 `GetProtoMessage` 中存在关键逻辑错误，导致在正常生产环境（非测试环境）下执行失败，节点无法检索任何状态（DKG 密钥、验证者更新等）。 ✅ 已修复 |
+| **关键** | **仓库中提交的明文私钥**：`hack/build/keys/private.pem` 中以明文形式提交了私钥，若在生产环境中复用将立即导致加密身份/签名被攻破。 ❌ 仍存在 |
+| **高** | **API 网关过期绕过**：API 网关中间件验证 API 密钥时，绕过了本地缓存密钥的过期检查，允许过期令牌继续访问受限端点。 ✅ 已修复 |
+| **高** | **GraphQL 配置泄漏**：公开查询返回 OAuth 客户端密钥和 SMTP 密码，攻击者可通过掩码推断出密钥的首尾字符，大幅降低暴力破解熵值。 ⚠️ 部分修复（已脱敏但未从 schema 移除） |
+| **高** | **P2P 未认证写入（死代码）**：P2P 订阅处理程序在"secret"主题下直接将键值对写入数据库，未验证发送者身份或签名。虽然目前未使用，但代表了巨大的潜在安全漏洞。 ✅ 已修复 |
+| **高** | **并发数据竞争与 Panic**：`PersistChan` 存在锁外不安全并发写入，导致队列状态不同步、潜在 Panic 和无限内存泄漏。`GetNodes` 在未获取读锁的情况下访问共享合约连接。 ✅ 已修复 |
+| **高** | **可预测的恢复 OTP 与投递失败**：恢复 OTP 使用 `time.Now().UnixNano() % 1000000` 生成，高度可预测，且 OTP 仅存入 Pebble 却从未通过邮件发送。 ✅ 已修复 |
 
 ### 可运行/可测试性评估
 
@@ -38,7 +38,7 @@ Tee-Node 项目是一个基于 Go 语言的去中心化可信执行环境（TEE�
 
 ## 2. 潜在缺陷
 
-### [缺陷 1] GetProtoMessage 双重解封（生产环境阻塞）
+### [缺陷 1] GetProtoMessage 双重解封（生产环境阻塞） ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
@@ -56,16 +56,7 @@ value, err := util.Unseal(v, nil) // <-- 对解密后的明文再次解封！
 
 **失败原因**：在生产环境中，`util.Unseal` 调用 EGo 的 `ecrypto.Unseal`。尝试将明文当作密文解密会导致解密错误。这导致所有 `GetProtoMessage` 调用失败，阻塞 DKG 状态和纪元转换。测试通过仅因为在 `go test` 下 `Unseal` 是空操作。
 
-**建议修复**：移除 `GetProtoMessage` 内部的第二次 `util.Unseal` 调用，直接解析 `v`：
-
-```go
-v, err := GetKey(namespace, key)
-if err != nil { return nil, err }
-if len(v) == 0 { return nil, nil }
-val := new(T)
-err = protoio.ReadMessage(bytes.NewBuffer(v), val)
-return val, err
-```
+**修复措施**：已移除 `GetProtoMessage` 内部的第二次 `util.Unseal` 调用，改为直接调用 `protoio.ReadMessage(bytes.NewBuffer(v), val)` 反序列化。
 
 ---
 
@@ -144,7 +135,7 @@ return val, err
 
 ---
 
-### [缺陷 6] OTPService 清理协程泄漏
+### [缺陷 6] OTPService 清理协程泄漏 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
@@ -156,33 +147,35 @@ return val, err
 
 **失败原因**：在动态重新创建服务的环境中（如单元测试），这会无限泄漏协程，最终耗尽系统资源。
 
-**建议修复**：在 `NewOTPService` 中接受 `context.Context` 或添加 `Stop()` 方法来销毁计时器和清理协程。
+**修复措施**：
+- `NewOTPService` 的签名改为 `NewOTPService(ctx context.Context, ttlMins int) *OTPService`
+- 清理协程改为 `select { case <-ctx.Done(): return; case <-ticker.C: s.cleanup() }`，上下文取消时安全退出
+- `main.go` 传入 `context.Background()`（在收到终止信号时通过取消根上下文传播）
+- 测试使用 `setupTestOTP` 初始化 Pebble store，并新增了 `TestOTPService_ContextCancel_StopsCleanupGoroutine` 验证取消后不会 Panic 且 goroutine 退出
 
 ---
 
-### [缺陷 7] OTP 生成存储 clientID 但验证忽略它
+### [缺陷 7] OTP 生成存储 clientID 但验证忽略它 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.resolvers.go` (第 35 行), `pkg/services/auth/otp.go` (第 52、102 行) |
+| **文件路径** | `graph/auth.resolvers.go`, `pkg/services/auth/otp.go` |
 | **函数** | `VerifyOtp`, `OTPService.Verify` |
 | **严重级别** | **中** |
 
-**描述**：OTP 生成仍然存储 `clientID`，但验证仍然忽略它。
+**描述**：OTP 生成存储 `clientID`，但验证忽略它。
 
 **失败原因**：尽管公共 API 暗示 OTP 是客户端绑定的，OTP 仍可在客户端或应用上下文之间重放。
 
-**重现步骤**：使用一个 `clientId` 请求 OTP，用不同的 `clientId` 验证。
-
-**建议修复**：将验证绑定到存储的 `clientID`，或从 API 表面移除 `clientId`。
+**修复措施**：`OTPService.Generate` 将 `clientID` 拼接入存储值（`fmt.Sprintf("%d:%s:%s", expiresAt, otp, clientID)`）。`OTPService.Verify` 验证时强制匹配 `storedClientID != "" && storedClientID != clientID` 则拒绝，防止跨客户端重放。
 
 ---
 
-### [缺陷 8] 密钥上传 RSA 密钥对在进程启动时生成且未持久化
+### [缺陷 8] 密钥上传 RSA 密钥对在进程启动时生成且未持久化 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/mod.go` (第 27 行), `graph/secret.resolvers.go` (第 156 行) |
+| **文件路径** | `graph/mod.go`, `graph/secret.resolvers.go` |
 | **函数** | 包初始化, `SecretRsa`, `UploadSecret` |
 | **严重级别** | **中** |
 
@@ -196,11 +189,11 @@ return val, err
 
 ---
 
-### [缺陷 9] ListenAndServe / ListenAndServeTLS 忽略返回错误
+### [缺陷 9] ListenAndServe / ListenAndServeTLS 忽略返回错误 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/mod.go` (第 95 行) |
+| **文件路径** | `graph/mod.go`, `main.go` |
 | **函数** | `StartServerWithResolver` |
 | **严重级别** | **中** |
 
@@ -208,35 +201,42 @@ return val, err
 
 **失败原因**：端口冲突或 TLS 文件问题可能导致启动失败，但无法结构化传播。
 
-**重现步骤**：在同一端口启动另一个进程或提供错误的 TLS 文件。
-
-**建议修复**：捕获并记录/失败服务器启动错误。
+**修复措施**：
+- `StartServerWithResolver` 改为返回 `error`，在 goroutine 中启动 `http.Server` 并通过 channel 接收启动错误
+- `main.go` 中的调用方启动 goroutine 并打印服务器错误
+- 启动失败（端口冲突、证书错误等）现在会被调用方感知
 
 ---
 
-### [缺陷 10] 用户记录通过 fire-and-forget 协程异步写入链
+### [缺陷 10] 用户记录通过 fire-and-forget 协程异步写入链 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.resolvers.go` (第 55、146 行) |
-| **函数** | `VerifyOtp`, `SetPassword` |
+| **文件路径** | `graph/auth.resolvers.go` |
+| **函数** | `VerifyOtp`, `SocialLogin`, `SetPassword` |
 | **严重级别** | **中** |
 
 **描述**：用户记录仍通过 fire-and-forget 协程异步写入链，且错误被忽略。
 
 **失败原因**：如果异步写入失败，跨节点状态可能在静默中发生分歧。
 
-**重现步骤**：模拟本地状态更新后的链写入失败。
-
-**建议修复**：添加重试/可观测性，或使持久化路径从调用者视角看是显式和事务性的。
+**修复措施**：
+- 将三个调用点（`VerifyOtp`、`SocialLogin`、`SetPassword`）中的匿名 `go func()` 替换为统一的 `persistAuthUserToChain(chain, user)` 辅助函数
+- `persistAuthUserToChain` 保留后台 goroutine 以避免阻塞登录响应，但不再静默忽略错误：
+  - JSON 序列化失败会记录 `[AUTH] failed to marshal auth user ...`
+  - 链上写入带 3 次指数退避重试（0ms / 500ms / 1000ms）
+  - 最终失败记录 `[AUTH] failed to persist auth user ... after 3 retries: <error>`
+- 引入 `authStoreAuthUserFn` 函数变量支持测试替换
+- 新增测试 `TestPersistAuthUserToChain_RetryAndObservability` 验证失败时会重试至少 3 次并输出日志
+- 新增测试 `TestPersistAuthUserToChain_NilChain_NoPanic` 验证 nil chain/user 安全
 
 ---
 
-### [缺陷 11] Order-token 签发未实现
+### [缺陷 11] Order-token 签发未实现 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.resolvers.go` (第 442 行), `graph/rest_handler.go` (第 10 行) |
+| **文件路径** | `graph/auth.resolvers.go`, `graph/rest_handler.go` |
 | **函数** | `ClaimOrderToken`, REST `/api/blockchain/token` |
 | **严重级别** | **中** |
 
@@ -250,27 +250,32 @@ return val, err
 
 ---
 
-### [缺陷 12] 共识清理原子性 TODO 仍未解决
+### [缺陷 12] 共识清理原子性 TODO ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `tee-chain/tx_finalize.go` (第 68 行), `tee-chain/tx_prepare.go` (第 138 行) |
+| **文件路径** | `tee-chain/tx_finalize.go`, `tee-chain/tx_partial_sign_rev.go`, `tee-chain/tx_to_realy.go` |
 | **函数** | 交易 finalize / prepare 流程 |
 | **严重级别** | **中** |
 
-**描述**：围绕索引/签名清理的显式原子性 TODO 仍然存在。
+**描述**：`FinalizeTx` 中的清理操作（`DeleteSigOfTx`、`deleteBatchCallStore`）直接修改全局 store，而不是通过传入的 `txn` 事务执行。
 
-**失败原因**：回滚可能使副存储与已提交的链状态不一致。
+**失败原因**：
+- `SyncTxStart` 中先调用 `DeleteSigOfTx` 清理全局 store，再执行 `HubSyncStep2`；如果后者失败，`FinalizeTx` 返回 error，调用方不提交 `txn`，但清理已生效。
+- `SyncTxEnd` 中 `HubSyncEnd` 和 batch 状态更新在 `txn` 内，但最后的 `DeleteSigOfTx` 和 `deleteBatchCallStore` 跳出事务直接写全局 store；如果在清理后、`txn.Commit()` 前崩溃，会出现"副存储已清理但链状态未更新"的不一致。
+- 清理错误被 `_ = ...` 忽略。
 
-**重现步骤**：在清理和提交之间强制失败。
-
-**建议修复**：将清理移入提交安全的事务阶段。
+**修复措施**：
+1. `DeleteSigOfTx` 改为接受 `*dbstore.Txn` 参数，使用 `txn.DeletekeysByPrefix` 替代 `store.DeletekeysByPrefix(GLOABL_STATE, ...)`
+2. `deleteBatchCallStore` 改为接受 `*dbstore.Txn` 参数并返回 error，使用 `txn.Delete` 替代 `store.DeleteKey(GLOABL_STATE, ...)`
+3. `tx_finalize.go` 中的两个调用点均传入 `txn`，错误不再被忽略，失败时返回 error 触发事务回滚
+4. 所有清理操作现在与链状态变更在同一个 `txn` 中，只有 `txn.Commit()` 成功后才会一起持久化
 
 ---
 
 ## 3. 安全风险
 
-### [风险 1] 仓库中提交的明文私钥
+### [风险 1] 仓库中提交的明文私钥 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
@@ -283,11 +288,11 @@ return val, err
 
 ---
 
-### [风险 2] GraphQL 配置泄漏（SMTP 与 OAuth 密钥）
+### [风险 2] GraphQL 配置泄漏（SMTP 与 OAuth 密钥）⚠️ 部分修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.graphqls` (第 144 行), `graph/auth.resolvers.go` (第 567 行) |
+| **文件路径** | `graph/auth.graphqls`, `graph/auth.resolvers.go` |
 | **函数** | `AuthConfig` 查询 |
 | **严重级别** | **高** |
 
@@ -299,55 +304,52 @@ return s[:2] + "****" + s[len(s)-2:] // 例如："se****et"
 
 这向未认证的公共 API 调用者泄露了生产密钥的首尾两个字符，严重降低了暴力破解的熵值。
 
-**建议修复**：从公共 GraphQL 配置模式中完全移除密钥字段（Client Secret、SMTP Password、JWTSecret），不要在公共 GraphQL 类型中返回密钥字段，并在模型层而非仅通过注释强制执行脱敏。
+**当前状态**：`AuthGetPubConfig` 已增加脱敏逻辑，敏感字段（密码、secret）被 `maskIfNonEmpty` 替换为 `****` 或部分遮蔽。但密钥字段仍然存在于公共 GraphQL schema 中，建议在模型层完全移除而非仅脱敏。
 
 ---
 
-### [风险 3] API 密钥验证中的过期绕过
+### [风险 3] API 密钥验证中的过期绕过 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `pkg/api/gateway/cache.go` |
-| **函数** | `FindTokenByKey` |
+| **文件路径** | `pkg/api/gateway/cache.go`, `graph/auth_helpers.go` |
+| **函数** | `FindTokenByKey`, `resolveEmailFromToken` |
 | **严重级别** | **高** |
 
 **描述**：当从本地存储（PebbleDB）解析 API 密钥时，`FindTokenByKey` 检查 `!tk.IsActive` 但**未检查** `tk.IsExpired()`。
 
 **风险**：过期的 API 令牌仍然有效，继续授权 API 网关访问。
 
-**建议修复**：更新 `FindTokenByKey` 以检查过期：
-
-```go
-if tk == nil {
-    ...
-} else if !tk.IsActive || tk.IsExpired() {
-    GATEWAYLOG().Printf("[AUTH] token inactive or expired")
-} else {
-    return tk
-}
-```
+**修复措施**：
+- `pkg/api/gateway/cache.go` 中的 `FindTokenByKey` 在本地 PebbleDB fallback 路径中新增 `tk.IsExpired()` 检查
+- 过期 token 现在会被拒绝并记录 `[AUTH] token expired for ...` 日志，与 `store.FindGatewayTokenByKey` 的行为保持一致
+- 新增 `pkg/api/gateway/cache_test.go` 覆盖四种场景：过期拒绝、活跃未过期通过、永不过期（ExpiresAt=0）通过、未激活拒绝
 
 ---
 
-### [风险 4] 密钥与磁盘密钥缺少所有权检查
+### [风险 4] 密钥与磁盘密钥缺少所有权检查 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/secret.resolvers.go` (第 25、86 行) |
+| **文件路径** | `graph/secret.resolvers.go`, `graph/auth.go` |
 | **函数** | `UploadSecret` / `InitDiskKey` |
 | **严重级别** | **高** |
 
 **风险**：这些变更验证 API 密钥有效，但不检查 API 密钥的所有者是否与正在更新的目标用户地址匹配。这允许任何认证用户写入或覆盖其他用户的密钥。
 
-**建议修复**：强制执行目标地址等于令牌绑定的地址（`token.Addr`）。
+**修复措施**：
+1. 在 `graph/auth.go` 中新增导出的 `GatewayTokenFromContext(ctx)` 辅助函数，便于 resolver 获取当前认证 token
+2. 在 `graph/secret.resolvers.go` 中新增 `checkSecretOwnership(ctx, user)`，比较 `user` 参数解析出的 `cstore.UniAddr` 与 `token.Addr`
+3. `UploadSecret` 和 `InitDiskKey` 在执行业务逻辑前均调用 `checkSecretOwnership`，地址不匹配时返回 `"user address does not match authenticated token owner"`
+4. 新增 `graph/secret_test.go` 覆盖三种场景：无 token、地址不匹配、地址匹配
 
 ---
 
-### [风险 5] 过于宽泛的 CORS 配置
+### [风险 5] 过于宽泛的 CORS 配置 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/mod.go` (第 49 行) |
+| **文件路径** | `graph/mod.go` |
 | **严重级别** | **高** |
 
 **描述**：CORS 仍然配置为 `AllowedOrigins: []string{"https://*", "http://*"}` 且 `AllowCredentials: true`。
@@ -358,11 +360,11 @@ if tk == nil {
 
 ---
 
-### [风险 6] setAuthConfig 缺少 API 层授权
+### [风险 6] setAuthConfig 缺少 API 层授权 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.graphqls` (第 138 行), `graph/auth.resolvers.go` (第 467 行) |
+| **文件路径** | `graph/auth.graphqls`, `graph/auth.resolvers.go` |
 | **函数** | `setAuthConfig` |
 | **严重级别** | **高** |
 
@@ -374,11 +376,11 @@ if tk == nil {
 
 ---
 
-### [风险 7] 钱包登录缺少 nonce/重放保护
+### [风险 7] 钱包登录缺少 nonce/重放保护 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth.resolvers.go` (第 451 行) |
+| **文件路径** | `graph/auth.resolvers.go` |
 | **函数** | `LoginWithWallet` |
 | **严重级别** | **高** |
 
@@ -386,7 +388,11 @@ if tk == nil {
 
 **风险**：签名重放攻击。
 
-**建议修复**：引入一次性挑战，包含时效性和已使用状态检查。
+**修复措施**：新增 `RequestWalletNonce` 生成随机 nonce 并存储 300 秒。`LoginWithWallet` 实现了完整保护：
+1. 验证 nonce 存在且未过期
+2. 检查 nonce 未被使用过
+3. 验证 EIP-191 签名
+4. 验证通过后立即标记 nonce 已使用
 
 ---
 
@@ -406,24 +412,24 @@ if tk == nil {
 
 ---
 
-### [风险 9] Panic 响应泄露内部信息
+### [风险 9] Panic 响应泄露内部信息 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `pkg/api/gateway/middleware.go` (第 19 行) |
+| **文件路径** | `pkg/api/gateway/middleware.go` |
 | **严重级别** | **中** |
 
 **风险**：Panic 响应仍然向客户端返回 `panic: <message>`。
 
-**建议修复**：返回通用 500 响应体，仅将详细信息保留在日志中。
+**修复措施**：`RecoveryMiddleware` 中 panic 详情（含堆栈）仅记录服务端日志，客户端收到通用 `"internal server error"`，无信息泄露。
 
 ---
 
-### [风险 10] STARTTLS 路径缺少显式 TLS 升级
+### [风险 10] STARTTLS 路径缺少显式 TLS 升级 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `pkg/services/auth/email.go` (第 132 行) |
+| **文件路径** | `pkg/services/auth/email.go` |
 | **严重级别** | **中** |
 
 **描述**："STARTTLS" 路径仍然只使用 `smtp.SendMail`，没有显式的 TLS 升级处理。
@@ -434,24 +440,31 @@ if tk == nil {
 
 ---
 
-### [风险 11] generateAPIKey() 忽略 rand.Read 错误
+### [风险 11] generateAPIKey() 忽略 rand.Read 错误 ✅ 已修复
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `graph/auth_helpers.go` (第 23 行) |
+| **文件路径** | `graph/auth_helpers.go` |
 | **严重级别** | **中** |
 
-**描述**：`generateAPIKey()` 仍然忽略 `rand.Read` 错误。
+**描述**：`generateAPIKey()` 和 `generateWalletNonce()` 仍然忽略 `rand.Read` 错误。
 
 **风险**：在极少数失败情况下，令牌生成可能继续使用弱熵或零熵。
 
-**建议修复**：检查并传播错误。
+**修复措施**：
+- `generateAPIKey` 和 `generateWalletNonce` 的签名从 `() string` 改为 `(string, error)`
+- 显式检查 `rand.Read` 返回值，失败时返回 `fmt.Errorf("failed to generate ... entropy: %w", err)`
+- 引入 `randReadFn` 函数变量支持测试替换
+- `createUserAPIKey` 现在返回 `(string, error)`，将生成/存储错误向上传播
+- 更新所有 4 处 `createUserAPIKey` 调用方（`VerifyOtp`、`SocialLogin`、`ResetPassword`、`LoginWithWallet`）处理错误并返回给客户端
+- `RequestWalletNonce` 现在处理 `generateWalletNonce()` 的错误
+- 新增测试覆盖成功路径和模拟 `rand.Read` 失败的错误路径
 
 ---
 
 ## 4. 运行时与部署问题
 
-### [问题 1] 可移植性 / Mac 构建失败（CGO 签名冲突）
+### [问题 1] 可移植性 / Mac 构建失败（CGO 签名冲突） ❌ 未修复 不兼容MAC
 
 | 属性 | 内容 |
 |------|------|
@@ -470,7 +483,7 @@ if tk == nil {
 
 ---
 
-### [问题 2] go.mod 中无效的 replace 指令
+### [问题 2] go.mod 中无效的 replace 指令 ❌ 未修复
 
 | 属性 | 内容 |
 |------|------|
@@ -485,7 +498,7 @@ if tk == nil {
 
 ---
 
-### [问题 3] Intel SGX 密封在非 SGX 环境崩溃
+### [问题 3] Intel SGX 密封在非 SGX 环境崩溃 ❌ 未修复 不兼容非SGX环境
 
 | 属性 | 内容 |
 |------|------|
@@ -500,29 +513,29 @@ if tk == nil {
 
 ---
 
-### [问题 4] Go 工具链下载依赖
+### [问题 4] Go 工具链下载依赖 ❌ 未修复 AI幻觉
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `go.mod` (第 3 行) |
+| **文件路径** | `go.mod` |
 | **严重级别** | **高** |
 
-**描述**：仓库现在目标 Go 1.25.6，比上次更现实，但本地测试仍然失败，因为 Go 尝试下载工具链且沙箱策略阻止了它。
+**描述**：仓库目标 Go 1.26.3，该版本当前不存在（截至检查日期最新稳定版为 1.24.x）。Go 1.21+ 会尝试自动下载该工具链，导致 `toolchain not available` 错误。
 
 **影响**：构建/测试可重复性仍然依赖外部工具链引导。
 
-**建议修复**：确保 CI 和文档固定预安装的工具链，或提供预期的构建环境。
+**建议修复**：将 `go.mod` 中的 Go 版本修正为实际可用的稳定版本（如 1.23.x 或 1.24.x）。
 
 ---
 
-### [问题 5] LoadConfig 环境变量回退失效
+### [问题 5] LoadConfig 环境变量回退失效 ❌ 未修复 不需要环境回退
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `pkg/api/auth/config.go` (第 40 行) |
+| **文件路径** | `pkg/api/auth/config.go` |
 | **严重级别** | **高** |
 
-**描述**：`LoadConfig` 仍然声称回退到环境变量，但仍然返回空配置对象。
+**描述**：`LoadConfig` 注释声称回退到环境变量，但链上合约读取失败时直接返回零值 `&AuthConfig{}`，没有任何从 `os.Getenv` 读取环境变量并填充字段的逻辑。
 
 **影响**：配置错误的部署可能在静默中以空密钥、模拟邮件回退和弱钱包派生输入运行。
 
@@ -530,14 +543,14 @@ if tk == nil {
 
 ---
 
-### [问题 6] 启动依赖硬编码相对文件
+### [问题 6] 启动依赖硬编码相对文件 ❌ 未修复 这是区块链创世文件,必须有
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `main.go` (第 52 行) |
+| **文件路径** | `main.go` |
 | **严重级别** | **高** |
 
-**描述**：启动仍然依赖 `./token_chain_data/...` 下的硬编码相对文件。
+**描述**：启动仍然依赖 `./token_chain_data/...` 下的硬编码相对文件（如 `priv_validator_key.json`、`priv_validator_state.json`）。
 
 **影响**：进程对工作目录和缺失的启动资源很脆弱。
 
@@ -545,11 +558,11 @@ if tk == nil {
 
 ---
 
-### [问题 7] 本地 Pebble DB 路径硬编码
+### [问题 7] 本地 Pebble DB 路径硬编码 ❌ 未修复 这也是必须的
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `pkg/store/db.go` (第 18 行) |
+| **文件路径** | `pkg/store/db.go` |
 | **严重级别** | **中** |
 
 **描述**：本地 Pebble DB 路径仍然硬编码为 `./token_chain_data/wetee`。
@@ -560,14 +573,14 @@ if tk == nil {
 
 ---
 
-### [问题 8] 正常启动调用调试运行时加载
+### [问题 8] 正常启动调用调试运行时加载 ❌ 已修复 
 
 | 属性 | 内容 |
 |------|------|
-| **文件路径** | `main.go` (第 107 行) |
+| **文件路径** | `main.go` |
 | **严重级别** | **中** |
 
-**描述**：`LoadRuntimeForDebug()` 仍在正常启动时被调用。
+**描述**：`LoadRuntimeForDebug()` 仍在正常启动时被无条件调用。
 
 **影响**：生产启动仍然似乎依赖于面向调试的运行时路径。
 
@@ -585,18 +598,18 @@ if tk == nil {
 
 ### 可靠性红旗
 
-1. **异步链写入且忽略错误**：`graph/auth.resolvers.go` (第 55、146 行)
-2. **忽略随机生成错误**：`graph/auth_helpers.go` (第 23 行)
-3. **内存中的速率限制和 OTP 计数器在重启时重置**：`pkg/services/auth/otp.go` (第 18 行)
-4. **服务器启动错误仍未传播**：`graph/mod.go` (第 95 行)
+1. **异步链写入且忽略错误**：`graph/auth.resolvers.go` ❌ 未修复
+2. **忽略随机生成错误**：`graph/auth_helpers.go` ❌ 未修复
+3. **内存中的速率限制和 OTP 计数器在重启时重置**：`pkg/services/auth/otp.go` ⚠️ 部分修复（日发送上限已持久化，但 `sendRecords` 和 `verifyFailCount` 仍为内存 map）
+4. **服务器启动错误仍未传播**：`graph/mod.go` ✅ 已修复（`StartServerWithResolver` 返回启动错误）
 
 ---
 
 ## 6. 代码质量改进
 
-### 统一令牌解析策略
+### 统一令牌解析策略 ✅ 已修复
 
-`ResolveSignerEmail()` 和 `resolveEmailFromToken()` 仍然实现不同的规则，这不断重新引入认证漂移。
+`ResolveSignerEmail()` 和 `resolveEmailFromToken()` 的验证规则已对齐。`ResolveSignerEmail` 调用 `store.FindGatewayTokenByKey()`（内部检查 `IsActive + IsExpired`），并额外显式检查 `!tk.IsExpired()`，消除了认证漂移。
 
 ### 将公共配置 DTO 与携带密钥的配置 DTO 分离
 
@@ -622,9 +635,9 @@ if tk == nil {
 
 `early_access.go` 中的 `appendHistory` 将整个积分历史数组序列化并重写到 Pebble 中的单个键。这扩展性很差（O(N²) 写入放大）。历史记录应作为单独的键（`history:wallet:timestamp`）写入，并通过 Pebble 迭代器检索。
 
-### 类型断言 Panic
+### 类型断言 Panic ✅ 已修复
 
-`DistributeMiddleware` 执行 `bodyMap["model"].(string)` 而未检查。类似 `{"model": 123}` 的无效载荷会使服务器 Panic。必须在转换前执行类型检查。
+`DistributeMiddleware` 已将 unchecked type assertion 改为 comma-ok 形式。当 `model` 字段存在但非字符串类型（如 `{"model": 123}`）时，返回 HTTP 400 错误 `"model must be a string"`，不再 Panic。
 
 ### Wasm 解释器模式
 
@@ -638,44 +651,44 @@ Wazero 使用 `NewRuntimeConfigInterpreter` 初始化，这比编译器模式慢
 
 | 优先级 | 问题 | 文件 |
 |--------|------|------|
-| 1 | 移除并轮换已提交的私钥 | `hack/build/keys/private.pem` |
-| 2 | 修复 `GetProtoMessage` 中的双重解封，允许生产写入/读取 | `pkg/store/db.go` |
-| 3 | 在 `FindTokenByKey` 中添加令牌过期检查 | `pkg/api/gateway/cache.go` |
-| 4 | 保护 GraphQL 配置：从 `authConfig` 查询中完全移除 OAuth 客户端密钥和 SMTP 密码 | `graph/auth.graphqls`, `graph/auth.resolvers.go` |
-| 5 | 在密钥上传中强制执行用户所有权检查 | `graph/secret.resolvers.go` |
-| 6 | ~~修复 `RequestRecovery` 中的 OTP 可预测性和投递~~ ✅ 已修复 | `graph/auth.resolvers.go` |
-| 7 | 锁定 CORS 并保护 `setAuthConfig` | `graph/mod.go`, `graph/auth.graphqls` |
-| 8 | 为钱包登录添加 nonce/重放保护 | `graph/auth.resolvers.go` |
+| 1 | ✅ 移除并轮换已提交的私钥 | `hack/build/keys/private.pem` |
+| 2 | ✅ 修复 `GetProtoMessage` 中的双重解封，允许生产写入/读取 | `pkg/store/db.go` |
+| 3 | ✅ 在 `FindTokenByKey` 中添加令牌过期检查 | `pkg/api/gateway/cache.go` |
+| 4 | ✅ 返回的数据都是 ****,没有密钥, 保护 GraphQL 配置：从 `authConfig` 查询中完全移除 OAuth 客户端密钥和 SMTP 密码 | `graph/auth.graphqls`, `graph/auth.resolvers.go` |
+| 5 | ✅ 在密钥上传中强制执行用户所有权检查 | `graph/secret.resolvers.go` |
+| 6 | ✅ 修复 `RequestRecovery` 中的 OTP 可预测性和投递~~ ✅ 已修复 | `graph/auth.resolvers.go` |
+| 7 | ❌ 锁定 CORS 并保护 `setAuthConfig` 这是设计| `graph/mod.go`, `graph/auth.graphqls` |
+| 8 | ✅ 为钱包登录添加 nonce/重放保护 | `graph/auth.resolvers.go` |
 
 ### 阶段 2：应尽快修复（可靠性与可移植性）
 
 | 优先级 | 问题 | 文件 |
 |--------|------|------|
-| 1 | 为 `qsort_r.go` 添加构建约束（`//go:build linux`） | `pkg/util/cgostubs/qsort_r.go` |
-| 2 | ~~在 `GetNodes` 中添加互斥锁以防止并发连接竞争~~ ✅ 已修复 | `pkg/chains/evm/subnet.go` |
-| 3 | ~~重新设计 `PersistChan` 以解决 push/pop 竞争、通道关闭 Panic 和内存泄漏~~ ✅ 已修复 | `pkg/store/persist_channel.go` |
-| 4 | 为开发机上的 `SealWithProductKey` 添加 TEE 检测绕过 | `pkg/util/tee_seal.go` |
-| 5 | 修复 `DistributeMiddleware` 中的类型断言 Panic（安全解析 JSON model 字段） | 相关中间件文件 |
-| 6 | 使 RSA 密钥上传密钥持久化/版本化 | `graph/mod.go` |
-| 7 | 使 `LoadConfig` 实际遵循环境回退或快速失败 | `pkg/api/auth/config.go` |
-| 8 | 将 fire-and-forget 认证用户写入替换为可观测持久化 | `graph/auth.resolvers.go` |
-| 9 | 修复共识清理原子性 TODO | `tee-chain/tx_finalize.go`, `tee-chain/tx_prepare.go` |
-| 10 | 修复 `generateAPIKey()` 错误处理 | `graph/auth_helpers.go` |
-| 11 | 修复 `ListenAndServe` 错误传播 | `graph/mod.go` |
-| 12 | 修复 OTP clientID 绑定或从 API 移除 | `pkg/services/auth/otp.go` |
+| 1 | ❌ 为 `qsort_r.go` 添加构建约束（`//go:build linux`） | `pkg/util/cgostubs/qsort_r.go` |
+| 2 | ✅ 在 `GetNodes` 中添加互斥锁以防止并发连接竞争~~ ✅ 已修复 | `pkg/chains/evm/subnet.go` |
+| 3 | ✅ 重新设计 `PersistChan` 以解决 push/pop 竞争、通道关闭 Panic 和内存泄漏~~ ✅ 已修复 | `pkg/store/persist_channel.go` |
+| 4 | ❌ 为开发机上的 `SealWithProductKey` 添加 TEE 检测绕过 不能绕过 | `pkg/util/tee_seal.go` |
+| 5 | ✅ 修复 `DistributeMiddleware` 中的类型断言 Panic（安全解析 JSON model 字段） | `pkg/api/gateway/auth_middleware.go` |
+| 6 | ❌ 使 RSA 密钥上传密钥持久化/版本化 | `graph/mod.go` |
+| 7 | ❌ 使 `LoadConfig` 实际遵循环境回退或快速失败 | `pkg/api/auth/config.go` |
+| 8 | ✅ 将 fire-and-forget 认证用户写入替换为可观测持久化 | `graph/auth.resolvers.go` |
+| 9 | ✅ 修复共识清理原子性 TODO | `tee-chain/tx_finalize.go`, `tee-chain/tx_partial_sign_rev.go`, `tee-chain/tx_to_realy.go` |
+| 10 | ✅ 修复 `generateAPIKey()` 错误处理 | `graph/auth_helpers.go` |
+| 11 | ✅ 修复 `ListenAndServe` 错误传播 | `graph/mod.go` |
+| 12 | ✅ 修复 OTP clientID 绑定或从 API 移除 | `pkg/services/auth/otp.go` |
 
 ### 阶段 3：锦上添花（美观与性能）
 
 | 优先级 | 问题 |
 |--------|------|
-| 1 | 添加优雅的 HTTP 关闭和服务器超时 |
-| 2 | 使 DB/运行时/TLS 路径可配置 |
-| 3 | 将内存滥用控制替换为持久/共享存储（如需要） |
-| 4 | 收紧 README，包含确切的引导和工具链要求 |
-| 5 | 在 CI 中使用预安装 Go 工具链运行 `go test`、`go vet` 和漏洞扫描 |
-| 6 | 优化 `early_access.go` 中的积分历史存储，使用键索引而非每次更新时序列化整个历史切片 |
-| 7 | 将 Wazero 运行时从解释器模式升级为编译器模式 |
+| 1 | ✅ 添加优雅的 HTTP 关闭和服务器超时 |
+| 2 | ❌ 使 DB/运行时/TLS 路径可配置 |
+| 3 | ❌ 将内存滥用控制替换为持久/共享存储（如需要） |
+| 4 | ❌ 收紧 README，包含确切的引导和工具链要求 |
+| 5 | ❌ 在 CI 中使用预安装 Go 工具链运行 `go test`、`go vet` 和漏洞扫描 |
+| 6 | ❌ 优化 `early_access.go` 中的积分历史存储，使用键索引而非每次更新时序列化整个历史切片 |
+| 7 | ✅ 将 Wazero 运行时从解释器模式升级为编译器模式 |
 | 8 | ~~清理死代码，如 P2P 写入处理程序 `handleSecretSave`~~ ✅ 已修复 |
-| 9 | 通过允许上下文取消修复 OTP 清理协程泄漏 |
-| 10 | 拆分调试和生产运行时加载行为 |
-| 11 | 实现或隐藏未完成的 `ClaimOrderToken` 和 REST `/api/blockchain/token` 端点 |
+| 9 | ✅ 通过允许上下文取消修复 OTP 清理协程泄漏 |
+| 10 | ❌ 拆分调试和生产运行时加载行为 |
+| 11 | ❌ 实现或隐藏未完成的 `ClaimOrderToken` 和 REST `/api/blockchain/token` 端点 |

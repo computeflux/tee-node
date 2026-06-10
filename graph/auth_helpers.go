@@ -19,24 +19,34 @@ import (
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
+// randReadFn 是 crypto/rand.Read 的可测试替换点。
+var randReadFn = rand.Read
+
 // generateAPIKey generates a new API key in the format tee_<64 hex chars>
-func generateAPIKey() string {
+func generateAPIKey() (string, error) {
 	b := make([]byte, 32)
-	rand.Read(b)
-	return "auth_tee_" + hex.EncodeToString(b)
+	if _, err := randReadFn(b); err != nil {
+		return "", fmt.Errorf("failed to generate API key entropy: %w", err)
+	}
+	return "auth_tee_" + hex.EncodeToString(b), nil
 }
 
 // generateWalletNonce generates a random nonce for wallet login.
-func generateWalletNonce() string {
+func generateWalletNonce() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := randReadFn(b); err != nil {
+		return "", fmt.Errorf("failed to generate wallet nonce entropy: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // createUserAPIKey creates and stores a new API Key for the given user.
 // addrHex 为 Ethereum 地址 hex 字符串（如 "0xabc..."），用于结算时构造 UniAddr。
-func createUserAPIKey(owner string, addrHex string) string {
-	apiKey := generateAPIKey()
+func createUserAPIKey(owner string, addrHex string) (string, error) {
+	apiKey, err := generateAPIKey()
+	if err != nil {
+		return "", err
+	}
 	nextID := store.GetNextID("gateway_token")
 
 	// 构造 UniAddr：以太坊地址 callerType=2（EVM），去掉 0x 前缀
@@ -58,10 +68,12 @@ func createUserAPIKey(owner string, addrHex string) string {
 		CreatedAt: uint64(time.Now().Unix()),
 		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()), // 默认1天过期
 	}
-	store.SetGatewayTokenByKey(token) // 写入 key 索引，供 O(1) 查询
+	if err := store.SetGatewayTokenByKey(token); err != nil {
+		return "", fmt.Errorf("failed to store gateway token: %w", err)
+	}
 	store.SetNextID("gateway_token", nextID+1)
 
-	return apiKey
+	return apiKey, nil
 }
 
 // resolveEmailFromToken resolves user email from an API Key or sig_ token.

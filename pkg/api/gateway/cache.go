@@ -21,6 +21,8 @@ func FindTokenByKey(key string) *store.GatewayTokenInfo {
 		GATEWAYLOG().Printf("[AUTH] local DB not found for %s", key[:min(16, len(key))])
 	} else if !tk.IsActive {
 		GATEWAYLOG().Printf("[AUTH] token inactive for %s", key[:min(16, len(key))])
+	} else if tk.IsExpired() {
+		GATEWAYLOG().Printf("[AUTH] token expired for %s", key[:min(16, len(key))])
 	} else {
 		return tk
 	}

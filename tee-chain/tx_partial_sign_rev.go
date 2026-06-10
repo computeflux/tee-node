@@ -6,7 +6,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -158,12 +158,12 @@ func (s *TeeChain) savePartialSig(user_id string, msg *model.BlockPartialSign) e
 	if err != nil {
 		return errors.Wrap(err, "marshal partial sig error")
 	}
-	return store.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+fmt.Sprint(msg.ChainId)+"_"+user_id, bt)
+	return dbstore.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+fmt.Sprint(msg.ChainId)+"_"+user_id, bt)
 }
 
 // SigListOfTx retrieves a list of block partial signatures for (txIndex, chainId).
 func (s *TeeChain) SigListOfTx(txIndex int64, chainId uint32) ([]*model.BlockPartialSign, error) {
-	bts, _, err := store.GetList(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_"+fmt.Sprint(chainId)+"_", nil, 5000)
+	bts, _, err := dbstore.GetList(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_"+fmt.Sprint(chainId)+"_", nil, 5000)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,8 @@ func (s *TeeChain) SigListOfTx(txIndex int64, chainId uint32) ([]*model.BlockPar
 	return sigs, nil
 }
 
-// DeleteSigOfTx deletes partial signatures for a txIndex.
-func (s *TeeChain) DeleteSigOfTx(txIndex int64) error {
-	return store.DeletekeysByPrefix(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(txIndex)+"_")
+// DeleteSigOfTx deletes partial signatures for a txIndex within the given transaction.
+// The deletion is only persisted when txn is committed by the caller.
+func (s *TeeChain) DeleteSigOfTx(txn *dbstore.Txn, txIndex int64) error {
+	return txn.DeletekeysByPrefix([]byte(PartialSigPrefix + fmt.Sprint(txIndex) + "_"))
 }

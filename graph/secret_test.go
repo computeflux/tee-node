@@ -1,35 +1,52 @@
 package graph
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"encoding/base64"
+	"context"
+	"encoding/hex"
 	"testing"
+
+	"github.com/computeflux/tee-provider/pkg/store"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestDecryptSecret(t *testing.T) {
-	// 生成 RSA 密钥对
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("生成 RSA 密钥对失败: %v", err)
-	}
+// knownTestSS58 is a fixed SS58 address used in tests (pkg/crypto/key_ss58_test.go).
+// Its H160 address is 0x82ca18a28793a7149247d1f20dc4d26393e56986.
+const knownTestSS58 = "5DyxQhChcTfL7JmyJ9NMznNL5fx8zHG3xDeCkxGXaiKJYyAb"
 
-	// 先用公钥加密，再用私钥解密（与 rsaDecryptWithKey 的 PKCS#1 v1.5 模式一致）
-	expected := "这是一个测试字符串"
-	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, &privateKey.PublicKey, []byte(expected))
+func mustHex(s string) []byte {
+	b, err := hex.DecodeString(s)
 	if err != nil {
-		t.Fatalf("加密失败: %v", err)
+		panic(err)
 	}
-	encryptedBase64 := base64.StdEncoding.EncodeToString(ciphertext)
+	return b
+}
 
-	// 解密
-	plaintext, err := rsaDecryptWithKey(privateKey, encryptedBase64)
-	if err != nil {
-		t.Fatalf("解密失败: %v", err)
-	}
+func TestCheckSecretOwnership(t *testing.T) {
+	targetAddr := cstore.UniAddr{T: 2, V: mustHex("82ca18a28793a7149247d1f20dc4d26393e56986")}
+	otherAddr := cstore.UniAddr{T: 2, V: mustHex("1111111111111111111111111111111111111111")}
 
-	// 验证解密结果（这里假设加密前的数据是一个简单的字符串）
-	if string(plaintext) != expected {
-		t.Errorf("解密结果错误: 期望 %s, 实际 %s", expected, string(plaintext))
-	}
+	t.Run("missing token", func(t *testing.T) {
+		ctx := context.Background()
+		_, err := checkSecretOwnership(ctx, knownTestSS58)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "authentication required")
+	})
+
+	t.Run("mismatched owner address", func(t *testing.T) {
+		token := &store.GatewayTokenInfo{Addr: otherAddr}
+		ctx := context.WithValue(context.Background(), gatewayTokenCtxKey, token)
+		_, err := checkSecretOwnership(ctx, knownTestSS58)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match authenticated token owner")
+	})
+
+	t.Run("matching owner address", func(t *testing.T) {
+		token := &store.GatewayTokenInfo{Addr: targetAddr}
+		ctx := context.WithValue(context.Background(), gatewayTokenCtxKey, token)
+		pub, err := checkSecretOwnership(ctx, knownTestSS58)
+		require.NoError(t, err)
+		require.NotNil(t, pub)
+	})
 }

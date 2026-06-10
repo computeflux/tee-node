@@ -32,15 +32,17 @@ func setupAuthTest(t *testing.T, seedSecret string) (*Resolver, func()) {
 	})
 
 	walletSvc := wallet.NewWalletService(&teechain.TeeChain{})
+	otpCtx, otpCancel := context.WithCancel(context.Background())
 
 	resolver := &Resolver{
 		TeeChain:  nil, // nil 时 getAuthUserFromContract 回退到本地存储
 		WalletSvc: walletSvc,
-		OTPSvc:    authsvc.NewOTPService(5),
+		OTPSvc:    authsvc.NewOTPService(otpCtx, 5),
 		EmailSvc:  authsvc.NewMockEmailService("test"),
 	}
 
 	cleanup := func() {
+		otpCancel()
 		auth.ResetConfigCache()
 		db.Close()
 	}
@@ -119,10 +121,12 @@ func TestVerifyOtp_CrossNodeConsistency(t *testing.T) {
 		SeedSecret: "test-seed-secret-node-b",
 		JWTSecret:  "test-jwt-secret",
 	})
+	otpCtxB, otpCancelB := context.WithCancel(context.Background())
+	defer otpCancelB()
 	resolverB := &Resolver{
 		TeeChain:  nil,
 		WalletSvc: wallet.NewWalletService(&teechain.TeeChain{}),
-		OTPSvc:    authsvc.NewOTPService(5),
+		OTPSvc:    authsvc.NewOTPService(otpCtxB, 5),
 	}
 
 	// 在节点 B 登录：由于本地存储已有记录，应使用已有地址，
@@ -495,4 +499,81 @@ func TestLoginWithWallet_MissingNonce(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, resp.Success)
 	assert.Equal(t, "invalid or expired nonce", resp.Error)
+}
+
+// TestPersistAuthUserToChain_RetryAndObservability verifies that the async
+// chain persistence helper retries on failure and eventually logs the error
+// instead of silently dropping it (fire-and-forget).
+func TestPersistAuthUserToChain_RetryAndObservability(t *testing.T) {
+	_, cleanup := setupAuthTest(t, "test-seed-secret")
+	defer cleanup()
+
+	calls := 0
+	originalFn := authStoreAuthUserFn
+	defer func() { authStoreAuthUserFn = originalFn }()
+
+	authStoreAuthUserFn = func(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
+		calls++
+		return fmt.Errorf("simulated chain failure")
+	}
+
+	user := &store.AuthUser{Email: "retry-test@example.com", Address: "0x1234"}
+	persistAuthUserToChain(&teechain.TeeChain{}, user)
+
+	// Wait for goroutine + retries: 3 retries with 0ms, 500ms, 1000ms backoff.
+	time.Sleep(2 * time.Second)
+
+	assert.GreaterOrEqual(t, calls, 3, "expected at least 3 retry attempts")
+}
+
+// TestPersistAuthUserToChain_NilChain_NoPanic ensures nil chain/user is safe.
+func TestPersistAuthUserToChain_NilChain_NoPanic(t *testing.T) {
+	persistAuthUserToChain(nil, &store.AuthUser{Email: "x@example.com"})
+	persistAuthUserToChain(&teechain.TeeChain{}, nil)
+	// No panic = pass
+}
+
+// TestGenerateAPIKey_ReturnsErrorOnRandFailure verifies that generateAPIKey
+// propagates rand.Read errors instead of returning weak/zero entropy keys.
+func TestGenerateAPIKey_ReturnsErrorOnRandFailure(t *testing.T) {
+	originalFn := randReadFn
+	defer func() { randReadFn = originalFn }()
+
+	randReadFn = func(b []byte) (int, error) {
+		return 0, fmt.Errorf("simulated rand failure")
+	}
+
+	key, err := generateAPIKey()
+	assert.Error(t, err)
+	assert.Empty(t, key)
+}
+
+// TestGenerateWalletNonce_ReturnsErrorOnRandFailure verifies that
+// generateWalletNonce propagates rand.Read errors.
+func TestGenerateWalletNonce_ReturnsErrorOnRandFailure(t *testing.T) {
+	originalFn := randReadFn
+	defer func() { randReadFn = originalFn }()
+
+	randReadFn = func(b []byte) (int, error) {
+		return 0, fmt.Errorf("simulated rand failure")
+	}
+
+	nonce, err := generateWalletNonce()
+	assert.Error(t, err)
+	assert.Empty(t, nonce)
+}
+
+// TestGenerateAPIKey_Success verifies the happy path returns a well-formed key.
+func TestGenerateAPIKey_Success(t *testing.T) {
+	key, err := generateAPIKey()
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(key, "auth_tee_"))
+	assert.Equal(t, 64+len("auth_tee_"), len(key))
+}
+
+// TestGenerateWalletNonce_Success verifies the happy path returns a 32-char hex nonce.
+func TestGenerateWalletNonce_Success(t *testing.T) {
+	nonce, err := generateWalletNonce()
+	require.NoError(t, err)
+	assert.Equal(t, 32, len(nonce))
 }

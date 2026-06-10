@@ -19,9 +19,16 @@ type contextKey struct {
 	name string
 }
 
+// GatewayTokenFromContext extracts the authenticated gateway token from context.
+// Returns nil if no token was injected by AuthMiddleware.
+func GatewayTokenFromContext(ctx context.Context) *store.GatewayTokenInfo {
+	token, _ := ctx.Value(gatewayTokenCtxKey).(*store.GatewayTokenInfo)
+	return token
+}
+
 // AuthCheck checks the API key is valid via context.
 func AuthCheck(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
-	token := ctx.Value(gatewayTokenCtxKey).(*store.GatewayTokenInfo)
+	token := GatewayTokenFromContext(ctx)
 	if token == nil {
 		err = gqlerror.Errorf("Please log in first.")
 		return

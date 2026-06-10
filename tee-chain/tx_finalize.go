@@ -51,8 +51,10 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				return nil, err
 			}
 		case *model.SysCall_SyncTxStart:
-			// 清理所有共识缓存
-			_ = app.DeleteSigOfTx(int64(p.SyncTxStart.Ids[0]))
+			// 清理所有共识缓存（纳入 txn，与区块提交原子化）
+			if err := app.DeleteSigOfTx(txn, int64(p.SyncTxStart.Ids[0])); err != nil {
+				return nil, errors.Wrap(err, "delete sigs at sync tx start")
+			}
 
 			err = HubSyncStep2(p.SyncTxStart.ChainId, p.SyncTxStart.Ids, txn)
 			if err != nil {
@@ -97,10 +99,14 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				}
 			}
 
-			// 清理签名和临时存储的 batch call 数据
+			// 清理签名和临时存储的 batch call 数据（纳入 txn，与区块提交原子化）
 			if len(p.SyncTxEnd.Ids) > 0 {
-				_ = app.DeleteSigOfTx(int64(p.SyncTxEnd.Ids[0]))
-				deleteBatchCallStore(int64(p.SyncTxEnd.Ids[0]), p.SyncTxEnd.ChainId)
+				if err := app.DeleteSigOfTx(txn, int64(p.SyncTxEnd.Ids[0])); err != nil {
+					return nil, errors.Wrap(err, "delete sigs at sync tx end")
+				}
+				if err := deleteBatchCallStore(txn, int64(p.SyncTxEnd.Ids[0]), p.SyncTxEnd.ChainId); err != nil {
+					return nil, errors.Wrap(err, "delete batch call store")
+				}
 			}
 		case *model.SysCall_RuntimeUpgrade:
 			upgrade := p.RuntimeUpgrade

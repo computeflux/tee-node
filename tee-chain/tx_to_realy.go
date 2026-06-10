@@ -59,10 +59,17 @@ func loadHubCallIds(txIndex int64, chainId uint32) ([]uint64, error) {
 	return stored.Ids, nil
 }
 
-func deleteBatchCallStore(txIndex int64, chainId uint32) {
+// deleteBatchCallStore removes temporary batch call data for a txIndex within the given transaction.
+// The deletion is only persisted when txn is committed by the caller.
+func deleteBatchCallStore(txn *dbstore.Txn, txIndex int64, chainId uint32) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
-	_ = store.DeleteKey(GLOABL_STATE, baseKey+TxIndexCallSuffix)
-	_ = store.DeleteKey(GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+	if err := txn.Delete([]byte(baseKey + TxIndexCallSuffix)); err != nil {
+		return errors.Wrap(err, "delete batch call")
+	}
+	if err := txn.Delete([]byte(baseKey + TxIndexHubCallsSuffix)); err != nil {
+		return errors.Wrap(err, "delete batch hub calls")
+	}
+	return nil
 }
 
 func saveBatchCall(txIndex int64, chainId uint32, call *chaintypes.ChainCall) error {

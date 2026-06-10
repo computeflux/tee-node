@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -33,8 +34,11 @@ func init() {
 	}
 }
 
-// StartServerWithResolver starts the GraphQL + Auth REST + Gateway REST server.
-func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver) {
+// StartServerWithResolver starts the GraphQL + Auth REST + Gateway REST server
+// and blocks until ctx is cancelled. On cancellation it performs a graceful
+// shutdown with a 10-second timeout, closing both the HTTP server and the
+// local AI tunnel.
+func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int, resolver *Resolver) error {
 	teeChain = s
 
 	// 注入合约查询桥接（Gateway 数据从合约读取）
@@ -99,11 +103,40 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")
 	util.LogWithBlue("API", "  /health     -> health check")
 
-	if util.IsFileExists("./token_chain_data/ssl/ser.pem") && util.IsFileExists("./token_chain_data/ssl/ser.key") {
-		util.LogWithBlue("Listen", fmt.Sprintf("https://0.0.0.0:%d", port))
-		http.ListenAndServeTLS(":"+fmt.Sprint(port), "./token_chain_data/ssl/ser.pem", "./token_chain_data/ssl/ser.key", router)
-	} else {
-		util.LogWithBlue("Listen", fmt.Sprintf("http://0.0.0.0:%d", port))
-		http.ListenAndServe(":"+fmt.Sprint(port), router)
+	server := &http.Server{
+		Addr:         ":" + fmt.Sprint(port),
+		Handler:      router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		if util.IsFileExists("./token_chain_data/ssl/ser.pem") && util.IsFileExists("./token_chain_data/ssl/ser.key") {
+			util.LogWithBlue("Listen", fmt.Sprintf("https://0.0.0.0:%d", port))
+			serverErr <- server.ListenAndServeTLS("./token_chain_data/ssl/ser.pem", "./token_chain_data/ssl/ser.key")
+		} else {
+			util.LogWithBlue("Listen", fmt.Sprintf("http://0.0.0.0:%d", port))
+			serverErr <- server.ListenAndServe()
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := localtunnel.ShutdownGlobalServer(10 * time.Second); err != nil {
+			util.LogWithRed("API", "local tunnel shutdown error:", err)
+		}
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("server shutdown: %w", err)
+		}
+		util.LogWithBlue("API", "server shutdown gracefully")
+		return nil
+	case err := <-serverErr:
+		return err
 	}
 }

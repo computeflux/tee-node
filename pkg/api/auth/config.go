@@ -87,7 +87,6 @@ func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 		}
 	}
 
-	// 2. 回退到环境变量（开发环境）
 	return &AuthConfig{}
 }
 

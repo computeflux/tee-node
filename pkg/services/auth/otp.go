@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
@@ -25,7 +26,10 @@ type OTPService struct {
 	verifyFailCount map[string]int       // email -> 连续验证失败次数
 }
 
-func NewOTPService(ttlMins int) *OTPService {
+// NewOTPService creates a new OTP service. The provided context controls the
+// background cleanup goroutine; cancelling the context stops the ticker and
+// terminates the goroutine, preventing leaks in tests and dynamic environments.
+func NewOTPService(ctx context.Context, ttlMins int) *OTPService {
 	ttl := time.Duration(ttlMins) * time.Minute
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
@@ -38,12 +42,17 @@ func NewOTPService(ttlMins int) *OTPService {
 		sendRecords:     make(map[string]time.Time),
 		verifyFailCount: make(map[string]int),
 	}
-	// 启动后台清理
+	// 启动后台清理，受 ctx 控制
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			s.cleanup()
+		for {
+			select {
+			case <-ticker.C:
+				s.cleanup()
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 	return s

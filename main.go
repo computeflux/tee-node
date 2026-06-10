@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -104,10 +105,10 @@ func main() {
 	// Set DKG to teeChain
 	teeChain.SetDKG(dkgIns)
 
-	if err := teechain.LoadRuntimeForDebug(); err != nil {
-		fmt.Println("LoadRuntimeForDebug:", err)
-		os.Exit(1)
-	}
+	// if err := teechain.LoadRuntimeForDebug(); err != nil {
+	// 	fmt.Println("LoadRuntimeForDebug:", err)
+	// 	os.Exit(1)
+	// }
 
 	// load chains
 	err = teeChain.LoadChains()
@@ -137,7 +138,11 @@ func main() {
 	walletSvc := wallet.NewWalletService(teeChain)
 	emailSvc := authsvc.NewEmailService(teeChain)
 	oauthSvc := authsvc.NewOAuthService(teeChain)
-	otpSvc := authsvc.NewOTPService(5)
+	// Start GraphQL server
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	otpSvc := authsvc.NewOTPService(ctx, 5)
 
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{
@@ -148,11 +153,15 @@ func main() {
 		OTPSvc:    otpSvc,
 	}
 
-	// Start GraphQL server
-	go graph.StartServerWithResolver(teeChain, gqlPort, resolver)
+	go func() {
+		if err := graph.StartServerWithResolver(ctx, teeChain, gqlPort, resolver); err != nil {
+			fmt.Println("server error:", err)
+		}
+	}()
 
 	// wait for stop signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
+	cancel()
 }
