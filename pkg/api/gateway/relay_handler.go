@@ -53,8 +53,9 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Endpoint 级别限流 — 这才是真正的瓶颈
-	providerType := relay.DetectProvider(endpoint.URL)
-	rpmLimit, maxConc := GetProviderLimits(providerType)
+	// 优先使用合约中的 ProviderType 做限流分类，本地模型不再被误判为 openai。
+	providerTypeStr := providerTypeToLimiterKey(modelData.Data.ProviderType)
+	rpmLimit, maxConc := GetProviderLimits(providerTypeStr)
 	lim := getEndpointLimiter(endpoint.ID, rpmLimit)
 	lim.SetLimits(rpmLimit, maxConc)
 	if !lim.Allow() {
@@ -75,7 +76,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(bodyBytes, &reqBody)
 
 	// Business error (e.g. upstream 4xx): already contains status code and message.
-	usage, bizErr, err := relayToUpstreamFn(w, r, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream)
+	usage, bizErr, err := relayToUpstreamFn(w, r, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream, modelData.Data.ProviderType)
 	if bizErr != nil {
 		EmitProviderMetric(modelData.Data.ProviderID, false)
 		writeError(w, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
@@ -115,9 +116,11 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 }
 
 // relayToUpstreamFn 可被测试替换为 mock。
-var relayToUpstreamFn = relayToUpstream
+var relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	return relayToUpstream(w, r, endpoint, modelName, bodyBytes, isStream, providerType)
+}
 
-func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
 
 	meta := relay.GetMetaByContext(ctx)
@@ -125,8 +128,11 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	meta.APIKey = endpoint.APIKey
 	meta.IsStream = isStream
 	meta.OriginModelName = modelName
+	meta.ProviderType = providerType
 
-	adaptor := relay.GetAdaptorForProviderType(relay.DetectProvider(endpoint.URL))
+	// 优先根据合约中的 ProviderType 选择 Adaptor，避免通过 URL 字符串猜测。
+	// 本地模型地址（如 http://192.168.x.x）会被 DetectProvider 误判为 openai。
+	adaptor := relay.GetAdaptorForProviderTypeCode(providerType)
 	adaptor.Init(meta)
 
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
@@ -142,6 +148,20 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 		return nil, bizErr, nil
 	}
 	return usage, nil, nil
+}
+
+// providerTypeToLimiterKey 将合约 ProviderType 数值映射为限流配置中的字符串 key。
+func providerTypeToLimiterKey(providerType uint16) string {
+	switch providerType {
+	case 2:
+		return "anthropic"
+	case 3:
+		return "gemini"
+	case 9:
+		return "local"
+	default:
+		return "openai"
+	}
 }
 
 func HandleListModels(w http.ResponseWriter, r *http.Request) {

@@ -416,7 +416,7 @@ func TestCodec_Gateway_ModelInfoWithID(t *testing.T) {
 		ID: 99,
 		Data: gateway.ModelInfo{
 			Name: "llama", ProviderID: 3,
-			ProviderType: gateway.ProviderLlama,
+			ProviderType: gateway.ProviderOpenAI,
 			ModelID:      "llama-3-70b",
 			IsActive:     true,
 		},

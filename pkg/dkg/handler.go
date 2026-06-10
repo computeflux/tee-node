@@ -2,13 +2,10 @@ package dkg
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/dkg/types"
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -68,30 +65,3 @@ func (dkg *DKG) handleDkg(msg *model.DkgMessage) error {
 	}
 }
 
-// handleSecretSave handles shared secret data persistence from P2P messages.
-func (r *DKG) handleSecretSave() {
-	r.Peer.Sub("secret", func(msgWrap any) error {
-		msg, ok := msgWrap.(*model.DkgMessage)
-		if !ok {
-			return errors.New("invalid message type")
-		}
-		// 解析消息
-		var datas []domain.Kvs
-		err := json.Unmarshal(msg.Payload, &datas)
-		if err != nil {
-			fmt.Println("Error unmarshalling message data: ", err)
-			return err
-		}
-
-		for _, data := range datas {
-			fmt.Println("-------------------------Save key: ", data.K)
-			err := store.SetKey("secret", data.K, data.V)
-			if err != nil {
-				fmt.Println("Error setting key: ", err)
-				continue
-			}
-		}
-
-		return nil
-	})
-}

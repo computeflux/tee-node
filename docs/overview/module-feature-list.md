@@ -47,7 +47,7 @@
 | **DSS 阈值签名** | `DssSigner` 支持 Ed25519（Schnorr/EdDSA）和 BLS12-381（`tbls` + EIP-2537 格式化）的 `Sign()` / `PartialSign()` |
 | **随机数池** | `RandomSharePool` 预生成独立随机份额，避免 Ed25519 DSS 并发签名时的 nonce 重用 |
 | **Epoch 部分签名** | `SendNewEpochPartialSigToSponsor` / `RevPartialSig` — 收集阈值部分签名完成链上 epoch 提交 |
-| **P2P 消息路由** | `handleDkg()` 路由 `consensus` / `deal` / `deal_resp` / `random_deal_batch` 等消息；`handleSecretSave` 用于 P2P 秘密持久化 |
+| **P2P 消息路由** | `handleDkg()` 路由 `consensus` / `deal` / `deal_resp` / `random_deal_batch` 等消息 |
 | **状态持久化** | DKG 状态保存/恢复至 PebbleDB (`persist.go`) |
 
 #### 2.3 代理重加密（`pkg/proxy-reenc/`）

@@ -46,7 +46,7 @@ func setupMockFns(t *testing.T) func() {
 		getBridgeFn = old["getBridgeFn"].(func() *teechain.TeeChain)
 		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
 		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
-		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, bool) (*relay.Usage, *relay.ErrorWithStatusCode, error))
+		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, bool, uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error))
 		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
 	}
 }
@@ -501,7 +501,7 @@ func TestHandleRelay_RateLimited(t *testing.T) {
 	}
 
 	// Mock relay so we don't hit real upstream if rate limit doesn't trigger
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		t.Fatal("relayToUpstream should not be called when rate limited")
 		return nil, nil, nil
 	}
@@ -526,7 +526,7 @@ func TestHandleRelay_UpstreamBizError(t *testing.T) {
 	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return nil, &relay.ErrorWithStatusCode{StatusCode: http.StatusBadRequest, Error: relay.ErrorDetail{Message: "bad request", Type: "invalid_request"}}, nil
 	}
 
@@ -545,7 +545,7 @@ func TestHandleRelay_UpstreamTransportError(t *testing.T) {
 	endpoint := &store.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
 	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return nil, nil, fmt.Errorf("connection refused")
 	}
 
@@ -569,7 +569,7 @@ func TestHandleRelay_Success(t *testing.T) {
 		recorded = true
 	}
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		return &relay.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, nil, nil
 	}
 

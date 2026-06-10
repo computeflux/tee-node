@@ -82,6 +82,8 @@ func providerDefaultURL(providerType uint16) string {
 		return "https://api.anthropic.com"
 	case 3: // googleapis
 		return "https://generativelanguage.googleapis.com"
+	case 9: // local
+		return "" // 本地模型必须显式配置 URI
 	default:
 		return ""
 	}

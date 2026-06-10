@@ -17,6 +17,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
+	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
 	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
@@ -79,6 +80,15 @@ func StartServerWithResolver(s *teechain.TeeChain, port int, resolver *Resolver)
 
 	// Gateway REST routes (OpenAI SDK compatible)
 	gateway.RegisterGatewayRoutes(router)
+
+	// Local AI tunnel TCP endpoint (本地模型反向隧道，Yamux)
+	if err := localtunnel.StartGlobalServer(":19000", func(modelID, apiKey string) bool {
+		// TODO: 从合约验证 apiKey 是否属于该 model 的 apiKeys
+		// 当前简化为非空即通过，生产环境应接入合约查询
+		return apiKey != ""
+	}); err != nil {
+		fmt.Printf("[LOCAL-TUNNEL] failed to start: %v\n", err)
+	}
 
 	// REST routes for dapp (Web3Auth SDK compatible)
 	restMux := http.NewServeMux()

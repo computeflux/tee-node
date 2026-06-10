@@ -83,6 +83,7 @@ var ProviderRateDefaults = map[string]struct {
 	"openai":    {MaxConc: 50},  // 10 keys × 50 = 500 打满连接池
 	"anthropic": {MaxConc: 20},  // 25 keys × 20 = 500
 	"gemini":    {MaxConc: 100}, // 5 keys × 100 = 500
+	"local":     {MaxConc: 100}, // 本地模型通常部署在局域网，并发可更高
 	"default":   {MaxConc: 50},
 }
 

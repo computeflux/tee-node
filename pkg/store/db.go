@@ -253,13 +253,8 @@ func GetProtoMessage[T any](namespace, key string) (*T, error) {
 		return nil, nil
 	}
 
-	value, err := util.Unseal(v, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	val := new(T)
-	err = protoio.ReadMessage(bytes.NewBuffer(value), val)
+	err = protoio.ReadMessage(bytes.NewBuffer(v), val)
 	return val, err
 }
 

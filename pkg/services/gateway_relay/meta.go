@@ -16,6 +16,7 @@ type Meta struct {
 	OriginModelName string
 	RequestURLPath  string
 	StartTime       time.Time
+	ProviderType    uint16 // 供应商类型代码，用于选择 Adaptor
 }
 
 // GetByContext 从 RelayContext 构建 Meta（替代 token 的 GetByContext）

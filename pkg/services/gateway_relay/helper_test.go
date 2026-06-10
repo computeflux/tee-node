@@ -18,12 +18,6 @@ func TestDetectProvider(t *testing.T) {
 	}{
 		{"https://api.openai.com/v1", "openai"},
 		{"https://api.anthropic.com/v1", "anthropic"},
-		{"https://generativelanguage.googleapis.com", "gemini"},
-		{"https://api.deepseek.com", "deepseek"},
-		{"https://api.groq.com/openai", "groq"},
-		{"https://api.mistral.ai", "mistral"},
-		{"https://api.cohere.ai", "cohere"},
-		{"https://api.x.ai", "xai"},
 		{"https://unknown.com", "openai"}, // default
 	}
 

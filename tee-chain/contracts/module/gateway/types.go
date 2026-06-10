@@ -28,14 +28,10 @@ const (
 
 // ── Provider Type ───────────────────────────────────────
 const (
-	ProviderOpenAI   uint16 = iota + 1 // 1
-	ProviderClaude                     // 2
-	ProviderGemini                     // 3
-	ProviderAzure                      // 4
-	ProviderDeepSeek                   // 5
-	ProviderLlama                      // 6
-	ProviderMistral                    // 7
-	ProviderCohere                     // 8
+	ProviderOpenAI uint16 = iota + 1 // 1
+	ProviderClaude                   // 2
+	ProviderGemini                   // 3
+	ProviderLocal                    // 9 本地私有化部署模型
 )
 
 // ── Model ────────────────────────────────────────────────

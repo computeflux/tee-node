@@ -55,7 +55,8 @@ func jsonDecode(data []byte, v interface{}) error {
 
 // ── Provider detection ──────────────────────────────────
 
-// DetectProvider tries to detect the provider from the base URL
+// DetectProvider tries to detect the provider from the base URL.
+// Deprecated: adaptor 选择已改为通过 ProviderType 代码直接路由，不再依赖 URL 猜测。
 func DetectProvider(baseURL string) string {
 	lower := strings.ToLower(baseURL)
 	switch {
@@ -75,6 +76,23 @@ func GetAdaptorForProviderType(providerType string) Adaptor {
 		return &AnthropicAdaptor{}
 	case "gemini":
 		return &GeminiAdaptor{}
+	case "local":
+		return &LocalAdaptor{}
+	default:
+		return &OpenAIAdaptor{}
+	}
+}
+
+// GetAdaptorForProviderTypeCode 根据 ProviderType 数值代码返回 Adaptor。
+// 优先用于已知 providerType 的场景（如合约模型元数据），避免通过 URL 字符串猜测。
+func GetAdaptorForProviderTypeCode(providerType uint16) Adaptor {
+	switch providerType {
+	case 2: // ProviderClaude
+		return &AnthropicAdaptor{}
+	case 3: // ProviderGemini
+		return &GeminiAdaptor{}
+	case 9: // ProviderLocal
+		return &LocalAdaptor{}
 	default:
 		return &OpenAIAdaptor{}
 	}

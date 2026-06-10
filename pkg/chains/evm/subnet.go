@@ -146,7 +146,16 @@ func buildValidators(ids []uint64, nodes []bindings.SecretNode) []*chaintypes.Va
 
 func (e *EvmChain) GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error) {
 	// 获取所有 workers（与旧版 ink! 逻辑一致）
+	e.mu.RLock()
 	workers, _, err := e.subnet.GetWorkers(&bind.CallOpts{}, 0, 5000)
+	e.mu.RUnlock()
+	if err != nil {
+		if rerr := e.reconnect(); rerr == nil {
+			e.mu.RLock()
+			workers, _, err = e.subnet.GetWorkers(&bind.CallOpts{}, 0, 5000)
+			e.mu.RUnlock()
+		}
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("GetWorkers: %w", err)
 	}
@@ -156,7 +165,16 @@ func (e *EvmChain) GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error)
 	// start 必须 >= total 才能拿到全部。传一个大数让合约自动 clamp 到 total-1。
 	bigStart := big.NewInt(1 << 60) // 足够大，合约会 clamp 到 nextSecretId-1
 	bigSize := big.NewInt(5000)
+	e.mu.RLock()
 	secretsResult, err := e.subnet.GetSecrets(&bind.CallOpts{}, bigStart, bigSize)
+	e.mu.RUnlock()
+	if err != nil {
+		if rerr := e.reconnect(); rerr == nil {
+			e.mu.RLock()
+			secretsResult, err = e.subnet.GetSecrets(&bind.CallOpts{}, bigStart, bigSize)
+			e.mu.RUnlock()
+		}
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("GetSecrets: %w", err)
 	}
