@@ -143,28 +143,6 @@ export SIDE_CHAIN_RPC_PORT=30117
 export GQL_PORT=30118
 export CHAIN_ENV=test
 
-# mutation{
-#   setAuthConfig(cfg:{
-#     corsOrigins: "*",
-#     smtpHost: "smtp.feishu.cn",
-#     smtpPort: 465,
-#     smtpUser: "bai@asyou.me",
-#     smtpPassword: "lgMoryDJQuM88BoL",
-#     smtpFrom: "bai@asyou.me",
-#     smtpFromName: "compute flux",
-#     mockEmail: true,
-#     googleClientID: "560483017331-cjvd4d7ed90ddibspo72fmdmc87nb91v.apps.googleusercontent.com",
-#     googleClientSecret: "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",
-#     googleRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
-#     githubClientID: "Ov23lioDBYC59lwL07p6",
-#     githubClientSecret: "efd1ff9c815b4353d4f57ed85847c17c2f498df5",
-#     githubRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
-#     twitterClientID: "MFEzY1J1SWsyQlZyVXAxeTF1TDM6MTpjaQ",
-#     twitterClientSecret: "M74QGQdYEq-8Uyl3TTUVbWOqvYWEYHVLz5uibXbv_R9ARJbptE",
-#     twitterRedirectURL: "http://xiaobai.asyou.me:5174/oauth/callback.html",
-#   })
-# }
-
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
 

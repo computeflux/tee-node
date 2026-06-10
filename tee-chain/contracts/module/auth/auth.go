@@ -188,6 +188,7 @@ func (a AuthQuery) GetConfig() (*AuthConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if cfg == nil {
 		return nil, nil
 	}
