@@ -97,22 +97,3 @@ func GetRelayMode(path string) int {
 	}
 	return 0
 }
-
-// ── Model Ratio Lookup ───────────────────────────────────
-
-// GetModelPointsRate returns points per 1K tokens for a given model
-func GetModelPointsRate(model string) int {
-	// Simplified: map common models to points
-	rates := map[string]int{
-		"gpt-4": 30, "gpt-4-32k": 60, "gpt-4-turbo": 10,
-		"gpt-4o": 5, "gpt-4o-mini": 1,
-		"gpt-3.5-turbo": 3, "gpt-3.5-turbo-0125": 3,
-		"claude-3-opus": 25, "claude-3-sonnet": 10, "claude-3-haiku": 3,
-		"gemini-1.5-pro": 5, "gemini-1.5-flash": 1,
-		"text-embedding-3-small": 1, "text-embedding-3-large": 2,
-	}
-	if r, ok := rates[model]; ok {
-		return r
-	}
-	return 1 // default 1 point per 1K tokens
-}

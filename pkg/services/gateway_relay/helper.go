@@ -91,7 +91,7 @@ func GetAdaptorForProviderTypeCode(providerType uint16) Adaptor {
 		return &AnthropicAdaptor{}
 	case 3: // ProviderGemini
 		return &GeminiAdaptor{}
-	case 9: // ProviderLocal
+	case 9999: // ProviderLocal
 		return &LocalAdaptor{}
 	default:
 		return &OpenAIAdaptor{}

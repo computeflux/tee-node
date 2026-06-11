@@ -41,18 +41,6 @@ func TestGetRelayMode(t *testing.T) {
 	}
 }
 
-// ── GetModelPointsRate ─────────────────────────────────────
-
-func TestGetModelPointsRate(t *testing.T) {
-	assert.Equal(t, 30, GetModelPointsRate("gpt-4"))
-	assert.Equal(t, 60, GetModelPointsRate("gpt-4-32k"))
-	assert.Equal(t, 5, GetModelPointsRate("gpt-4o"))
-	assert.Equal(t, 1, GetModelPointsRate("gpt-4o-mini"))
-	assert.Equal(t, 25, GetModelPointsRate("claude-3-opus"))
-	assert.Equal(t, 5, GetModelPointsRate("gemini-1.5-pro"))
-	assert.Equal(t, 1, GetModelPointsRate("unknown-model")) // default
-}
-
 // ── GetAdaptorForProviderType ──────────────────────────────
 
 func TestGetAdaptorForProviderType(t *testing.T) {
