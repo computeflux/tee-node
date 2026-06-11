@@ -113,6 +113,21 @@ type LenValue struct {
 	V int    `json:"v"`
 }
 
+type ModelInfo struct {
+	Name            string `json:"name"`
+	ProviderID      int    `json:"providerId"`
+	ProviderType    int    `json:"providerType"`
+	ModelID         string `json:"modelId"`
+	URI             string `json:"uri"`
+	InputModalities int    `json:"inputModalities"`
+	ContextLength   int    `json:"contextLength"`
+	InPrice         int    `json:"inPrice"`
+	CachedPrice     int    `json:"cachedPrice"`
+	OutPrice        int    `json:"outPrice"`
+	IsActive        bool   `json:"isActive"`
+	CreatedAt       int    `json:"createdAt"`
+}
+
 type Mutation struct {
 }
 

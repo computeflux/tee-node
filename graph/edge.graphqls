@@ -1,0 +1,19 @@
+type ModelInfo {
+  name: String!
+  providerId: Int!
+  providerType: Int!
+  modelId: String!
+  uri: String!
+  inputModalities: Int!
+  contextLength: Int!
+  inPrice: Int!
+  cachedPrice: Int!
+  outPrice: Int!
+  isActive: Boolean!
+  createdAt: Int!
+}
+
+# ── Query ───────────────────────────────────────────────
+extend type Query {
+  EdgeModels: [ModelInfo!]! @AuthCheck
+}
