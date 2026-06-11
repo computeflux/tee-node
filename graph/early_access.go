@@ -11,7 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/store"
 )
 
-const eaNamespace = "EARLY_WAITLIST"
+const eaNamespace = "EARLY_POINTS"
 
 // EarlyAccessStore 基于 Pebble 的持久化存储。
 type EarlyAccessStore struct {
@@ -148,7 +148,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 			if err := s.addPoints(wallet, bonusInvitee); err != nil {
 				return false, err
 			}
-			if err := s.appendHistory(wallet, "50", "referral_reward", now, &referrerWallet); err != nil {
+			if err := s.appendHistory(wallet, "50", "referral_reward_invitee", now, &referrerWallet); err != nil {
 				return false, err
 			}
 			stats.TotalPointsDistributed += bonusInvitee
@@ -158,7 +158,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 			if err := s.addPoints(referrerWallet, bonusInviter); err != nil {
 				return false, err
 			}
-			if err := s.appendHistory(referrerWallet, "200", "referral_reward", now, &wallet); err != nil {
+			if err := s.appendHistory(referrerWallet, "200", "referral_reward_inviter", now, &wallet); err != nil {
 				return false, err
 			}
 			stats.TotalPointsDistributed += bonusInviter
@@ -303,7 +303,7 @@ func (s *EarlyAccessStore) updateReferralCode(wallet, referralCode string) (bool
 	if err := s.addPoints(wallet, bonusInvitee); err != nil {
 		return false, err
 	}
-	if err := s.appendHistory(wallet, "50", "referral_reward", now, &referrerWallet); err != nil {
+	if err := s.appendHistory(wallet, "50", "referral_reward_invitee", now, &referrerWallet); err != nil {
 		return false, err
 	}
 
@@ -312,7 +312,7 @@ func (s *EarlyAccessStore) updateReferralCode(wallet, referralCode string) (bool
 	if err := s.addPoints(referrerWallet, bonusInviter); err != nil {
 		return false, err
 	}
-	if err := s.appendHistory(referrerWallet, "200", "referral_reward", now, &wallet); err != nil {
+	if err := s.appendHistory(referrerWallet, "200", "referral_reward_inviter", now, &wallet); err != nil {
 		return false, err
 	}
 
@@ -552,12 +552,18 @@ func (s *EarlyAccessStore) getPointsHistory(wallet string, offset, limit int) ([
 	items := make([]*pointsHistoryRecord, total)
 	for i := 0; i < total; i++ {
 		rec := records[total-1-i]
-		items[i] = &pointsHistoryRecord{
+		item := &pointsHistoryRecord{
 			amount:      rec.Amount,
 			reason:      rec.Reason,
 			timestamp:   rec.Timestamp,
 			relatedUser: rec.RelatedUser,
 		}
+		if rec.RelatedUser != nil && *rec.RelatedUser != "" {
+			if related := s.getUser(*rec.RelatedUser); related != nil && related.email != "" {
+				item.relatedEmail = &related.email
+			}
+		}
+		items[i] = item
 	}
 
 	if offset < 0 {
@@ -596,10 +602,11 @@ type earlyAccessUserRecord struct {
 }
 
 type pointsHistoryRecord struct {
-	amount      string
-	reason      string
-	timestamp   string
-	relatedUser *string
+	amount       string
+	reason       string
+	timestamp    string
+	relatedUser  *string
+	relatedEmail *string
 }
 
 type earlyAccessStatsRecord struct {

@@ -9,7 +9,7 @@ var TestChainConfig = chaintypes.ChainConfigType{
 	ChainID:       420420417,
 	ChainType:     "substrate",
 	Cipher:        crypto.SuiteEd25519,
-	Urls:          []string{"wss://asset-hub-paseo.ibp.network", "wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://asset-hub-paseo.dotters.network"},
+	Urls:          []string{"wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://asset-hub-paseo.dotters.network"},
 	SubnetAddress: "0xf8e6c4dec077b148b55e31533efea751c91f25e4",
 	TokenAddress:  "0xc0849f08bd8f1028a499d6e689f3431c0730a582",
 	NetworkLabel:  "Paseo (Asset Hub)",

@@ -23,6 +23,7 @@ type PointsHistoryItem {
   reason: String!
   timestamp: String!
   relatedUser: String
+  relatedEmail: String
 }
 
 type PointsHistory {
@@ -77,4 +78,6 @@ extend type Mutation {
   joinEarlyAccess(wallet: String!, email: String, referralCode: String): JoinEarlyAccessResult!
   updateReferralCode(wallet: String!, referralCode: String!): JoinEarlyAccessResult!
   claimEarlyAccessTask(wallet: String!, task: EarlyAccessTaskType!): ClaimTaskResult!
+  joinDiscord(wallet: String!, message: String!, signature: String!): ClaimTaskResult!
+  joinTelegram(wallet: String!, message: String!, signature: String!): ClaimTaskResult!
 }

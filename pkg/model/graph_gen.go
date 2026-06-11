@@ -122,10 +122,11 @@ type PointsHistory struct {
 }
 
 type PointsHistoryItem struct {
-	Amount      string  `json:"amount"`
-	Reason      string  `json:"reason"`
-	Timestamp   string  `json:"timestamp"`
-	RelatedUser *string `json:"relatedUser,omitempty"`
+	Amount       string  `json:"amount"`
+	Reason       string  `json:"reason"`
+	Timestamp    string  `json:"timestamp"`
+	RelatedUser  *string `json:"relatedUser,omitempty"`
+	RelatedEmail *string `json:"relatedEmail,omitempty"`
 }
 
 type Query struct {

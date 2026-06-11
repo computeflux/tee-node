@@ -50,6 +50,38 @@ func (r *mutationResolver) ClaimEarlyAccessTask(ctx context.Context, wallet stri
 	}, nil
 }
 
+// JoinDiscord is the resolver for the joinDiscord field.
+func (r *mutationResolver) JoinDiscord(ctx context.Context, wallet string, message string, signature string) (*model.ClaimTaskResult, error) {
+	if !verifyEIP191Signature(wallet, signature, message) {
+		return nil, fmt.Errorf("invalid signature")
+	}
+	success, awarded, total, err := earlyAccessStore.claimTask(wallet, "JOIN_DISCORD")
+	if err != nil {
+		return nil, err
+	}
+	return &model.ClaimTaskResult{
+		Success:       success,
+		PointsAwarded: fmt.Sprintf("%d", awarded),
+		TotalPoints:   fmt.Sprintf("%d", total),
+	}, nil
+}
+
+// JoinTelegram is the resolver for the joinTelegram field.
+func (r *mutationResolver) JoinTelegram(ctx context.Context, wallet string, message string, signature string) (*model.ClaimTaskResult, error) {
+	if !verifyEIP191Signature(wallet, signature, message) {
+		return nil, fmt.Errorf("invalid signature")
+	}
+	success, awarded, total, err := earlyAccessStore.claimTask(wallet, "JOIN_TELEGRAM")
+	if err != nil {
+		return nil, err
+	}
+	return &model.ClaimTaskResult{
+		Success:       success,
+		PointsAwarded: fmt.Sprintf("%d", awarded),
+		TotalPoints:   fmt.Sprintf("%d", total),
+	}, nil
+}
+
 // EarlyAccessUser is the resolver for the earlyAccessUser field.
 func (r *queryResolver) EarlyAccessUser(ctx context.Context, user string) (*model.EarlyAccessUser, error) {
 	record := earlyAccessStore.getUser(user)
@@ -163,10 +195,11 @@ func (r *queryResolver) EarlyAccessPointsHistory(ctx context.Context, user strin
 	items := make([]*model.PointsHistoryItem, len(records))
 	for i, rec := range records {
 		items[i] = &model.PointsHistoryItem{
-			Amount:      rec.amount,
-			Reason:      rec.reason,
-			Timestamp:   rec.timestamp,
-			RelatedUser: rec.relatedUser,
+			Amount:       rec.amount,
+			Reason:       rec.reason,
+			Timestamp:    rec.timestamp,
+			RelatedUser:  rec.relatedUser,
+			RelatedEmail: rec.relatedEmail,
 		}
 	}
 	return &model.PointsHistory{

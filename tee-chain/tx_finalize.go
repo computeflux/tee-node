@@ -176,7 +176,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 			}
 
 			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce {
+			if txNonce != expectedNonce && callerType != 0 {
 				return nil, errors.Errorf(
 					"invalid nonce: expected %d, got %d (caller %x, type %d)",
 					expectedNonce, txNonce, caller, callerType,

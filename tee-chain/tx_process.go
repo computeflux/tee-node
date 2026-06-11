@@ -50,7 +50,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 			}
 
 			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce {
+			if txNonce != expectedNonce && callerType != 0 {
 				fmt.Printf("ProcessTx REJECT: invalid nonce, expected %d, got %d (caller %x, type %d)\n", expectedNonce, txNonce, caller, callerType)
 				return abci.ResponseProcessProposal_REJECT
 			}

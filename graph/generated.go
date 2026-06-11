@@ -136,7 +136,9 @@ type ComplexityRoot struct {
 		ContractCall         func(childComplexity int, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) int
 		Faucet               func(childComplexity int, caller string, callerType int) int
 		InitDiskKey          func(childComplexity int, index string, user string) int
+		JoinDiscord          func(childComplexity int, wallet string, message string, signature string) int
 		JoinEarlyAccess      func(childComplexity int, wallet string, email *string, referralCode *string) int
+		JoinTelegram         func(childComplexity int, wallet string, message string, signature string) int
 		LoginWithWallet      func(childComplexity int, address string, signature string, message string, nonce string) int
 		RequestOtp           func(childComplexity int, email string, clientID string) int
 		RequestRecovery      func(childComplexity int, recoveryEmail string) int
@@ -166,10 +168,11 @@ type ComplexityRoot struct {
 	}
 
 	PointsHistoryItem struct {
-		Amount      func(childComplexity int) int
-		Reason      func(childComplexity int) int
-		RelatedUser func(childComplexity int) int
-		Timestamp   func(childComplexity int) int
+		Amount       func(childComplexity int) int
+		Reason       func(childComplexity int) int
+		RelatedEmail func(childComplexity int) int
+		RelatedUser  func(childComplexity int) int
+		Timestamp    func(childComplexity int) int
 	}
 
 	Query struct {
@@ -274,6 +277,8 @@ type MutationResolver interface {
 	JoinEarlyAccess(ctx context.Context, wallet string, email *string, referralCode *string) (*model.JoinEarlyAccessResult, error)
 	UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*model.JoinEarlyAccessResult, error)
 	ClaimEarlyAccessTask(ctx context.Context, wallet string, task model.EarlyAccessTaskType) (*model.ClaimTaskResult, error)
+	JoinDiscord(ctx context.Context, wallet string, message string, signature string) (*model.ClaimTaskResult, error)
+	JoinTelegram(ctx context.Context, wallet string, message string, signature string) (*model.ClaimTaskResult, error)
 	UploadSecret(ctx context.Context, index string, secret string, hash string, user string) (bool, error)
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
 }
@@ -735,6 +740,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.InitDiskKey(childComplexity, args["index"].(string), args["user"].(string)), true
 
+	case "Mutation.joinDiscord":
+		if e.complexity.Mutation.JoinDiscord == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_joinDiscord_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.JoinDiscord(childComplexity, args["wallet"].(string), args["message"].(string), args["signature"].(string)), true
+
 	case "Mutation.joinEarlyAccess":
 		if e.complexity.Mutation.JoinEarlyAccess == nil {
 			break
@@ -746,6 +763,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.JoinEarlyAccess(childComplexity, args["wallet"].(string), args["email"].(*string), args["referralCode"].(*string)), true
+
+	case "Mutation.joinTelegram":
+		if e.complexity.Mutation.JoinTelegram == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_joinTelegram_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.JoinTelegram(childComplexity, args["wallet"].(string), args["message"].(string), args["signature"].(string)), true
 
 	case "Mutation.loginWithWallet":
 		if e.complexity.Mutation.LoginWithWallet == nil {
@@ -980,6 +1009,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PointsHistoryItem.Reason(childComplexity), true
+
+	case "PointsHistoryItem.relatedEmail":
+		if e.complexity.PointsHistoryItem.RelatedEmail == nil {
+			break
+		}
+
+		return e.complexity.PointsHistoryItem.RelatedEmail(childComplexity), true
 
 	case "PointsHistoryItem.relatedUser":
 		if e.complexity.PointsHistoryItem.RelatedUser == nil {
@@ -1929,6 +1965,80 @@ func (ec *executionContext) field_Mutation_init_disk_key_argsUser(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_joinDiscord_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_joinDiscord_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := ec.field_Mutation_joinDiscord_argsMessage(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["message"] = arg1
+	arg2, err := ec.field_Mutation_joinDiscord_argsSignature(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["signature"] = arg2
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_joinDiscord_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinDiscord_argsMessage(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["message"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+	if tmp, ok := rawArgs["message"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinDiscord_argsSignature(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["signature"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+	if tmp, ok := rawArgs["signature"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_joinEarlyAccess_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2000,6 +2110,80 @@ func (ec *executionContext) field_Mutation_joinEarlyAccess_argsReferralCode(
 	}
 
 	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinTelegram_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_joinTelegram_argsWallet(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := ec.field_Mutation_joinTelegram_argsMessage(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["message"] = arg1
+	arg2, err := ec.field_Mutation_joinTelegram_argsSignature(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["signature"] = arg2
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_joinTelegram_argsWallet(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["wallet"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("wallet"))
+	if tmp, ok := rawArgs["wallet"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinTelegram_argsMessage(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["message"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("message"))
+	if tmp, ok := rawArgs["message"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_joinTelegram_argsSignature(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["signature"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("signature"))
+	if tmp, ok := rawArgs["signature"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
 	return zeroVal, nil
 }
 
@@ -7341,6 +7525,132 @@ func (ec *executionContext) fieldContext_Mutation_claimEarlyAccessTask(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_joinDiscord(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_joinDiscord(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().JoinDiscord(rctx, fc.Args["wallet"].(string), fc.Args["message"].(string), fc.Args["signature"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ClaimTaskResult)
+	fc.Result = res
+	return ec.marshalNClaimTaskResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐClaimTaskResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_joinDiscord(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_ClaimTaskResult_success(ctx, field)
+			case "pointsAwarded":
+				return ec.fieldContext_ClaimTaskResult_pointsAwarded(ctx, field)
+			case "totalPoints":
+				return ec.fieldContext_ClaimTaskResult_totalPoints(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ClaimTaskResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_joinDiscord_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_joinTelegram(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_joinTelegram(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().JoinTelegram(rctx, fc.Args["wallet"].(string), fc.Args["message"].(string), fc.Args["signature"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ClaimTaskResult)
+	fc.Result = res
+	return ec.marshalNClaimTaskResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐClaimTaskResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_joinTelegram(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_ClaimTaskResult_success(ctx, field)
+			case "pointsAwarded":
+				return ec.fieldContext_ClaimTaskResult_pointsAwarded(ctx, field)
+			case "totalPoints":
+				return ec.fieldContext_ClaimTaskResult_totalPoints(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ClaimTaskResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_joinTelegram_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_upload_secret(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_upload_secret(ctx, field)
 	if err != nil {
@@ -7586,6 +7896,8 @@ func (ec *executionContext) fieldContext_PointsHistory_items(_ context.Context, 
 				return ec.fieldContext_PointsHistoryItem_timestamp(ctx, field)
 			case "relatedUser":
 				return ec.fieldContext_PointsHistoryItem_relatedUser(ctx, field)
+			case "relatedEmail":
+				return ec.fieldContext_PointsHistoryItem_relatedEmail(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type PointsHistoryItem", field.Name)
 		},
@@ -7798,6 +8110,47 @@ func (ec *executionContext) _PointsHistoryItem_relatedUser(ctx context.Context, 
 }
 
 func (ec *executionContext) fieldContext_PointsHistoryItem_relatedUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PointsHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PointsHistoryItem_relatedEmail(ctx context.Context, field graphql.CollectedField, obj *model.PointsHistoryItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_PointsHistoryItem_relatedEmail(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RelatedEmail, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_PointsHistoryItem_relatedEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PointsHistoryItem",
 		Field:      field,
@@ -13409,6 +13762,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "joinDiscord":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_joinDiscord(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "joinTelegram":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_joinTelegram(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "upload_secret":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_upload_secret(ctx, field)
@@ -13557,6 +13924,8 @@ func (ec *executionContext) _PointsHistoryItem(ctx context.Context, sel ast.Sele
 			}
 		case "relatedUser":
 			out.Values[i] = ec._PointsHistoryItem_relatedUser(ctx, field, obj)
+		case "relatedEmail":
+			out.Values[i] = ec._PointsHistoryItem_relatedEmail(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
