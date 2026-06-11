@@ -50,3 +50,5 @@ node0.log
 /scale-codec-gen
 **.wasm
 **.wasm.gz
+
+local-client

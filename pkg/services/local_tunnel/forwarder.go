@@ -193,17 +193,22 @@ func readResponseFrames(stream io.Reader, reqID string) {
 			if json.Unmarshal(payload, &h) == nil {
 				select {
 				case waiter.headerDone <- &h:
-				default:
+				case <-waiter.closedCh:
+					return
 				}
 			}
 		case FrameTypeData:
 			// Data 帧直接是原始二进制，无需 JSON 解析
-			// 阻塞发送而非丢弃，防止流式响应数据丢失
-			waiter.dataChan <- payload
+			select {
+			case waiter.dataChan <- payload:
+			case <-waiter.closedCh:
+				return
+			}
 		case FrameTypeDone:
 			select {
 			case waiter.doneChan <- struct{}{}:
-			default:
+			case <-waiter.closedCh:
+				return
 			}
 			// 清理 waiter
 			waiterRegistryMu.Lock()
@@ -215,7 +220,8 @@ func readResponseFrames(stream io.Reader, reqID string) {
 			if json.Unmarshal(payload, &e) == nil {
 				select {
 				case waiter.errChan <- &e:
-				default:
+				case <-waiter.closedCh:
+					return
 				}
 			}
 			// 清理 waiter
@@ -254,6 +260,7 @@ type responseWaiter struct {
 	dataChan   chan []byte
 	doneChan   chan struct{}
 	errChan    chan *ErrorFrame
+	closedCh   chan struct{} // 当 tunnelResponseBody.Close() 时关闭，通知 readResponseFrames 停止写入
 }
 
 func newResponseWaiter(id string) *responseWaiter {
@@ -263,6 +270,7 @@ func newResponseWaiter(id string) *responseWaiter {
 		dataChan:   make(chan []byte, 64), // 增大缓冲防止阻塞
 		doneChan:   make(chan struct{}, 1),
 		errChan:    make(chan *ErrorFrame, 1),
+		closedCh:   make(chan struct{}),
 	}
 }
 
@@ -290,6 +298,8 @@ func (b *tunnelResponseBody) Read(p []byte) (int, error) {
 		return n, nil
 	}
 
+	// 优先读取 dataChan，避免和 doneChan 的 race condition
+	// 如果 dataChan 有数据，必须优先消费，不能跳过最后一个 Data 帧
 	select {
 	case data := <-b.waiter.dataChan:
 		if len(data) == 0 {
@@ -300,12 +310,25 @@ func (b *tunnelResponseBody) Read(p []byte) (int, error) {
 			b.buffer = data[n:]
 		}
 		return n, nil
-	case <-b.waiter.doneChan:
-		b.closed = true
-		return 0, io.EOF
-	case <-time.After(b.readTimeout):
-		b.closed = true
-		return 0, fmt.Errorf("tunnel read timeout")
+	default:
+		// dataChan 为空时，等待 dataChan、doneChan 或超时
+		select {
+		case data := <-b.waiter.dataChan:
+			if len(data) == 0 {
+				return 0, io.EOF
+			}
+			n := copy(p, data)
+			if n < len(data) {
+				b.buffer = data[n:]
+			}
+			return n, nil
+		case <-b.waiter.doneChan:
+			b.closed = true
+			return 0, io.EOF
+		case <-time.After(b.readTimeout):
+			b.closed = true
+			return 0, fmt.Errorf("tunnel read timeout")
+		}
 	}
 }
 
@@ -313,6 +336,8 @@ func (b *tunnelResponseBody) Close() error {
 	b.mu.Lock()
 	b.closed = true
 	b.mu.Unlock()
+	// 通知 readResponseFrames 停止向 channel 写入，防止 goroutine 泄漏
+	close(b.waiter.closedCh)
 	// 关闭底层 stream，触发 readResponseFrames goroutine 退出
 	if b.stream != nil {
 		b.stream.Close()

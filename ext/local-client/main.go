@@ -188,7 +188,7 @@ func runClient(ctx context.Context, cfg Config) error {
 			// 并发满，发送 Error 帧后关闭 stream
 			sendErrorFrame(stream, "max concurrency reached")
 			stream.Close()
-			fmt.Println("[LOCAL-CLIENT] max concurrency reached, rejecting stream")
+			fmt.Printf("[LOCAL-CLIENT] max concurrency reached, rejecting stream (inflight=%d/%d)\n", len(sema), cfg.MaxConcurrency)
 		}
 	}
 }
@@ -219,9 +219,11 @@ func handleStream(stream net.Conn, cfg Config) {
 		Timeout:   120 * time.Second,
 		Transport: sharedTransport,
 	}
+	start := time.Now()
 	resp, err := client.Do(upstreamReq)
 	if err != nil {
 		sendErrorFrame(stream, "upstream error: "+err.Error())
+		fmt.Printf("[LOCAL-CLIENT] upstream error path=%s err=%v\n", req.Path, err)
 		return
 	}
 	defer resp.Body.Close()
@@ -237,9 +239,11 @@ func handleStream(stream net.Conn, cfg Config) {
 
 	// 流式转发响应体（二进制 Data 帧，无需 JSON wrap）
 	buf := make([]byte, 32*1024)
+	dataBytes := 0
 	for {
 		n, err := resp.Body.Read(buf)
 		if n > 0 {
+			dataBytes += n
 			if err := localtunnel.WriteTypedFrame(stream, localtunnel.FrameTypeData, buf[:n]); err != nil {
 				fmt.Printf("[LOCAL-CLIENT] write data error: %v\n", err)
 				return
@@ -258,6 +262,7 @@ func handleStream(stream net.Conn, cfg Config) {
 	if err := localtunnel.WriteTypedFrame(stream, localtunnel.FrameTypeDone, nil); err != nil {
 		fmt.Printf("[LOCAL-CLIENT] write done error: %v\n", err)
 	}
+	fmt.Printf("[LOCAL-CLIENT] request done path=%s status=%d bytes=%d latency=%v\n", req.Path, resp.StatusCode, dataBytes, time.Since(start))
 }
 
 func sendErrorFrame(stream net.Conn, message string) {
@@ -300,9 +305,27 @@ func healthCheckLoop(ctx context.Context, cfg Config) {
 	}
 }
 
+// localHopByHopHeaders 是 local-client 不应透传给 TEE-Node 的 headers。
+// 包括 HTTP/1.1 hop-by-hop headers，以及 http.Client 自动解压后失效的 Content-Encoding/Content-Length。
+var localHopByHopHeaders = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailers":            true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+	"Content-Encoding":    true, // http.Client 可能已自动解压，该 header 失效
+	"Content-Length":      true, // body 已被解压，需要重新计算，不能透传旧值
+}
+
 func headersToMap(h http.Header) map[string]string {
 	m := make(map[string]string)
 	for k, vs := range h {
+		if localHopByHopHeaders[k] {
+			continue
+		}
 		if len(vs) > 0 {
 			m[k] = vs[0]
 		}

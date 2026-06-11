@@ -21,7 +21,7 @@ func SetupCommonRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) 
 func SetEventStreamHeaders(ctx *RelayContext) {
 	ctx.W.Header().Set("Content-Type", "text/event-stream")
 	ctx.W.Header().Set("Cache-Control", "no-cache")
-	ctx.W.Header().Set("Connection", "keep-alive")
+	// 注意：HTTP/2 禁止 Connection header，不设置它
 	ctx.W.Header().Set("X-Accel-Buffering", "no")
 }
 

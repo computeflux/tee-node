@@ -106,8 +106,8 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	server := &http.Server{
 		Addr:         ":" + fmt.Sprint(port),
 		Handler:      router,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 300 * time.Second, // 本地模型推理可能需要较长时间
 		IdleTimeout:  120 * time.Second,
 	}
 

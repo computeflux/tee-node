@@ -43,12 +43,18 @@ func (a *LocalAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader) 
 	}
 
 	// 收集原始 HTTP headers（透传 Authorization、Content-Type 等）
+	// 注意：过滤掉 Origin，避免本地模型服务（Ollama/vLLM）因 CORS 限制返回 403
 	headers := make(map[string]string)
 	if ctx.R != nil {
 		for k, vs := range ctx.R.Header {
-			if len(vs) > 0 {
-				headers[k] = vs[0]
+			if len(vs) == 0 {
+				continue
 			}
+			lower := strings.ToLower(k)
+			if lower == "origin" {
+				continue
+			}
+			headers[k] = vs[0]
 		}
 	}
 
@@ -131,9 +137,27 @@ func (a *LocalAdaptor) handleLocalStream(ctx *RelayContext, resp *http.Response)
 	return usage, nil
 }
 
+// hopByHopHeaders 是 HTTP/2 禁止或不应透传的 headers。
+// 包括 hop-by-hop headers，以及可能和实际 body 不匹配的 Content-Encoding/Content-Length。
+var hopByHopHeaders = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailers":            true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+	"Content-Encoding":    true, // body 可能已被解压，该 header 失效
+	"Content-Length":      true, // 由 Go HTTP server 自动计算，避免本地模型传错值
+}
+
 // handleLocalNormal 处理普通（非流式）响应
 func (a *LocalAdaptor) handleLocalNormal(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
 	for k, vs := range resp.Header {
+		if hopByHopHeaders[k] {
+			continue
+		}
 		for _, v := range vs {
 			ctx.W.Header().Add(k, v)
 		}

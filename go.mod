@@ -16,7 +16,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/go-sev-guest v0.13.0
 	github.com/hashicorp/vault v1.19.0
-	github.com/libp2p/go-yamux/v5 v5.0.1
+	github.com/libp2p/go-yamux/v5 v5.1.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/vedhavyas/go-subkey/v2 v2.0.0

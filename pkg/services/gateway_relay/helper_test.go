@@ -87,7 +87,8 @@ func TestSetEventStreamHeaders(t *testing.T) {
 
 	assert.Equal(t, "text/event-stream", rec.Header().Get("Content-Type"))
 	assert.Equal(t, "no-cache", rec.Header().Get("Cache-Control"))
-	assert.Equal(t, "keep-alive", rec.Header().Get("Connection"))
+	// Connection header 在 HTTP/2 中非法，不再设置
+	assert.Equal(t, "", rec.Header().Get("Connection"))
 	assert.Equal(t, "no", rec.Header().Get("X-Accel-Buffering"))
 }
 

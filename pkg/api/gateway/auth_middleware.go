@@ -106,7 +106,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// 3. 从合约构建 endpoints（URI + APIKeys） ProviderType 为动态注册
 		endpoints := buildEndpointsFromModel(&model.Data)
-		if len(endpoints) == 0 && model.Data.ProviderType < 9999 {
+		if len(endpoints) == 0 {
 			writeError(w, http.StatusServiceUnavailable,
 				"no available endpoints for model "+modelName, "server_error")
 			return

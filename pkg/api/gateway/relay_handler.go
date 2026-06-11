@@ -139,9 +139,12 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	if err != nil {
 		return nil, nil, fmt.Errorf("upstream: %w", err)
 	}
-	defer resp.Body.Close()
 
 	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
+	// 立即关闭 body，避免 defer 在函数返回时才执行可能引入的并发时序问题
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
 	if bizErr != nil {
 		GATEWAYLOG().Printf("[MONITOR] upstream error: %s (status=%d)", bizErr.Error.Message, bizErr.StatusCode)
 		// Return the bizErr so the caller writes the error response once.
@@ -157,7 +160,7 @@ func providerTypeToLimiterKey(providerType uint16) string {
 		return "anthropic"
 	case 3:
 		return "gemini"
-	case 9:
+	case 9, 9999:
 		return "local"
 	default:
 		return "openai"

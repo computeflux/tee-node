@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/computeflux/tee-provider v0.0.0
-	github.com/libp2p/go-yamux/v5 v5.0.1
+	github.com/libp2p/go-yamux/v5 v5.1.0
 )
 
 require (

@@ -82,8 +82,8 @@ func providerDefaultURL(providerType uint16) string {
 		return "https://api.anthropic.com"
 	case 3: // googleapis
 		return "https://generativelanguage.googleapis.com"
-	case 9: // local
-		return "" // 本地模型必须显式配置 URI
+	case 9, 9999: // local
+		return "local://yamux" // 本地模型通过反向隧道转发，不需要真实 URL
 	default:
 		return ""
 	}
@@ -177,6 +177,18 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 	url := m.URI
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
+	}
+
+	// 本地模型使用 Yamux 反向隧道，不需要 APIKeys 也不依赖 URI
+	if m.ProviderType == 9999 || m.ProviderType == 9 {
+		return []*store.GatewayEndpoint{{
+			ID:         m.ProviderID,
+			ProviderID: m.ProviderID,
+			URL:        url,
+			APIKey:     "",
+			Weight:     1,
+			IsActive:   true,
+		}}
 	}
 
 	if len(m.APIKeys) == 0 {
