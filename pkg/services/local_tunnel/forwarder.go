@@ -38,7 +38,7 @@ type ForwardMetrics struct {
 var forwardMetrics ForwardMetrics
 
 // ForwardRequest 通过 Yamux 反向隧道将 HTTP 请求转发给本地客户端
-func ForwardRequest(ctx context.Context, modelID string, reqBody io.Reader, path string, isStream bool, headers map[string]string) (*http.Response, error) {
+func ForwardRequest(ctx context.Context, providerID uint64, modelID string, reqBody io.Reader, path string, isStream bool, headers map[string]string) (*http.Response, error) {
 	start := time.Now()
 	defer func() {
 		atomic.AddInt64(&forwardMetrics.TotalLatency, time.Since(start).Milliseconds())
@@ -54,6 +54,8 @@ func ForwardRequest(ctx context.Context, modelID string, reqBody io.Reader, path
 		pool.IncrRequests(false)
 		return nil, fmt.Errorf("read request body: %w", err)
 	}
+
+	rk := routeKey(providerID, modelID)
 
 	// 构建请求帧
 	reqFrame := RequestFrame{
@@ -77,7 +79,7 @@ func ForwardRequest(ctx context.Context, modelID string, reqBody io.Reader, path
 			}
 		}
 
-		resp, err := forwardOnce(ctx, pool, modelID, reqFrame, isStream)
+		resp, err := forwardOnce(ctx, pool, rk, reqFrame, isStream)
 		if err == nil {
 			pool.IncrRequests(true)
 			return resp, nil
@@ -90,10 +92,10 @@ func ForwardRequest(ctx context.Context, modelID string, reqBody io.Reader, path
 	return nil, fmt.Errorf("forward failed after %d attempts: %w", defaultForwarderConfig.MaxRetries+1, lastErr)
 }
 
-func forwardOnce(ctx context.Context, pool *Pool, modelID string, reqFrame RequestFrame, isStream bool) (*http.Response, error) {
-	entry := pool.Pick(modelID)
+func forwardOnce(ctx context.Context, pool *Pool, routeKey string, reqFrame RequestFrame, isStream bool) (*http.Response, error) {
+	entry := pool.Pick(routeKey)
 	if entry == nil {
-		return nil, fmt.Errorf("no available local client for model=%s", modelID)
+		return nil, fmt.Errorf("no available local client for route=%s", routeKey)
 	}
 
 	atomic.AddInt32(&entry.InFlight, 1)

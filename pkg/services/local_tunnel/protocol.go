@@ -73,6 +73,9 @@ type Handshake struct {
 	BaseURL   string            `json:"baseUrl"`   // 本地服务默认基地址
 	Models    []string          `json:"models"`    // 支持的所有模型列表
 	ModelURLs map[string]string `json:"modelUrls"` // 模型 ID -> 本地服务地址（可选）
+
+	// ProviderID 由服务端根据 apiKey 推导得出，不接收客户端传入（json:"-"）。
+	ProviderID uint64 `json:"-"`
 }
 
 // RegisteredModels 返回本次握手注册的所有模型 ID（去重）
@@ -104,6 +107,15 @@ func (h *Handshake) ModelBaseURL(modelID string) string {
 		return u
 	}
 	return h.BaseURL
+}
+
+// routeKey 生成连接池路由键。
+// 当 ProviderID 为 0 时保持与旧版兼容，仅使用 modelID。
+func routeKey(providerID uint64, modelID string) string {
+	if providerID == 0 {
+		return modelID
+	}
+	return fmt.Sprintf("%d/%s", providerID, modelID)
 }
 
 // ── Low-level framing ────────────────────────────────────

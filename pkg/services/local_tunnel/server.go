@@ -107,7 +107,10 @@ func (s *Server) handleClientConn(conn net.Conn) {
 	}
 	_ = conn.SetReadDeadline(time.Time{})
 
-	// 2. 验证握手
+	// ProviderID 必须由服务端根据 apiKey 推导，忽略客户端传入的任何值
+	handshake.ProviderID = 0
+
+	// 2. 验证握手（同时推导 ProviderID）
 	if err := s.pool.Validate(handshake, remoteAddr); err != nil {
 		conn.Close()
 		fmt.Printf("[LOCAL-TUNNEL] handshake rejected from %s model=%s: %v\n", remoteAddr, handshake.ModelID, err)
@@ -140,19 +143,20 @@ func (s *Server) handleClientConn(conn net.Conn) {
 	var entriesMu sync.Mutex
 	for _, modelID := range models {
 		entry := &PoolEntry{
-			Session:     session,
-			ModelID:     modelID,
-			APIKey:      handshake.APIKey,
-			BaseURL:     handshake.ModelBaseURL(modelID),
-			RemoteAddr:  remoteAddr,
+			Session:    session,
+			ProviderID: handshake.ProviderID,
+			ModelID:    modelID,
+			APIKey:     handshake.APIKey,
+			BaseURL:    handshake.ModelBaseURL(modelID),
+			RemoteAddr: remoteAddr,
 			ConnectedAt: time.Now(),
-			Available:   false,
+			Available:  false,
 		}
 		s.pool.Add(entry)
 		entries = append(entries, entry)
 	}
-	fmt.Printf("[LOCAL-TUNNEL] client connected from=%s models=%v baseUrl=%s, warmup=%s\n",
-		remoteAddr, models, handshake.BaseURL, s.config.WarmupDuration)
+	fmt.Printf("[LOCAL-TUNNEL] client connected from=%s provider=%d models=%v baseUrl=%s, warmup=%s\n",
+		remoteAddr, handshake.ProviderID, models, handshake.BaseURL, s.config.WarmupDuration)
 
 	// 4. 启动控制流 goroutine，处理客户端动态增删模型
 	var ctrlWg sync.WaitGroup
@@ -177,7 +181,7 @@ func (s *Server) handleClientConn(conn net.Conn) {
 		s.pool.Remove(e)
 	}
 	entriesMu.Unlock()
-	fmt.Printf("[LOCAL-TUNNEL] client disconnected from=%s models=%v\n", remoteAddr, models)
+	fmt.Printf("[LOCAL-TUNNEL] client disconnected from=%s provider=%d models=%v\n", remoteAddr, handshake.ProviderID, models)
 }
 
 func (s *Server) heartbeatLoop() {
@@ -249,7 +253,7 @@ func (s *Server) handleControlStream(stream net.Conn, session *yamux.Session, ha
 			sendControlError(stream, "invalid unregister frame")
 			return
 		}
-		if err := s.unregisterModel(ctrl.ModelID, entries, entriesMu); err != nil {
+		if err := s.unregisterModel(handshake, ctrl.ModelID, entries, entriesMu); err != nil {
 			sendControlError(stream, err.Error())
 			return
 		}
@@ -268,51 +272,56 @@ func (s *Server) registerModel(session *yamux.Session, handshake *Handshake, rem
 		baseURL = handshake.ModelBaseURL(modelID)
 	}
 
-	// API Key 校验
-	if s.pool.validateKey != nil && !s.pool.validateKey(modelID, handshake.APIKey) {
-		return fmt.Errorf("invalid api key for model %s", modelID)
+	// API Key 校验（必须解析到与当前 session 相同的 ProviderID）
+	if s.pool.validateKey != nil {
+		pid, ok := s.pool.validateKey(modelID, handshake.APIKey)
+		if !ok || pid != handshake.ProviderID {
+			return fmt.Errorf("invalid api key for model %s", modelID)
+		}
 	}
 
 	// 连接数上限校验
-	if err := s.pool.CheckModelQuota(modelID); err != nil {
+	rk := routeKey(handshake.ProviderID, modelID)
+	if err := s.pool.CheckModelQuota(rk); err != nil {
 		return err
 	}
 
 	entriesMu.Lock()
 	defer entriesMu.Unlock()
 
-	// 去重
+	// 去重（同一供应商同一模型只能注册一次）
 	for _, e := range *entries {
-		if e.ModelID == modelID {
+		if e.ProviderID == handshake.ProviderID && e.ModelID == modelID {
 			return fmt.Errorf("model %s already registered", modelID)
 		}
 	}
 
 	entry := &PoolEntry{
-		Session:     session,
-		ModelID:     modelID,
-		APIKey:      handshake.APIKey,
-		BaseURL:     baseURL,
-		RemoteAddr:  remoteAddr,
+		Session:    session,
+		ProviderID: handshake.ProviderID,
+		ModelID:    modelID,
+		APIKey:     handshake.APIKey,
+		BaseURL:    baseURL,
+		RemoteAddr: remoteAddr,
 		ConnectedAt: time.Now(),
-		Available:   false,
+		Available:  false,
 	}
 	s.pool.Add(entry)
 	*entries = append(*entries, entry)
-	fmt.Printf("[LOCAL-TUNNEL] model registered from=%s model=%s baseUrl=%s\n", remoteAddr, modelID, baseURL)
+	fmt.Printf("[LOCAL-TUNNEL] model registered from=%s provider=%d model=%s baseUrl=%s\n", remoteAddr, handshake.ProviderID, modelID, baseURL)
 	return nil
 }
 
-func (s *Server) unregisterModel(modelID string, entries *[]*PoolEntry, entriesMu *sync.Mutex) error {
+func (s *Server) unregisterModel(handshake *Handshake, modelID string, entries *[]*PoolEntry, entriesMu *sync.Mutex) error {
 	entriesMu.Lock()
 	defer entriesMu.Unlock()
 
 	list := *entries
 	for i, e := range list {
-		if e.ModelID == modelID {
+		if e.ProviderID == handshake.ProviderID && e.ModelID == modelID {
 			s.pool.Remove(e)
 			*entries = append(list[:i], list[i+1:]...)
-			fmt.Printf("[LOCAL-TUNNEL] model unregistered model=%s\n", modelID)
+			fmt.Printf("[LOCAL-TUNNEL] model unregistered provider=%d model=%s\n", handshake.ProviderID, modelID)
 			return nil
 		}
 	}

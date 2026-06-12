@@ -125,7 +125,7 @@ mutation {
       "15000",               # outPrice
       "9",                   # providerType: 9 = ProviderLocal ★关键★
       "",                    # URI: 留空（走隧道，不需要地址）
-      "dummy-api-key"        # apiKeys: 认证密钥（与本地客户端 -key 匹配）
+      ""                     # apiKeys: 本地模型不依赖此字段，可留空
     ]
     signature: "SIGNATURE_HEX"
   )
@@ -155,7 +155,7 @@ cd ext/local-client
 go run main.go \
   -gateway tee-node.example.com:19000 \
   -model llama3 \
-  -key dummy-api-key \
+  -key tee_xxx... \
   -local http://localhost:11434
 ```
 
@@ -165,7 +165,7 @@ go run main.go \
 |------|------|
 | `-gateway` | TEE-Node 的隧道端口地址（默认 `:19000`） |
 | `-model` | 模型标识，必须与合约注册的 `name` 一致 |
-| `-key` | API Key，必须与合约注册的 `apiKeys` 之一匹配 |
+| `-key` | 用户的网关 API Key（即调用 `/v1/chat/completions` 时 `Authorization: Bearer` 后的 key）；TEE-Node 通过该 key 找到 key Owner，再找到其 ProviderID |
 | `-local` | 本地模型服务地址（如 Ollama） |
 
 客户端启动后会：
@@ -202,6 +202,7 @@ go run main.go -config config.json
 ```
 
 说明：
+- TEE-Node 根据 `-key` 自动从链上合约推导出 ProviderID，并使用 `providerId/modelId` 作为路由键，确保不同供应商提供的同名模型互不干扰；客户端不需要、也不应该传入 `providerId`。
 - `local` 为默认本地服务地址，未在 `models` 中指定地址的模型会回退到该地址。
 - `models` 中的每个键都是要注册的模型 ID，值是该模型对应的本地服务地址。
 - TEE-Node 收到任意已注册模型的请求后，会在同一条连接上打开 Stream，并在 `RequestFrame` 中带上目标模型 ID；`local-client` 据此路由到正确的本地地址。

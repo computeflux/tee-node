@@ -9,8 +9,9 @@ import (
 	"github.com/libp2p/go-yamux/v5"
 )
 
-// ValidateAPIKeyFunc 验证 API Key 是否合法的回调函数
-type ValidateAPIKeyFunc func(modelID, apiKey string) bool
+// ValidateAPIKeyFunc 验证 API Key 是否合法，并返回该模型所属的 Provider ID。
+// 返回 (0, true) 表示验证通过但无法识别 Provider（旧版兼容）。
+type ValidateAPIKeyFunc func(modelID, apiKey string) (providerID uint64, ok bool)
 
 // PoolMetrics 连接池指标
 type PoolMetrics struct {
@@ -24,6 +25,7 @@ type PoolMetrics struct {
 // PoolEntry 表示一个本地客户端会话
 type PoolEntry struct {
 	Session     *yamux.Session
+	ProviderID  uint64 // 供应商 ID（0 表示旧版未指定）
 	ModelID     string
 	APIKey      string
 	BaseURL     string
@@ -76,7 +78,7 @@ func NewPool(opts ...PoolOption) *Pool {
 	return p
 }
 
-// Validate 验证握手信息是否合法
+// Validate 验证握手信息是否合法，并根据 API Key 推导出 ProviderID 写入 h。
 func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -90,21 +92,32 @@ func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 		return fmt.Errorf("no model registered")
 	}
 
-	// 检查每个模型的最大连接数
-	if p.maxConnsPerModel > 0 {
+	// 验证每个模型的 API Key，并解析 ProviderID
+	var resolvedProviderID uint64
+	var resolved bool
+	if p.validateKey != nil {
 		for _, modelID := range models {
-			if len(p.entries[modelID]) >= p.maxConnsPerModel {
-				return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
+			pid, ok := p.validateKey(modelID, h.APIKey)
+			if !ok {
+				atomic.AddInt64(&p.metrics.RejectedHandshakes, 1)
+				return fmt.Errorf("invalid api key for model %s", modelID)
+			}
+			if !resolved {
+				resolvedProviderID = pid
+				resolved = true
+			} else if resolvedProviderID != pid {
+				return fmt.Errorf("models belong to different providers")
 			}
 		}
 	}
+	h.ProviderID = resolvedProviderID
 
-	// 验证每个模型的 API Key
-	if p.validateKey != nil {
+	// 检查每个模型的最大连接数（按 providerID/modelID 隔离）
+	if p.maxConnsPerModel > 0 {
 		for _, modelID := range models {
-			if !p.validateKey(modelID, h.APIKey) {
-				atomic.AddInt64(&p.metrics.RejectedHandshakes, 1)
-				return fmt.Errorf("invalid api key for model %s", modelID)
+			rk := routeKey(h.ProviderID, modelID)
+			if len(p.entries[rk]) >= p.maxConnsPerModel {
+				return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
 			}
 		}
 	}
@@ -112,16 +125,16 @@ func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 	return nil
 }
 
-// CheckModelQuota 检查指定模型是否还能继续添加连接
-func (p *Pool) CheckModelQuota(modelID string) error {
+// CheckModelQuota 检查指定路由键是否还能继续添加连接
+func (p *Pool) CheckModelQuota(routeKey string) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if p.closed {
 		return fmt.Errorf("pool is closed")
 	}
-	if p.maxConnsPerModel > 0 && len(p.entries[modelID]) >= p.maxConnsPerModel {
-		return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
+	if p.maxConnsPerModel > 0 && len(p.entries[routeKey]) >= p.maxConnsPerModel {
+		return fmt.Errorf("max connections reached for route %s (%d)", routeKey, p.maxConnsPerModel)
 	}
 	return nil
 }
@@ -136,7 +149,8 @@ func (p *Pool) Add(entry *PoolEntry) {
 		return
 	}
 
-	p.entries[entry.ModelID] = append(p.entries[entry.ModelID], entry)
+	rk := routeKey(entry.ProviderID, entry.ModelID)
+	p.entries[rk] = append(p.entries[rk], entry)
 	atomic.AddInt64(&p.metrics.TotalConnections, 1)
 	atomic.AddInt64(&p.metrics.ActiveConnections, 1)
 
@@ -162,26 +176,27 @@ func (p *Pool) Remove(entry *PoolEntry) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	list := p.entries[entry.ModelID]
+	rk := routeKey(entry.ProviderID, entry.ModelID)
+	list := p.entries[rk]
 	for i, e := range list {
 		if e == entry {
-			p.entries[entry.ModelID] = append(list[:i], list[i+1:]...)
+			p.entries[rk] = append(list[:i], list[i+1:]...)
 			atomic.AddInt64(&p.metrics.ActiveConnections, -1)
 			break
 		}
 	}
-	if len(p.entries[entry.ModelID]) == 0 {
-		delete(p.entries, entry.ModelID)
+	if len(p.entries[rk]) == 0 {
+		delete(p.entries, rk)
 	}
 }
 
-// Pick 为指定 modelID 挑选一个可用 session（最小负载轮询）
+// Pick 为指定路由键挑选一个可用 session（最小负载轮询）
 // 修复了原版的竞态条件：对 best 的 InFlight 访问也加了读锁
-func (p *Pool) Pick(modelID string) *PoolEntry {
+func (p *Pool) Pick(routeKey string) *PoolEntry {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	list := p.entries[modelID]
+	list := p.entries[routeKey]
 	if len(list) == 0 {
 		return nil
 	}
@@ -206,12 +221,12 @@ func (p *Pool) Pick(modelID string) *PoolEntry {
 	return best
 }
 
-// Count 返回指定 modelID 的可用连接数
-func (p *Pool) Count(modelID string) int {
+// Count 返回指定路由键的可用连接数
+func (p *Pool) Count(routeKey string) int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	list := p.entries[modelID]
+	list := p.entries[routeKey]
 	count := 0
 	for _, e := range list {
 		e.mu.RLock()

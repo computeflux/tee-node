@@ -22,7 +22,7 @@ func TestDynamicModelRegisterUnregister(t *testing.T) {
 		Addr:             listener.Addr().String(),
 		MaxConnsPerModel: 10,
 		WarmupDuration:   0,
-		ValidateKey:      func(modelID, apiKey string) bool { return true },
+		ValidateKey:      func(modelID, apiKey string) (uint64, bool) { return 1, true },
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,10 +78,10 @@ func TestDynamicModelRegisterUnregister(t *testing.T) {
 		e.Available = true
 	}
 
-	if got := srv.Pool().Count("model-a"); got != 1 {
+	if got := srv.Pool().Count(routeKey(1, "model-a")); got != 1 {
 		t.Fatalf("model-a count = %d, want 1", got)
 	}
-	if got := srv.Pool().Count("model-b"); got != 1 {
+	if got := srv.Pool().Count(routeKey(1, "model-b")); got != 1 {
 		t.Fatalf("model-b count = %d, want 1", got)
 	}
 
@@ -91,10 +91,10 @@ func TestDynamicModelRegisterUnregister(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 
-	if got := srv.Pool().Count("model-b"); got != 0 {
+	if got := srv.Pool().Count(routeKey(1, "model-b")); got != 0 {
 		t.Fatalf("model-b count after unregister = %d, want 0", got)
 	}
-	if got := srv.Pool().Count("model-a"); got != 1 {
+	if got := srv.Pool().Count(routeKey(1, "model-a")); got != 1 {
 		t.Fatalf("model-a count after unregister = %d, want 1", got)
 	}
 }

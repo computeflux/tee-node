@@ -14,6 +14,12 @@ import (
 // ContractRuntime 构造一个新的合约运行时上下文，供外部包（gateway、graph 等）使用。
 // 调用者负责 defer runtime.GetTxn().Rollback()。
 func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
+	return app.ContractRuntimeWithCaller(chaintypes.UniAddr{})
+}
+
+// ContractRuntimeWithCaller 构造一个指定调用方 caller 的合约运行时上下文。
+// 主要用于 GetProviderByOwner 等依赖 caller 身份的查询。
+func (app *TeeChain) ContractRuntimeWithCaller(caller chaintypes.UniAddr) (*contracts.Runtime, error) {
 	if dbstore.DBINS == nil {
 		return nil, fmt.Errorf("DBINS is nil")
 	}
@@ -32,7 +38,7 @@ func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
 		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
 
-	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, chaintypes.UniAddr{}, sudo, version), nil
+	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, caller, sudo, version), nil
 }
 
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。

@@ -128,6 +128,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	meta.APIKey = endpoint.APIKey
 	meta.IsStream = isStream
 	meta.OriginModelName = modelName
+	meta.ProviderId = endpoint.ProviderID
 	meta.ProviderType = providerType
 
 	// 优先根据合约中的 ProviderType 选择 Adaptor，避免通过 URL 字符串猜测。

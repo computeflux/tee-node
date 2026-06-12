@@ -58,7 +58,7 @@ func (a *LocalAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader) 
 		}
 	}
 
-	resp, err := localtunnel.ForwardRequest(ctx.Context(), modelID, body, path, meta.IsStream, headers)
+	resp, err := localtunnel.ForwardRequest(ctx.Context(), meta.ProviderId, modelID, body, path, meta.IsStream, headers)
 	if err != nil {
 		return nil, fmt.Errorf("local tunnel forward: %w", err)
 	}

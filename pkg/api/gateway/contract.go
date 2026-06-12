@@ -124,6 +124,83 @@ func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway
 	return out, nameMap
 }
 
+// FindProviderByModelAPIKey 根据模型名和 API Key 查找对应的本地模型供应商 ID。
+// 流程：
+//   1. 用 apiKey 找到对应的用户 token，得到用户地址 Addr。
+//   2. 以该用户地址为 caller 创建合约 runtime，调用 GetProviderByOwner 获取 ProviderID。
+//   3. 检查该 ProviderID 下是否存在名为 modelName 的活跃本地模型。
+// local-client 传的就是用户登录后的 session token（也是调用网关的 Authorization Bearer key）。
+func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
+	bridge := getBridge()
+	if bridge == nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] FindProviderByModelAPIKey: no contract bridge")
+		return 0, false
+	}
+
+	// 1. 查 token（先缓存，再合约）
+	token := store.FindGatewayTokenByKey(apiKey)
+	if token == nil {
+		token = LookupAPIKeyViaContract(apiKey)
+	}
+	if token == nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] apiKey=%s token not found", truncateKey(apiKey))
+		return 0, false
+	}
+	if !token.IsActive || token.IsExpired() {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] apiKey=%s token inactive or expired", truncateKey(apiKey))
+		return 0, false
+	}
+
+	// 2. 以 token.Addr 为 caller 查询 ProviderID
+	runtime, err := bridge.ContractRuntimeWithCaller(token.Addr)
+	if err != nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] contract runtime error: %v", err)
+		return 0, false
+	}
+	defer runtime.GetTxn().Rollback()
+
+	query := cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}
+	opt, err := query.GetProviderByOwner()
+	if err != nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] GetProviderByOwner error: %v", err)
+		return 0, false
+	}
+	if opt.IsNone() {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] apiKey=%s has no provider", truncateKey(apiKey))
+		return 0, false
+	}
+	providerID, err := opt.UnWrap()
+	if err != nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] unwrap providerID error: %v", err)
+		return 0, false
+	}
+
+	// 3. 检查该 provider 下是否有对应活跃本地模型
+	model, err := query.GetModelByName(providerID, modelName)
+	if err != nil {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] GetModelByName provider=%d model=%s error: %v", providerID, modelName, err)
+		return 0, false
+	}
+	if model == nil || !model.Data.IsActive {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s not found or inactive under provider=%d", modelName, providerID)
+		return 0, false
+	}
+	if model.Data.ProviderType != cgateway.ProviderLocal && model.Data.ProviderType != 9999 {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s provider=%d providerType=%d is not local", modelName, providerID, model.Data.ProviderType)
+		return 0, false
+	}
+
+	GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s matched provider=%d", modelName, providerID)
+	return providerID, true
+}
+
+func truncateKey(key string) string {
+	if len(key) <= 8 {
+		return key
+	}
+	return key[:8] + "..."
+}
+
 // getCachedGatewayModels 返回缓存的合约模型列表。
 func getCachedGatewayModels() []cgateway.ModelInfo {
 	gatewayModelCache.mu.RLock()

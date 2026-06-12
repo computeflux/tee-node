@@ -86,10 +86,8 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	gateway.RegisterGatewayRoutes(router)
 
 	// Local AI tunnel TCP endpoint (本地模型反向隧道，Yamux)
-	if err := localtunnel.StartGlobalServer(":19000", func(modelID, apiKey string) bool {
-		// TODO: 从合约验证 apiKey 是否属于该 model 的 apiKeys
-		// 当前简化为非空即通过，生产环境应接入合约查询
-		return apiKey != ""
+	if err := localtunnel.StartGlobalServer(":19000", func(modelID, apiKey string) (uint64, bool) {
+		return gateway.FindProviderByModelAPIKey(modelID, apiKey)
 	}); err != nil {
 		fmt.Printf("[LOCAL-TUNNEL] failed to start: %v\n", err)
 	}
