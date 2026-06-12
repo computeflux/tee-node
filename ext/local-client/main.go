@@ -1,8 +1,19 @@
 // local-client 是本地模型反向隧道客户端（Yamux 版）。
 //
 // 用法：
-//   go run main.go -config config.yaml
+//   go run main.go -config config.json
 //   或直接传参：go run main.go -gateway tee-node:19000 -model llama3 -key xxx -local http://localhost:11434
+//
+// 多模型配置示例（config.json）：
+//   {
+//     "gateway": "tee-node:19000",
+//     "key": "xxx",
+//     "local": "http://localhost:11434",
+//     "models": {
+//       "qwen2.5": "http://localhost:11434",
+//       "llama3": "http://localhost:8000"
+//     }
+//   }
 //
 // 工作流程：
 //   1. TCP 连接到 TEE-Node :19000
@@ -24,6 +35,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,18 +45,105 @@ import (
 
 // Config 客户端配置
 type Config struct {
-	GatewayAddr      string        `json:"gateway"`       // TEE-Node 隧道地址
-	ModelID          string        `json:"model"`         // 主模型标识
-	APIKey           string        `json:"key"`           // API Key
-	LocalURL         string        `json:"local"`         // 本地服务地址
-	MaxConcurrency   int           `json:"maxConcurrency"` // 最大并发处理数（防止压垮本地 GPU）
-	HealthCheckInterval time.Duration `json:"healthCheckInterval"`
-	ReconnectBackoff time.Duration `json:"reconnectBackoff"`
-	MaxBackoff       time.Duration `json:"maxBackoff"`
+	GatewayAddr         string            `json:"gateway"`          // TEE-Node 隧道地址
+	ModelID             string            `json:"model"`            // 主模型标识（兼容旧版）
+	APIKey              string            `json:"key"`              // API Key
+	LocalURL            string            `json:"local"`            // 本地服务默认地址
+	ModelURLs           map[string]string `json:"models"`           // 模型 ID -> 本地服务地址
+	AdminAddr           string            `json:"admin"`            // 管理 HTTP 监听地址（空则禁用）
+	MaxConcurrency      int               `json:"maxConcurrency"`   // 最大并发处理数（防止压垮本地 GPU）
+	HealthCheckInterval time.Duration     `json:"healthCheckInterval"`
+	ReconnectBackoff    time.Duration     `json:"reconnectBackoff"`
+	MaxBackoff          time.Duration     `json:"maxBackoff"`
+}
+
+// 运行时动态增删的模型地址表（启动时从 cfg.ModelURLs 初始化）
+var (
+	appCfg Config
+
+	extraModelURLs   = make(map[string]string)
+	extraModelURLsMu sync.RWMutex
+
+	currentSession   *yamux.Session
+	currentSessionMu sync.RWMutex
+)
+
+func setCurrentSession(s *yamux.Session) {
+	currentSessionMu.Lock()
+	currentSession = s
+	currentSessionMu.Unlock()
+}
+
+func getCurrentSession() *yamux.Session {
+	currentSessionMu.RLock()
+	defer currentSessionMu.RUnlock()
+	return currentSession
+}
+
+// registeredModels 返回需要向 TEE-Node 注册的所有模型 ID
+func registeredModels(cfg Config) []string {
+	seen := make(map[string]struct{})
+	if cfg.ModelID != "" {
+		seen[cfg.ModelID] = struct{}{}
+	}
+	extraModelURLsMu.RLock()
+	for modelID := range extraModelURLs {
+		if modelID != "" {
+			seen[modelID] = struct{}{}
+		}
+	}
+	extraModelURLsMu.RUnlock()
+	models := make([]string, 0, len(seen))
+	for modelID := range seen {
+		models = append(models, modelID)
+	}
+	return models
+}
+
+// modelLocalURL 返回指定模型对应的本地服务地址
+func modelLocalURL(cfg Config, modelID string) string {
+	extraModelURLsMu.RLock()
+	if u, ok := extraModelURLs[modelID]; ok && u != "" {
+		extraModelURLsMu.RUnlock()
+		return u
+	}
+	extraModelURLsMu.RUnlock()
+	return cfg.LocalURL
+}
+
+// allLocalURLs 返回所有配置的本地服务地址（去重）
+func allLocalURLs(cfg Config) []string {
+	seen := make(map[string]struct{})
+	if cfg.LocalURL != "" {
+		seen[cfg.LocalURL] = struct{}{}
+	}
+	extraModelURLsMu.RLock()
+	for _, u := range extraModelURLs {
+		if u != "" {
+			seen[u] = struct{}{}
+		}
+	}
+	extraModelURLsMu.RUnlock()
+	urls := make([]string, 0, len(seen))
+	for u := range seen {
+		urls = append(urls, u)
+	}
+	return urls
+}
+
+func cloneExtraModelURLs() map[string]string {
+	extraModelURLsMu.RLock()
+	defer extraModelURLsMu.RUnlock()
+	m := make(map[string]string, len(extraModelURLs))
+	for k, v := range extraModelURLs {
+		m[k] = v
+	}
+	return m
 }
 
 var defaultConfig = Config{
 	GatewayAddr:         "localhost:19000",
+	AdminAddr:           ":19001",
 	MaxConcurrency:      10,
 	HealthCheckInterval: 30 * time.Second,
 	ReconnectBackoff:    1 * time.Second,
@@ -56,34 +155,48 @@ var (
 	modelID     = flag.String("model", "", "模型标识")
 	apiKey      = flag.String("key", "", "API Key")
 	localURL    = flag.String("local", "", "本地模型服务地址 (default: http://localhost:11434)")
+	adminAddr   = flag.String("admin", "", "管理 HTTP 监听地址 (默认 :19001，空则禁用)")
 	configFile  = flag.String("config", "", "配置文件路径 (JSON/YAML)")
 )
 
 func main() {
 	flag.Parse()
 
-	cfg := loadConfig()
-	if cfg.ModelID == "" || cfg.APIKey == "" {
-		fmt.Fprintln(os.Stderr, "Usage: local-client -model <model> -key <key> [-gateway <addr>] [-local <url>]")
+	appCfg = loadConfig()
+	if appCfg.APIKey == "" || (appCfg.ModelID == "" && len(appCfg.ModelURLs) == 0) {
+		fmt.Fprintln(os.Stderr, "Usage: local-client -model <model> -key <key> [-gateway <addr>] [-local <url>] [-config <file>]")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	fmt.Printf("[LOCAL-CLIENT] model=%s gateway=%s local=%s maxConcurrency=%d\n",
-		cfg.ModelID, cfg.GatewayAddr, cfg.LocalURL, cfg.MaxConcurrency)
+	// 初始化运行时模型表
+	extraModelURLsMu.Lock()
+	for k, v := range appCfg.ModelURLs {
+		extraModelURLs[k] = v
+	}
+	extraModelURLsMu.Unlock()
+
+	fmt.Printf("[LOCAL-CLIENT] models=%v gateway=%s local=%s modelUrls=%v maxConcurrency=%d\n",
+		registeredModels(appCfg), appCfg.GatewayAddr, appCfg.LocalURL, appCfg.ModelURLs, appCfg.MaxConcurrency)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	backoff := cfg.ReconnectBackoff
+	// 启动管理 HTTP 接口
+	if appCfg.AdminAddr != "" {
+		adminSrv := startAdminServer(ctx, appCfg.AdminAddr)
+		defer adminSrv.Shutdown(context.Background())
+	}
+
+	backoff := appCfg.ReconnectBackoff
 	for {
-		if err := runClient(ctx, cfg); err != nil {
+		if err := runClient(ctx, appCfg); err != nil {
 			fmt.Printf("[LOCAL-CLIENT] connection lost: %v, reconnecting in %v...\n", err, backoff)
 			select {
 			case <-time.After(backoff):
 				backoff *= 2
-				if backoff > cfg.MaxBackoff {
-					backoff = cfg.MaxBackoff
+				if backoff > appCfg.MaxBackoff {
+					backoff = appCfg.MaxBackoff
 				}
 				continue
 			case <-ctx.Done():
@@ -91,7 +204,127 @@ func main() {
 				return
 			}
 		}
-		backoff = cfg.ReconnectBackoff
+		backoff = appCfg.ReconnectBackoff
+	}
+}
+
+func startAdminServer(ctx context.Context, addr string) *http.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /admin/models", handleRegisterModel)
+	mux.HandleFunc("DELETE /admin/models/{modelId}", handleUnregisterModel)
+
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		fmt.Printf("[LOCAL-CLIENT] admin server listening on %s\n", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("[LOCAL-CLIENT] admin server error: %v\n", err)
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		_ = srv.Shutdown(context.Background())
+	}()
+	return srv
+}
+
+func handleRegisterModel(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ModelID string `json:"modelId"`
+		URL     string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.ModelID == "" || req.URL == "" {
+		http.Error(w, "modelId and url are required", http.StatusBadRequest)
+		return
+	}
+
+	if err := sendModelControl(localtunnel.FrameTypeModelRegister, req.ModelID, req.URL); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	extraModelURLsMu.Lock()
+	extraModelURLs[req.ModelID] = req.URL
+	extraModelURLsMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "modelId": req.ModelID})
+}
+
+func handleUnregisterModel(w http.ResponseWriter, r *http.Request) {
+	modelID := r.PathValue("modelId")
+	if modelID == "" {
+		http.Error(w, "modelId is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := sendModelControl(localtunnel.FrameTypeModelUnregister, modelID, ""); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	extraModelURLsMu.Lock()
+	delete(extraModelURLs, modelID)
+	extraModelURLsMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "modelId": modelID})
+}
+
+func sendModelControl(ft localtunnel.FrameType, modelID, url string) error {
+	session := getCurrentSession()
+	if session == nil {
+		return fmt.Errorf("not connected to TEE-Node")
+	}
+
+	stream, err := session.OpenStream(context.Background())
+	if err != nil {
+		return fmt.Errorf("open control stream: %w", err)
+	}
+	defer stream.Close()
+
+	if err := localtunnel.WriteJSONFrame(stream, ft, localtunnel.ModelControlFrame{ModelID: modelID, BaseURL: url}); err != nil {
+		return fmt.Errorf("write control frame: %w", err)
+	}
+	return readControlResponse(stream)
+}
+
+func readControlResponse(stream net.Conn) error {
+	ft, payload, err := localtunnel.ReadTypedFrame(stream)
+	if err != nil {
+		return fmt.Errorf("read control response: %w", err)
+	}
+
+	switch ft {
+	case localtunnel.FrameTypeHeader:
+		var h localtunnel.HeaderFrame
+		if err := json.Unmarshal(payload, &h); err != nil {
+			return fmt.Errorf("decode header frame: %w", err)
+		}
+		if h.Status != 200 {
+			return fmt.Errorf("control failed status=%d", h.Status)
+		}
+		ft2, _, err := localtunnel.ReadTypedFrame(stream)
+		if err != nil {
+			return fmt.Errorf("read done frame: %w", err)
+		}
+		if ft2 != localtunnel.FrameTypeDone {
+			return fmt.Errorf("unexpected frame type %d", ft2)
+		}
+		return nil
+	case localtunnel.FrameTypeError:
+		var e localtunnel.ErrorFrame
+		if err := json.Unmarshal(payload, &e); err != nil {
+			return fmt.Errorf("decode error frame: %w", err)
+		}
+		return fmt.Errorf(e.Message)
+	default:
+		return fmt.Errorf("unexpected frame type %d", ft)
 	}
 }
 
@@ -119,6 +352,9 @@ func loadConfig() Config {
 	if *localURL != "" {
 		cfg.LocalURL = *localURL
 	}
+	if *adminAddr != "" {
+		cfg.AdminAddr = *adminAddr
+	}
 
 	return cfg
 }
@@ -135,11 +371,12 @@ func runClient(ctx context.Context, cfg Config) error {
 
 	// 1. 发送注册握手
 	handshake := localtunnel.Handshake{
-		Version: localtunnel.ProtocolVersion,
-		ModelID: cfg.ModelID,
-		APIKey:  cfg.APIKey,
-		BaseURL: cfg.LocalURL,
-		Models:  []string{cfg.ModelID},
+		Version:   localtunnel.ProtocolVersion,
+		ModelID:   cfg.ModelID,
+		APIKey:    cfg.APIKey,
+		BaseURL:   cfg.LocalURL,
+		Models:    registeredModels(cfg),
+		ModelURLs: cloneExtraModelURLs(),
 	}
 	if err := localtunnel.WriteHandshake(conn, handshake); err != nil {
 		return fmt.Errorf("send handshake: %w", err)
@@ -156,7 +393,11 @@ func runClient(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("yamux client: %w", err)
 	}
-	defer session.Close()
+	setCurrentSession(session)
+	defer func() {
+		setCurrentSession(nil)
+		session.Close()
+	}()
 
 	fmt.Println("[LOCAL-CLIENT] registered, waiting for requests...")
 
@@ -203,8 +444,17 @@ func handleStream(stream net.Conn, cfg Config) {
 		return
 	}
 
-	// 转发到本地 Ollama/vLLM
-	localEndpoint := cfg.LocalURL + req.Path
+	// 根据请求中的模型 ID 路由到对应的本地服务地址
+	modelID := req.ModelID
+	if modelID == "" {
+		modelID = cfg.ModelID
+	}
+	localURL := modelLocalURL(cfg, modelID)
+	if localURL == "" {
+		sendErrorFrame(stream, "no local URL configured for model "+modelID)
+		return
+	}
+	localEndpoint := localURL + req.Path
 	upstreamReq, err := http.NewRequest(req.Method, localEndpoint, bytes.NewReader(req.Body))
 	if err != nil {
 		sendErrorFrame(stream, "create request: "+err.Error())
@@ -281,22 +531,27 @@ func healthCheckLoop(ctx context.Context, cfg Config) {
 	if cfg.HealthCheckInterval <= 0 {
 		return
 	}
+	urls := allLocalURLs(cfg)
+	if len(urls) == 0 {
+		return
+	}
 	ticker := time.NewTicker(cfg.HealthCheckInterval)
 	defer ticker.Stop()
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	healthURL := cfg.LocalURL + "/v1/models"
 
 	for {
 		select {
 		case <-ticker.C:
-			resp, err := client.Get(healthURL)
-			if err != nil {
-				fmt.Printf("[LOCAL-CLIENT] health check FAIL: %v\n", err)
-			} else {
-				resp.Body.Close()
-				if resp.StatusCode != 200 {
-					fmt.Printf("[LOCAL-CLIENT] health check WARN: status=%d\n", resp.StatusCode)
+			for _, localURL := range urls {
+				resp, err := client.Get(localURL + "/v1/models")
+				if err != nil {
+					fmt.Printf("[LOCAL-CLIENT] health check FAIL for %s: %v\n", localURL, err)
+				} else {
+					resp.Body.Close()
+					if resp.StatusCode != 200 {
+						fmt.Printf("[LOCAL-CLIENT] health check WARN for %s: status=%d\n", localURL, resp.StatusCode)
+					}
 				}
 			}
 		case <-ctx.Done():

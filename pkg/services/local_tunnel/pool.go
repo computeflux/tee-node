@@ -85,20 +85,44 @@ func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 		return fmt.Errorf("pool is closed")
 	}
 
-	// 检查单模型最大连接数
+	models := h.RegisteredModels()
+	if len(models) == 0 {
+		return fmt.Errorf("no model registered")
+	}
+
+	// 检查每个模型的最大连接数
 	if p.maxConnsPerModel > 0 {
-		list := p.entries[h.ModelID]
-		if len(list) >= p.maxConnsPerModel {
-			return fmt.Errorf("max connections reached for model %s (%d)", h.ModelID, p.maxConnsPerModel)
+		for _, modelID := range models {
+			if len(p.entries[modelID]) >= p.maxConnsPerModel {
+				return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
+			}
 		}
 	}
 
-	// 验证 API Key
-	if p.validateKey != nil && !p.validateKey(h.ModelID, h.APIKey) {
-		atomic.AddInt64(&p.metrics.RejectedHandshakes, 1)
-		return fmt.Errorf("invalid api key for model %s", h.ModelID)
+	// 验证每个模型的 API Key
+	if p.validateKey != nil {
+		for _, modelID := range models {
+			if !p.validateKey(modelID, h.APIKey) {
+				atomic.AddInt64(&p.metrics.RejectedHandshakes, 1)
+				return fmt.Errorf("invalid api key for model %s", modelID)
+			}
+		}
 	}
 
+	return nil
+}
+
+// CheckModelQuota 检查指定模型是否还能继续添加连接
+func (p *Pool) CheckModelQuota(modelID string) error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.closed {
+		return fmt.Errorf("pool is closed")
+	}
+	if p.maxConnsPerModel > 0 && len(p.entries[modelID]) >= p.maxConnsPerModel {
+		return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
+	}
 	return nil
 }
 

@@ -57,6 +57,7 @@ func ForwardRequest(ctx context.Context, modelID string, reqBody io.Reader, path
 
 	// 构建请求帧
 	reqFrame := RequestFrame{
+		ModelID: modelID,
 		Path:    path,
 		Method:  "POST",
 		Headers: headers,

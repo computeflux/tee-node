@@ -170,11 +170,64 @@ go run main.go \
 
 客户端启动后会：
 1. 通过 TCP 连接到 TEE-Node `:19000`
-2. 发送注册握手（modelID, apiKey, baseUrl）
+2. 发送注册握手（modelID, apiKey, baseUrl, models, modelUrls）
 3. 创建 Yamux client session
 4. 进入 `AcceptStream` 循环，等待 TEE-Node 转发请求
 5. 收到请求后转发到本地 Ollama，响应通过同一条 Stream 返回
 6. 断线后自动指数退避重连（1s → 2s → 4s ... 30s 封顶）
+
+## 7.1 单客户端注册多个模型
+
+一个 `local-client` 实例可以通过一条 Yamux 连接同时注册多个模型，并根据请求中的模型 ID 将流量路由到不同的本地服务地址。
+
+多模型配置文件示例 `config.json`：
+
+```json
+{
+  "gateway": "tee-node.example.com:19000",
+  "key": "dummy-api-key",
+  "local": "http://localhost:11434",
+  "models": {
+    "qwen2.5": "http://localhost:11434",
+    "llama3": "http://localhost:8000"
+  }
+}
+```
+
+启动方式：
+
+```bash
+cd ext/local-client
+go run main.go -config config.json
+```
+
+说明：
+- `local` 为默认本地服务地址，未在 `models` 中指定地址的模型会回退到该地址。
+- `models` 中的每个键都是要注册的模型 ID，值是该模型对应的本地服务地址。
+- TEE-Node 收到任意已注册模型的请求后，会在同一条连接上打开 Stream，并在 `RequestFrame` 中带上目标模型 ID；`local-client` 据此路由到正确的本地地址。
+
+## 7.2 运行时动态增删模型
+
+`local-client` 启动后默认在 `:19001` 暴露一个管理 HTTP 接口（可用 `-admin` 或配置文件中的 `admin` 字段修改地址，空则禁用）。连接建立后，可以通过该接口动态添加或删除模型，无需重启客户端。
+
+### 添加模型
+
+```bash
+curl -X POST http://localhost:19001/admin/models \
+  -H "Content-Type: application/json" \
+  -d '{"modelId":"mistral","url":"http://localhost:8000"}'
+```
+
+### 删除模型
+
+```bash
+curl -X DELETE http://localhost:19001/admin/models/mistral
+```
+
+说明：
+- 管理接口会先向 TEE-Node 发送控制帧完成注册/注销，成功后再更新本地模型路由表。
+- 添加/删除的模型会在断线重连后保留（已写入运行时模型表）。
+- 如果客户端尚未与 TEE-Node 建立连接，调用会返回 `502` 错误。
 
 ## 8. 调用本地模型
 
@@ -214,7 +267,7 @@ curl -X POST https://tee-node.example.com/v1/chat/completions \
 [LocalClient] ──TCP──> [TEE-Node:19000]
     │
     ├── 1. 发送 Handshake (length-prefixed JSON)
-    │       {"version":1,"modelId":"llama3","apiKey":"xxx","baseUrl":"http://localhost:11434"}
+    │       {"version":1,"modelId":"llama3","apiKey":"xxx","baseUrl":"http://localhost:11434","models":["llama3"],"modelUrls":{"llama3":"http://localhost:11434"}}
     │
     ├── 2. TEE-Node 验证 API Key、检查最大连接数
     ├── 3. TEE-Node 创建 yamux.Server(session)
@@ -228,7 +281,7 @@ curl -X POST https://tee-node.example.com/v1/chat/completions \
 
 ```
 TEE-Node -> LocalClient (同一条 Stream):
-  [1B type=1][4B len][JSON: {"path":"/v1/chat/completions","method":"POST","headers":{},"body":"..."}]
+  [1B type=1][4B len][JSON: {"modelId":"llama3","path":"/v1/chat/completions","method":"POST","headers":{},"body":"..."}]
 
 LocalClient -> TEE-Node (同一条 Stream):
   [1B type=2][4B len][JSON: {"status":200,"headers":{...}}]

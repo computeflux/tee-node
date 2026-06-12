@@ -3,6 +3,7 @@ package localtunnel
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"sync"
@@ -128,28 +129,55 @@ func (s *Server) handleClientConn(conn net.Conn) {
 	}
 	defer session.Close()
 
-	entry := &PoolEntry{
-		Session:     session,
-		ModelID:     handshake.ModelID,
-		APIKey:      handshake.APIKey,
-		BaseURL:     handshake.BaseURL,
-		RemoteAddr:  remoteAddr,
-		ConnectedAt: time.Now(),
-		Available:   false,
+	models := handshake.RegisteredModels()
+	if len(models) == 0 {
+		conn.Close()
+		fmt.Printf("[LOCAL-TUNNEL] no models registered from %s\n", remoteAddr)
+		return
 	}
-	s.pool.Add(entry)
-	fmt.Printf("[LOCAL-TUNNEL] client connected from=%s model=%s baseUrl=%s, warmup=%s\n",
-		remoteAddr, handshake.ModelID, handshake.BaseURL, s.config.WarmupDuration)
 
-	// 4. 监听 session 关闭事件
+	entries := make([]*PoolEntry, 0, len(models))
+	var entriesMu sync.Mutex
+	for _, modelID := range models {
+		entry := &PoolEntry{
+			Session:     session,
+			ModelID:     modelID,
+			APIKey:      handshake.APIKey,
+			BaseURL:     handshake.ModelBaseURL(modelID),
+			RemoteAddr:  remoteAddr,
+			ConnectedAt: time.Now(),
+			Available:   false,
+		}
+		s.pool.Add(entry)
+		entries = append(entries, entry)
+	}
+	fmt.Printf("[LOCAL-TUNNEL] client connected from=%s models=%v baseUrl=%s, warmup=%s\n",
+		remoteAddr, models, handshake.BaseURL, s.config.WarmupDuration)
+
+	// 4. 启动控制流 goroutine，处理客户端动态增删模型
+	var ctrlWg sync.WaitGroup
+	ctrlWg.Add(1)
+	go func() {
+		defer ctrlWg.Done()
+		s.handleControlStreams(session, handshake, remoteAddr, &entries, &entriesMu)
+	}()
+
+	// 5. 监听 session 关闭事件
 	select {
 	case <-session.CloseChan():
 	case <-s.ctx.Done():
 		session.Close()
 	}
 
-	s.pool.Remove(entry)
-	fmt.Printf("[LOCAL-TUNNEL] client disconnected from=%s model=%s\n", remoteAddr, handshake.ModelID)
+	// 等待控制流 goroutine 退出后再清理
+	ctrlWg.Wait()
+
+	entriesMu.Lock()
+	for _, e := range entries {
+		s.pool.Remove(e)
+	}
+	entriesMu.Unlock()
+	fmt.Printf("[LOCAL-TUNNEL] client disconnected from=%s models=%v\n", remoteAddr, models)
 }
 
 func (s *Server) heartbeatLoop() {
@@ -181,6 +209,123 @@ func (s *Server) Pool() *Pool {
 // Metrics 返回服务器指标
 func (s *Server) Metrics() PoolMetrics {
 	return s.pool.Metrics()
+}
+
+// handleControlStreams 接受并处理本地客户端发起的控制流
+func (s *Server) handleControlStreams(session *yamux.Session, handshake *Handshake, remoteAddr string, entries *[]*PoolEntry, entriesMu *sync.Mutex) {
+	for {
+		stream, err := session.AcceptStream()
+		if err != nil {
+			return
+		}
+		go s.handleControlStream(stream, session, handshake, remoteAddr, entries, entriesMu)
+	}
+}
+
+func (s *Server) handleControlStream(stream net.Conn, session *yamux.Session, handshake *Handshake, remoteAddr string, entries *[]*PoolEntry, entriesMu *sync.Mutex) {
+	defer stream.Close()
+
+	ft, payload, err := ReadTypedFrame(stream)
+	if err != nil {
+		return
+	}
+
+	switch ft {
+	case FrameTypeModelRegister:
+		var ctrl ModelControlFrame
+		if err := json.Unmarshal(payload, &ctrl); err != nil || ctrl.ModelID == "" {
+			sendControlError(stream, "invalid register frame")
+			return
+		}
+		if err := s.registerModel(session, handshake, remoteAddr, ctrl.ModelID, ctrl.BaseURL, entries, entriesMu); err != nil {
+			sendControlError(stream, err.Error())
+			return
+		}
+		sendControlSuccess(stream)
+
+	case FrameTypeModelUnregister:
+		var ctrl ModelControlFrame
+		if err := json.Unmarshal(payload, &ctrl); err != nil || ctrl.ModelID == "" {
+			sendControlError(stream, "invalid unregister frame")
+			return
+		}
+		if err := s.unregisterModel(ctrl.ModelID, entries, entriesMu); err != nil {
+			sendControlError(stream, err.Error())
+			return
+		}
+		sendControlSuccess(stream)
+
+	default:
+		sendControlError(stream, "unknown control frame")
+	}
+}
+
+func (s *Server) registerModel(session *yamux.Session, handshake *Handshake, remoteAddr, modelID, baseURL string, entries *[]*PoolEntry, entriesMu *sync.Mutex) error {
+	if modelID == "" {
+		return fmt.Errorf("modelId is required")
+	}
+	if baseURL == "" {
+		baseURL = handshake.ModelBaseURL(modelID)
+	}
+
+	// API Key 校验
+	if s.pool.validateKey != nil && !s.pool.validateKey(modelID, handshake.APIKey) {
+		return fmt.Errorf("invalid api key for model %s", modelID)
+	}
+
+	// 连接数上限校验
+	if err := s.pool.CheckModelQuota(modelID); err != nil {
+		return err
+	}
+
+	entriesMu.Lock()
+	defer entriesMu.Unlock()
+
+	// 去重
+	for _, e := range *entries {
+		if e.ModelID == modelID {
+			return fmt.Errorf("model %s already registered", modelID)
+		}
+	}
+
+	entry := &PoolEntry{
+		Session:     session,
+		ModelID:     modelID,
+		APIKey:      handshake.APIKey,
+		BaseURL:     baseURL,
+		RemoteAddr:  remoteAddr,
+		ConnectedAt: time.Now(),
+		Available:   false,
+	}
+	s.pool.Add(entry)
+	*entries = append(*entries, entry)
+	fmt.Printf("[LOCAL-TUNNEL] model registered from=%s model=%s baseUrl=%s\n", remoteAddr, modelID, baseURL)
+	return nil
+}
+
+func (s *Server) unregisterModel(modelID string, entries *[]*PoolEntry, entriesMu *sync.Mutex) error {
+	entriesMu.Lock()
+	defer entriesMu.Unlock()
+
+	list := *entries
+	for i, e := range list {
+		if e.ModelID == modelID {
+			s.pool.Remove(e)
+			*entries = append(list[:i], list[i+1:]...)
+			fmt.Printf("[LOCAL-TUNNEL] model unregistered model=%s\n", modelID)
+			return nil
+		}
+	}
+	return fmt.Errorf("model %s not found", modelID)
+}
+
+func sendControlSuccess(stream net.Conn) {
+	_ = WriteJSONFrame(stream, FrameTypeHeader, HeaderFrame{Status: 200})
+	_ = WriteTypedFrame(stream, FrameTypeDone, nil)
+}
+
+func sendControlError(stream net.Conn, message string) {
+	_ = WriteJSONFrame(stream, FrameTypeError, ErrorFrame{Message: message})
 }
 
 // Shutdown 优雅关闭服务器

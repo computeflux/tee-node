@@ -22,16 +22,19 @@ const MaxBodySize = 16 * 1024 * 1024
 type FrameType uint8
 
 const (
-	FrameTypeRequest FrameType = 1 // TEE-Node -> LocalClient: HTTP request
-	FrameTypeHeader  FrameType = 2 // LocalClient -> TEE-Node: HTTP response header
-	FrameTypeData    FrameType = 3 // LocalClient -> TEE-Node: response body chunk (binary)
-	FrameTypeDone    FrameType = 4 // LocalClient -> TEE-Node: end of response
-	FrameTypeError   FrameType = 5 // LocalClient -> TEE-Node: upstream error
+	FrameTypeRequest       FrameType = 1 // TEE-Node -> LocalClient: HTTP request
+	FrameTypeHeader        FrameType = 2 // LocalClient -> TEE-Node: HTTP response header
+	FrameTypeData          FrameType = 3 // LocalClient -> TEE-Node: response body chunk (binary)
+	FrameTypeDone          FrameType = 4 // LocalClient -> TEE-Node: end of response
+	FrameTypeError         FrameType = 5 // LocalClient -> TEE-Node: upstream error
+	FrameTypeModelRegister FrameType = 6 // LocalClient -> TEE-Node: register a new model
+	FrameTypeModelUnregister FrameType = 7 // LocalClient -> TEE-Node: unregister a model
 )
 
 // ── Request Frame (JSON) ─────────────────────────────────
 
 type RequestFrame struct {
+	ModelID string            `json:"modelId,omitempty"` // 请求目标模型
 	Path    string            `json:"path"`
 	Method  string            `json:"method"`
 	Headers map[string]string `json:"headers,omitempty"`
@@ -52,14 +55,55 @@ type ErrorFrame struct {
 	Code    string `json:"code,omitempty"`
 }
 
+// ── Model Control Frame (JSON) ───────────────────────────
+//
+// 用于本地客户端在连接建立后动态增删模型。
+
+type ModelControlFrame struct {
+	ModelID string `json:"modelId"`
+	BaseURL string `json:"baseUrl,omitempty"`
+}
+
 // ── Handshake (JSON) ─────────────────────────────────────
 
 type Handshake struct {
-	Version int      `json:"version"` // 协议版本号
-	ModelID string   `json:"modelId"` // 主模型标识
-	APIKey  string   `json:"apiKey"`  // 认证密钥
-	BaseURL string   `json:"baseUrl"` // 本地服务基地址
-	Models  []string `json:"models"`  // 支持的所有模型列表
+	Version   int               `json:"version"`   // 协议版本号
+	ModelID   string            `json:"modelId"`   // 主模型标识（兼容旧版）
+	APIKey    string            `json:"apiKey"`    // 认证密钥
+	BaseURL   string            `json:"baseUrl"`   // 本地服务默认基地址
+	Models    []string          `json:"models"`    // 支持的所有模型列表
+	ModelURLs map[string]string `json:"modelUrls"` // 模型 ID -> 本地服务地址（可选）
+}
+
+// RegisteredModels 返回本次握手注册的所有模型 ID（去重）
+func (h *Handshake) RegisteredModels() []string {
+	seen := make(map[string]struct{})
+	if h.ModelID != "" {
+		seen[h.ModelID] = struct{}{}
+	}
+	for _, m := range h.Models {
+		if m != "" {
+			seen[m] = struct{}{}
+		}
+	}
+	for m := range h.ModelURLs {
+		if m != "" {
+			seen[m] = struct{}{}
+		}
+	}
+	models := make([]string, 0, len(seen))
+	for m := range seen {
+		models = append(models, m)
+	}
+	return models
+}
+
+// ModelBaseURL 返回指定模型对应的本地服务地址
+func (h *Handshake) ModelBaseURL(modelID string) string {
+	if u, ok := h.ModelURLs[modelID]; ok && u != "" {
+		return u
+	}
+	return h.BaseURL
 }
 
 // ── Low-level framing ────────────────────────────────────
