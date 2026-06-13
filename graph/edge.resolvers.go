@@ -54,7 +54,8 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 
 	// 过滤 providerType == 9999 的本地模型
 	result := make([]*model.ModelInfo, 0, len(models))
-	for _, m := range models {
+	for _, mid := range models {
+		m := mid.Data
 		if m.ProviderType == 9999 {
 			result = append(result, &model.ModelInfo{
 				Name:            m.Name,

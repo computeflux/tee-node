@@ -205,7 +205,7 @@ func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, erro
 	return vals, nil
 }
 
-func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32) ([]ModelInfo, error) {
+func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32) ([]ModelInfoWithID, error) {
 	if uint64(len(ids)) <= offset {
 		return nil, nil
 	}
@@ -214,18 +214,21 @@ func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32)
 		end = uint64(len(ids))
 	}
 	txn := g.api.GetTxn()
-	out := make([]ModelInfo, 0, end-offset)
+	out := make([]ModelInfoWithID, 0, end-offset)
 	for _, id := range ids[offset:end] {
 		m, err := g.models.Get(txn, id)
 		if err != nil || m == nil {
 			continue
 		}
-		out = append(out, *m)
+		out = append(out, ModelInfoWithID{
+			ID:   id,
+			Data: *m,
+		})
 	}
 	return out, nil
 }
 
-func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfoWithID, error) {
 	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
@@ -235,12 +238,12 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 		return nil, err
 	}
 	for i := range models {
-		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
 	}
 	return models, nil
 }
 
-func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error) {
+func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfoWithID, error) {
 	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
 		return nil, err
@@ -250,7 +253,7 @@ func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfo, error)
 		return nil, err
 	}
 	for i := range models {
-		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
 	}
 	return models, nil
 }
@@ -271,18 +274,21 @@ func (g GatewayQuery) ListActiveModelsWithinProvider(
 	if err != nil {
 		return nil, err
 	}
+
 	models, err := g.listModelsByIDs(ids, offset, limit)
 	if err != nil {
 		return nil, err
 	}
+
 	out := make([]ModelInfoWithProvider, 0, len(models))
 	for i := range models {
-		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].ProviderID)
+		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].Data.ProviderID)
 		if prov == nil {
 			continue
 		}
 		out = append(out, ModelInfoWithProvider{
-			Model:    models[i],
+			ID:       ids[i],
+			Model:    models[i].Data,
 			Provider: *prov,
 		})
 	}
@@ -299,7 +305,7 @@ func (g GatewayQuery) QueryModels(
 	maxPrice uint64,
 	offset uint64,
 	limit uint32,
-) ([]ModelInfo, error) {
+) ([]ModelInfoWithID, error) {
 	txn := g.api.GetTxn()
 
 	exprs := store.QueryAND{store.QueryCond{Field: "IsActive", Val: uint64(1)}}
@@ -321,9 +327,9 @@ func (g GatewayQuery) QueryModels(
 	}
 
 	if modalities != 0 {
-		filtered := make([]ModelInfo, 0, len(models))
+		filtered := make([]ModelInfoWithID, 0, len(models))
 		for _, m := range models {
-			if m.InputModalities&modalities != 0 {
+			if m.Data.InputModalities&modalities != 0 {
 				filtered = append(filtered, m)
 			}
 		}
@@ -339,7 +345,7 @@ func (g GatewayQuery) QueryModels(
 	}
 	models = models[offset:end]
 	for i := range models {
-		models[i].APIKeys = maskAPIKeys(models[i].APIKeys)
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
 	}
 	return models, nil
 }
@@ -453,17 +459,21 @@ func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInf
 	return out, nil
 }
 
-// maskAPIKey 保留前 1/3 明文，后 2/3 替换为 *
+// maskAPIKey 保留最后一个 '-' 及之前前缀，再保留其后 3 个字符明文，其余替换为 *
 func maskAPIKey(key string) string {
 	if len(key) <= 3 {
 		return strings.Repeat("*", len(key))
 	}
-	show := len(key) / 3
-	if show == 0 {
-		show = 1
+	idx := strings.LastIndex(key, "-")
+	if idx == -1 {
+		// 没有 '-' 时保留前 3 个字符
+		return key[:3] + strings.Repeat("*", len(key)-3)
 	}
-	maskLen := len(key) - show
-	return key[:show] + strings.Repeat("*", maskLen)
+	visibleEnd := idx + 1 + 3
+	if visibleEnd > len(key) {
+		visibleEnd = len(key)
+	}
+	return key[:visibleEnd] + strings.Repeat("*", len(key)-visibleEnd)
 }
 
 // maskAPIKeys 对所有 API Key 做脱敏处理

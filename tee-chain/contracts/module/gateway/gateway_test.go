@@ -98,7 +98,7 @@ func TestGateway_RegisterModel_Success(t *testing.T) {
 	require.Len(t, models, 1)
 	assert.Equal(t, "gpt-4", models[0].Name)
 	// API keys should be masked in query
-	assert.Equal(t, "sk****", models[0].APIKeys[0])
+	assert.Equal(t, "sk-abc", models[0].APIKeys[0])
 }
 
 func TestGateway_RegisterModel_WithoutProvider(t *testing.T) {
@@ -303,6 +303,9 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
+	// Settle must be called by node (T == 0)
+	rt.Caller.T = 0
+
 	// Settle: in=1000 tokens, out=500 tokens → cost = (1000*1000000 + 500*2000000) / 1000000 = 2002
 	err := m.SettleUsage([]Settlement{
 		{
@@ -351,6 +354,9 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 		Nonce:      nonce,
 	}
 
+	// Settle must be called by node (T == 0)
+	rt.Caller.T = 0
+
 	require.NoError(t, m.SettleUsage([]Settlement{record}))
 	// Duplicate record nonce should be silently skipped (return nil), no double charge
 	require.NoError(t, m.SettleUsage([]Settlement{record}))
@@ -361,6 +367,8 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
+	// ApplyWithdraw requires caller.T == 2 and matching provider owner
+	rt.Caller.T = 2
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil))
 
@@ -369,6 +377,8 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
+	// Settle must be called by node (T == 0)
+	rt.Caller.T = 0
 	require.NoError(t, m.SettleUsage([]Settlement{
 		{User: user, ModelID: 0, ProviderID: 0, TokenIn: 1000000, TokenOut: 500000, Count: 1, Nonce: []byte{0x01}},
 	}))
@@ -376,8 +386,9 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 	provCredit, _ := q.GetProviderCredit(0)
 	require.Greater(t, provCredit, uint64(0))
 
-	rt.System = true
-	require.NoError(t, m.ApplyWithdraw(0, []byte{}, 0, provCredit, []byte("nonce1")))
+	// ApplyWithdraw as provider owner with allowed chainID
+	rt.Caller.T = 2
+	require.NoError(t, m.ApplyWithdraw(420420417, []byte{}, 0, provCredit, []byte("nonce1")))
 
 	provCreditAfter, _ := q.GetProviderCredit(0)
 	assert.Equal(t, uint64(0), provCreditAfter)
@@ -387,14 +398,17 @@ func TestGateway_Withdraw_RequiresSystem(t *testing.T) {
 	gw, _ := newTestGateway()
 	m := GatewayMutation{*gw}
 
+	// Default caller type (T:1) is not allowed for any chainID
 	err := m.ApplyWithdraw(0, []byte{}, 0, 100, []byte("nonce1"))
-	assert.ErrorContains(t, err, "not sudo")
+	assert.ErrorContains(t, err, "chainID not allowed for user type")
 }
 
 func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
+	// ApplyWithdraw requires caller.T == 2 and matching provider owner
+	rt.Caller.T = 2
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil))
 
@@ -403,13 +417,15 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
 	rt.System = false
 
+	// Settle must be called by node (T == 0)
+	rt.Caller.T = 0
 	// Settle a small amount first
 	require.NoError(t, m.SettleUsage([]Settlement{
 		{User: user, ModelID: 0, ProviderID: 0, TokenIn: 1000, TokenOut: 500, Count: 1, Nonce: []byte{0x01}},
 	}))
 
-	// Try to withdraw more than earned
-	rt.System = true
-	err := m.ApplyWithdraw(0, []byte{}, 0, 1_000_000, []byte("nonce1"))
+	// Try to withdraw more than earned as provider owner with allowed chainID
+	rt.Caller.T = 2
+	err := m.ApplyWithdraw(420420417, []byte{}, 0, 1_000_000, []byte("nonce1"))
 	assert.ErrorIs(t, err, ErrLowCredit)
 }

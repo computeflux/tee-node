@@ -2,6 +2,7 @@ package domain
 
 import (
 	"bytes"
+	"encoding/hex"
 
 	"fmt"
 
@@ -139,8 +140,9 @@ func EVMWalletSignVerify(caller []byte, msg []byte, signature []byte) bool {
 	}
 
 	// EIP-191: \x19Ethereum Signed Message:\n<len><msg>
-	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(msg))
-	prefixedMsg := append([]byte(prefix), msg...)
+	sigData := "call_tee_contract:" + hex.EncodeToString(msg)
+	prefix := fmt.Sprintf("\x19Ethereum Signed Message:\n%d", len(sigData))
+	prefixedMsg := append([]byte(prefix), []byte(sigData)...)
 	hash := ethcrypto.Keccak256Hash(prefixedMsg)
 
 	// 复制签名并调整 v 值：以太坊使用 27/28，Ecrecover 期望 0/1

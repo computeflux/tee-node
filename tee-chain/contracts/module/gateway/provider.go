@@ -126,7 +126,7 @@ func (g GatewayQuery) GetProviderCount() (uint64, error) {
 	return g.providers.Len(g.api.GetTxn())
 }
 
-func (g GatewayQuery) listProvidersByIDs(ids []uint64, offset uint64, limit uint32) ([]ProviderInfo, error) {
+func (g GatewayQuery) listProvidersByIDs(ids []uint64, offset uint64, limit uint32) ([]ProviderInfoWithID, error) {
 	if uint64(len(ids)) <= offset {
 		return nil, nil
 	}
@@ -135,13 +135,16 @@ func (g GatewayQuery) listProvidersByIDs(ids []uint64, offset uint64, limit uint
 		end = uint64(len(ids))
 	}
 	txn := g.api.GetTxn()
-	out := make([]ProviderInfo, 0, end-offset)
+	out := make([]ProviderInfoWithID, 0, end-offset)
 	for _, id := range ids[offset:end] {
 		p, err := g.providers.Get(txn, id)
 		if err != nil || p == nil {
 			continue
 		}
-		out = append(out, *p)
+		out = append(out, ProviderInfoWithID{
+			ID:   id,
+			Data: *p,
+		})
 	}
 	return out, nil
 }
@@ -151,11 +154,12 @@ func (g GatewayQuery) ListProviders(offset uint64, limit uint32) ([]ProviderInfo
 	return vals, err
 }
 
-func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfo, error) {
+func (g GatewayQuery) ListActiveProviders(offset uint64, limit uint32) ([]ProviderInfoWithID, error) {
 	ids, err := g.providers.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
 	}
+
 	return g.listProvidersByIDs(ids, offset, limit)
 }
 

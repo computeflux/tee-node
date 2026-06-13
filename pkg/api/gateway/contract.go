@@ -112,23 +112,24 @@ func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway
 		return nil, nil
 	}
 
-	out := make([]cgateway.ModelInfo, len(models))
-	copy(out, models)
+	out := make([]cgateway.ModelInfo, 0, len(models))
 
 	nameMap := make(map[string]cgateway.ModelInfo, len(models))
-	for _, m := range out {
-		if m.IsActive {
-			nameMap[m.Name] = m
+	for _, m := range models {
+		if m.Data.IsActive {
+			nameMap[m.Data.Name] = m.Data
 		}
+		out = append(out, m.Data)
 	}
 	return out, nameMap
 }
 
 // FindProviderByModelAPIKey 根据模型名和 API Key 查找对应的本地模型供应商 ID。
 // 流程：
-//   1. 用 apiKey 找到对应的用户 token，得到用户地址 Addr。
-//   2. 以该用户地址为 caller 创建合约 runtime，调用 GetProviderByOwner 获取 ProviderID。
-//   3. 检查该 ProviderID 下是否存在名为 modelName 的活跃本地模型。
+//  1. 用 apiKey 找到对应的用户 token，得到用户地址 Addr。
+//  2. 以该用户地址为 caller 创建合约 runtime，调用 GetProviderByOwner 获取 ProviderID。
+//  3. 检查该 ProviderID 下是否存在名为 modelName 的活跃本地模型。
+//
 // local-client 传的就是用户登录后的 session token（也是调用网关的 Authorization Bearer key）。
 func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
 	bridge := getBridge()
@@ -308,7 +309,7 @@ func GatewayLookupAPIKey(chain *teechain.TeeChain, keyHash []byte) (*cgateway.AP
 }
 
 // GatewayListActiveModels 查询链上活跃模型列表。
-func GatewayListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ModelInfo, error) {
+func GatewayListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ModelInfoWithID, error) {
 	runtime, err := contractRuntime(chain)
 	if err != nil {
 		return nil, err
@@ -316,17 +317,6 @@ func GatewayListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint
 	defer runtime.GetTxn().Rollback()
 
 	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
-}
-
-// GatewayListActiveProviders 查询链上活跃 Provider 列表。
-func GatewayListActiveProviders(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ProviderInfo, error) {
-	runtime, err := contractRuntime(chain)
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveProviders(offset, limit)
 }
 
 // GatewayGetProvider 查询单个 Provider。
