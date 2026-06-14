@@ -54,16 +54,38 @@ func GetGatewayTokenByKey(key string) (*GatewayTokenInfo, error) {
 }
 
 // FindGatewayTokenByKey 通过 key 索引直接查询（O(1)），同时检查是否过期。
-// 不再遍历整个 token 表。
+// 若已过期则自动删除数据及对应过期索引，避免长期占用存储。
 func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
 	tk, err := GetGatewayTokenByKey(key)
 	if err != nil || tk == nil {
 		return nil
 	}
 	if !tk.IsActive || tk.IsExpired() {
+		_ = DeleteGatewayTokenByKey(key)
 		return nil
 	}
 	return tk
+}
+
+// DeleteGatewayTokenByKey 通过 API Key 删除 token 记录，并同步清理过期索引。
+// 先删除数据，成功后再清理索引；若数据删除失败则保留索引，确保后续清理仍能定位该记录。
+func DeleteGatewayTokenByKey(key string) error {
+	tk, _ := GetGatewayTokenByKey(key)
+	if err := DeleteKey("GATEWAY", fmt.Sprintf("token_by_key:%s", key)); err != nil {
+		return err
+	}
+	if tk != nil {
+		_ = CancelExpiration("GATEWAY", "token_by_key:"+key, int64(tk.ExpiresAt))
+	}
+	return nil
+}
+
+// CleanupExpiredGatewayTokens 基于过期索引删除过期 Gateway token。
+// 优先使用时间排序的过期索引，避免全表扫描。
+func CleanupExpiredGatewayTokens() error {
+	return CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
+		return DeleteKey("GATEWAY", subKey)
+	})
 }
 
 func ListUserGatewayTokens(user string, startKey uint64, size int) ([]*GatewayTokenInfo, error) {

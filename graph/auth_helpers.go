@@ -40,6 +40,38 @@ func generateWalletNonce() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// generateRefreshToken generates a new refresh token in the format refresh_tee_<64 hex chars>
+func generateRefreshToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := randReadFn(b); err != nil {
+		return "", fmt.Errorf("failed to generate refresh token entropy: %w", err)
+	}
+	return "refresh_tee_" + hex.EncodeToString(b), nil
+}
+
+// createRefreshToken creates and stores a new refresh token for the given user.
+// Refresh token 有效期较长（默认 30 天），用于在 API Key 过期后换取新的 API Key。
+func createRefreshToken(owner string, address string) (string, error) {
+	refreshToken, err := generateRefreshToken()
+	if err != nil {
+		return "", err
+	}
+	token := &store.RefreshTokenInfo{
+		Owner:     owner,
+		Address:   address,
+		IsActive:  true,
+		CreatedAt: uint64(time.Now().Unix()),
+		ExpiresAt: uint64(time.Now().Add(30 * 24 * time.Hour).Unix()),
+	}
+	if err := store.SetRefreshToken(refreshToken, token); err != nil {
+		return "", fmt.Errorf("failed to store refresh token: %w", err)
+	}
+	if err := store.ScheduleExpiration("GATEWAY", "refresh_token:"+refreshToken, int64(token.ExpiresAt)); err != nil {
+		fmt.Printf("[createRefreshToken] schedule expiration failed: %v\n", err)
+	}
+	return refreshToken, nil
+}
+
 // createUserAPIKey creates and stores a new API Key for the given user.
 // addrHex 为 Ethereum 地址 hex 字符串（如 "0xabc..."），用于结算时构造 UniAddr。
 func createUserAPIKey(owner string, addrHex string) (string, error) {
@@ -71,6 +103,9 @@ func createUserAPIKey(owner string, addrHex string) (string, error) {
 	if err := store.SetGatewayTokenByKey(token); err != nil {
 		return "", fmt.Errorf("failed to store gateway token: %w", err)
 	}
+	if err := store.ScheduleExpiration("GATEWAY", "token_by_key:"+apiKey, int64(token.ExpiresAt)); err != nil {
+		fmt.Printf("[createUserAPIKey] schedule expiration failed: %v\n", err)
+	}
 	store.SetNextID("gateway_token", nextID+1)
 
 	return apiKey, nil
@@ -94,6 +129,7 @@ func resolveEmailFromToken(token string) (string, error) {
 	if tk := gateway.LookupAPIKeyViaContract(token); tk != nil && tk.IsActive {
 		// 合约查询不携带过期时间，补充本地过期检查确保一致性
 		if localTk, _ := store.GetGatewayTokenByKey(token); localTk != nil && localTk.IsExpired() {
+			_ = store.DeleteGatewayTokenByKey(token)
 			return "", fmt.Errorf("token expired")
 		}
 		return tk.Owner, nil
@@ -103,6 +139,7 @@ func resolveEmailFromToken(token string) (string, error) {
 	tk, _ := store.GetGatewayTokenByKey(token)
 	if tk != nil {
 		if tk.IsExpired() {
+			_ = store.DeleteGatewayTokenByKey(token)
 			return "", fmt.Errorf("token expired")
 		}
 		if tk.IsActive {

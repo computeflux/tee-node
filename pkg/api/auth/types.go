@@ -4,11 +4,12 @@ package auth
 
 // AuthResponse 认证操作返回
 type AuthResponse struct {
-	Success  bool      `json:"success"`
-	UserInfo *UserInfo `json:"userInfo,omitempty"`
-	Token    string    `json:"token,omitempty"`
-	Address  string    `json:"address,omitempty"`
-	Error    string    `json:"error,omitempty"`
+	Success      bool      `json:"success"`
+	UserInfo     *UserInfo `json:"userInfo,omitempty"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refreshToken,omitempty"`
+	Address      string    `json:"address,omitempty"`
+	Error        string    `json:"error,omitempty"`
 }
 
 // UserInfo 用户信息
@@ -43,6 +44,7 @@ type RecoveryResult struct {
 	Status        string `json:"status"`
 	RecoveryToken string `json:"recoveryToken,omitempty"`
 	Token         string `json:"token,omitempty"`
+	RefreshToken  string `json:"refreshToken,omitempty"`
 	Address       string `json:"address,omitempty"`
 	Email         string `json:"email,omitempty"`
 	Error         string `json:"error,omitempty"`

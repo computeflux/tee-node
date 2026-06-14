@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cometbft/cometbft/privval"
 	"github.com/computeflux/tee-provider/config"
@@ -143,6 +144,9 @@ func main() {
 	defer cancel()
 
 	otpSvc := authsvc.NewOTPService(ctx, 5)
+
+	// 启动后台清理任务，每小时扫描并删除过期 token 和临时会话
+	store.StartCleanupTask(ctx, time.Hour)
 
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{

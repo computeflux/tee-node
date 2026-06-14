@@ -67,6 +67,8 @@ func TestVerifyOtp_NewUser_DerivesAddress(t *testing.T) {
 	require.True(t, resp.Success, "新用户 OTP 验证应成功")
 	require.NotEmpty(t, resp.Address, "新用户应派生钱包地址")
 	require.NotEmpty(t, resp.Token, "新用户应获得 API Key")
+	require.NotEmpty(t, resp.RefreshToken, "新用户应获得 Refresh Token")
+	assert.True(t, strings.HasPrefix(resp.RefreshToken, "refresh_tee_"))
 
 	// 验证本地存储已写入
 	user, err := getAuthUserFromContract(nil, email)
@@ -98,6 +100,7 @@ func TestVerifyOtp_ExistingUser_KeepsAddress(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, resp2.Success)
 	assert.Equal(t, addr1, resp2.Address, "已有用户再次登录时地址必须保持一致")
+	require.NotEmpty(t, resp2.RefreshToken, "已有用户再次登录也应获得 Refresh Token")
 }
 
 func TestVerifyOtp_CrossNodeConsistency(t *testing.T) {
@@ -448,9 +451,10 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 	nonce := "expired_nonce_123"
 	err := store.PutWalletNonce(address, nonce, 300)
 	require.NoError(t, err)
-	// 修改记录为 10 分钟前创建
+	// 修改记录为 10 分钟前创建并已过期
 	rec, _ := store.GetWalletNonce(address, nonce)
 	rec.CreatedAt = time.Now().Unix() - 600
+	rec.ExpiresAt = rec.CreatedAt + 300
 	b, _ := json.Marshal(rec)
 	_ = store.SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
 
@@ -459,7 +463,8 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
 	require.NoError(t, err)
 	require.False(t, resp.Success)
-	assert.Equal(t, "nonce expired", resp.Error)
+	// 过期 nonce 会在 GetWalletNonce 时被懒删除
+	assert.Equal(t, "invalid or expired nonce", resp.Error)
 }
 
 func TestLoginWithWallet_InvalidSignature(t *testing.T) {
@@ -576,4 +581,102 @@ func TestGenerateWalletNonce_Success(t *testing.T) {
 	nonce, err := generateWalletNonce()
 	require.NoError(t, err)
 	assert.Equal(t, 32, len(nonce))
+}
+
+// TestLoginWithWallet_ReturnsRefreshToken verifies that wallet login issues a
+// refresh token alongside the API token.
+func TestLoginWithWallet_ReturnsRefreshToken(t *testing.T) {
+	resolver, cleanup := setupAuthTest(t, "test-seed")
+	defer cleanup()
+
+	m := &mutationResolver{Resolver: resolver}
+	address := "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
+	privKeyHex := "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"
+	message := "Sign in to TEE Node"
+
+	nonce, err := m.RequestWalletNonce(context.Background(), address)
+	require.NoError(t, err)
+
+	sig, err := signEIP191(privKeyHex, message+nonce)
+	require.NoError(t, err)
+
+	resp, err := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+	require.NotEmpty(t, resp.Token)
+	require.NotEmpty(t, resp.RefreshToken)
+	assert.True(t, strings.HasPrefix(resp.RefreshToken, "refresh_tee_"))
+
+	// Verify refresh token is stored and active
+	rt, err := store.GetRefreshToken(resp.RefreshToken)
+	require.NoError(t, err)
+	require.NotNil(t, rt)
+	assert.Equal(t, address, rt.Owner)
+	assert.Equal(t, address, rt.Address)
+	assert.True(t, rt.IsActive)
+	assert.False(t, rt.IsExpired())
+}
+
+// TestRefreshToken_Success verifies that a valid refresh token returns a new API key.
+func TestRefreshToken_Success(t *testing.T) {
+	resolver, cleanup := setupAuthTest(t, "test-seed")
+	defer cleanup()
+
+	m := &mutationResolver{Resolver: resolver}
+	address := "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
+	privKeyHex := "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"
+	message := "Sign in to TEE Node"
+
+	nonce, _ := m.RequestWalletNonce(context.Background(), address)
+	sig, _ := signEIP191(privKeyHex, message+nonce)
+	loginResp, _ := m.LoginWithWallet(context.Background(), address, sig, message, nonce)
+	require.True(t, loginResp.Success)
+
+	refreshResp, err := m.RefreshToken(context.Background(), loginResp.RefreshToken)
+	require.NoError(t, err)
+	require.True(t, refreshResp.Success)
+	require.NotEmpty(t, refreshResp.Token)
+	assert.NotEqual(t, loginResp.Token, refreshResp.Token, "refresh should issue a new API key")
+	assert.NotEqual(t, loginResp.RefreshToken, refreshResp.RefreshToken, "refresh should rotate refresh token")
+	assert.Equal(t, address, refreshResp.Address)
+
+	// 旧的 refresh token 应已失效，不能再次使用。
+	reusedResp, err := m.RefreshToken(context.Background(), loginResp.RefreshToken)
+	require.NoError(t, err)
+	require.False(t, reusedResp.Success)
+	assert.Equal(t, "invalid or expired refresh token", reusedResp.Error)
+}
+
+// TestRefreshToken_InvalidToken verifies that an invalid refresh token is rejected.
+func TestRefreshToken_InvalidToken(t *testing.T) {
+	resolver, cleanup := setupAuthTest(t, "test-seed")
+	defer cleanup()
+
+	m := &mutationResolver{Resolver: resolver}
+	resp, err := m.RefreshToken(context.Background(), "refresh_tee_nonexistent")
+	require.NoError(t, err)
+	require.False(t, resp.Success)
+	assert.Equal(t, "invalid or expired refresh token", resp.Error)
+}
+
+// TestRefreshToken_ExpiredToken verifies that an expired refresh token is rejected.
+func TestRefreshToken_ExpiredToken(t *testing.T) {
+	resolver, cleanup := setupAuthTest(t, "test-seed")
+	defer cleanup()
+
+	refreshToken := "refresh_tee_expiredtoken"
+	err := store.SetRefreshToken(refreshToken, &store.RefreshTokenInfo{
+		Owner:     "user@example.com",
+		Address:   "0x1234",
+		IsActive:  true,
+		CreatedAt: uint64(time.Now().Add(-31 * 24 * time.Hour).Unix()),
+		ExpiresAt: uint64(time.Now().Add(-24 * time.Hour).Unix()),
+	})
+	require.NoError(t, err)
+
+	m := &mutationResolver{Resolver: resolver}
+	resp, err := m.RefreshToken(context.Background(), refreshToken)
+	require.NoError(t, err)
+	require.False(t, resp.Success)
+	assert.Equal(t, "invalid or expired refresh token", resp.Error)
 }

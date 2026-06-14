@@ -60,11 +60,17 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
+	refreshToken, err := createRefreshToken(email, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
 	return &auth.AuthResponse{
-		Success:  true,
-		Token:    apiKey,
-		Address:  address,
-		UserInfo: &auth.UserInfo{Email: email, Name: email, TypeOfLogin: provider},
+		Success:      true,
+		Token:        apiKey,
+		RefreshToken: refreshToken,
+		Address:      address,
+		UserInfo:     &auth.UserInfo{Email: email, Name: email, TypeOfLogin: provider},
 	}, nil
 }
 
@@ -128,6 +134,12 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	if err != nil {
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
+
+	refreshToken, err := createRefreshToken(oauthUser.Email, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
 	userInfo := &auth.UserInfo{
 		Email:        oauthUser.Email,
 		Name:         oauthUser.Name,
@@ -138,7 +150,7 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	}
 
 	return &auth.AuthResponse{
-		Success: true, UserInfo: userInfo, Token: apiKey, Address: address,
+		Success: true, UserInfo: userInfo, Token: apiKey, RefreshToken: refreshToken, Address: address,
 	}, nil
 }
 
@@ -448,8 +460,14 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 	if err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
+
+	refreshToken, err := createRefreshToken(email, address)
+	if err != nil {
+		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
+	}
+
 	return &auth.RecoveryResult{
-		Status: "ok", Token: apiKey, Address: address, Email: email,
+		Status: "ok", Token: apiKey, RefreshToken: refreshToken, Address: address, Email: email,
 	}, nil
 }
 
@@ -479,7 +497,7 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 		return &auth.AuthResponse{Success: false, Error: "nonce already used"}, nil
 	}
 
-	if time.Now().Unix()-rec.CreatedAt > 300 {
+	if time.Now().Unix() > rec.ExpiresAt {
 		return &auth.AuthResponse{Success: false, Error: "nonce expired"}, nil
 	}
 
@@ -497,10 +515,55 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 	if err != nil {
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
+
+	// 5. 生成 Refresh Token，用于后续刷新 API Key
+	refreshToken, err := createRefreshToken(address, address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
 	return &auth.AuthResponse{
-		Success: true,
-		Token:   apiKey,
-		Address: address,
+		Success:      true,
+		Token:        apiKey,
+		RefreshToken: refreshToken,
+		Address:      address,
+	}, nil
+}
+
+// RefreshToken is the resolver for the refreshToken field.
+// 使用 refreshToken 校验用户身份并颁发新的 API Key（UserAPIKey），
+// 同时执行 Refresh Token Rotation：旧 refresh token 立即失效并返回新的 refresh token。
+func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string) (*auth.AuthResponse, error) {
+	tk := store.FindRefreshToken(refreshToken)
+	if tk == nil {
+		return &auth.AuthResponse{Success: false, Error: "invalid or expired refresh token"}, nil
+	}
+
+	apiKey, err := createUserAPIKey(tk.Owner, tk.Address)
+	if err != nil {
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	// 生成新的 refresh token；若失败则回滚已创建的 API Key，避免孤儿凭证。
+	newRefreshToken, err := createRefreshToken(tk.Owner, tk.Address)
+	if err != nil {
+		_ = store.DeleteGatewayTokenByKey(apiKey)
+		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+	}
+
+	// 旧的 refresh token 立即失效并清理。
+	if err := store.DeleteRefreshToken(refreshToken); err != nil {
+		_ = store.DeleteGatewayTokenByKey(apiKey)
+		_ = store.DeleteRefreshToken(newRefreshToken)
+		return &auth.AuthResponse{Success: false, Error: "failed to rotate refresh token"}, nil
+	}
+
+	return &auth.AuthResponse{
+		Success:      true,
+		Token:        apiKey,
+		RefreshToken: newRefreshToken,
+		Address:      tk.Address,
+		UserInfo:     &auth.UserInfo{Email: tk.Owner},
 	}, nil
 }
 

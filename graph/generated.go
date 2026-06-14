@@ -72,11 +72,12 @@ type ComplexityRoot struct {
 	}
 
 	AuthResponse struct {
-		Address  func(childComplexity int) int
-		Error    func(childComplexity int) int
-		Success  func(childComplexity int) int
-		Token    func(childComplexity int) int
-		UserInfo func(childComplexity int) int
+		Address      func(childComplexity int) int
+		Error        func(childComplexity int) int
+		RefreshToken func(childComplexity int) int
+		Success      func(childComplexity int) int
+		Token        func(childComplexity int) int
+		UserInfo     func(childComplexity int) int
 	}
 
 	ChainInfo struct {
@@ -155,6 +156,7 @@ type ComplexityRoot struct {
 		JoinEarlyAccess      func(childComplexity int, wallet string, email *string, referralCode *string) int
 		JoinTelegram         func(childComplexity int, wallet string, message string, signature string) int
 		LoginWithWallet      func(childComplexity int, address string, signature string, message string, nonce string) int
+		RefreshToken         func(childComplexity int, refreshToken string) int
 		RequestOtp           func(childComplexity int, email string, clientID string) int
 		RequestRecovery      func(childComplexity int, recoveryEmail string) int
 		RequestWalletNonce   func(childComplexity int, address string) int
@@ -218,6 +220,7 @@ type ComplexityRoot struct {
 		Email         func(childComplexity int) int
 		Error         func(childComplexity int) int
 		RecoveryToken func(childComplexity int) int
+		RefreshToken  func(childComplexity int) int
 		Status        func(childComplexity int) int
 		Token         func(childComplexity int) int
 	}
@@ -285,6 +288,7 @@ type MutationResolver interface {
 	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
 	RequestWalletNonce(ctx context.Context, address string) (string, error)
 	LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*auth.AuthResponse, error)
 	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
@@ -486,6 +490,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AuthResponse.Error(childComplexity), true
+
+	case "AuthResponse.refreshToken":
+		if e.complexity.AuthResponse.RefreshToken == nil {
+			break
+		}
+
+		return e.complexity.AuthResponse.RefreshToken(childComplexity), true
 
 	case "AuthResponse.success":
 		if e.complexity.AuthResponse.Success == nil {
@@ -888,6 +899,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.LoginWithWallet(childComplexity, args["address"].(string), args["signature"].(string), args["message"].(string), args["nonce"].(string)), true
+
+	case "Mutation.refreshToken":
+		if e.complexity.Mutation.RefreshToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_refreshToken_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RefreshToken(childComplexity, args["refreshToken"].(string)), true
 
 	case "Mutation.requestOTP":
 		if e.complexity.Mutation.RequestOtp == nil {
@@ -1364,6 +1387,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.RecoveryResult.RecoveryToken(childComplexity), true
+
+	case "RecoveryResult.refreshToken":
+		if e.complexity.RecoveryResult.RefreshToken == nil {
+			break
+		}
+
+		return e.complexity.RecoveryResult.RefreshToken(childComplexity), true
 
 	case "RecoveryResult.status":
 		if e.complexity.RecoveryResult.Status == nil {
@@ -2386,6 +2416,34 @@ func (ec *executionContext) field_Mutation_loginWithWallet_argsNonce(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("nonce"))
 	if tmp, ok := rawArgs["nonce"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_refreshToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_refreshToken_argsRefreshToken(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["refreshToken"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_refreshToken_argsRefreshToken(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	if _, ok := rawArgs["refreshToken"]; !ok {
+		var zeroVal string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("refreshToken"))
+	if tmp, ok := rawArgs["refreshToken"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -5074,6 +5132,47 @@ func (ec *executionContext) fieldContext_AuthResponse_token(_ context.Context, f
 	return fc, nil
 }
 
+func (ec *executionContext) _AuthResponse_refreshToken(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AuthResponse_refreshToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RefreshToken, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalOString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AuthResponse_refreshToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AuthResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _AuthResponse_address(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_address(ctx, field)
 	if err != nil {
@@ -6887,6 +6986,8 @@ func (ec *executionContext) fieldContext_Mutation_requestOTP(ctx context.Context
 				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
 			case "token":
 				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_AuthResponse_address(ctx, field)
 			case "error":
@@ -6954,6 +7055,8 @@ func (ec *executionContext) fieldContext_Mutation_verifyOTP(ctx context.Context,
 				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
 			case "token":
 				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_AuthResponse_address(ctx, field)
 			case "error":
@@ -7021,6 +7124,8 @@ func (ec *executionContext) fieldContext_Mutation_socialLogin(ctx context.Contex
 				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
 			case "token":
 				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_AuthResponse_address(ctx, field)
 			case "error":
@@ -7407,6 +7512,8 @@ func (ec *executionContext) fieldContext_Mutation_requestRecovery(ctx context.Co
 				return ec.fieldContext_RecoveryResult_recoveryToken(ctx, field)
 			case "token":
 				return ec.fieldContext_RecoveryResult_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_RecoveryResult_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_RecoveryResult_address(ctx, field)
 			case "email":
@@ -7476,6 +7583,8 @@ func (ec *executionContext) fieldContext_Mutation_verifyRecovery(ctx context.Con
 				return ec.fieldContext_RecoveryResult_recoveryToken(ctx, field)
 			case "token":
 				return ec.fieldContext_RecoveryResult_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_RecoveryResult_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_RecoveryResult_address(ctx, field)
 			case "email":
@@ -7545,6 +7654,8 @@ func (ec *executionContext) fieldContext_Mutation_completeRecovery(ctx context.C
 				return ec.fieldContext_RecoveryResult_recoveryToken(ctx, field)
 			case "token":
 				return ec.fieldContext_RecoveryResult_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_RecoveryResult_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_RecoveryResult_address(ctx, field)
 			case "email":
@@ -7669,6 +7780,8 @@ func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Co
 				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
 			case "token":
 				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_AuthResponse_address(ctx, field)
 			case "error":
@@ -7685,6 +7798,75 @@ func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_loginWithWallet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_refreshToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().RefreshToken(rctx, fc.Args["refreshToken"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*auth.AuthResponse)
+	fc.Result = res
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_refreshToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "success":
+				return ec.fieldContext_AuthResponse_success(ctx, field)
+			case "userInfo":
+				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
+			case "token":
+				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
+			case "address":
+				return ec.fieldContext_AuthResponse_address(ctx, field)
+			case "error":
+				return ec.fieldContext_AuthResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AuthResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_refreshToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9096,6 +9278,8 @@ func (ec *executionContext) fieldContext_Query_checkSession(ctx context.Context,
 				return ec.fieldContext_AuthResponse_userInfo(ctx, field)
 			case "token":
 				return ec.fieldContext_AuthResponse_token(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 			case "address":
 				return ec.fieldContext_AuthResponse_address(ctx, field)
 			case "error":
@@ -10271,6 +10455,47 @@ func (ec *executionContext) _RecoveryResult_token(ctx context.Context, field gra
 }
 
 func (ec *executionContext) fieldContext_RecoveryResult_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecoveryResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecoveryResult_refreshToken(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RecoveryResult_refreshToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RefreshToken, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalOString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RecoveryResult_refreshToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RecoveryResult",
 		Field:      field,
@@ -13921,6 +14146,8 @@ func (ec *executionContext) _AuthResponse(ctx context.Context, sel ast.Selection
 			out.Values[i] = ec._AuthResponse_userInfo(ctx, field, obj)
 		case "token":
 			out.Values[i] = ec._AuthResponse_token(ctx, field, obj)
+		case "refreshToken":
+			out.Values[i] = ec._AuthResponse_refreshToken(ctx, field, obj)
 		case "address":
 			out.Values[i] = ec._AuthResponse_address(ctx, field, obj)
 		case "error":
@@ -14525,6 +14752,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "loginWithWallet":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_loginWithWallet(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "refreshToken":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_refreshToken(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -15279,6 +15513,8 @@ func (ec *executionContext) _RecoveryResult(ctx context.Context, sel ast.Selecti
 			out.Values[i] = ec._RecoveryResult_recoveryToken(ctx, field, obj)
 		case "token":
 			out.Values[i] = ec._RecoveryResult_token(ctx, field, obj)
+		case "refreshToken":
+			out.Values[i] = ec._RecoveryResult_refreshToken(ctx, field, obj)
 		case "address":
 			out.Values[i] = ec._RecoveryResult_address(ctx, field, obj)
 		case "email":

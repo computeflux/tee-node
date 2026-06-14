@@ -4,6 +4,7 @@ type AuthResponse {
   success: Boolean!
   userInfo: UserInfo
   token: String
+  refreshToken: String
   address: String
   error: String
 }
@@ -41,6 +42,7 @@ type RecoveryResult {
   status: String!
   recoveryToken: String
   token: String
+  refreshToken: String
   address: String
   email: String
   error: String
@@ -134,6 +136,9 @@ extend type Mutation {
 
   """外部钱包登录（MetaMask 等），通过签名验证身份后返回 API Token。签名内容为 message + nonce"""
   loginWithWallet(address: String!, signature: String!, message: String!, nonce: String!): AuthResponse!
+
+  """使用 refreshToken 换取新的 API Token"""
+  refreshToken(refreshToken: String!): AuthResponse!
 
   """设置 Auth 合约配置（节点管理员调用）"""
   setAuthConfig(cfg: AuthConfigInput!): Boolean!

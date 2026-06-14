@@ -97,15 +97,32 @@ func PutSignSession(s *SignSession) error {
 	if err != nil {
 		return err
 	}
-	return SetKey("WEB3AUTH", "sig:"+s.Token, b)
+	key := "sig:" + s.Token
+	if err := SetKey("WEB3AUTH", key, b); err != nil {
+		return err
+	}
+	return ScheduleExpiration("WEB3AUTH", key, s.ExpiresAt)
 }
 
 func GetSignSession(token string) (*SignSession, error) {
-	return GetJson[SignSession]("WEB3AUTH", "sig:"+token)
+	s, err := GetJson[SignSession]("WEB3AUTH", "sig:"+token)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil && time.Now().Unix() > s.ExpiresAt {
+		_ = DeleteSignSession(token)
+		_ = CancelExpiration("WEB3AUTH", "sig:"+token, s.ExpiresAt)
+		return nil, nil
+	}
+	return s, nil
 }
 
 func DeleteSignSession(token string) error {
-	return DeleteKey("WEB3AUTH", "sig:"+token)
+	key := "sig:" + token
+	if s, _ := GetJson[SignSession]("WEB3AUTH", key); s != nil {
+		_ = CancelExpiration("WEB3AUTH", key, s.ExpiresAt)
+	}
+	return DeleteKey("WEB3AUTH", key)
 }
 
 // ── Challenge ─────────────────────────────────────────────
@@ -115,14 +132,18 @@ type ChallengeRecord struct {
 	Challenge string `json:"challenge"`
 	Email     string `json:"email"`
 	CreatedAt int64  `json:"createdAt"`
+	ExpiresAt int64  `json:"expiresAt"`
 	Used      bool   `json:"used"`
 }
 
 func PutChallenge(email, challenge string, ttlSeconds int) error {
+	now := time.Now().Unix()
+	expiresAt := now + int64(ttlSeconds)
 	rec := &ChallengeRecord{
 		Challenge: challenge,
 		Email:     email,
-		CreatedAt: time.Now().Unix(),
+		CreatedAt: now,
+		ExpiresAt: expiresAt,
 		Used:      false,
 	}
 	b, err := json.Marshal(rec)
@@ -130,12 +151,24 @@ func PutChallenge(email, challenge string, ttlSeconds int) error {
 		return err
 	}
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	return SetKey("WEB3AUTH", key, b)
+	if err := SetKey("WEB3AUTH", key, b); err != nil {
+		return err
+	}
+	return ScheduleExpiration("WEB3AUTH", key, expiresAt)
 }
 
 func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	return GetJson[ChallengeRecord]("WEB3AUTH", key)
+	rec, err := GetJson[ChallengeRecord]("WEB3AUTH", key)
+	if err != nil {
+		return nil, err
+	}
+	if rec != nil && time.Now().Unix() > rec.ExpiresAt {
+		_ = DeleteChallenge(email, challenge)
+		_ = CancelExpiration("WEB3AUTH", key, rec.ExpiresAt)
+		return nil, nil
+	}
+	return rec, nil
 }
 
 func MarkChallengeUsed(email, challenge string) error {
@@ -154,7 +187,11 @@ func MarkChallengeUsed(email, challenge string) error {
 }
 
 func DeleteChallenge(email, challenge string) error {
-	return DeleteKey("WEB3AUTH", fmt.Sprintf("c:%s:%s", email, challenge))
+	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	if rec, _ := GetJson[ChallengeRecord]("WEB3AUTH", key); rec != nil {
+		_ = CancelExpiration("WEB3AUTH", key, rec.ExpiresAt)
+	}
+	return DeleteKey("WEB3AUTH", key)
 }
 
 // FindPendingChallenge 查找用户最新的未使用 challenge
@@ -319,12 +356,18 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 }
 
 func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
-	data := fmt.Sprintf("%d:%s", time.Now().Add(time.Duration(ttlSeconds)*time.Second).Unix(), otp)
-	return SetKey("WEB3AUTH", "ro:"+userEmail, []byte(data))
+	expiresAt := time.Now().Add(time.Duration(ttlSeconds) * time.Second).Unix()
+	data := fmt.Sprintf("%d:%s", expiresAt, otp)
+	key := "ro:" + userEmail
+	if err := SetKey("WEB3AUTH", key, []byte(data)); err != nil {
+		return err
+	}
+	return ScheduleExpiration("WEB3AUTH", key, expiresAt)
 }
 
 func GetRecoveryOTP(userEmail string) (string, error) {
-	b, err := GetKey("WEB3AUTH", "ro:"+userEmail)
+	key := "ro:" + userEmail
+	b, err := GetKey("WEB3AUTH", key)
 	if err != nil {
 		return "", err
 	}
@@ -336,13 +379,23 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 	expiresAt, _ := strconv.ParseInt(parts[0], 10, 64)
 	if time.Now().Unix() > expiresAt {
 		_ = DeleteRecoveryOTP(userEmail)
+		_ = CancelExpiration("WEB3AUTH", key, expiresAt)
 		return "", fmt.Errorf("recovery otp expired")
 	}
 	return parts[1], nil
 }
 
 func DeleteRecoveryOTP(userEmail string) error {
-	return DeleteKey("WEB3AUTH", "ro:"+userEmail)
+	key := "ro:" + userEmail
+	if b, _ := GetKey("WEB3AUTH", key); len(b) > 0 {
+		parts := strings.SplitN(string(b), ":", 2)
+		if len(parts) == 2 {
+			if expiresAt, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+				_ = CancelExpiration("WEB3AUTH", key, expiresAt)
+			}
+		}
+	}
+	return DeleteKey("WEB3AUTH", key)
 }
 
 // ── Wallet Login Nonce ────────────────────────────────────
@@ -352,25 +405,43 @@ type WalletNonceRecord struct {
 	Address   string `json:"address"`
 	Nonce     string `json:"nonce"`
 	CreatedAt int64  `json:"createdAt"`
+	ExpiresAt int64  `json:"expiresAt"`
 	Used      bool   `json:"used"`
 }
 
 func PutWalletNonce(address, nonce string, ttlSeconds int) error {
+	now := time.Now().Unix()
+	expiresAt := now + int64(ttlSeconds)
 	rec := &WalletNonceRecord{
 		Address:   address,
 		Nonce:     nonce,
-		CreatedAt: time.Now().Unix(),
+		CreatedAt: now,
+		ExpiresAt: expiresAt,
 		Used:      false,
 	}
 	b, err := json.Marshal(rec)
 	if err != nil {
 		return err
 	}
-	return SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
+	key := "wn:" + address + ":" + nonce
+	if err := SetKey("WEB3AUTH", key, b); err != nil {
+		return err
+	}
+	return ScheduleExpiration("WEB3AUTH", key, expiresAt)
 }
 
 func GetWalletNonce(address, nonce string) (*WalletNonceRecord, error) {
-	return GetJson[WalletNonceRecord]("WEB3AUTH", "wn:"+address+":"+nonce)
+	key := "wn:" + address + ":" + nonce
+	rec, err := GetJson[WalletNonceRecord]("WEB3AUTH", key)
+	if err != nil {
+		return nil, err
+	}
+	if rec != nil && time.Now().Unix() > rec.ExpiresAt {
+		_ = DeleteKey("WEB3AUTH", key)
+		_ = CancelExpiration("WEB3AUTH", key, rec.ExpiresAt)
+		return nil, nil
+	}
+	return rec, nil
 }
 
 func MarkWalletNonceUsed(address, nonce string) error {
@@ -386,8 +457,13 @@ func MarkWalletNonceUsed(address, nonce string) error {
 	return SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
 }
 
-// CleanupWalletNonces 清理某地址下已过期的 nonce（由外部定时任务调用）
+// CleanupWalletNonces 清理指定地址下已过期的钱包登录 nonce。
+// 若 address 为空，则退化为基于过期索引的全局清理。
 func CleanupWalletNonces(address string, maxAgeSeconds int) error {
+	if address == "" {
+		return CleanupExpiredWalletNonces()
+	}
+
 	prefix := []byte(comboKey("WEB3AUTH", "wn:"+address+":"))
 	iter, err := DBINS.NewIter(&pebble.IterOptions{})
 	if err != nil {
@@ -396,6 +472,7 @@ func CleanupWalletNonces(address string, maxAgeSeconds int) error {
 	defer iter.Close()
 
 	cutoff := time.Now().Unix() - int64(maxAgeSeconds)
+	var toDelete [][]byte
 	for iter.SeekGE(prefix); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
 		raw, err := util.Unseal(iter.Value(), nil)
 		if err != nil {
@@ -403,8 +480,40 @@ func CleanupWalletNonces(address string, maxAgeSeconds int) error {
 		}
 		var rec WalletNonceRecord
 		if json.Unmarshal(raw, &rec) == nil && rec.CreatedAt < cutoff {
-			_ = DeleteKey("WEB3AUTH", "wn:"+address+":"+rec.Nonce)
+			toDelete = append(toDelete, copyIterKey(iter.Key()))
 		}
 	}
+
+	for _, key := range toDelete {
+		_ = DeleteByteKey(key)
+	}
 	return nil
+}
+
+// CleanupExpiredWalletNonces 基于过期索引删除所有已过期的钱包登录 nonce。
+func CleanupExpiredWalletNonces() error {
+	return CleanupExpiredByIndex("WEB3AUTH", func(subKey string) error {
+		return DeleteKey("WEB3AUTH", subKey)
+	})
+}
+
+// CleanupExpiredSignSessions 基于过期索引删除过期的短期签名 session。
+func CleanupExpiredSignSessions() error {
+	return CleanupExpiredByIndex("WEB3AUTH", func(subKey string) error {
+		return DeleteKey("WEB3AUTH", subKey)
+	})
+}
+
+// CleanupExpiredChallenges 基于过期索引删除过期的 challenge 记录。
+func CleanupExpiredChallenges() error {
+	return CleanupExpiredByIndex("WEB3AUTH", func(subKey string) error {
+		return DeleteKey("WEB3AUTH", subKey)
+	})
+}
+
+// CleanupExpiredRecoveryOTPs 基于过期索引删除过期的恢复 OTP。
+func CleanupExpiredRecoveryOTPs() error {
+	return CleanupExpiredByIndex("WEB3AUTH", func(subKey string) error {
+		return DeleteKey("WEB3AUTH", subKey)
+	})
 }
