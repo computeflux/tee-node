@@ -104,7 +104,11 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 
 // GetSettlementHistory 查询 Provider 结算历史（按时间倒序）
 func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]ProviderSettlementRecord, error) {
-	_, records, err := g.settlementHistory.DescList(g.api.GetTxn(), providerID, (*uint32)(nil), limit)
+	txn := g.api.GetTxn()
+	startKey := uint32(offset)
+	end, _ := g.settlementHistory.NextID(txn, providerID)
+	startKey = end - startKey
+	_, records, err := g.settlementHistory.DescList(txn, providerID, &startKey, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +120,13 @@ func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, lim
 
 // GetUserSettlementHistory 查询用户的结算历史（按时间倒序）
 func (g GatewayQuery) GetUserSettlementHistory(user store.UniAddr, offset uint64, limit uint32) ([]UserSettlementRecord, error) {
-	_, records, err := g.userSettlementHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
+	txn := g.api.GetTxn()
+	startKey := uint32(offset)
+	end, _ := g.userSettlementHistory.NextID(txn, user)
+	startKey = end - startKey
+	_, records, err := g.userSettlementHistory.DescList(txn, user, &startKey, limit)
 	if err != nil {
 		return nil, err
 	}
-	if int(offset) >= len(records) {
-		return []UserSettlementRecord{}, nil
-	}
-	return records[offset:], nil
+	return records, nil
 }
