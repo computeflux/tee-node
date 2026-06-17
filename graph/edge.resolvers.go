@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"time"
 
+	apigateway "github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/model"
+	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
@@ -72,6 +74,63 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 				CreatedAt:       int(m.CreatedAt),
 			})
 		}
+	}
+
+	return result, nil
+}
+
+// Models is the resolver for the Models field.
+func (r *queryResolver) Models(ctx context.Context, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfo, error) {
+	var mc, mxc, mp, mxp, off uint64
+	var lim uint32 = 1000
+	if minContext != nil {
+		mc = uint64(*minContext)
+	}
+	if maxContext != nil {
+		mxc = uint64(*maxContext)
+	}
+	if minPrice != nil {
+		mp = uint64(*minPrice)
+	}
+	if maxPrice != nil {
+		mxp = uint64(*maxPrice)
+	}
+	if offset != nil {
+		off = uint64(*offset)
+	}
+	if limit != nil {
+		lim = uint32(*limit)
+	}
+
+	models, err := apigateway.GatewayListActiveModelsWithinProvider(r.TeeChain, mc, mxc, mp, mxp, off, lim)
+	if err != nil {
+		return nil, err
+	}
+
+	pool := localtunnel.GetGlobalPool()
+
+	result := make([]*model.ModelInfo, 0, len(models))
+	for _, item := range models {
+		m := item.Model
+		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
+		if m.ProviderType == 9999 && !pool.HasEntry(m.ProviderID, m.Name) {
+			continue
+		}
+
+		result = append(result, &model.ModelInfo{
+			Name:            m.Name,
+			ProviderID:      int(m.ProviderID),
+			ProviderType:    int(m.ProviderType),
+			ModelID:         m.ModelID,
+			URI:             m.URI,
+			InputModalities: int(m.InputModalities),
+			ContextLength:   int(m.ContextLength),
+			InPrice:         int(m.InPrice),
+			CachedPrice:     int(m.CachedPrice),
+			OutPrice:        int(m.OutPrice),
+			IsActive:        m.IsActive,
+			CreatedAt:       int(m.CreatedAt),
+		})
 	}
 
 	return result, nil

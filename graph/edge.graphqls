@@ -16,4 +16,14 @@ type ModelInfo {
 # ── Query ───────────────────────────────────────────────
 extend type Query {
   EdgeModels: [ModelInfo!]! @AuthCheck
+  """获取活跃模型列表，支持按上下文长度和价格区间筛选。
+  ProviderType 为 9999 的个人算力会按本地隧道在线状态过滤。"""
+  Models(
+    minContext: Int
+    maxContext: Int
+    minPrice: Int
+    maxPrice: Int
+    offset: Int
+    limit: Int
+  ): [ModelInfo!]!
 }

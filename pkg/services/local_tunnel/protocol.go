@@ -22,12 +22,12 @@ const MaxBodySize = 16 * 1024 * 1024
 type FrameType uint8
 
 const (
-	FrameTypeRequest       FrameType = 1 // TEE-Node -> LocalClient: HTTP request
-	FrameTypeHeader        FrameType = 2 // LocalClient -> TEE-Node: HTTP response header
-	FrameTypeData          FrameType = 3 // LocalClient -> TEE-Node: response body chunk (binary)
-	FrameTypeDone          FrameType = 4 // LocalClient -> TEE-Node: end of response
-	FrameTypeError         FrameType = 5 // LocalClient -> TEE-Node: upstream error
-	FrameTypeModelRegister FrameType = 6 // LocalClient -> TEE-Node: register a new model
+	FrameTypeRequest         FrameType = 1 // TEE-Node -> LocalClient: HTTP request
+	FrameTypeHeader          FrameType = 2 // LocalClient -> TEE-Node: HTTP response header
+	FrameTypeData            FrameType = 3 // LocalClient -> TEE-Node: response body chunk (binary)
+	FrameTypeDone            FrameType = 4 // LocalClient -> TEE-Node: end of response
+	FrameTypeError           FrameType = 5 // LocalClient -> TEE-Node: upstream error
+	FrameTypeModelRegister   FrameType = 6 // LocalClient -> TEE-Node: register a new model
 	FrameTypeModelUnregister FrameType = 7 // LocalClient -> TEE-Node: unregister a model
 )
 
@@ -84,20 +84,24 @@ func (h *Handshake) RegisteredModels() []string {
 	if h.ModelID != "" {
 		seen[h.ModelID] = struct{}{}
 	}
+
 	for _, m := range h.Models {
 		if m != "" {
 			seen[m] = struct{}{}
 		}
 	}
+
 	for m := range h.ModelURLs {
 		if m != "" {
 			seen[m] = struct{}{}
 		}
 	}
+
 	models := make([]string, 0, len(seen))
 	for m := range seen {
 		models = append(models, m)
 	}
+
 	return models
 }
 
@@ -115,6 +119,7 @@ func routeKey(providerID uint64, modelID string) string {
 	if providerID == 0 {
 		return modelID
 	}
+
 	return fmt.Sprintf("%d/%s", providerID, modelID)
 }
 

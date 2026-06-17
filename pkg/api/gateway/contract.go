@@ -319,6 +319,23 @@ func GatewayListActiveModels(chain *teechain.TeeChain, offset uint64, limit uint
 	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveModels(offset, limit)
 }
 
+// GatewayListActiveModelsWithinProvider 按上下文长度和价格区间查询链上活跃模型列表。
+func GatewayListActiveModelsWithinProvider(
+	chain *teechain.TeeChain,
+	minContext, maxContext, minPrice, maxPrice uint64,
+	offset uint64, limit uint32,
+) ([]cgateway.ModelInfoWithProvider, error) {
+	runtime, err := contractRuntime(chain)
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.GetTxn().Rollback()
+
+	return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.ListActiveModelsWithinProvider(
+		minContext, maxContext, minPrice, maxPrice, offset, limit,
+	)
+}
+
 // GatewayGetProvider 查询单个 Provider。
 func GatewayGetProvider(chain *teechain.TeeChain, id uint64) (*cgateway.ProviderInfo, error) {
 	runtime, err := contractRuntime(chain)

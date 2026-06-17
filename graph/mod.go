@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -90,12 +91,8 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 		return gateway.FindProviderByModelAPIKey(modelID, apiKey)
 	}); err != nil {
 		fmt.Printf("[LOCAL-TUNNEL] failed to start: %v\n", err)
+		os.Exit(1)
 	}
-
-	// REST routes for dapp (Web3Auth SDK compatible)
-	restMux := http.NewServeMux()
-	RegisterRESTRoutes(restMux, resolver)
-	router.Mount("/", restMux)
 
 	util.LogWithBlue("API", "  /gql        -> GraphQL (auth, wallet, secrets)")
 	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")

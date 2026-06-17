@@ -14,11 +14,10 @@ import (
 
 // ServerConfig 本地隧道服务器配置
 type ServerConfig struct {
-	Addr             string            // 监听地址，如 ":19000"
-	MaxConnsPerModel int               // 单模型最大连接数
-	WarmupDuration   time.Duration     // 预热时间
-	ValidateKey      ValidateAPIKeyFunc // API Key 验证回调
-	TLSConfig        *tls.Config       // 可选 TLS 配置（nil 则为明文 TCP）
+	Addr           string             // 监听地址，如 ":19000"
+	WarmupDuration time.Duration      // 预热时间
+	ValidateKey    ValidateAPIKeyFunc // API Key 验证回调
+	TLSConfig      *tls.Config        // 可选 TLS 配置（nil 则为明文 TCP）
 }
 
 // Server 本地隧道服务端
@@ -38,7 +37,6 @@ func NewServer(cfg ServerConfig) *Server {
 	return &Server{
 		config: cfg,
 		pool: NewPool(
-			WithMaxConnsPerModel(cfg.MaxConnsPerModel),
 			WithWarmupDuration(cfg.WarmupDuration),
 			WithValidateKey(cfg.ValidateKey),
 		),
@@ -373,10 +371,9 @@ var globalServer *Server
 // StartGlobalServer 启动全局服务器
 func StartGlobalServer(addr string, validateKey ValidateAPIKeyFunc) error {
 	cfg := ServerConfig{
-		Addr:             addr,
-		MaxConnsPerModel: 10,
-		WarmupDuration:   10 * time.Second,
-		ValidateKey:      validateKey,
+		Addr:           addr,
+		WarmupDuration: 10 * time.Second,
+		ValidateKey:    validateKey,
 	}
 	globalServer = NewServer(cfg)
 	return globalServer.Start()

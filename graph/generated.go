@@ -209,6 +209,7 @@ type ComplexityRoot struct {
 		EarlyAccessUserByReferralCode func(childComplexity int, referralCode string) int
 		EdgeModels                    func(childComplexity int) int
 		GetChallenge                  func(childComplexity int, token string) int
+		Models                        func(childComplexity int, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) int
 		OauthURL                      func(childComplexity int, provider string, redirectURI *string) int
 		SecretRsa                     func(childComplexity int) int
 		TeeReport                     func(childComplexity int, hash string) int
@@ -321,6 +322,7 @@ type QueryResolver interface {
 	EarlyAccessStats(ctx context.Context) (*model.EarlyAccessStats, error)
 	EarlyAccessTasks(ctx context.Context, wallet string) ([]*model.TaskStatus, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
+	Models(ctx context.Context, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfo, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -1321,6 +1323,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.GetChallenge(childComplexity, args["token"].(string)), true
+
+	case "Query.Models":
+		if e.complexity.Query.Models == nil {
+			break
+		}
+
+		args, err := ec.field_Query_Models_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Models(childComplexity, args["minContext"].(*int), args["maxContext"].(*int), args["minPrice"].(*int), args["maxPrice"].(*int), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.oauthURL":
 		if e.complexity.Query.OauthURL == nil {
@@ -3374,6 +3388,149 @@ func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_Models_argsMinContext(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["minContext"] = arg0
+	arg1, err := ec.field_Query_Models_argsMaxContext(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["maxContext"] = arg1
+	arg2, err := ec.field_Query_Models_argsMinPrice(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["minPrice"] = arg2
+	arg3, err := ec.field_Query_Models_argsMaxPrice(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["maxPrice"] = arg3
+	arg4, err := ec.field_Query_Models_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg4
+	arg5, err := ec.field_Query_Models_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg5
+	return args, nil
+}
+func (ec *executionContext) field_Query_Models_argsMinContext(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["minContext"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minContext"))
+	if tmp, ok := rawArgs["minContext"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_argsMaxContext(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["maxContext"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxContext"))
+	if tmp, ok := rawArgs["maxContext"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_argsMinPrice(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["minPrice"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minPrice"))
+	if tmp, ok := rawArgs["minPrice"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_argsMaxPrice(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["maxPrice"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPrice"))
+	if tmp, ok := rawArgs["maxPrice"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_Models_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -10111,6 +10268,87 @@ func (ec *executionContext) fieldContext_Query_EdgeModels(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_Models(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_Models(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Models(rctx, fc.Args["minContext"].(*int), fc.Args["maxContext"].(*int), fc.Args["minPrice"].(*int), fc.Args["maxPrice"].(*int), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ModelInfo)
+	fc.Result = res
+	return ec.marshalNModelInfo2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_Models(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_ModelInfo_name(ctx, field)
+			case "providerId":
+				return ec.fieldContext_ModelInfo_providerId(ctx, field)
+			case "providerType":
+				return ec.fieldContext_ModelInfo_providerType(ctx, field)
+			case "modelId":
+				return ec.fieldContext_ModelInfo_modelId(ctx, field)
+			case "uri":
+				return ec.fieldContext_ModelInfo_uri(ctx, field)
+			case "inputModalities":
+				return ec.fieldContext_ModelInfo_inputModalities(ctx, field)
+			case "contextLength":
+				return ec.fieldContext_ModelInfo_contextLength(ctx, field)
+			case "inPrice":
+				return ec.fieldContext_ModelInfo_inPrice(ctx, field)
+			case "cachedPrice":
+				return ec.fieldContext_ModelInfo_cachedPrice(ctx, field)
+			case "outPrice":
+				return ec.fieldContext_ModelInfo_outPrice(ctx, field)
+			case "isActive":
+				return ec.fieldContext_ModelInfo_isActive(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ModelInfo_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelInfo", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_Models_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_tee_report(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_tee_report(ctx, field)
 	if err != nil {
@@ -15406,6 +15644,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_EdgeModels(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "Models":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_Models(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

@@ -17,9 +17,8 @@ func TestProviderIsolation(t *testing.T) {
 	defer listener.Close()
 
 	srv := NewServer(ServerConfig{
-		Addr:             listener.Addr().String(),
-		MaxConnsPerModel: 10,
-		WarmupDuration:   0,
+		Addr:           listener.Addr().String(),
+		WarmupDuration: 0,
 		ValidateKey: func(modelID, apiKey string) (uint64, bool) {
 			switch apiKey {
 			case "key1":

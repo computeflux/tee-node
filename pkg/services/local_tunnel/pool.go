@@ -36,24 +36,19 @@ type PoolEntry struct {
 	mu          sync.RWMutex
 }
 
-// Pool 按 modelID 管理本地客户端 yamux session
+// Pool 按 routeKey(providerID, modelID) 管理本地客户端 yamux session
+// 一个模型同时只能有一个连接提供服务。
 type Pool struct {
-	mu              sync.RWMutex
-	entries         map[string][]*PoolEntry // modelID -> entries
-	maxConnsPerModel int                     // 单模型最大连接数
-	warmupDuration  time.Duration
-	validateKey     ValidateAPIKeyFunc
-	metrics         PoolMetrics
-	closed          bool
+	mu             sync.RWMutex
+	entries        map[string]*PoolEntry // routeKey -> entry
+	warmupDuration time.Duration
+	validateKey    ValidateAPIKeyFunc
+	metrics        PoolMetrics
+	closed         bool
 }
 
 // PoolOption 连接池配置选项
 type PoolOption func(*Pool)
-
-// WithMaxConnsPerModel 设置单模型最大连接数
-func WithMaxConnsPerModel(n int) PoolOption {
-	return func(p *Pool) { p.maxConnsPerModel = n }
-}
 
 // WithWarmupDuration 设置预热时间
 func WithWarmupDuration(d time.Duration) PoolOption {
@@ -68,9 +63,8 @@ func WithValidateKey(fn ValidateAPIKeyFunc) PoolOption {
 // NewPool 创建连接池
 func NewPool(opts ...PoolOption) *Pool {
 	p := &Pool{
-		entries:          make(map[string][]*PoolEntry),
-		maxConnsPerModel: 10,
-		warmupDuration:   10 * time.Second,
+		entries:        make(map[string]*PoolEntry),
+		warmupDuration: 10 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -112,12 +106,15 @@ func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 	}
 	h.ProviderID = resolvedProviderID
 
-	// 检查每个模型的最大连接数（按 providerID/modelID 隔离）
-	if p.maxConnsPerModel > 0 {
-		for _, modelID := range models {
-			rk := routeKey(h.ProviderID, modelID)
-			if len(p.entries[rk]) >= p.maxConnsPerModel {
-				return fmt.Errorf("max connections reached for model %s (%d)", modelID, p.maxConnsPerModel)
+	// 检查每个模型是否已经有活跃连接（按 providerID/modelID 隔离）
+	for _, modelID := range models {
+		rk := routeKey(h.ProviderID, modelID)
+		if existing, ok := p.entries[rk]; ok {
+			existing.mu.RLock()
+			closed := existing.Session.IsClosed()
+			existing.mu.RUnlock()
+			if !closed {
+				return fmt.Errorf("model %s already connected", modelID)
 			}
 		}
 	}
@@ -125,7 +122,7 @@ func (p *Pool) Validate(h *Handshake, remoteAddr string) error {
 	return nil
 }
 
-// CheckModelQuota 检查指定路由键是否还能继续添加连接
+// CheckModelQuota 检查指定路由键是否已经有活跃连接
 func (p *Pool) CheckModelQuota(routeKey string) error {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -133,13 +130,19 @@ func (p *Pool) CheckModelQuota(routeKey string) error {
 	if p.closed {
 		return fmt.Errorf("pool is closed")
 	}
-	if p.maxConnsPerModel > 0 && len(p.entries[routeKey]) >= p.maxConnsPerModel {
-		return fmt.Errorf("max connections reached for route %s (%d)", routeKey, p.maxConnsPerModel)
+	if existing, ok := p.entries[routeKey]; ok {
+		existing.mu.RLock()
+		closed := existing.Session.IsClosed()
+		existing.mu.RUnlock()
+		if !closed {
+			return fmt.Errorf("model already connected for route %s", routeKey)
+		}
 	}
 	return nil
 }
 
-// Add 添加新 session，启动预热计时器
+// Add 添加新 session，启动预热计时器。
+// 同一 provider/model 已存在活跃连接时会拒绝新连接；旧连接已断开则替换。
 func (p *Pool) Add(entry *PoolEntry) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -150,7 +153,21 @@ func (p *Pool) Add(entry *PoolEntry) {
 	}
 
 	rk := routeKey(entry.ProviderID, entry.ModelID)
-	p.entries[rk] = append(p.entries[rk], entry)
+	if existing, ok := p.entries[rk]; ok {
+		existing.mu.RLock()
+		closed := existing.Session.IsClosed()
+		existing.mu.RUnlock()
+
+		if !closed {
+			// 已存在活跃连接，关闭新连接
+			entry.Session.Close()
+			return
+		}
+		// 旧连接已断开，删除旧条目并修正指标
+		delete(p.entries, rk)
+		atomic.AddInt64(&p.metrics.ActiveConnections, -1)
+	}
+	p.entries[rk] = entry
 	atomic.AddInt64(&p.metrics.TotalConnections, 1)
 	atomic.AddInt64(&p.metrics.ActiveConnections, 1)
 
@@ -177,65 +194,64 @@ func (p *Pool) Remove(entry *PoolEntry) {
 	defer p.mu.Unlock()
 
 	rk := routeKey(entry.ProviderID, entry.ModelID)
-	list := p.entries[rk]
-	for i, e := range list {
-		if e == entry {
-			p.entries[rk] = append(list[:i], list[i+1:]...)
-			atomic.AddInt64(&p.metrics.ActiveConnections, -1)
-			break
-		}
-	}
-	if len(p.entries[rk]) == 0 {
+	if existing, ok := p.entries[rk]; ok && existing == entry {
 		delete(p.entries, rk)
+		atomic.AddInt64(&p.metrics.ActiveConnections, -1)
 	}
 }
 
-// Pick 为指定路由键挑选一个可用 session（最小负载轮询）
-// 修复了原版的竞态条件：对 best 的 InFlight 访问也加了读锁
+// Pick 返回指定路由键的可用 session
 func (p *Pool) Pick(routeKey string) *PoolEntry {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	list := p.entries[routeKey]
-	if len(list) == 0 {
+	e := p.entries[routeKey]
+	if e == nil {
 		return nil
 	}
 
-	var best *PoolEntry
-	var bestInflight int32
-	for _, e := range list {
-		e.mu.RLock()
-		avail := e.Available
-		inflight := e.InFlight
-		closed := e.Session.IsClosed()
-		e.mu.RUnlock()
+	e.mu.RLock()
+	avail := e.Available
+	closed := e.Session.IsClosed()
+	e.mu.RUnlock()
 
-		if !avail || closed {
-			continue
-		}
-		if best == nil || inflight < bestInflight {
-			best = e
-			bestInflight = inflight
-		}
+	if !avail || closed {
+		return nil
 	}
-	return best
+	return e
 }
 
-// Count 返回指定路由键的可用连接数
+// Count 返回指定路由键的可用连接数（0 或 1）
 func (p *Pool) Count(routeKey string) int {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	e := p.entries[routeKey]
+	p.mu.RUnlock()
 
-	list := p.entries[routeKey]
-	count := 0
-	for _, e := range list {
-		e.mu.RLock()
-		if e.Available && !e.Session.IsClosed() {
-			count++
-		}
-		e.mu.RUnlock()
+	if e == nil {
+		return 0
 	}
-	return count
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.Available && !e.Session.IsClosed() {
+		return 1
+	}
+	return 0
+}
+
+// HasEntry 检查指定 provider/model 在池中是否存在可用连接。
+// 用于前端模型列表过滤：ProviderType 为 9999 的个人算力必须在线才展示。
+func (p *Pool) HasEntry(providerID uint64, modelID string) bool {
+	rk := routeKey(providerID, modelID)
+	p.mu.RLock()
+	e := p.entries[rk]
+	p.mu.RUnlock()
+
+	if e == nil {
+		return false
+	}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.Available && !e.Session.IsClosed()
 }
 
 // AllEntries 返回所有连接条目（用于心跳检测）
@@ -243,9 +259,9 @@ func (p *Pool) AllEntries() []*PoolEntry {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	all := make([]*PoolEntry, 0)
-	for _, list := range p.entries {
-		all = append(all, list...)
+	all := make([]*PoolEntry, 0, len(p.entries))
+	for _, e := range p.entries {
+		all = append(all, e)
 	}
 	return all
 }
@@ -273,11 +289,11 @@ func (p *Pool) IncrRequests(success bool) {
 func (p *Pool) Close() {
 	p.mu.Lock()
 	p.closed = true
-	all := make([]*PoolEntry, 0)
-	for _, list := range p.entries {
-		all = append(all, list...)
+	all := make([]*PoolEntry, 0, len(p.entries))
+	for _, e := range p.entries {
+		all = append(all, e)
 	}
-	p.entries = make(map[string][]*PoolEntry)
+	p.entries = make(map[string]*PoolEntry)
 	p.mu.Unlock()
 
 	for _, e := range all {
