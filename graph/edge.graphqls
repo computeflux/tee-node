@@ -13,17 +13,42 @@ type ModelInfo {
   createdAt: Int!
 }
 
+type ProviderInfo {
+  owner: String!
+  name: String!
+  logoUrl: String!
+  description: String!
+  modelIds: [Int!]!
+  region: Int!
+  deposit: Int!
+  feeRate: Int!
+  priority: Int!
+  totalRequests: Int!
+  successRate: Int!
+  avgLatency: Int!
+  uptimeSLA: Int!
+  isActive: Boolean!
+  createdAt: Int!
+}
+
+type ModelInfoWithProvider {
+  id: Int!
+  model: ModelInfo!
+  provider: ProviderInfo!
+}
+
 # ── Query ───────────────────────────────────────────────
 extend type Query {
-  EdgeModels: [ModelInfo!]! @AuthCheck
-  """获取活跃模型列表，支持按上下文长度和价格区间筛选。
+  edge_models: [ModelInfo!]! @AuthCheck
+  """获取活跃模型列表，支持按模型名关键字模糊搜索，以及上下文长度和价格区间筛选。
   ProviderType 为 9999 的个人算力会按本地隧道在线状态过滤。"""
-  Models(
+  models(
+    keyword: String
     minContext: Int
     maxContext: Int
     minPrice: Int
     maxPrice: Int
     offset: Int
     limit: Int
-  ): [ModelInfo!]!
+  ): [ModelInfoWithProvider!]!
 }

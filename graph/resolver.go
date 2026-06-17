@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
@@ -15,6 +16,7 @@ import (
 // Resolver 作为 GraphQL 的依赖注入容器
 type Resolver struct {
 	TeeChain *teechain.TeeChain
+	Indexer  *indexer.Indexer
 
 	// Web3Auth 服务
 	WalletSvc *wallet.WalletService

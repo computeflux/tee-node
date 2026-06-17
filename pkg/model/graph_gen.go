@@ -128,6 +128,12 @@ type ModelInfo struct {
 	CreatedAt       int    `json:"createdAt"`
 }
 
+type ModelInfoWithProvider struct {
+	ID       int           `json:"id"`
+	Model    *ModelInfo    `json:"model"`
+	Provider *ProviderInfo `json:"provider"`
+}
+
 type Mutation struct {
 }
 
@@ -142,6 +148,24 @@ type PointsHistoryItem struct {
 	Timestamp    string  `json:"timestamp"`
 	RelatedUser  *string `json:"relatedUser,omitempty"`
 	RelatedEmail *string `json:"relatedEmail,omitempty"`
+}
+
+type ProviderInfo struct {
+	Owner         string `json:"owner"`
+	Name          string `json:"name"`
+	LogoURL       string `json:"logoUrl"`
+	Description   string `json:"description"`
+	ModelIds      []int  `json:"modelIds"`
+	Region        int    `json:"region"`
+	Deposit       int    `json:"deposit"`
+	FeeRate       int    `json:"feeRate"`
+	Priority      int    `json:"priority"`
+	TotalRequests int    `json:"totalRequests"`
+	SuccessRate   int    `json:"successRate"`
+	AvgLatency    int    `json:"avgLatency"`
+	UptimeSLA     int    `json:"uptimeSLA"`
+	IsActive      bool   `json:"isActive"`
+	CreatedAt     int    `json:"createdAt"`
 }
 
 type Query struct {

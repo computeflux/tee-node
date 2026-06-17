@@ -146,6 +146,12 @@ type ComplexityRoot struct {
 		URI             func(childComplexity int) int
 	}
 
+	ModelInfoWithProvider struct {
+		ID       func(childComplexity int) int
+		Model    func(childComplexity int) int
+		Provider func(childComplexity int) int
+	}
+
 	Mutation struct {
 		ClaimEarlyAccessTask func(childComplexity int, wallet string, task model.EarlyAccessTaskType) int
 		CompleteRecovery     func(childComplexity int, recoveryToken string, passwordHash string) int
@@ -192,6 +198,24 @@ type ComplexityRoot struct {
 		Timestamp    func(childComplexity int) int
 	}
 
+	ProviderInfo struct {
+		AvgLatency    func(childComplexity int) int
+		CreatedAt     func(childComplexity int) int
+		Deposit       func(childComplexity int) int
+		Description   func(childComplexity int) int
+		FeeRate       func(childComplexity int) int
+		IsActive      func(childComplexity int) int
+		LogoURL       func(childComplexity int) int
+		ModelIds      func(childComplexity int) int
+		Name          func(childComplexity int) int
+		Owner         func(childComplexity int) int
+		Priority      func(childComplexity int) int
+		Region        func(childComplexity int) int
+		SuccessRate   func(childComplexity int) int
+		TotalRequests func(childComplexity int) int
+		UptimeSLA     func(childComplexity int) int
+	}
+
 	Query struct {
 		AuthConfig                    func(childComplexity int) int
 		AuthHealth                    func(childComplexity int) int
@@ -209,7 +233,7 @@ type ComplexityRoot struct {
 		EarlyAccessUserByReferralCode func(childComplexity int, referralCode string) int
 		EdgeModels                    func(childComplexity int) int
 		GetChallenge                  func(childComplexity int, token string) int
-		Models                        func(childComplexity int, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) int
+		Models                        func(childComplexity int, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) int
 		OauthURL                      func(childComplexity int, provider string, redirectURI *string) int
 		SecretRsa                     func(childComplexity int) int
 		TeeReport                     func(childComplexity int, hash string) int
@@ -322,7 +346,7 @@ type QueryResolver interface {
 	EarlyAccessStats(ctx context.Context) (*model.EarlyAccessStats, error)
 	EarlyAccessTasks(ctx context.Context, wallet string) ([]*model.TaskStatus, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
-	Models(ctx context.Context, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfo, error)
+	Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -794,6 +818,27 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ModelInfo.URI(childComplexity), true
 
+	case "ModelInfoWithProvider.id":
+		if e.complexity.ModelInfoWithProvider.ID == nil {
+			break
+		}
+
+		return e.complexity.ModelInfoWithProvider.ID(childComplexity), true
+
+	case "ModelInfoWithProvider.model":
+		if e.complexity.ModelInfoWithProvider.Model == nil {
+			break
+		}
+
+		return e.complexity.ModelInfoWithProvider.Model(childComplexity), true
+
+	case "ModelInfoWithProvider.provider":
+		if e.complexity.ModelInfoWithProvider.Provider == nil {
+			break
+		}
+
+		return e.complexity.ModelInfoWithProvider.Provider(childComplexity), true
+
 	case "Mutation.claimEarlyAccessTask":
 		if e.complexity.Mutation.ClaimEarlyAccessTask == nil {
 			break
@@ -1157,6 +1202,111 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.PointsHistoryItem.Timestamp(childComplexity), true
 
+	case "ProviderInfo.avgLatency":
+		if e.complexity.ProviderInfo.AvgLatency == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.AvgLatency(childComplexity), true
+
+	case "ProviderInfo.createdAt":
+		if e.complexity.ProviderInfo.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.CreatedAt(childComplexity), true
+
+	case "ProviderInfo.deposit":
+		if e.complexity.ProviderInfo.Deposit == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Deposit(childComplexity), true
+
+	case "ProviderInfo.description":
+		if e.complexity.ProviderInfo.Description == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Description(childComplexity), true
+
+	case "ProviderInfo.feeRate":
+		if e.complexity.ProviderInfo.FeeRate == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.FeeRate(childComplexity), true
+
+	case "ProviderInfo.isActive":
+		if e.complexity.ProviderInfo.IsActive == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.IsActive(childComplexity), true
+
+	case "ProviderInfo.logoUrl":
+		if e.complexity.ProviderInfo.LogoURL == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.LogoURL(childComplexity), true
+
+	case "ProviderInfo.modelIds":
+		if e.complexity.ProviderInfo.ModelIds == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.ModelIds(childComplexity), true
+
+	case "ProviderInfo.name":
+		if e.complexity.ProviderInfo.Name == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Name(childComplexity), true
+
+	case "ProviderInfo.owner":
+		if e.complexity.ProviderInfo.Owner == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Owner(childComplexity), true
+
+	case "ProviderInfo.priority":
+		if e.complexity.ProviderInfo.Priority == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Priority(childComplexity), true
+
+	case "ProviderInfo.region":
+		if e.complexity.ProviderInfo.Region == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.Region(childComplexity), true
+
+	case "ProviderInfo.successRate":
+		if e.complexity.ProviderInfo.SuccessRate == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.SuccessRate(childComplexity), true
+
+	case "ProviderInfo.totalRequests":
+		if e.complexity.ProviderInfo.TotalRequests == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.TotalRequests(childComplexity), true
+
+	case "ProviderInfo.uptimeSLA":
+		if e.complexity.ProviderInfo.UptimeSLA == nil {
+			break
+		}
+
+		return e.complexity.ProviderInfo.UptimeSLA(childComplexity), true
+
 	case "Query.authConfig":
 		if e.complexity.Query.AuthConfig == nil {
 			break
@@ -1305,7 +1455,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.EarlyAccessUserByReferralCode(childComplexity, args["referralCode"].(string)), true
 
-	case "Query.EdgeModels":
+	case "Query.edge_models":
 		if e.complexity.Query.EdgeModels == nil {
 			break
 		}
@@ -1324,17 +1474,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.GetChallenge(childComplexity, args["token"].(string)), true
 
-	case "Query.Models":
+	case "Query.models":
 		if e.complexity.Query.Models == nil {
 			break
 		}
 
-		args, err := ec.field_Query_Models_args(ctx, rawArgs)
+		args, err := ec.field_Query_models_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Query.Models(childComplexity, args["minContext"].(*int), args["maxContext"].(*int), args["minPrice"].(*int), args["maxPrice"].(*int), args["offset"].(*int), args["limit"].(*int)), true
+		return e.complexity.Query.Models(childComplexity, args["keyword"].(*string), args["minContext"].(*int), args["maxContext"].(*int), args["minPrice"].(*int), args["maxPrice"].(*int), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.oauthURL":
 		if e.complexity.Query.OauthURL == nil {
@@ -3391,149 +3541,6 @@ func (ec *executionContext) field_Mutation_verifyResponse_argsResponse(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Query_Models_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Query_Models_argsMinContext(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["minContext"] = arg0
-	arg1, err := ec.field_Query_Models_argsMaxContext(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["maxContext"] = arg1
-	arg2, err := ec.field_Query_Models_argsMinPrice(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["minPrice"] = arg2
-	arg3, err := ec.field_Query_Models_argsMaxPrice(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["maxPrice"] = arg3
-	arg4, err := ec.field_Query_Models_argsOffset(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["offset"] = arg4
-	arg5, err := ec.field_Query_Models_argsLimit(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["limit"] = arg5
-	return args, nil
-}
-func (ec *executionContext) field_Query_Models_argsMinContext(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["minContext"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minContext"))
-	if tmp, ok := rawArgs["minContext"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_Models_argsMaxContext(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["maxContext"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxContext"))
-	if tmp, ok := rawArgs["maxContext"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_Models_argsMinPrice(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["minPrice"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minPrice"))
-	if tmp, ok := rawArgs["minPrice"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_Models_argsMaxPrice(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["maxPrice"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPrice"))
-	if tmp, ok := rawArgs["maxPrice"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_Models_argsOffset(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["offset"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
-	if tmp, ok := rawArgs["offset"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_Models_argsLimit(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (*int, error) {
-	if _, ok := rawArgs["limit"]; !ok {
-		var zeroVal *int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
-	if tmp, ok := rawArgs["limit"]; ok {
-		return ec.unmarshalOInt2ᚖint(ctx, tmp)
-	}
-
-	var zeroVal *int
-	return zeroVal, nil
-}
-
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4051,6 +4058,172 @@ func (ec *executionContext) field_Query_getChallenge_argsToken(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_models_argsKeyword(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["keyword"] = arg0
+	arg1, err := ec.field_Query_models_argsMinContext(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["minContext"] = arg1
+	arg2, err := ec.field_Query_models_argsMaxContext(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["maxContext"] = arg2
+	arg3, err := ec.field_Query_models_argsMinPrice(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["minPrice"] = arg3
+	arg4, err := ec.field_Query_models_argsMaxPrice(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["maxPrice"] = arg4
+	arg5, err := ec.field_Query_models_argsOffset(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg5
+	arg6, err := ec.field_Query_models_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg6
+	return args, nil
+}
+func (ec *executionContext) field_Query_models_argsKeyword(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*string, error) {
+	if _, ok := rawArgs["keyword"]; !ok {
+		var zeroVal *string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("keyword"))
+	if tmp, ok := rawArgs["keyword"]; ok {
+		return ec.unmarshalOString2ᚖstring(ctx, tmp)
+	}
+
+	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsMinContext(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["minContext"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minContext"))
+	if tmp, ok := rawArgs["minContext"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsMaxContext(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["maxContext"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxContext"))
+	if tmp, ok := rawArgs["maxContext"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsMinPrice(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["minPrice"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("minPrice"))
+	if tmp, ok := rawArgs["minPrice"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsMaxPrice(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["maxPrice"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPrice"))
+	if tmp, ok := rawArgs["maxPrice"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsOffset(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["offset"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+	if tmp, ok := rawArgs["offset"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["limit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+	if tmp, ok := rawArgs["limit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -7098,6 +7271,196 @@ func (ec *executionContext) fieldContext_ModelInfo_createdAt(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _ModelInfoWithProvider_id(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfoWithProvider) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfoWithProvider_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfoWithProvider_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfoWithProvider",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelInfoWithProvider_model(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfoWithProvider) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfoWithProvider_model(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Model, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ModelInfo)
+	fc.Result = res
+	return ec.marshalNModelInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfoWithProvider_model(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfoWithProvider",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_ModelInfo_name(ctx, field)
+			case "providerId":
+				return ec.fieldContext_ModelInfo_providerId(ctx, field)
+			case "providerType":
+				return ec.fieldContext_ModelInfo_providerType(ctx, field)
+			case "modelId":
+				return ec.fieldContext_ModelInfo_modelId(ctx, field)
+			case "uri":
+				return ec.fieldContext_ModelInfo_uri(ctx, field)
+			case "inputModalities":
+				return ec.fieldContext_ModelInfo_inputModalities(ctx, field)
+			case "contextLength":
+				return ec.fieldContext_ModelInfo_contextLength(ctx, field)
+			case "inPrice":
+				return ec.fieldContext_ModelInfo_inPrice(ctx, field)
+			case "cachedPrice":
+				return ec.fieldContext_ModelInfo_cachedPrice(ctx, field)
+			case "outPrice":
+				return ec.fieldContext_ModelInfo_outPrice(ctx, field)
+			case "isActive":
+				return ec.fieldContext_ModelInfo_isActive(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ModelInfo_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelInfoWithProvider_provider(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfoWithProvider) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfoWithProvider_provider(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Provider, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ProviderInfo)
+	fc.Result = res
+	return ec.marshalNProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfoWithProvider_provider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfoWithProvider",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "owner":
+				return ec.fieldContext_ProviderInfo_owner(ctx, field)
+			case "name":
+				return ec.fieldContext_ProviderInfo_name(ctx, field)
+			case "logoUrl":
+				return ec.fieldContext_ProviderInfo_logoUrl(ctx, field)
+			case "description":
+				return ec.fieldContext_ProviderInfo_description(ctx, field)
+			case "modelIds":
+				return ec.fieldContext_ProviderInfo_modelIds(ctx, field)
+			case "region":
+				return ec.fieldContext_ProviderInfo_region(ctx, field)
+			case "deposit":
+				return ec.fieldContext_ProviderInfo_deposit(ctx, field)
+			case "feeRate":
+				return ec.fieldContext_ProviderInfo_feeRate(ctx, field)
+			case "priority":
+				return ec.fieldContext_ProviderInfo_priority(ctx, field)
+			case "totalRequests":
+				return ec.fieldContext_ProviderInfo_totalRequests(ctx, field)
+			case "successRate":
+				return ec.fieldContext_ProviderInfo_successRate(ctx, field)
+			case "avgLatency":
+				return ec.fieldContext_ProviderInfo_avgLatency(ctx, field)
+			case "uptimeSLA":
+				return ec.fieldContext_ProviderInfo_uptimeSLA(ctx, field)
+			case "isActive":
+				return ec.fieldContext_ProviderInfo_isActive(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ProviderInfo_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProviderInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_requestOTP(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Mutation_requestOTP(ctx, field)
 	if err != nil {
@@ -9139,6 +9502,666 @@ func (ec *executionContext) fieldContext_PointsHistoryItem_relatedEmail(_ contex
 	return fc, nil
 }
 
+func (ec *executionContext) _ProviderInfo_owner(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_owner(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Owner, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_name(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_logoUrl(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_logoUrl(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LogoURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_logoUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_description(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_modelIds(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_modelIds(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModelIds, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]int)
+	fc.Result = res
+	return ec.marshalNInt2ᚕintᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_modelIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_region(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_region(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Region, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_region(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_deposit(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_deposit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Deposit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_deposit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_feeRate(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_feeRate(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.FeeRate, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_feeRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_priority(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_priority(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Priority, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_priority(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_totalRequests(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_totalRequests(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalRequests, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_totalRequests(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_successRate(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_successRate(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SuccessRate, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_successRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_avgLatency(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_avgLatency(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AvgLatency, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_avgLatency(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_uptimeSLA(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_uptimeSLA(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UptimeSLA, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_uptimeSLA(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_isActive(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_isActive(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsActive, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_isActive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProviderInfo_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.ProviderInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ProviderInfo_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ProviderInfo_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProviderInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_oauthURL(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_oauthURL(ctx, field)
 	if err != nil {
@@ -10176,8 +11199,8 @@ func (ec *executionContext) fieldContext_Query_earlyAccessTasks(ctx context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_EdgeModels(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_EdgeModels(ctx, field)
+func (ec *executionContext) _Query_edge_models(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_edge_models(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -10229,7 +11252,7 @@ func (ec *executionContext) _Query_EdgeModels(ctx context.Context, field graphql
 	return ec.marshalNModelInfo2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_EdgeModels(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_edge_models(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -10268,8 +11291,8 @@ func (ec *executionContext) fieldContext_Query_EdgeModels(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_Models(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_Models(ctx, field)
+func (ec *executionContext) _Query_models(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_models(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -10282,7 +11305,7 @@ func (ec *executionContext) _Query_Models(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Models(rctx, fc.Args["minContext"].(*int), fc.Args["maxContext"].(*int), fc.Args["minPrice"].(*int), fc.Args["maxPrice"].(*int), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		return ec.resolvers.Query().Models(rctx, fc.Args["keyword"].(*string), fc.Args["minContext"].(*int), fc.Args["maxContext"].(*int), fc.Args["minPrice"].(*int), fc.Args["maxPrice"].(*int), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -10294,12 +11317,12 @@ func (ec *executionContext) _Query_Models(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.ModelInfo)
+	res := resTmp.([]*model.ModelInfoWithProvider)
 	fc.Result = res
-	return ec.marshalNModelInfo2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoᚄ(ctx, field.Selections, res)
+	return ec.marshalNModelInfoWithProvider2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoWithProviderᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_Models(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_models(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -10307,32 +11330,14 @@ func (ec *executionContext) fieldContext_Query_Models(ctx context.Context, field
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "name":
-				return ec.fieldContext_ModelInfo_name(ctx, field)
-			case "providerId":
-				return ec.fieldContext_ModelInfo_providerId(ctx, field)
-			case "providerType":
-				return ec.fieldContext_ModelInfo_providerType(ctx, field)
-			case "modelId":
-				return ec.fieldContext_ModelInfo_modelId(ctx, field)
-			case "uri":
-				return ec.fieldContext_ModelInfo_uri(ctx, field)
-			case "inputModalities":
-				return ec.fieldContext_ModelInfo_inputModalities(ctx, field)
-			case "contextLength":
-				return ec.fieldContext_ModelInfo_contextLength(ctx, field)
-			case "inPrice":
-				return ec.fieldContext_ModelInfo_inPrice(ctx, field)
-			case "cachedPrice":
-				return ec.fieldContext_ModelInfo_cachedPrice(ctx, field)
-			case "outPrice":
-				return ec.fieldContext_ModelInfo_outPrice(ctx, field)
-			case "isActive":
-				return ec.fieldContext_ModelInfo_isActive(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_ModelInfo_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_ModelInfoWithProvider_id(ctx, field)
+			case "model":
+				return ec.fieldContext_ModelInfoWithProvider_model(ctx, field)
+			case "provider":
+				return ec.fieldContext_ModelInfoWithProvider_provider(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type ModelInfo", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ModelInfoWithProvider", field.Name)
 		},
 	}
 	defer func() {
@@ -10342,7 +11347,7 @@ func (ec *executionContext) fieldContext_Query_Models(ctx context.Context, field
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_Models_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_models_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -14884,6 +15889,55 @@ func (ec *executionContext) _ModelInfo(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var modelInfoWithProviderImplementors = []string{"ModelInfoWithProvider"}
+
+func (ec *executionContext) _ModelInfoWithProvider(ctx context.Context, sel ast.SelectionSet, obj *model.ModelInfoWithProvider) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, modelInfoWithProviderImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModelInfoWithProvider")
+		case "id":
+			out.Values[i] = ec._ModelInfoWithProvider_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "model":
+			out.Values[i] = ec._ModelInfoWithProvider_model(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "provider":
+			out.Values[i] = ec._ModelInfoWithProvider_provider(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -15221,6 +16275,115 @@ func (ec *executionContext) _PointsHistoryItem(ctx context.Context, sel ast.Sele
 			out.Values[i] = ec._PointsHistoryItem_relatedUser(ctx, field, obj)
 		case "relatedEmail":
 			out.Values[i] = ec._PointsHistoryItem_relatedEmail(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var providerInfoImplementors = []string{"ProviderInfo"}
+
+func (ec *executionContext) _ProviderInfo(ctx context.Context, sel ast.SelectionSet, obj *model.ProviderInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, providerInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProviderInfo")
+		case "owner":
+			out.Values[i] = ec._ProviderInfo_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._ProviderInfo_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "logoUrl":
+			out.Values[i] = ec._ProviderInfo_logoUrl(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._ProviderInfo_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "modelIds":
+			out.Values[i] = ec._ProviderInfo_modelIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "region":
+			out.Values[i] = ec._ProviderInfo_region(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deposit":
+			out.Values[i] = ec._ProviderInfo_deposit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "feeRate":
+			out.Values[i] = ec._ProviderInfo_feeRate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "priority":
+			out.Values[i] = ec._ProviderInfo_priority(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalRequests":
+			out.Values[i] = ec._ProviderInfo_totalRequests(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "successRate":
+			out.Values[i] = ec._ProviderInfo_successRate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "avgLatency":
+			out.Values[i] = ec._ProviderInfo_avgLatency(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "uptimeSLA":
+			out.Values[i] = ec._ProviderInfo_uptimeSLA(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isActive":
+			out.Values[i] = ec._ProviderInfo_isActive(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ProviderInfo_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -15634,7 +16797,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "EdgeModels":
+		case "edge_models":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -15643,7 +16806,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_EdgeModels(ctx, field)
+				res = ec._Query_edge_models(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15656,7 +16819,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "Models":
+		case "models":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -15665,7 +16828,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_Models(ctx, field)
+				res = ec._Query_models(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -16649,6 +17812,36 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
+func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v any) ([]int, error) {
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]int, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalNJoinEarlyAccessResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐJoinEarlyAccessResult(ctx context.Context, sel ast.SelectionSet, v model.JoinEarlyAccessResult) graphql.Marshaler {
 	return ec._JoinEarlyAccessResult(ctx, sel, &v)
 }
@@ -16771,6 +17964,60 @@ func (ec *executionContext) marshalNModelInfo2ᚖgithubᚗcomᚋcomputefluxᚋte
 	return ec._ModelInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNModelInfoWithProvider2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoWithProviderᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ModelInfoWithProvider) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNModelInfoWithProvider2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoWithProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNModelInfoWithProvider2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfoWithProvider(ctx context.Context, sel ast.SelectionSet, v *model.ModelInfoWithProvider) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModelInfoWithProvider(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNOAuthURL2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v auth.OAuthURL) graphql.Marshaler {
 	return ec._OAuthURL(ctx, sel, &v)
 }
@@ -16851,6 +18098,16 @@ func (ec *executionContext) marshalNPointsHistoryItem2ᚖgithubᚗcomᚋcomputef
 		return graphql.Null
 	}
 	return ec._PointsHistoryItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx context.Context, sel ast.SelectionSet, v *model.ProviderInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProviderInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNRecoveryResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v auth.RecoveryResult) graphql.Marshaler {

@@ -16,6 +16,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
@@ -148,9 +149,20 @@ func main() {
 	// 启动后台清理任务，每小时扫描并删除过期 token 和临时会话
 	store.StartCleanupTask(ctx, time.Hour)
 
+	// 启动合约内存索引器，每分钟刷新一次
+	idx := indexer.NewIndexer(teeChain)
+	if err := idx.Register(indexer.NewGatewayModelIndex()); err != nil {
+		log.Fatalf("failed to register gateway model index: %v", err)
+	}
+	if err := idx.Start(1 * time.Minute); err != nil {
+		log.Fatalf("failed to start indexer: %v", err)
+	}
+	defer idx.Stop()
+
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{
 		TeeChain:  teeChain,
+		Indexer:   idx,
 		WalletSvc: walletSvc,
 		EmailSvc:  emailSvc,
 		OAuthSvc:  oauthSvc,

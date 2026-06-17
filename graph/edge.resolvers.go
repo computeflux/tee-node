@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	apigateway "github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	"github.com/computeflux/tee-provider/pkg/model"
 	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"
@@ -80,21 +80,14 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 }
 
 // Models is the resolver for the Models field.
-func (r *queryResolver) Models(ctx context.Context, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfo, error) {
-	var mc, mxc, mp, mxp, off uint64
+func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error) {
+	var kw string
+	if keyword != nil {
+		kw = *keyword
+	}
+
+	var off uint64
 	var lim uint32 = 1000
-	if minContext != nil {
-		mc = uint64(*minContext)
-	}
-	if maxContext != nil {
-		mxc = uint64(*maxContext)
-	}
-	if minPrice != nil {
-		mp = uint64(*minPrice)
-	}
-	if maxPrice != nil {
-		mxp = uint64(*maxPrice)
-	}
 	if offset != nil {
 		off = uint64(*offset)
 	}
@@ -102,14 +95,45 @@ func (r *queryResolver) Models(ctx context.Context, minContext *int, maxContext 
 		lim = uint32(*limit)
 	}
 
-	models, err := apigateway.GatewayListActiveModelsWithinProvider(r.TeeChain, mc, mxc, mp, mxp, off, lim)
+	idx, err := r.Indexer.Get(indexer.GatewayModelIndexName)
+	if err != nil {
+		return nil, err
+	}
+	gatewayIdx, ok := idx.(*indexer.GatewayModelIndex)
+	if !ok {
+		return nil, fmt.Errorf("invalid gateway model index type")
+	}
+
+	req := indexer.GatewayModelSearchRequest{
+		Keyword: kw,
+		Offset:  off,
+		Limit:   lim,
+	}
+	if minContext != nil {
+		v := uint64(*minContext)
+		req.MinContext = &v
+	}
+	if maxContext != nil {
+		v := uint64(*maxContext)
+		req.MaxContext = &v
+	}
+	if minPrice != nil {
+		v := uint64(*minPrice)
+		req.MinPrice = &v
+	}
+	if maxPrice != nil {
+		v := uint64(*maxPrice)
+		req.MaxPrice = &v
+	}
+
+	models, err := gatewayIdx.Search(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
 	pool := localtunnel.GetGlobalPool()
 
-	result := make([]*model.ModelInfo, 0, len(models))
+	result := make([]*model.ModelInfoWithProvider, 0, len(models))
 	for _, item := range models {
 		m := item.Model
 		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
@@ -117,19 +141,45 @@ func (r *queryResolver) Models(ctx context.Context, minContext *int, maxContext 
 			continue
 		}
 
-		result = append(result, &model.ModelInfo{
-			Name:            m.Name,
-			ProviderID:      int(m.ProviderID),
-			ProviderType:    int(m.ProviderType),
-			ModelID:         m.ModelID,
-			URI:             m.URI,
-			InputModalities: int(m.InputModalities),
-			ContextLength:   int(m.ContextLength),
-			InPrice:         int(m.InPrice),
-			CachedPrice:     int(m.CachedPrice),
-			OutPrice:        int(m.OutPrice),
-			IsActive:        m.IsActive,
-			CreatedAt:       int(m.CreatedAt),
+		p := item.Provider
+		modelIDs := make([]int, len(p.ModelIds))
+		for i, v := range p.ModelIds {
+			modelIDs[i] = int(v)
+		}
+
+		result = append(result, &model.ModelInfoWithProvider{
+			ID: int(item.ID),
+			Model: &model.ModelInfo{
+				Name:            m.Name,
+				ProviderID:      int(m.ProviderID),
+				ProviderType:    int(m.ProviderType),
+				ModelID:         m.ModelID,
+				URI:             m.URI,
+				InputModalities: int(m.InputModalities),
+				ContextLength:   int(m.ContextLength),
+				InPrice:         int(m.InPrice),
+				CachedPrice:     int(m.CachedPrice),
+				OutPrice:        int(m.OutPrice),
+				IsActive:        m.IsActive,
+				CreatedAt:       int(m.CreatedAt),
+			},
+			Provider: &model.ProviderInfo{
+				Owner:         p.Owner.String(),
+				Name:          p.Name,
+				LogoURL:       p.LogoURL,
+				Description:   p.Description,
+				ModelIds:      modelIDs,
+				Region:        int(p.Region),
+				Deposit:       int(p.Deposit),
+				FeeRate:       int(p.FeeRate),
+				Priority:      int(p.Priority),
+				TotalRequests: int(p.TotalRequests),
+				SuccessRate:   int(p.SuccessRate),
+				AvgLatency:    int(p.AvgLatency),
+				UptimeSLA:     int(p.UptimeSLA),
+				IsActive:      p.IsActive,
+				CreatedAt:     int(p.CreatedAt),
+			},
 		})
 	}
 
