@@ -139,7 +139,7 @@ func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
 	}
 
 	// 1. 查 token（先缓存，再合约）
-	token := store.FindGatewayTokenByKey(apiKey)
+	token := FindTokenByKey(apiKey)
 	if token == nil {
 		token = LookupAPIKeyViaContract(apiKey)
 	}

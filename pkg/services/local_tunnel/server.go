@@ -141,14 +141,14 @@ func (s *Server) handleClientConn(conn net.Conn) {
 	var entriesMu sync.Mutex
 	for _, modelID := range models {
 		entry := &PoolEntry{
-			Session:    session,
-			ProviderID: handshake.ProviderID,
-			ModelID:    modelID,
-			APIKey:     handshake.APIKey,
-			BaseURL:    handshake.ModelBaseURL(modelID),
-			RemoteAddr: remoteAddr,
+			Session:     session,
+			ProviderID:  handshake.ProviderID,
+			ModelID:     modelID,
+			APIKey:      handshake.APIKey,
+			BaseURL:     handshake.ModelBaseURL(modelID),
+			RemoteAddr:  remoteAddr,
 			ConnectedAt: time.Now(),
-			Available:  false,
+			Available:   false,
 		}
 		s.pool.Add(entry)
 		entries = append(entries, entry)
@@ -295,14 +295,14 @@ func (s *Server) registerModel(session *yamux.Session, handshake *Handshake, rem
 	}
 
 	entry := &PoolEntry{
-		Session:    session,
-		ProviderID: handshake.ProviderID,
-		ModelID:    modelID,
-		APIKey:     handshake.APIKey,
-		BaseURL:    baseURL,
-		RemoteAddr: remoteAddr,
+		Session:     session,
+		ProviderID:  handshake.ProviderID,
+		ModelID:     modelID,
+		APIKey:      handshake.APIKey,
+		BaseURL:     baseURL,
+		RemoteAddr:  remoteAddr,
 		ConnectedAt: time.Now(),
-		Available:  false,
+		Available:   false,
 	}
 	s.pool.Add(entry)
 	*entries = append(*entries, entry)
