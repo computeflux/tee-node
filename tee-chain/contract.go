@@ -41,6 +41,22 @@ func (app *TeeChain) ContractRuntimeWithCaller(caller chaintypes.UniAddr) (*cont
 	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, caller, sudo, version), nil
 }
 
+// WithRuntime 在只读合约 runtime 上执行 fn，并统一处理创建与回滚。
+func WithRuntime[T any](chain *TeeChain, fn func(*contracts.Runtime) (T, error)) (T, error) {
+	return WithRuntimeCaller(chain, chaintypes.UniAddr{}, fn)
+}
+
+// WithRuntimeCaller 在指定 caller 的只读合约 runtime 上执行 fn，并统一处理创建与回滚。
+func WithRuntimeCaller[T any](chain *TeeChain, caller chaintypes.UniAddr, fn func(*contracts.Runtime) (T, error)) (T, error) {
+	var zero T
+	runtime, err := chain.ContractRuntimeWithCaller(caller)
+	if err != nil {
+		return zero, err
+	}
+	defer runtime.GetTxn().Rollback()
+	return fn(runtime)
+}
+
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。
 func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall) error {
 	var err error

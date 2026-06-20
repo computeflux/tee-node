@@ -68,10 +68,3 @@ type PointsAccount struct {
 	TotalRecharged uint64        `json:"totalRecharged"`
 	TotalSpent     uint64        `json:"totalSpent"`
 }
-
-func (p PointsAccount) Balance() uint64 {
-	if p.TotalRecharged < p.TotalSpent {
-		return 0
-	}
-	return p.TotalRecharged - p.TotalSpent
-}

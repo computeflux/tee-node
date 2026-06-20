@@ -1,7 +1,6 @@
 package util
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -94,11 +93,4 @@ func LogWithBlue(tag string, a ...any) {
 	b = append(b, a...)
 
 	fmt.Println(b...)
-}
-
-func PrintJson(v any) {
-	b, _ := json.MarshalIndent(v, "", "  ")
-	fmt.Println("------------------ json --------------------------")
-	fmt.Println(string(b))
-	fmt.Println("------------------ json --------------------------")
 }

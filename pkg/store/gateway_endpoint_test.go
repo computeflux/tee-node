@@ -70,64 +70,6 @@ func TestEndpointBalancer_Pick_Empty(t *testing.T) {
 	assert.Nil(t, b)
 }
 
-func TestEndpointBalancer_Release(t *testing.T) {
-	eps := []*GatewayEndpoint{
-		{ID: 1, URL: "http://a", Weight: 1, IsActive: true},
-	}
-	b := NewEndpointBalancerFromEndpoints(eps)
-
-	b.Pick("user1")
-	stats := b.Stats()
-	assert.Equal(t, int64(1), stats[1].Inflight)
-
-	b.Release(1)
-	stats = b.Stats()
-	assert.Equal(t, int64(0), stats[1].Inflight)
-}
-
-func TestEndpointBalancer_OnEndpointDisabled(t *testing.T) {
-	eps := []*GatewayEndpoint{
-		{ID: 1, URL: "http://a", Weight: 1, IsActive: true},
-		{ID: 2, URL: "http://b", Weight: 1, IsActive: true},
-	}
-	b := NewEndpointBalancerFromEndpoints(eps)
-
-	// Bind multiple users
-	b.Pick("alice")
-	b.Pick("bob")
-
-	// Verify both are bound
-	statsBefore := b.Stats()
-	totalUsersBefore := 0
-	for _, s := range statsBefore {
-		totalUsersBefore += s.Users
-	}
-	assert.Equal(t, 2, totalUsersBefore)
-
-	// Disable endpoint 1: clear all bindings to it
-	b.OnEndpointDisabled(1)
-
-	// Verify bindings are cleared
-	statsAfter := b.Stats()
-	assert.Equal(t, 0, statsAfter[1].Users)
-}
-
-func TestEndpointBalancer_Stats(t *testing.T) {
-	eps := []*GatewayEndpoint{
-		{ID: 1, URL: "http://a", Weight: 1, IsActive: true},
-		{ID: 2, URL: "http://b", Weight: 1, IsActive: true},
-	}
-	b := NewEndpointBalancerFromEndpoints(eps)
-
-	b.Pick("alice")
-	b.Pick("bob")
-	b.Pick("charlie")
-
-	stats := b.Stats()
-	assert.Len(t, stats, 2)
-	assert.Equal(t, int64(3), stats[1].Inflight+stats[2].Inflight)
-}
-
 func TestEndpointBalancer_WeightedDistribution(t *testing.T) {
 	eps := []*GatewayEndpoint{
 		{ID: 1, URL: "http://a", Weight: 90, IsActive: true},

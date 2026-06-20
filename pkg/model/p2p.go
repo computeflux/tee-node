@@ -6,15 +6,6 @@ import (
 	"github.com/computeflux/tee-provider/pkg/crypto"
 )
 
-// p2p send msg to all node
-func SendBroadcast() *To {
-	return &To{
-		Payload: &To_Broadcast{
-			Broadcast: true,
-		},
-	}
-}
-
 // p2p send msg to modes
 func SendToNodes(ids []*crypto.PubKey) *To {
 	keys := make([][]byte, len(ids))

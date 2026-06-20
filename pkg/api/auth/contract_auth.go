@@ -9,31 +9,25 @@ import (
 
 // ── Auth 合约桥接（从 tee-chain/contract.go 拆分出来）─────────
 
-// contractRuntime 构造合约运行时上下文（本包内部使用）。
-func contractRuntime(chain *teechain.TeeChain) (*contracts.Runtime, error) {
-	return chain.ContractRuntime()
+// runAuthQuery 构造 AuthQuery 并执行 fn，统一处理合约 runtime 的创建与回滚。
+func runAuthQuery[T any](chain *teechain.TeeChain, fn func(cauth.AuthQuery) (T, error)) (T, error) {
+	return teechain.WithRuntime(chain, func(runtime *contracts.Runtime) (T, error) {
+		return fn(cauth.AuthQuery{Auth: *cauth.NewAuth(runtime)})
+	})
+}
+
+// runAuthSecret 构造 AuthSecret 并执行 fn，统一处理合约 runtime 的创建与回滚。
+func runAuthSecret[T any](chain *teechain.TeeChain, fn func(cauth.AuthSecret) (T, error)) (T, error) {
+	return teechain.WithRuntime(chain, func(runtime *contracts.Runtime) (T, error) {
+		return fn(cauth.AuthSecret{Auth: *cauth.NewAuth(runtime)})
+	})
 }
 
 // AuthGetAuthUser 查询 Web3Auth 用户信息。
 func AuthGetAuthUser(chain *teechain.TeeChain, ref string) (*cauth.AuthUserRecord, error) {
-	runtime, err := contractRuntime(chain)
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return cauth.AuthQuery{Auth: *cauth.NewAuth(runtime)}.GetAuthUser(ref)
-}
-
-// AuthGetPrivateKey 查询用户私钥。
-func AuthGetPrivateKey(chain *teechain.TeeChain, ref string) (*cauth.PrivateKeyRecord, error) {
-	runtime, err := contractRuntime(chain)
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return cauth.AuthQuery{Auth: *cauth.NewAuth(runtime)}.GetPrivateKey(ref)
+	return runAuthQuery(chain, func(q cauth.AuthQuery) (*cauth.AuthUserRecord, error) {
+		return q.GetAuthUser(ref)
+	})
 }
 
 // AuthStoreAuthUser 将 Web3Auth 用户信息提交到链上合约。
@@ -46,24 +40,16 @@ func AuthStoreAuthUser(chain *teechain.TeeChain, ref string, ciphertext []byte) 
 
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）。
 func AuthGetConfig(chain *teechain.TeeChain) (*cauth.AuthConfig, error) {
-	runtime, err := contractRuntime(chain)
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return cauth.AuthSecret{Auth: *cauth.NewAuth(runtime)}.GetConfig()
+	return runAuthSecret(chain, func(s cauth.AuthSecret) (*cauth.AuthConfig, error) {
+		return s.GetConfig()
+	})
 }
 
 // AuthGetPubConfig 查询认证服务配置（对外，已脱敏）。
 func AuthGetPubConfig(chain *teechain.TeeChain) (*cauth.AuthConfig, error) {
-	runtime, err := contractRuntime(chain)
-	if err != nil {
-		return nil, err
-	}
-	defer runtime.GetTxn().Rollback()
-
-	return cauth.AuthQuery{Auth: *cauth.NewAuth(runtime)}.GetConfig()
+	return runAuthQuery(chain, func(q cauth.AuthQuery) (*cauth.AuthConfig, error) {
+		return q.GetConfig()
+	})
 }
 
 // AuthSetConfig 设置认证服务配置（链上存储）。
@@ -99,12 +85,4 @@ func AuthSetConfig(
 		ghIDBytes, ghSecBytes, ghRedBytes,
 		twIDBytes, twSecBytes, twRedBytes,
 	})
-}
-
-// AuthStorePrivateKey 存储用户私钥到链上合约。
-func AuthStorePrivateKey(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
-	refBytes, _ := store.ScaleEncode(ref)
-	cipherBytes, _ := store.ScaleEncode(ciphertext)
-	nonceBytes, _ := store.ScaleEncode([]byte{})
-	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }

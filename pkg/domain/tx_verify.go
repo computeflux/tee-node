@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vedhavyas/go-subkey/v2/ed25519"
 	"github.com/vedhavyas/go-subkey/v2/sr25519"
-	"github.com/wetee-dao/ink.go"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -105,16 +104,6 @@ func SideContractPolkadotVerify(caller []byte, call []byte, signature []byte) er
 	}
 
 	return nil
-}
-
-func SideContractPolkadotSign(caller *ink.Signer, call *model.ContractCall) ([]byte, error) {
-	parts := append([][]byte{[]byte("<Bytes>"), call.Name, call.Method[:]}, call.Args...)
-	parts = append(parts, []byte("</Bytes>"))
-
-	// 合并所有部分
-	result := bytes.Join(parts, nil)
-
-	return caller.Sign(result)
 }
 
 func Ed25519SignVerify(pubkeyBt []byte, msg []byte, signature []byte) bool {

@@ -2,33 +2,10 @@ package store
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
-
-func AddToList(namespace string, key string, val []byte) error {
-	indexBt, err := GetKey(namespace, "index_"+key)
-	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
-		return err
-	}
-
-	var index uint64 = 0
-	if indexBt != nil {
-		index = util.BytesToUint64(indexBt)
-	}
-
-	txn := DBINS.NewTransaction()
-	if err := txn.SetKey(namespace, "index_"+key, util.Uint64ToBytes(index+1)); err != nil {
-		return err
-	}
-	if err := txn.SetKey(namespace, key+fmt.Sprint(index), val); err != nil {
-		return err
-	}
-	return txn.Commit()
-}
 
 // GetList 基于游标分页获取列表。
 // cursor: 上一页最后一条记录的键，nil 或空表示从首条开始。
@@ -82,8 +59,4 @@ func GetList(namespace string, subkey string, cursor []byte, size int) ([][]byte
 	}
 
 	return list, nextCursor, nil
-}
-
-func DeleteList(namespace string, key string) error {
-	return DeletekeysByPrefix(namespace, key)
 }

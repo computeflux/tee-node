@@ -208,11 +208,6 @@ func (s *Server) Pool() *Pool {
 	return s.pool
 }
 
-// Metrics 返回服务器指标
-func (s *Server) Metrics() PoolMetrics {
-	return s.pool.Metrics()
-}
-
 // handleControlStreams 接受并处理本地客户端发起的控制流
 func (s *Server) handleControlStreams(session *yamux.Session, handshake *Handshake, remoteAddr string, entries *[]*PoolEntry, entriesMu *sync.Mutex) {
 	for {

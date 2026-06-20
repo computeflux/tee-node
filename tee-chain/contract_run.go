@@ -1,7 +1,6 @@
 package teechain
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/store"
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 const (
@@ -42,36 +40,6 @@ func CheckRuntimeV0() error {
 	}
 
 	return nil
-}
-
-func LoadRuntimeForDebug() error {
-	data, err := os.ReadFile("./token_chain_data/config/genesis.json")
-	if err != nil {
-		return fmt.Errorf("read genesis.json: %w", err)
-	}
-
-	var genesis struct {
-		AppState struct {
-			Runtime struct {
-				Wasm string `json:"wasm"`
-			} `json:"runtime"`
-		} `json:"app_state"`
-	}
-	if err := json.Unmarshal(data, &genesis); err != nil {
-		return fmt.Errorf("parse genesis.json: %w", err)
-	}
-
-	if genesis.AppState.Runtime.Wasm == "" {
-		return fmt.Errorf("genesis.json missing app_state.runtime.wasm")
-	}
-
-	b, err := base64.StdEncoding.DecodeString(genesis.AppState.Runtime.Wasm)
-	if err != nil {
-		util.LogError("InitChain decode wasm", err)
-		return err
-	}
-
-	return createRuntimeV0(b, "debug")
 }
 
 // InitRuntimeVersion 初始化运行时版本系统（在 InitChain 或首次启动时调用）。
@@ -113,18 +81,6 @@ func GetCurrentRuntimeVersion() (uint32, error) {
 		return RuntimeDefaultVersion, err
 	}
 	return v, nil
-}
-
-// GetRuntimeVersionAtHeightTxn 从当前交易中优先读取版本（支持同区块内 RuntimeUpgrade 立即生效）。
-func GetRuntimeVersionAtHeightTxn(txn *store.Txn, height int64) (uint32, error) {
-	v, err := store.TxnGetCodec[uint32](txn, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
-	if err != nil {
-		return RuntimeDefaultVersion, err
-	}
-	if v != nil {
-		return *v, nil
-	}
-	return GetRuntimeVersionAtHeight(height)
 }
 
 // GetRuntimeVersionAtHeight 获取指定区块高度使用的运行时版本

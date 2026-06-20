@@ -3,23 +3,11 @@ package token
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/util"
 )
-
-func DeployTokenWithNew(__ink_params chain.DeployParams) (*types.H160, error) {
-	return __ink_params.Client.DeployContract(
-		__ink_params.Code, __ink_params.Signer, types.NewU128(*big.NewInt(0)),
-		util.InkContractInput{
-			Selector: "0x00000000",
-			Args:     []any{},
-		},
-		__ink_params.Salt,
-	)
-}
 
 func InitTokenContract(client *chain.ChainClient, address string) (*Token, error) {
 	contractAddress, err := util.HexToH160(address)

@@ -7,7 +7,7 @@ import "github.com/computeflux/tee-provider/pkg/store"
 // 2. 回退到本地 PebbleDB 直接查询（通过 key 索引 O(1)）
 func FindTokenByKey(key string) *store.GatewayTokenInfo {
 	// 优先走合约查询 api_tee_xxxxxx
-	if tk := lookupAPIKeyViaContract(key); tk != nil {
+	if tk := LookupAPIKeyViaContract(key); tk != nil {
 		return tk
 	}
 

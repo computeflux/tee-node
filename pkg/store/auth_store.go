@@ -54,34 +54,6 @@ func PutAuthUser(u *AuthUser) error {
 	return SetKey("WEB3AUTH", "u:"+u.Email, b)
 }
 
-// ── Session ───────────────────────────────────────────────
-
-func PutAuthSession(s *AuthSession) error {
-	tok := s.Token
-	if len(tok) > 32 {
-		tok = tok[:32]
-	}
-	b, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-	return SetKey("WEB3AUTH", "s:"+tok, b)
-}
-
-func GetAuthSession(token string) (*AuthSession, error) {
-	if len(token) > 32 {
-		token = token[:32]
-	}
-	return GetJson[AuthSession]("WEB3AUTH", "s:"+token)
-}
-
-func DeleteAuthSession(token string) error {
-	if len(token) > 32 {
-		token = token[:32]
-	}
-	return DeleteKey("WEB3AUTH", "s:"+token)
-}
-
 // SignSession 签名会话（密码验证后的短期授权）
 type SignSession struct {
 	Token        string `json:"token"`
@@ -194,30 +166,6 @@ func DeleteChallenge(email, challenge string) error {
 	return DeleteKey("WEB3AUTH", key)
 }
 
-// FindPendingChallenge 查找用户最新的未使用 challenge
-func FindPendingChallenge(email string) (string, error) {
-	prefix := []byte(comboKey("WEB3AUTH", fmt.Sprintf("c:%s:", email)))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
-		LowerBound: prefix,
-	})
-	if err != nil {
-		return "", err
-	}
-	defer iter.Close()
-
-	for iter.First(); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
-		raw, err := util.Unseal(iter.Value(), nil)
-		if err != nil {
-			continue
-		}
-		var rec ChallengeRecord
-		if json.Unmarshal(raw, &rec) == nil && !rec.Used {
-			return rec.Challenge, nil
-		}
-	}
-	return "", nil
-}
-
 // ClearAllChallenges 清除用户所有未使用的 challenge（避免多 challenge 残留导致验证错位）
 func ClearAllChallenges(email string) error {
 	prefix := []byte(comboKey("WEB3AUTH", fmt.Sprintf("c:%s:", email)))
@@ -298,10 +246,6 @@ func GetEncryptedKey(email string) (*EncryptedKey, error) {
 	return GetJson[EncryptedKey]("WEB3AUTH", "k:"+email)
 }
 
-func DeleteEncryptedKey(email string) error {
-	return DeleteKey("WEB3AUTH", "k:"+email)
-}
-
 // ── OTP ───────────────────────────────────────────────────
 
 func PutOTP(email, otp string) error {
@@ -328,10 +272,6 @@ func PutRecoveryConfig(c *RecoveryConfig) error {
 		return err
 	}
 	return SetKey("WEB3AUTH", "r:"+c.UserEmail, b)
-}
-
-func GetRecoveryConfig(userEmail string) (*RecoveryConfig, error) {
-	return GetJson[RecoveryConfig]("WEB3AUTH", "r:"+userEmail)
 }
 
 func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
@@ -455,39 +395,6 @@ func MarkWalletNonceUsed(address, nonce string) error {
 	rec.Used = true
 	b, _ := json.Marshal(rec)
 	return SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
-}
-
-// CleanupWalletNonces 清理指定地址下已过期的钱包登录 nonce。
-// 若 address 为空，则退化为基于过期索引的全局清理。
-func CleanupWalletNonces(address string, maxAgeSeconds int) error {
-	if address == "" {
-		return CleanupExpiredWalletNonces()
-	}
-
-	prefix := []byte(comboKey("WEB3AUTH", "wn:"+address+":"))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{})
-	if err != nil {
-		return err
-	}
-	defer iter.Close()
-
-	cutoff := time.Now().Unix() - int64(maxAgeSeconds)
-	var toDelete [][]byte
-	for iter.SeekGE(prefix); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
-		raw, err := util.Unseal(iter.Value(), nil)
-		if err != nil {
-			continue
-		}
-		var rec WalletNonceRecord
-		if json.Unmarshal(raw, &rec) == nil && rec.CreatedAt < cutoff {
-			toDelete = append(toDelete, copyIterKey(iter.Key()))
-		}
-	}
-
-	for _, key := range toDelete {
-		_ = DeleteByteKey(key)
-	}
-	return nil
 }
 
 // CleanupExpiredWalletNonces 基于过期索引删除所有已过期的钱包登录 nonce。

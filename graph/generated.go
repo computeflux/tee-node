@@ -152,6 +152,11 @@ type ComplexityRoot struct {
 		Provider func(childComplexity int) int
 	}
 
+	ModelRunningStatus struct {
+		IsRunning func(childComplexity int) int
+		ModelName func(childComplexity int) int
+	}
+
 	Mutation struct {
 		ClaimEarlyAccessTask func(childComplexity int, wallet string, task model.EarlyAccessTaskType) int
 		CompleteRecovery     func(childComplexity int, recoveryToken string, passwordHash string) int
@@ -231,6 +236,7 @@ type ComplexityRoot struct {
 		EarlyAccessUser               func(childComplexity int, user string) int
 		EarlyAccessUserByEmail        func(childComplexity int, email string) int
 		EarlyAccessUserByReferralCode func(childComplexity int, referralCode string) int
+		EdgeModelRunningStatus        func(childComplexity int, providerID int, modelNames []string) int
 		EdgeModels                    func(childComplexity int) int
 		GetChallenge                  func(childComplexity int, token string) int
 		Models                        func(childComplexity int, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) int
@@ -347,6 +353,7 @@ type QueryResolver interface {
 	EarlyAccessTasks(ctx context.Context, wallet string) ([]*model.TaskStatus, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
 	Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error)
+	EdgeModelRunningStatus(ctx context.Context, providerID int, modelNames []string) ([]*model.ModelRunningStatus, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -838,6 +845,20 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ModelInfoWithProvider.Provider(childComplexity), true
+
+	case "ModelRunningStatus.isRunning":
+		if e.complexity.ModelRunningStatus.IsRunning == nil {
+			break
+		}
+
+		return e.complexity.ModelRunningStatus.IsRunning(childComplexity), true
+
+	case "ModelRunningStatus.modelName":
+		if e.complexity.ModelRunningStatus.ModelName == nil {
+			break
+		}
+
+		return e.complexity.ModelRunningStatus.ModelName(childComplexity), true
 
 	case "Mutation.claimEarlyAccessTask":
 		if e.complexity.Mutation.ClaimEarlyAccessTask == nil {
@@ -1454,6 +1475,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.EarlyAccessUserByReferralCode(childComplexity, args["referralCode"].(string)), true
+
+	case "Query.edge_model_running_status":
+		if e.complexity.Query.EdgeModelRunningStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_edge_model_running_status_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.EdgeModelRunningStatus(childComplexity, args["providerId"].(int), args["modelNames"].([]string)), true
 
 	case "Query.edge_models":
 		if e.complexity.Query.EdgeModels == nil {
@@ -4030,6 +4063,57 @@ func (ec *executionContext) field_Query_earlyAccessUser_argsUser(
 	}
 
 	var zeroVal string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_edge_model_running_status_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_edge_model_running_status_argsProviderID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["providerId"] = arg0
+	arg1, err := ec.field_Query_edge_model_running_status_argsModelNames(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["modelNames"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_edge_model_running_status_argsProviderID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (int, error) {
+	if _, ok := rawArgs["providerId"]; !ok {
+		var zeroVal int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("providerId"))
+	if tmp, ok := rawArgs["providerId"]; ok {
+		return ec.unmarshalNInt2int(ctx, tmp)
+	}
+
+	var zeroVal int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_edge_model_running_status_argsModelNames(
+	ctx context.Context,
+	rawArgs map[string]any,
+) ([]string, error) {
+	if _, ok := rawArgs["modelNames"]; !ok {
+		var zeroVal []string
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("modelNames"))
+	if tmp, ok := rawArgs["modelNames"]; ok {
+		return ec.unmarshalNString2ᚕstringᚄ(ctx, tmp)
+	}
+
+	var zeroVal []string
 	return zeroVal, nil
 }
 
@@ -7456,6 +7540,94 @@ func (ec *executionContext) fieldContext_ModelInfoWithProvider_provider(_ contex
 				return ec.fieldContext_ProviderInfo_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ProviderInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelRunningStatus_modelName(ctx context.Context, field graphql.CollectedField, obj *model.ModelRunningStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelRunningStatus_modelName(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModelName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelRunningStatus_modelName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelRunningStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelRunningStatus_isRunning(ctx context.Context, field graphql.CollectedField, obj *model.ModelRunningStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelRunningStatus_isRunning(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsRunning, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelRunningStatus_isRunning(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelRunningStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -11348,6 +11520,67 @@ func (ec *executionContext) fieldContext_Query_models(ctx context.Context, field
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_models_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_edge_model_running_status(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_edge_model_running_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().EdgeModelRunningStatus(rctx, fc.Args["providerId"].(int), fc.Args["modelNames"].([]string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ModelRunningStatus)
+	fc.Result = res
+	return ec.marshalNModelRunningStatus2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelRunningStatusᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_edge_model_running_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "modelName":
+				return ec.fieldContext_ModelRunningStatus_modelName(ctx, field)
+			case "isRunning":
+				return ec.fieldContext_ModelRunningStatus_isRunning(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ModelRunningStatus", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_edge_model_running_status_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15938,6 +16171,50 @@ func (ec *executionContext) _ModelInfoWithProvider(ctx context.Context, sel ast.
 	return out
 }
 
+var modelRunningStatusImplementors = []string{"ModelRunningStatus"}
+
+func (ec *executionContext) _ModelRunningStatus(ctx context.Context, sel ast.SelectionSet, obj *model.ModelRunningStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, modelRunningStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModelRunningStatus")
+		case "modelName":
+			out.Values[i] = ec._ModelRunningStatus_modelName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isRunning":
+			out.Values[i] = ec._ModelRunningStatus_isRunning(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -16829,6 +17106,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_models(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "edge_model_running_status":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_edge_model_running_status(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -18016,6 +18315,60 @@ func (ec *executionContext) marshalNModelInfoWithProvider2ᚖgithubᚗcomᚋcomp
 		return graphql.Null
 	}
 	return ec._ModelInfoWithProvider(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNModelRunningStatus2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelRunningStatusᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ModelRunningStatus) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNModelRunningStatus2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelRunningStatus(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNModelRunningStatus2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelRunningStatus(ctx context.Context, sel ast.SelectionSet, v *model.ModelRunningStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModelRunningStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNOAuthURL2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v auth.OAuthURL) graphql.Marshaler {

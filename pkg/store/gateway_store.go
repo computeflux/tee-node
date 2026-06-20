@@ -88,10 +88,6 @@ func CleanupExpiredGatewayTokens() error {
 	})
 }
 
-func ListUserGatewayTokens(user string, startKey uint64, size int) ([]*GatewayTokenInfo, error) {
-	return nil, nil
-}
-
 // ── NextID ───────────────────────────────────────────────
 
 func GetNextID(key string) uint64 {

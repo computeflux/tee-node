@@ -67,22 +67,3 @@ type GeneralOpenAIRequest struct {
 	Instruction string `json:"instruction,omitempty"`
 	NumCtx      int    `json:"num_ctx,omitempty"`
 }
-
-func (r GeneralOpenAIRequest) ParseInput() []string {
-	if r.Input == nil {
-		return nil
-	}
-	var input []string
-	switch r.Input.(type) {
-	case string:
-		input = []string{r.Input.(string)}
-	case []any:
-		input = make([]string, 0, len(r.Input.([]any)))
-		for _, item := range r.Input.([]any) {
-			if str, ok := item.(string); ok {
-				input = append(input, str)
-			}
-		}
-	}
-	return input
-}

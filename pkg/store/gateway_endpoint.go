@@ -25,16 +25,15 @@ type GatewayEndpoint struct {
 // 只有 Endpoint 故障时才切换。
 //
 // 路由规则：
-//   1. 新用户：按权重分配 Endpoint，分配后永久绑定
-//   2. 老用户：永远回到之前绑定的 Endpoint
-//   3. Endpoint 故障 → 用户自动迁移到其他 Endpoint
-//   4. Endpoint 恢复 → 用户不会自动回来（避免反复迁移）
+//  1. 新用户：按权重分配 Endpoint，分配后永久绑定
+//  2. 老用户：永远回到之前绑定的 Endpoint
+//  3. Endpoint 故障 → 用户自动迁移到其他 Endpoint
+//  4. Endpoint 恢复 → 用户不会自动回来（避免反复迁移）
 //
 // 效果：
 //   - 同一用户的所有请求打到同一 API Key
 //   - OpenAI server-side cache 100% 命中
 //   - 成本最低
-
 type EndpointBalancer struct {
 	mu        sync.RWMutex
 	endpoints []*GatewayEndpoint
@@ -118,53 +117,4 @@ func (b *EndpointBalancer) hashToIndex(userKey string) int {
 		}
 	}
 	return len(b.endpoints) - 1
-}
-
-// Release decrements inflight count
-func (b *EndpointBalancer) Release(endpointID uint64) {
-	for i, ep := range b.endpoints {
-		if ep.ID == endpointID {
-			v := atomic.LoadInt64(&b.inflight[i])
-			if v > 0 {
-				atomic.AddInt64(&b.inflight[i], -1)
-			}
-			return
-		}
-	}
-}
-
-// OnEndpointDisabled removes the endpoint from active rotation
-func (b *EndpointBalancer) OnEndpointDisabled(endpointID uint64) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	// 清除该 endpoint 的所有用户绑定
-	for k, v := range b.userMap {
-		if v == endpointID {
-			delete(b.userMap, k)
-		}
-	}
-}
-
-// Stats returns per-endpoint stats
-func (b *EndpointBalancer) Stats() map[uint64]struct {
-	Users    int
-	Inflight int64
-} {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	s := make(map[uint64]struct {
-		Users    int
-		Inflight int64
-	})
-	userCounts := make(map[uint64]int)
-	for _, epID := range b.userMap {
-		userCounts[epID]++
-	}
-	for i, ep := range b.endpoints {
-		s[ep.ID] = struct {
-			Users    int
-			Inflight int64
-		}{userCounts[ep.ID], atomic.LoadInt64(&b.inflight[i])}
-	}
-	return s
 }

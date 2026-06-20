@@ -172,18 +172,6 @@ func WriteJSONFrame(w io.Writer, ft FrameType, v interface{}) error {
 	return WriteTypedFrame(w, ft, data)
 }
 
-// ReadJSONFrame 读取 typed frame 并解析 JSON
-func ReadJSONFrame(r io.Reader, ft FrameType, v interface{}) error {
-	actualType, payload, err := ReadTypedFrame(r)
-	if err != nil {
-		return err
-	}
-	if actualType != ft {
-		return fmt.Errorf("unexpected frame type: got %d, want %d", actualType, ft)
-	}
-	return json.Unmarshal(payload, v)
-}
-
 // ── Conn helpers ─────────────────────────────────────────
 
 // WriteHandshake 发送注册握手（JSON frame with type 0，兼容旧版）

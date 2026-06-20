@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/cosmos/go-bip39"
 	oed "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	"go.dedis.ch/kyber/v4/suites"
 )
@@ -38,21 +37,4 @@ func main() {
 	sPub := suite.Point().Mul(sPriv, nil)
 	fmt.Println("sPub: ", sPub)
 
-}
-
-func seed() {
-	// 生成 128 位的随机熵
-	entropy, err := bip39.NewEntropy(128)
-	if err != nil {
-		panic(err)
-	}
-
-	// 生成助记词
-	mnemonic, err := bip39.NewMnemonic(entropy)
-	if err != nil {
-		panic(err)
-	}
-
-	// 打印助记词
-	fmt.Println("助记词:", mnemonic)
 }

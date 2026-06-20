@@ -37,6 +37,11 @@ type ModelInfoWithProvider {
   provider: ProviderInfo!
 }
 
+type ModelRunningStatus {
+  modelName: String!
+  isRunning: Boolean!
+}
+
 # ── Query ───────────────────────────────────────────────
 extend type Query {
   edge_models: [ModelInfo!]! @AuthCheck
@@ -51,4 +56,8 @@ extend type Query {
     offset: Int
     limit: Int
   ): [ModelInfoWithProvider!]!
+
+  """批量查询指定 provider 下多个个人算力模型是否在线运行。
+  返回每个模型名称及其本地隧道可用状态。"""
+  edge_model_running_status(providerId: Int!, modelNames: [String!]!): [ModelRunningStatus!]!
 }

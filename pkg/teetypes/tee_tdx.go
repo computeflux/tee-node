@@ -18,9 +18,3 @@ func TdxIssue(pk chain.SignerType, call *model.TeeCall) error {
 func TdxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	return nil, errors.New("TDX report verify is not yet implemented")
 }
-
-// ClientTdxVerify verifies a TDX attestation report from a client perspective.
-// TODO: implement client-side TDX verification.
-func ClientTdxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
-	return nil, errors.New("TDX client verification is not yet implemented")
-}

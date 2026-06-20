@@ -87,11 +87,6 @@ func Int64ToBytes(time int64) []byte {
 	return b
 }
 
-// bytes to int
-func BytesToInt64(b []byte) int64 {
-	return int64(binary.BigEndian.Uint64(b))
-}
-
 // Exists 检查路径是否存在（无论是文件还是目录）
 func CheckExists(path string) bool {
 	_, err := os.Stat(path)

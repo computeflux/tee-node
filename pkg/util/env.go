@@ -25,7 +25,3 @@ func GetEnvInt(key string, defaultValue int) int {
 	}
 	return i
 }
-
-func GetRootDir() string {
-	return "/wetee"
-}

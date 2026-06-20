@@ -65,13 +65,3 @@ func DeleteRefreshToken(token string) error {
 	}
 	return nil
 }
-
-// RevokeRefreshToken 将 refresh token 标记为失效。
-func RevokeRefreshToken(token string) error {
-	tk, err := GetRefreshToken(token)
-	if err != nil || tk == nil {
-		return fmt.Errorf("refresh token not found")
-	}
-	tk.IsActive = false
-	return SetRefreshToken(token, tk)
-}

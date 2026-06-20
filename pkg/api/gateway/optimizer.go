@@ -81,23 +81,6 @@ func initUsageWriter() {
 	})
 }
 
-// FlushUsage 强制将内存中的用量统计同步落盘。
-func FlushUsage() {
-	initUsageWriter()
-	select {
-	case usageFlushCh <- struct{}{}:
-	default:
-	}
-	// 等待 flush 完成（最多等 200ms）
-	time.Sleep(200 * time.Millisecond)
-}
-
-// StopUsageWriter 优雅停止用量统计 worker，先 flush 再退出。
-func StopUsageWriter() {
-	FlushUsage()
-	usageWg.Wait()
-}
-
 // recordUsageAsyncFn 可被测试替换为 mock。
 var recordUsageAsyncFn = recordUsageAsync
 
@@ -160,16 +143,6 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func GetBuffer() []byte {
-	return bufferPool.Get().([]byte)[:0]
-}
-
-func PutBuffer(buf []byte) {
-	if cap(buf) <= 256*1024 {
-		bufferPool.Put(buf[:0])
-	}
-}
-
 // ── Usage settlement to sidechain ────────────────────────
 var (
 	settleOnce   sync.Once
@@ -201,11 +174,6 @@ func initUsageSettler() {
 			}
 		}()
 	})
-}
-
-// StopUsageSettler 停止结算循环（优雅停机时调用）。
-func StopUsageSettler() {
-	close(settleDone)
 }
 
 // settlePendingUsage 扫描本地 PebbleDB 用量记录，统一打包为一个大数组一次性上链。

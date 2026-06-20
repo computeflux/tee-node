@@ -185,3 +185,18 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 
 	return result, nil
 }
+
+// EdgeModelRunningStatus is the resolver for the edge_model_running_status field.
+func (r *queryResolver) EdgeModelRunningStatus(ctx context.Context, providerID int, modelNames []string) ([]*model.ModelRunningStatus, error) {
+	pool := localtunnel.GetGlobalPool()
+
+	result := make([]*model.ModelRunningStatus, 0, len(modelNames))
+	for _, name := range modelNames {
+		result = append(result, &model.ModelRunningStatus{
+			ModelName: name,
+			IsRunning: pool.HasEntry(uint64(providerID), name),
+		})
+	}
+
+	return result, nil
+}

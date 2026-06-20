@@ -134,6 +134,11 @@ type ModelInfoWithProvider struct {
 	Provider *ProviderInfo `json:"provider"`
 }
 
+type ModelRunningStatus struct {
+	ModelName string `json:"modelName"`
+	IsRunning bool   `json:"isRunning"`
+}
+
 type Mutation struct {
 }
 

@@ -3,7 +3,6 @@ package crypto
 import (
 	"fmt"
 
-	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing/bls12381/circl"
 	"go.dedis.ch/kyber/v4/suites"
 )
@@ -54,35 +53,5 @@ func NewSuite(st SuiteType) suites.Suite {
 		return circl.NewSuiteBLS12381()
 	default:
 		return suites.MustFind("Ed25519")
-	}
-}
-
-// SuiteToPoint 将字节反序列化为对应 suite 的 Point
-func SuiteToPoint(suite suites.Suite, data []byte) (kyber.Point, error) {
-	point := suite.Point()
-	if err := point.UnmarshalBinary(data); err != nil {
-		return nil, fmt.Errorf("unmarshal point: %w", err)
-	}
-	return point, nil
-}
-
-// SuiteToScalar 将字节反序列化为对应 suite 的 Scalar
-func SuiteToScalar(suite suites.Suite, data []byte) (kyber.Scalar, error) {
-	scalar := suite.Scalar()
-	if err := scalar.UnmarshalBinary(data); err != nil {
-		return nil, fmt.Errorf("unmarshal scalar: %w", err)
-	}
-	return scalar, nil
-}
-
-// SuiteFromPubKeyBytes 根据公钥字节长度推断 suite 类型
-func SuiteFromPubKeyBytes(pub []byte) (SuiteType, error) {
-	switch len(pub) {
-	case 32:
-		return SuiteEd25519, nil
-	case 96:
-		return SuiteBLS12381, nil
-	default:
-		return 255, fmt.Errorf("unknown public key length: %d", len(pub))
 	}
 }

@@ -266,17 +266,6 @@ func (p *Pool) AllEntries() []*PoolEntry {
 	return all
 }
 
-// Metrics 返回连接池指标
-func (p *Pool) Metrics() PoolMetrics {
-	return PoolMetrics{
-		TotalConnections:   atomic.LoadInt64(&p.metrics.TotalConnections),
-		ActiveConnections:  atomic.LoadInt64(&p.metrics.ActiveConnections),
-		TotalRequests:      atomic.LoadInt64(&p.metrics.TotalRequests),
-		FailedRequests:     atomic.LoadInt64(&p.metrics.FailedRequests),
-		RejectedHandshakes: atomic.LoadInt64(&p.metrics.RejectedHandshakes),
-	}
-}
-
 // IncrRequests 增加请求计数
 func (p *Pool) IncrRequests(success bool) {
 	atomic.AddInt64(&p.metrics.TotalRequests, 1)

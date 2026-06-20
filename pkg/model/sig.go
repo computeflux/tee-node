@@ -29,7 +29,3 @@ func Uint64ToBytes(n uint64) []byte {
 	binary.BigEndian.PutUint64(b, n)
 	return b
 }
-
-func BytesToUint64(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b)
-}
