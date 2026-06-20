@@ -57,7 +57,7 @@ func NewSMTPEmailService(cfg *auth.AuthConfig) *SMTPEmailService {
 
 func (s *SMTPEmailService) SendOTP(to, otp string) error {
 	subject := "Your verification code"
-	fmt.Println(otp)
+
 	body := fmt.Sprintf(
 		"Your verification code is: %s\n\nIt expires in 5 minutes.\n\n— %s",
 		otp, s.fromName,
