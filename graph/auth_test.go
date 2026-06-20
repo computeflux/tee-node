@@ -456,7 +456,7 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 	rec.CreatedAt = time.Now().Unix() - 600
 	rec.ExpiresAt = rec.CreatedAt + 300
 	b, _ := json.Marshal(rec)
-	_ = store.SetKey("WEB3AUTH", "wn:"+address+":"+nonce, b)
+	_ = store.SetKey(store.Web3AuthNamespace, "wn:"+address+":"+nonce, b)
 
 	message := "Sign in to TEE Node"
 	sig, _ := signEIP191(privKeyHex, message+nonce)

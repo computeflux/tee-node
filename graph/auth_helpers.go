@@ -187,23 +187,33 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 	return strings.EqualFold(recoveredAddr, address)
 }
 
-// getAuthUserFromContract 优先从链上合约读取 AuthUser；链上读不到时回退到本地存储。
+// getAuthUserFromContract 读取 AuthUser。
+// 优先读本地（最新），若本地没有或链上数据更完整则读链上合约。
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*store.AuthUser, error) {
+	// 本地数据通常最新（如 setPassword 后尚未异步上链）
+	localUser, _ := store.GetJson[store.AuthUser](store.Web3AuthNamespace, "u:"+email)
+
 	if tc != nil {
 		ref := "auth_user:" + email
 		rec, err := authpkg.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
-			var u store.AuthUser
-			if json.Unmarshal(rec.Ciphertext, &u) == nil {
-				return &u, nil
+			var chainUser store.AuthUser
+			if json.Unmarshal(rec.Ciphertext, &chainUser) == nil {
+				// 链上数据已包含密码信息，直接使用
+				if chainUser.Salt != "" && chainUser.DKHash != "" {
+					return &chainUser, nil
+				}
+				// 链上数据不完整（如旧记录），优先使用本地
+				if localUser != nil && (localUser.Salt != "" || localUser.DKHash != "") {
+					return localUser, nil
+				}
+				return &chainUser, nil
 			}
 		}
 	}
 
-	// 回退到本地存储（用户注册后尚未上链时数据在本地）
-	user, err := store.GetJson[store.AuthUser]("WEB3AUTH", "u:"+email)
-	if err != nil || user == nil {
-		return nil, fmt.Errorf("auth user not found")
+	if localUser != nil {
+		return localUser, nil
 	}
-	return user, nil
+	return nil, fmt.Errorf("auth user not found")
 }

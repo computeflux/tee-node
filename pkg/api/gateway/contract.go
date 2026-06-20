@@ -77,7 +77,7 @@ func providerDefaultURL(providerType uint16) string {
 		return "https://api.anthropic.com"
 	case 3: // googleapis
 		return "https://generativelanguage.googleapis.com"
-	case 9, 9999: // local
+	case 9999: // local
 		return "local://yamux" // 本地模型通过反向隧道转发，不需要真实 URL
 	default:
 		return ""
