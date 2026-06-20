@@ -476,9 +476,12 @@ tee-node/
 │   │   ├── auto_scaler.go        ← 连接池自动伸缩
 │   │   ├── cache.go              ← 模型/Provider 内存缓存
 │   │   ├── optimizer.go          ← 异步用量写入 + 结算 goroutine
-│   │   ├── contract.go           ← 合约查询桥接
+│   │   ├── contract.go           ← 合约桥接 + API Key/Provider 高层查询
+│   │   ├── contract_query.go     ← Gateway 合约查询封装（复用 tee-chain.WithRuntime）
+│   │   ├── contract_model.go     ← 模型/Provider 缓存与查找
+│   │   ├── contract_hooks.go     ← 可替换的测试函数指针
 │   │   ├── logger.go             ← Gateway 专用日志文件
-│   │   └── seed.go               ← ~~已删除~~
+│   │   └── middleware.go         ← 中间件链 + 健康监控
 │   ├── services/
 │   │   ├── auth/                  ← JWT / Email / OAuth / OTP
 │   │   ├── wallet/                ← 钱包派生 / 加密 / 签名
@@ -637,3 +640,24 @@ Authorization: Bearer tee_<64 hex chars>
 ---
 
 *文档更新：2026-06-04*
+
+## 2026-06-20 Gateway 合约查询层整理与死代码清理
+
+### 变更 1：合约查询文件拆分
+- `contract.go` 保留合约桥接、API Key/Provider 高层业务逻辑。
+- 新增 `contract_query.go`：集中 Gateway 合约查询封装，复用 `teechain.WithRuntime`/`WithRuntimeCaller`。
+- 新增 `contract_model.go`：模型/Provider 缓存与查找逻辑。
+- 新增 `contract_hooks.go`：测试用的可替换函数指针。
+
+### 变更 2：公共 runtime 辅助函数
+- `tee-chain/contract.go` 新增泛型 `WithRuntime` / `WithRuntimeCaller`。
+- `pkg/api/gateway/contract_query.go` 与 `pkg/api/auth/contract_auth.go` 统一复用，删除各自重复的 `ContractRuntime` + `Rollback` 样板代码。
+
+### 变更 3：清理无用导出函数
+- 删除 `pkg/api/gateway/contract_query.go` 中未被外部使用的函数：`GatewayGetProvider`、`GatewayGetModel`、`GatewayGetModelByName`、`GatewaySecretGetModel`、`GatewaySecretListActiveModels`、`GatewayGetRechargeHistory`。
+- 包内调用直接通过 `teechain.WithRuntime` 内联。
+
+### 变更 4：清理 Gateway 内部死代码
+- 删除 `auto_scaler.go` / `optimizer.go` 中未使用的函数：`totalInflight`、`AutoScaler.tick`、`GetScalerStats`、`SetScalerEnabled`、`SetScalerLimits`、`InitAutoScaler`、`FlushUsage`、`StopUsageWriter`、`GetBuffer`、`PutBuffer`、`StopUsageSettler`。
+
+---

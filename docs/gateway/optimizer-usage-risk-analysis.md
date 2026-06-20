@@ -1,7 +1,7 @@
 # optimizer.go 用量统计丢失风险分析
 
-> 最后更新：2026-05-26
-> 状态：已修复 — channel 容量 65536、阻塞写入、ticker 100ms、优雅停机 flush
+> 最后更新：2026-06-20
+> 状态：已修复 — channel 容量 65536、阻塞写入、ticker 100ms；`StopUsageWriter` / `FlushUsage` 未实施并已删除
 
 ## 结论
 
@@ -74,41 +74,13 @@ usageCh = make(chan usageRecord, 65536)
 ticker := time.NewTicker(100 * time.Millisecond)
 ```
 
-### 修复4：增加优雅停机 flush（待实施）
+### 修复4：增加优雅停机 flush（不再实施）
 
-```go
-var usageStopCh = make(chan struct{})
+原计划增加 `StopUsageWriter()` 监听停止信号并在退出前 flush，但该函数未被任何调用方使用，已在死代码清理中删除。当前仍依赖 100ms ticker 落盘，崩溃/重启时最多丢失 100ms 数据。
 
-func StopUsageWriter() {
-    close(usageStopCh)
-    usageWg.Wait()
-}
-```
+### 修复5：增加同步 flush 接口（不再实施）
 
-在 goroutine 中监听 `stopCh`，收到信号后立即 flush batch：
-
-```go
-select {
-case r := <-usageCh:
-    // 聚合到 batch...
-case <-ticker.C:
-    flush(batch)
-case <-usageStopCh:
-    flush(batch)
-    return
-}
-```
-
-### 修复5：增加同步 flush 接口（待实施）
-
-```go
-func FlushUsage() {
-    // 发送一个特殊信号到 usageCh，触发立即 flush
-    usageCh <- usageRecord{flush: true}
-}
-```
-
-在关键操作前（如结算前）调用 `FlushUsage()`，确保数据已落盘。
+原计划增加 `FlushUsage()` 在关键操作前强制落盘，但该函数同样未被使用，已删除。
 
 ### 修复6：聚合 key 精度不够（潜在问题）
 
@@ -125,9 +97,9 @@ func FlushUsage() {
 | P0 | 去掉 `select default` 丢弃逻辑 | ✅ 已完成 |
 | P0 | channel 容量 4096 → 65536 | ✅ 已完成 |
 | P1 | ticker 500ms → 100ms | ✅ 已完成 |
-| P1 | 增加 `StopUsageWriter()` + 优雅停机 flush | 🔲 待实施 |
-| P2 | 增加 `FlushUsage()` 接口 | 🔲 待实施 |
+| P1 | 增加 `StopUsageWriter()` + 优雅停机 flush | ❌ 不再实施（函数已删除） |
+| P2 | 增加 `FlushUsage()` 接口 | ❌ 不再实施（函数已删除） |
 
 ---
 
-*文档更新：2026-05-26*
+*文档更新：2026-06-20*

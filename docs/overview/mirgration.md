@@ -340,14 +340,28 @@ func (r *mutationResolver) SignMessage(ctx context.Context, tokenStr, message, f
     return &auth.WalletResult{Status: "ok", Result: sig}, nil
 }
 
-func (r *mutationResolver) SetPassword(ctx context.Context, tokenStr, passwordHash string) (*auth.WalletResult, error) {
-    claims, err := r.JWTSvc.ParseToken(tokenStr)
+func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error) {
+    email, err := resolveEmailFromToken(token)
     if err != nil {
         return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
     }
-    if err := r.WalletSvc.EncryptPrivateKey(claims.Email, passwordHash); err != nil {
+    // 加密私钥
+    if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
         return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
     }
+    // 存储密码信息到用户记录
+    user, _ := getAuthUserFromContract(r.TeeChain, email)
+    if user == nil {
+        user = &store.AuthUser{Email: email}
+    }
+    user.PasswordHash = passwordHash
+    user.Salt = salt
+    user.DKHash = dkHash
+    if err := store.PutAuthUser(user); err != nil {
+        return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+    }
+    // 异步上链
+    persistAuthUserToChain(r.TeeChain, user)
     return &auth.WalletResult{Status: "ok"}, nil
 }
 

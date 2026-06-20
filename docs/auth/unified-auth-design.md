@@ -113,20 +113,26 @@ API Key 信息现在**优先从链上合约查询**，回退到本地 PebbleDB �
 
 ```go
 // 优先走合约查询，回退到本地 O(1) key 索引
-func FindTokenByKey(key string) *GatewayTokenInfo {
+func FindTokenByKey(key string) *store.GatewayTokenInfo {
     // 1. 先查合约
-    if tk := lookupAPIKeyViaContract(key); tk != nil {
+    if tk := LookupAPIKeyViaContract(key); tk != nil {
         return tk
     }
     // 2. Fallback: 本地 PebbleDB O(1) key 索引（不再遍历全表）
-    tk, err := model.GetGatewayTokenByKey(key)
-    if err != nil || tk == nil {
-        return nil
+    tk, err := store.GetGatewayTokenByKey(key)
+    if err != nil {
+        GATEWAYLOG().Printf("[AUTH] local DB lookup error for %s: %v", key[:min(16, len(key))], err)
     }
-    if !tk.IsActive || tk.IsExpired() {
-        return nil
+    if tk == nil {
+        GATEWAYLOG().Printf("[AUTH] local DB not found for %s", key[:min(16, len(key))])
+    } else if !tk.IsActive {
+        GATEWAYLOG().Printf("[AUTH] token inactive for %s", key[:min(16, len(key))])
+    } else if tk.IsExpired() {
+        GATEWAYLOG().Printf("[AUTH] token expired for %s", key[:min(16, len(key))])
+    } else {
+        return tk
     }
-    return tk
+    return nil
 }
 ```
 

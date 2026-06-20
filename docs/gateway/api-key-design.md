@@ -219,17 +219,30 @@ func hashAPIKey(key string) []byte {
 }
 
 // LookupAPIKeyViaContract 通过合约查询 API Key 信息
-func LookupAPIKeyViaContract(key string) *model.GatewayTokenInfo {
+func LookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
     bridge := getBridge()
     hash := hashAPIKey(key)
-    
-    info, err := bridge.GatewayLookupAPIKey(hash)
-    if err != nil || info == nil {
+    hexHash := hex.EncodeToString(hash)
+
+    if bridge == nil {
         return nil
     }
-    
-    return &model.GatewayTokenInfo{
+
+    info, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.APIKeyInfo, error) {
+        return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.LookupAPIKey(hash)
+    })
+    if err != nil {
+        return nil
+    }
+
+    if info == nil {
+        GATEWAYLOG().Printf("[GATEWAY] contract lookup returned nil for hexHash=%s", hexHash)
+        return nil
+    }
+
+    return &store.GatewayTokenInfo{
         Owner:     fmt.Sprintf("%x", info.Owner.V),
+        Addr:      info.Owner,
         Key:       key,
         RateLimit: info.RateLimit,
         IsActive:  info.IsActive,
@@ -246,22 +259,23 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
         if key == "" {
-            writeError(w, 401, "missing api key", "auth_error")
+            writeError(w, http.StatusUnauthorized, "missing api key", "auth_error")
             return
         }
-        
-        // 优先查本地 key 索引（O(1)）
-        token := FindGatewayTokenByKey(key)
+
+        token := findTokenCachedFn(key)
         if token == nil {
-            // Fallback: 链上合约查询
-            token = LookupAPIKeyViaContract(key)
-        }
-        
-        if token == nil || !token.IsActive {
-            writeError(w, 401, "invalid api key", "auth_error")
+            GATEWAYLOG().Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
+            writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
             return
         }
-        
+
+        if !token.IsActive {
+            GATEWAYLOG().Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
+            writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
+            return
+        }
+
         ctx := context.WithValue(r.Context(), ctxToken, token)
         next.ServeHTTP(w, r.WithContext(ctx))
     })
@@ -273,16 +287,16 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 ```go
 // pkg/api/gateway/optimizer.go
 
-func recordUsageAsync(user model.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cached uint64) {
+func recordUsageAsync(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
     initUsageWriter()
-    usageCh <- usageRecord{user, tokenID, model, in, out, cached}
+    usageCh <- usageRecord{user, tokenID, model, in, out, cachedTokens}
 }
 ```
 
 ## 六、Token 本地索引
 
 ```go
-// pkg/model/gateway_store.go
+// pkg/store/gateway_store.go
 
 // SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。
 func SetGatewayTokenByKey(t *GatewayTokenInfo) error {
@@ -295,12 +309,14 @@ func GetGatewayTokenByKey(key string) (*GatewayTokenInfo, error) {
 }
 
 // FindGatewayTokenByKey 通过 key 索引直接查询（O(1)），同时检查是否过期。
+// 若已过期则自动删除数据及对应过期索引，避免长期占用存储。
 func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
     tk, err := GetGatewayTokenByKey(key)
     if err != nil || tk == nil {
         return nil
     }
     if !tk.IsActive || tk.IsExpired() {
+        _ = DeleteGatewayTokenByKey(key)
         return nil
     }
     return tk
@@ -341,5 +357,5 @@ func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
 
 ---
 
-*文档更新：2026-06-04*
+*文档更新：2026-06-20*
 *基于代码版本：`tee-node` 项目当前仓库状态*

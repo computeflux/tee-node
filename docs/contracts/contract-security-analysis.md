@@ -64,7 +64,7 @@
    }
    ```
 
-4. **TEE 节点生成随机 Nonce** [`pkg/api/gateway/optimizer.go:237-248`](pkg/api/gateway/optimizer.go:237)
+4. **TEE 节点生成随机 Nonce** [`pkg/api/gateway/optimizer.go:214-227`](pkg/api/gateway/optimizer.go:214)
    ```go
    nonce := make([]byte, 16)
    io.ReadFull(rand.Reader, nonce)
@@ -209,12 +209,12 @@
    - 用量数据写入本地 PebbleDB（`GatewayDailyUsage`），Provider 无法篡改
 
 2. **结算交易由 System Account 签名提交**
-   - `pkg/api/gateway/optimizer.go:278-319` 中 `submitSettleUsage()` 使用 DKG signer（system call, callerType=0）签名
+   - `pkg/api/gateway/optimizer.go:258-288` 中 `submitSettleUsage()` 使用 DKG signer（system call, callerType=0）签名
    - `SettleUsage` 合约方法检查 `CallbySystem()`，只有 system account 可调用
    - Provider 无法直接调用结算合约，也无法伪造结算数据
 
 3. **防重放机制**
-   - 每条结算记录带唯一随机 16-byte Nonce（`optimizer.go:242-244`）
+   - 每条结算记录带唯一随机 16-byte Nonce（`optimizer.go:214-216`）
    - 合约侧 `settledNonces` 永久记录已使用 Nonce（`credit.go:41-48`），杜绝重复结算
 
 **结论**:
@@ -261,7 +261,7 @@
 
 ### HI-3: `SettleUsage` 结算频率无链上限制 ✅ 已缓解
 
-**位置**: `tee-chain/contracts/gateway/credit.go:38`, `pkg/api/gateway/optimizer.go:278`
+**位置**: `tee-chain/contracts/gateway/credit.go:38`, `pkg/api/gateway/optimizer.go:258`
 
 **原问题描述**（已缓解）:
 - ~~注释说"每 5 分钟执行一次"，但链上无限制，Provider 可连续调用~~

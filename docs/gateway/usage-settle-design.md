@@ -168,7 +168,7 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 | 组件 | 影响 | 说明 |
 |------|------|------|
 | `usageCh` 写入 | 无变化 | 只增加了 `userAddr` 参数 |
-| `FlushUsage` / `StopUsageWriter` | 无变化 | 仍用于 flush 内存到 PebbleDB |
+| `FlushUsage` / `StopUsageWriter` | 已删除 | 死代码清理中移除，当前依赖 100ms ticker 落盘 |
 | `InitOptimizations` | 新增 `initUsageSettler()` | 启动时自动启动结算循环 |
 | 合约查询接口 | 无变化 | 所有 `GatewayQuery` 方法不变 |
 | GraphQL 登录 | 无变化 | `createUserAPIKey` 增加参数，调用方已同步更新 |
