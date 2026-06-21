@@ -8,7 +8,6 @@ require (
 	github.com/centrifuge/go-substrate-rpc-client/v4 v4.2.2-0.20240919131012-e3b938563803
 	github.com/cockroachdb/pebble v1.1.2
 	github.com/cometbft/cometbft v0.39.3
-	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/gogoproto v1.7.2
 	github.com/decred/base58 v1.0.4
 	github.com/edgelesssys/ego v1.8.1
@@ -16,7 +15,6 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/go-sev-guest v0.13.0
-	github.com/hashicorp/vault v1.19.0
 	github.com/libp2p/go-yamux/v5 v5.1.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.12.0
@@ -51,10 +49,16 @@ require (
 	github.com/blevesearch/zapx/v16 v16.3.4 // indirect
 	github.com/blevesearch/zapx/v17 v17.1.2 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
+	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
+	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
+	github.com/hashicorp/go-bexpr v0.1.12 // indirect
+	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/ipfs/go-cid v0.5.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect

@@ -1,12 +1,15 @@
 package dkg
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/pairing/bls12381/circl"
@@ -132,6 +135,17 @@ func TestDssSigner_BLS12381(t *testing.T) {
 	require.Len(t, pairingInput, 768, "PAIRING_INPUT must be 768 bytes")
 
 	t.Logf("PAIRING_INPUT: %x", pairingInput)
+
+	// ── 链上验证：调用 Ethereum EIP-2537 pairing precompile (address 0x10) ──
+	pairingPrecompile := vm.PrecompiledContractsBLS[common.BytesToAddress([]byte{16})]
+	require.NotNil(t, pairingPrecompile, "EIP-2537 pairing precompile not found")
+
+	out, err := pairingPrecompile.Run(pairingInput)
+	require.NoError(t, err, "EIP-2537 pairing precompile execution failed")
+	require.Len(t, out, 32, "precompile output must be 32 bytes")
+
+	expected := common.LeftPadBytes(big.NewInt(1).Bytes(), 32)
+	require.Equal(t, expected, out, "on-chain pairing verification failed")
 }
 
 func mustPubKeyFromPoint(pt kyber.Point, st crypto.SuiteType) *crypto.PubKey {
