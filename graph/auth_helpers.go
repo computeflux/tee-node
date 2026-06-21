@@ -22,7 +22,7 @@ import (
 // randReadFn 是 crypto/rand.Read 的可测试替换点。
 var randReadFn = rand.Read
 
-// generateAPIKey generates a new API key in the format tee_<64 hex chars>
+// generateAPIKey generates a new API key in the format auth_tee_<64 hex chars>
 func generateAPIKey() (string, error) {
 	b := make([]byte, 32)
 	if _, err := randReadFn(b); err != nil {

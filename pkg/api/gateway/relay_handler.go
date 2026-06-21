@@ -100,9 +100,9 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			token.Addr,
 			token.ID,
 			modelData,
-			uint64(usage.PromptTokens),     // 总输入token
-			uint64(usage.CompletionTokens), // 命中缓存折扣token
-			uint64(usage.PromptTokensDetails.CachedTokens), // CompletionTokens
+			uint64(usage.PromptTokens),     // 总输入 token
+			uint64(usage.CompletionTokens), // 输出 token
+			uint64(usage.PromptTokensDetails.CachedTokens), // 命中缓存的输入 token
 		)
 	}
 
