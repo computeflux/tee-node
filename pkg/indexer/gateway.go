@@ -25,6 +25,7 @@ type GatewayModelSearchRequest struct {
 	MaxContext *uint64
 	MinPrice   *uint64
 	MaxPrice   *uint64
+	Modalities uint8 // inputModalities 位掩码筛选，0 表示不过滤
 	Offset     uint64
 	Limit      uint32
 }
@@ -78,14 +79,15 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 		newModels[docID] = m
 
 		doc := map[string]interface{}{
-			"name":          m.Model.Name,
-			"modelId":       m.Model.ModelID,
-			"providerType":  m.Model.ProviderType,
-			"contextLength": m.Model.ContextLength,
-			"inPrice":       m.Model.InPrice,
-			"cachedPrice":   m.Model.CachedPrice,
-			"outPrice":      m.Model.OutPrice,
-			"providerID":    m.Model.ProviderID,
+			"name":              m.Model.Name,
+			"modelId":           m.Model.ModelID,
+			"providerType":      m.Model.ProviderType,
+			"contextLength":     m.Model.ContextLength,
+			"inPrice":           m.Model.InPrice,
+			"cachedPrice":       m.Model.CachedPrice,
+			"outPrice":          m.Model.OutPrice,
+			"providerID":        m.Model.ProviderID,
+			"inputModalityTags": inputModalityTags(m.Model.InputModalities),
 		}
 		if err := newIndex.Index(docID, doc); err != nil {
 			_ = newIndex.Close()
@@ -121,6 +123,18 @@ func (g *GatewayModelIndex) Search(ctx context.Context, req GatewayModelSearchRe
 		mq.SetField("name")
 		mq.SetFuzziness(1)
 		queries = append(queries, mq)
+	}
+
+	if req.Modalities != 0 {
+		tagQueries := make([]query.Query, 0, 5)
+		for _, tag := range inputModalityTags(req.Modalities) {
+			mq := bleve.NewMatchQuery(tag)
+			mq.SetField("inputModalityTags")
+			tagQueries = append(tagQueries, mq)
+		}
+		if len(tagQueries) > 0 {
+			queries = append(queries, bleve.NewDisjunctionQuery(tagQueries...))
+		}
 	}
 
 	if req.MinContext != nil || req.MaxContext != nil {
@@ -175,6 +189,10 @@ func (g *GatewayModelIndex) buildDocumentMapping() *mapping.DocumentMapping {
 	dm.AddFieldMappingsAt("outPrice", bleve.NewNumericFieldMapping())
 	dm.AddFieldMappingsAt("providerID", bleve.NewNumericFieldMapping())
 
+	tagsFM := bleve.NewTextFieldMapping()
+	tagsFM.Analyzer = "standard"
+	dm.AddFieldMappingsAt("inputModalityTags", tagsFM)
+
 	return dm
 }
 
@@ -193,4 +211,26 @@ func numericRangeQuery(min, max *uint64, field string) query.Query {
 	q := bleve.NewNumericRangeQuery(&minF, &maxF)
 	q.SetField(field)
 	return q
+}
+
+// inputModalityTags 将 inputModalities 位掩码转换为索引/查询用的标签列表。
+// 位定义与链上 Gateway 合约一致：0x01 Text, 0x02 Image, 0x04 File, 0x08 Audio, 0x10 Video。
+func inputModalityTags(modalities uint8) []string {
+	tags := make([]string, 0, 5)
+	if modalities&cgateway.ModalityVideo != 0 {
+		tags = append(tags, "Video")
+	}
+	if modalities&cgateway.ModalityAudio != 0 {
+		tags = append(tags, "Audio")
+	}
+	if modalities&cgateway.ModalityFile != 0 {
+		tags = append(tags, "File")
+	}
+	if modalities&cgateway.ModalityImage != 0 {
+		tags = append(tags, "Image")
+	}
+	if modalities&cgateway.ModalityText != 0 {
+		tags = append(tags, "Text")
+	}
+	return tags
 }

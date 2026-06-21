@@ -53,6 +53,7 @@ extend type Query {
     maxContext: Int
     minPrice: Int
     maxPrice: Int
+    modalities: Int
     offset: Int
     limit: Int
   ): [ModelInfoWithProvider!]!

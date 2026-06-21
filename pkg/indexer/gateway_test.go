@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
 func sampleModel(id uint64, name string, providerType uint16, contextLength, inPrice uint64) cgateway.ModelInfoWithProvider {
@@ -105,4 +105,29 @@ func TestGatewayModelIndex_Pagination(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, res, 2)
+}
+
+func TestGatewayModelIndex_ModalityFilter(t *testing.T) {
+	idx := NewGatewayModelIndex()
+	models := []cgateway.ModelInfoWithProvider{
+		{ID: 1, Model: cgateway.ModelInfo{Name: "text-only", ProviderID: 1, ProviderType: 1, ModelID: "text-only", URI: "http://localhost", InputModalities: cgateway.ModalityText, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+		{ID: 2, Model: cgateway.ModelInfo{Name: "text-image", ProviderID: 1, ProviderType: 1, ModelID: "text-image", URI: "http://localhost", InputModalities: cgateway.ModalityText | cgateway.ModalityImage, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+		{ID: 3, Model: cgateway.ModelInfo{Name: "audio-video", ProviderID: 1, ProviderType: 1, ModelID: "audio-video", URI: "http://localhost", InputModalities: cgateway.ModalityAudio | cgateway.ModalityVideo, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+	}
+	require.NoError(t, idx.BuildFromModels(models))
+
+	// 查询支持 Text 或 Image 的模型（位掩码包含 Text|Image）
+	res, err := idx.Search(context.Background(), GatewayModelSearchRequest{
+		Modalities: cgateway.ModalityText | cgateway.ModalityImage,
+		Limit:      10,
+	})
+	require.NoError(t, err)
+	require.Len(t, res, 2)
+	names := map[string]bool{}
+	for _, m := range res {
+		names[m.Model.Name] = true
+	}
+	assert.True(t, names["text-only"])
+	assert.True(t, names["text-image"])
+	assert.False(t, names["audio-video"])
 }

@@ -239,7 +239,7 @@ type ComplexityRoot struct {
 		EdgeModelRunningStatus        func(childComplexity int, providerID int, modelNames []string) int
 		EdgeModels                    func(childComplexity int) int
 		GetChallenge                  func(childComplexity int, token string) int
-		Models                        func(childComplexity int, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) int
+		Models                        func(childComplexity int, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) int
 		OauthURL                      func(childComplexity int, provider string, redirectURI *string) int
 		SecretRsa                     func(childComplexity int) int
 		TeeReport                     func(childComplexity int, hash string) int
@@ -352,7 +352,7 @@ type QueryResolver interface {
 	EarlyAccessStats(ctx context.Context) (*model.EarlyAccessStats, error)
 	EarlyAccessTasks(ctx context.Context, wallet string) ([]*model.TaskStatus, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
-	Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error)
+	Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error)
 	EdgeModelRunningStatus(ctx context.Context, providerID int, modelNames []string) ([]*model.ModelRunningStatus, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
@@ -1517,7 +1517,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Models(childComplexity, args["keyword"].(*string), args["minContext"].(*int), args["maxContext"].(*int), args["minPrice"].(*int), args["maxPrice"].(*int), args["offset"].(*int), args["limit"].(*int)), true
+		return e.complexity.Query.Models(childComplexity, args["keyword"].(*string), args["minContext"].(*int), args["maxContext"].(*int), args["minPrice"].(*int), args["maxPrice"].(*int), args["modalities"].(*int), args["offset"].(*int), args["limit"].(*int)), true
 
 	case "Query.oauthURL":
 		if e.complexity.Query.OauthURL == nil {
@@ -4173,16 +4173,21 @@ func (ec *executionContext) field_Query_models_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["maxPrice"] = arg4
-	arg5, err := ec.field_Query_models_argsOffset(ctx, rawArgs)
+	arg5, err := ec.field_Query_models_argsModalities(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg5
-	arg6, err := ec.field_Query_models_argsLimit(ctx, rawArgs)
+	args["modalities"] = arg5
+	arg6, err := ec.field_Query_models_argsOffset(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["limit"] = arg6
+	args["offset"] = arg6
+	arg7, err := ec.field_Query_models_argsLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg7
 	return args, nil
 }
 func (ec *executionContext) field_Query_models_argsKeyword(
@@ -4268,6 +4273,24 @@ func (ec *executionContext) field_Query_models_argsMaxPrice(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("maxPrice"))
 	if tmp, ok := rawArgs["maxPrice"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_models_argsModalities(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["modalities"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("modalities"))
+	if tmp, ok := rawArgs["modalities"]; ok {
 		return ec.unmarshalOInt2ᚖint(ctx, tmp)
 	}
 
@@ -11477,7 +11500,7 @@ func (ec *executionContext) _Query_models(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Models(rctx, fc.Args["keyword"].(*string), fc.Args["minContext"].(*int), fc.Args["maxContext"].(*int), fc.Args["minPrice"].(*int), fc.Args["maxPrice"].(*int), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		return ec.resolvers.Query().Models(rctx, fc.Args["keyword"].(*string), fc.Args["minContext"].(*int), fc.Args["maxContext"].(*int), fc.Args["minPrice"].(*int), fc.Args["maxPrice"].(*int), fc.Args["modalities"].(*int), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

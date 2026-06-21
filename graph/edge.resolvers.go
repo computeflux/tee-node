@@ -80,7 +80,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 }
 
 // Models is the resolver for the Models field.
-func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error) {
+func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error) {
 	var kw string
 	if keyword != nil {
 		kw = *keyword
@@ -124,6 +124,9 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 	if maxPrice != nil {
 		v := uint64(*maxPrice)
 		req.MaxPrice = &v
+	}
+	if modalities != nil {
+		req.Modalities = uint8(*modalities)
 	}
 
 	models, err := gatewayIdx.Search(ctx, req)
