@@ -62,7 +62,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 69
+        "type": 78
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -1937,6 +1937,134 @@
           "type": 68
         },
         "selector": "0xa1262752"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "signer",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "signature",
+            "type": {
+              "displayName": [
+                "Bytes"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "添加 TEE 程序版本，返回分配的版本 ID"
+        ],
+        "label": "add_code_version",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 70
+        },
+        "selector": "0x5d2520c5"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "删除指定 TEE 程序版本"
+        ],
+        "label": "delete_code_version",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 4
+        },
+        "selector": "0x480309ff"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "id",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 19
+            }
+          }
+        ],
+        "default": false,
+        "docs": [
+          "查询指定 TEE 程序版本"
+        ],
+        "label": "code_version",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 73
+        },
+        "selector": "0xe172f7f5"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询当前版本总数"
+        ],
+        "label": "code_version_len",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 74
+        },
+        "selector": "0x6d2f266f"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [
+          "查询所有 TEE 程序版本列表"
+        ],
+        "label": "code_versions",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 77
+        },
+        "selector": "0xef58ed57"
       }
     ]
   },
@@ -3998,6 +4126,294 @@
     },
     {
       "id": 69,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 19
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 1
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 19
+          },
+          {
+            "name": "E",
+            "type": 1
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 70,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 69
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 69
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 71,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "signer",
+                "type": 13,
+                "typeName": "Bytes"
+              },
+              {
+                "name": "signature",
+                "type": 13,
+                "typeName": "Bytes"
+              }
+            ]
+          }
+        },
+        "path": [
+          "CodeVersion"
+        ]
+      }
+    },
+    {
+      "id": 72,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 71
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 71
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 73,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 72
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 72
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 74,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 19
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 19
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 75,
+      "type": {
+        "def": {
+          "tuple": [
+            19,
+            71
+          ]
+        }
+      }
+    },
+    {
+      "id": 76,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 75
+          }
+        }
+      }
+    },
+    {
+      "id": 77,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 76
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 3
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 76
+          },
+          {
+            "name": "E",
+            "type": 3
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 78,
       "type": {
         "def": {
           "composite": {

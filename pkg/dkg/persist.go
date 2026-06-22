@@ -10,14 +10,14 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkg/types"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // Restore dkg state
 func (dkg *DKG) reState() error {
-	v, err := store.GetKey("DKG", dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58())
+	v, err := store.SECRET_DB.GetKey("DKG", dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
 			return nil
@@ -77,7 +77,7 @@ func (dkg *DKG) saveState() error {
 	if err != nil {
 		return fmt.Errorf("marshal dkg state: %w", err)
 	}
-	return store.SetKey("DKG", dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58(), bt)
+	return store.SECRET_DB.SetKey("DKG", dkg.Signer.GetPublicForSuite(crypto.SuiteEd25519).SS58(), bt)
 }
 
 // distKeyShareStore is a JSON-serializable form of DistKeyShare that stores

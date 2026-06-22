@@ -10,42 +10,42 @@ import (
 )
 
 func TestCleanupExpiredByIndex(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	expiredKey := "sub:expired"
 	validKey := "sub:valid"
 
-	require.NoError(t, SetKey("GATEWAY", expiredKey, []byte("old-data")))
+	require.NoError(t, SECRET_DB.SetKey("GATEWAY", expiredKey, []byte("old-data")))
 	require.NoError(t, ScheduleExpiration("GATEWAY", expiredKey, time.Now().Add(-1*time.Hour).Unix()))
 
-	require.NoError(t, SetKey("GATEWAY", validKey, []byte("fresh-data")))
+	require.NoError(t, SECRET_DB.SetKey("GATEWAY", validKey, []byte("fresh-data")))
 	require.NoError(t, ScheduleExpiration("GATEWAY", validKey, time.Now().Add(1*time.Hour).Unix()))
 
 	deleted := make(map[string]bool)
 	require.NoError(t, CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
 		deleted[subKey] = true
-		return DeleteKey("GATEWAY", subKey)
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
 	}))
 
 	assert.True(t, deleted[expiredKey], "应删除过期索引指向的 key")
 	assert.False(t, deleted[validKey], "不应删除未过期的 key")
 
-	_, err = GetKey("GATEWAY", expiredKey)
+	_, err = SECRET_DB.GetKey("GATEWAY", expiredKey)
 	assert.ErrorIs(t, err, pebble.ErrNotFound)
 
-	v, err := GetKey("GATEWAY", validKey)
+	v, err := SECRET_DB.GetKey("GATEWAY", validKey)
 	require.NoError(t, err)
 	assert.Equal(t, "fresh-data", string(v))
 }
 
 func TestCleanupExpiredByIndex_MissingData(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	// 索引存在但数据已不存在：应只清理索引，不报错
 	require.NoError(t, ScheduleExpiration("GATEWAY", "sub:missing", time.Now().Add(-1*time.Hour).Unix()))

@@ -158,7 +158,7 @@ func (s *TeeChain) savePartialSig(user_id string, msg *model.BlockPartialSign) e
 	if err != nil {
 		return errors.Wrap(err, "marshal partial sig error")
 	}
-	return dbstore.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+fmt.Sprint(msg.ChainId)+"_"+user_id, bt)
+	return dbstore.SECRET_DB.SetKey(GLOABL_STATE, PartialSigPrefix+fmt.Sprint(msg.TxIndex)+"_"+fmt.Sprint(msg.ChainId)+"_"+user_id, bt)
 }
 
 // SigListOfTx retrieves a list of block partial signatures for (txIndex, chainId).

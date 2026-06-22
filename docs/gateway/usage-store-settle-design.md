@@ -79,7 +79,7 @@ model.SetJson("GATEWAY", "usage:day_tokenID_modelID", &usage)
 ```go
 // 结算成功后删除本地记录
 for _, key := range settledKeys {
-    model.DBINS.Delete([]byte(comboKey("GATEWAY", key)))
+    model.SECRET_DB.Delete([]byte(comboKey("GATEWAY", key)))
 }
 ```
 

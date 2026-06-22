@@ -66,7 +66,7 @@ func (s *TeeChain) SaveSecret(user types.H160, index uint64, data []byte, txn *s
 }
 
 func (s *TeeChain) GetSecrets(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
-	list, keys, err := dbstore.GetProtoMessageList[model.SecretStore](SecretSpace, user.Hex())
+	list, keys, err := dbstore.DBGetProtoMessageList[model.SecretStore](dbstore.SECRET_DB, SecretSpace, user.Hex())
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *TeeChain) SaveDiskKey(user types.H160, index uint64, data []byte, txn *
 }
 
 func (s *TeeChain) GetDiskKeys(user types.H160, indexs []uint64) (map[uint64]*model.SecretStore, error) {
-	list, keys, err := dbstore.GetProtoMessageList[model.SecretStore](DiskSpace, user.Hex())
+	list, keys, err := dbstore.DBGetProtoMessageList[model.SecretStore](dbstore.SECRET_DB, DiskSpace, user.Hex())
 	if err != nil {
 		return nil, err
 	}

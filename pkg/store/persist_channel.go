@@ -42,7 +42,7 @@ func (c *PersistChan[T]) sender() {
 }
 
 func (c *PersistChan[T]) load() error {
-	bt, err := GetKey("PersistChan", c.key)
+	bt, err := SECRET_DB.GetKey("PersistChan", c.key)
 	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
 		return fmt.Errorf("load persist chan: %w", err)
 	}
@@ -68,7 +68,7 @@ func (c *PersistChan[T]) save() error {
 	if err != nil {
 		return fmt.Errorf("save persist chan: %w", err)
 	}
-	return SetKey("PersistChan", c.key, bt)
+	return SECRET_DB.SetKey("PersistChan", c.key, bt)
 }
 
 func (c *PersistChan[T]) Push(msg T) error {

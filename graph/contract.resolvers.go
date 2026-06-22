@@ -20,7 +20,7 @@ import (
 
 // SystemContractInit is the resolver for the systemContractInit field.
 func (r *mutationResolver) SystemContractInit(ctx context.Context, contract string) (bool, error) {
-	txn := store.DBINS.NewTransaction()
+	txn := store.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	if contracts.IsContractIsInited(txn, "gov") {

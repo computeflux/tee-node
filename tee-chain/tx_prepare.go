@@ -12,7 +12,7 @@ import (
 )
 
 func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, blockTime time.Time, addMainChainTx bool) {
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	// RuntimeUpgrade 独占整个区块：有升级交易时忽略其他所有交易

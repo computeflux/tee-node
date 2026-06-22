@@ -45,7 +45,7 @@ func initUsageWriter() {
 			flush := func() {
 				if len(batch) > 0 {
 					for k, u := range batch {
-						store.SetJson("GATEWAY", "usage:"+k, u)
+						store.DBSetJson(store.SECRET_DB, "GATEWAY", "usage:"+k, u)
 					}
 					batch = make(map[string]*store.GatewayDailyUsage, 64)
 				}
@@ -196,7 +196,7 @@ func settlePendingUsage() error {
 	GATEWAYLOG().Printf("[SETTLE] SUBMIT: pool empty, collecting usage records")
 
 	// 1. 扫描本地 usage: 前缀的所有记录
-	records, keys, err := store.GetJsonList[store.GatewayDailyUsage]("GATEWAY", "usage:")
+	records, keys, err := store.DBGetJsonList[store.GatewayDailyUsage](store.SECRET_DB, "GATEWAY", "usage:")
 	if err != nil {
 		return fmt.Errorf("list usage: %w", err)
 	}
@@ -243,7 +243,7 @@ func settlePendingUsage() error {
 	//    等到 ApplyToChain 消费 pool 后，下次成功 tick 才会提交新一轮 usage。
 	deleted := 0
 	for _, k := range keys {
-		if err := store.DeleteByteKey(k); err != nil {
+		if err := store.SECRET_DB.DeleteByteKey(k); err != nil {
 			GATEWAYLOG().Printf("[SETTLE] delete usage key=%x failed: %v", k, err)
 			return fmt.Errorf("[SETTLE] delete usage key failed: %w", err)
 		}

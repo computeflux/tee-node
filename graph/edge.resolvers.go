@@ -26,7 +26,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 		return nil, fmt.Errorf("unauthorized")
 	}
 
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	// 使用当前用户地址作为 caller 创建 runtime，以便 GetProviderByOwner 能正确识别

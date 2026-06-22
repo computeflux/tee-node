@@ -23,7 +23,7 @@ func (s AppState) Hash() []byte {
 }
 
 func loadAppState() (AppState, error) {
-	state, err := dbstore.GetJson[AppState]("", stateKey)
+	state, err := dbstore.DBGetJson[AppState](dbstore.SECRET_DB, "", stateKey)
 	if err != nil && !errors.Is(err, pebble.ErrNotFound) {
 		return AppState{}, err
 	}
@@ -36,5 +36,5 @@ func loadAppState() (AppState, error) {
 }
 
 func saveAppState(state *AppState) error {
-	return dbstore.SetJson("", stateKey, state)
+	return dbstore.DBSetJson(dbstore.SECRET_DB, "", stateKey, state)
 }

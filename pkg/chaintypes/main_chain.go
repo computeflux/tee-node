@@ -74,6 +74,12 @@ type K8sCluster struct {
 	Status        byte
 }
 
+// CodeVersion 表示主链上登记的可信代码版本（代码签名者 + 代码签名）。
+type CodeVersion struct {
+	Signer    []byte `json:"signer"`
+	Signature []byte `json:"signature"`
+}
+
 type Validator struct {
 	// node id
 	NodeID uint64 `json:"NodeID"`

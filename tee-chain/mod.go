@@ -137,6 +137,7 @@ func InitTeeChain(
 		p2pReactor.SetID(P2PKey)
 	}
 
+	// dbProvider := store.EncryptedDBProvider()
 	var StartTeeChain = func() (*nm.Node, error) {
 		// init BFT node
 		TeeChainNode, err = nm.NewNode(

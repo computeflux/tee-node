@@ -11,7 +11,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/dkg"
-	"github.com/computeflux/tee-provider/pkg/dkg/types"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/store"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"
@@ -141,7 +141,7 @@ func (app *TeeChain) newEpochFail(err error) {
 
 // Callback when DKG consensus success
 func (app *TeeChain) GetEpochStatus() int64 {
-	bt, err := store.GetKey(GLOABL_STATE, "epoch_status")
+	bt, err := store.SECRET_DB.GetKey(GLOABL_STATE, "epoch_status")
 	if err != nil {
 		return 0
 	}
@@ -151,12 +151,12 @@ func (app *TeeChain) GetEpochStatus() int64 {
 
 // SetEpochStatus last epoch timestamp
 func (app *TeeChain) SetEpochStatus(status int64) error {
-	return store.SetKey(GLOABL_STATE, "epoch_status", util.Int64ToBytes(status))
+	return store.SECRET_DB.SetKey(GLOABL_STATE, "epoch_status", util.Int64ToBytes(status))
 }
 
 // GetEpoch get last epoch
 func (app *TeeChain) GetEpoch() uint32 {
-	bt, err := store.GetKey(GLOABL_STATE, "epoch")
+	bt, err := store.SECRET_DB.GetKey(GLOABL_STATE, "epoch")
 	if err != nil {
 		return 0
 	}
@@ -205,7 +205,7 @@ func (app *TeeChain) SetEpoch(epoch *model.EpochEnd, txn *store.Txn) error {
 // Get validators form local db
 func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*teecrypto.PubKey, error) {
 	var err error
-	list, _, err := dbstore.GetProtoMessageList[model.SideValidator](GLOABL_STATE, "validator")
+	list, _, err := dbstore.DBGetProtoMessageList[model.SideValidator](dbstore.SECRET_DB, GLOABL_STATE, "validator")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -221,7 +221,7 @@ func (app *TeeChain) GetValidators() ([]*model.SideValidator, map[string]*teecry
 
 // Init validator to db From init chain
 func (app *TeeChain) initValidators(vs []abci.ValidatorUpdate) error {
-	tx := store.DBINS.NewTransaction()
+	tx := store.SECRET_DB.NewTransaction()
 
 	var err error
 	for i, v := range vs {

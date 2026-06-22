@@ -3,11 +3,23 @@ package subnet
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/util"
 )
+
+func DeploySubnetWithNew(__ink_params chain.DeployParams) (*types.H160, error) {
+	return __ink_params.Client.DeployContract(
+		__ink_params.Code, __ink_params.Signer, types.NewU128(*big.NewInt(0)),
+		util.InkContractInput{
+			Selector: "0x00000000",
+			Args:     []any{},
+		},
+		__ink_params.Salt,
+	)
+}
 
 func InitSubnetContract(client *chain.ChainClient, address string) (*Subnet, error) {
 	contractAddress, err := util.HexToH160(address)
@@ -1990,5 +2002,213 @@ func (c *Subnet) QueryNextEpochValidators(
 		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
 	}
 
+	return v, gas, nil
+}
+
+func (c *Subnet) DryRunAddCodeVersion(
+	signer []byte, signature []byte, __ink_params chain.DryRunParams,
+) (*util.Result[uint64, Error], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "add_code_version")
+	}
+	v, gas, err := chain.DryRunInk[util.Result[uint64, Error]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x5d2520c5",
+			Args:     []any{signer, signature},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	if v != nil && v.IsErr {
+		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
+	}
+
+	return v, gas, nil
+}
+
+func (c *Subnet) ExecAddCodeVersion(
+	signer []byte, signature []byte, __ink_params chain.ExecParams,
+) error {
+	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
+	_param.PayAmount = __ink_params.PayAmount
+	_, gas, err := c.DryRunAddCodeVersion(signer, signature, _param)
+	if err != nil {
+		return err
+	}
+	return chain.CallInk(
+		c,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x5d2520c5",
+			Args:     []any{signer, signature},
+		},
+		__ink_params,
+	)
+}
+
+func (c *Subnet) CallOfAddCodeVersion(
+	signer []byte, signature []byte, __ink_params chain.DryRunParams,
+) (*types.Call, error) {
+	_, gas, err := c.DryRunAddCodeVersion(signer, signature, __ink_params)
+	if err != nil {
+		return nil, err
+	}
+	return chain.CallOfTransaction(
+		c,
+		__ink_params.PayAmount,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x5d2520c5",
+			Args:     []any{signer, signature},
+		},
+	)
+}
+
+func (c *Subnet) DryRunDeleteCodeVersion(
+	id uint64, __ink_params chain.DryRunParams,
+) (*util.Result[util.NullTuple, Error], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "delete_code_version")
+	}
+	v, gas, err := chain.DryRunInk[util.Result[util.NullTuple, Error]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x480309ff",
+			Args:     []any{id},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	if v != nil && v.IsErr {
+		return nil, nil, errors.New("Contract Reverted: " + v.E.Error())
+	}
+
+	return v, gas, nil
+}
+
+func (c *Subnet) ExecDeleteCodeVersion(
+	id uint64, __ink_params chain.ExecParams,
+) error {
+	_param := chain.DefaultParamWithOrigin(__ink_params.Signer.AccountID())
+	_param.PayAmount = __ink_params.PayAmount
+	_, gas, err := c.DryRunDeleteCodeVersion(id, _param)
+	if err != nil {
+		return err
+	}
+	return chain.CallInk(
+		c,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x480309ff",
+			Args:     []any{id},
+		},
+		__ink_params,
+	)
+}
+
+func (c *Subnet) CallOfDeleteCodeVersion(
+	id uint64, __ink_params chain.DryRunParams,
+) (*types.Call, error) {
+	_, gas, err := c.DryRunDeleteCodeVersion(id, __ink_params)
+	if err != nil {
+		return nil, err
+	}
+	return chain.CallOfTransaction(
+		c,
+		__ink_params.PayAmount,
+		gas.GasRequired,
+		gas.StorageDeposit,
+		util.InkContractInput{
+			Selector: "0x480309ff",
+			Args:     []any{id},
+		},
+	)
+}
+
+func (c *Subnet) QueryCodeVersion(
+	id uint64, __ink_params chain.DryRunParams,
+) (*util.Option[CodeVersion], *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "code_version")
+	}
+	v, gas, err := chain.DryRunInk[util.Option[CodeVersion]](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0xe172f7f5",
+			Args:     []any{id},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
+func (c *Subnet) QueryCodeVersionLen(
+	__ink_params chain.DryRunParams,
+) (*uint64, *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "code_version_len")
+	}
+	v, gas, err := chain.DryRunInk[uint64](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0x6d2f266f",
+			Args:     []any{},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
+	return v, gas, nil
+}
+
+func (c *Subnet) QueryCodeVersions(
+	__ink_params chain.DryRunParams,
+) (*[]Tuple_75, *chain.DryRunReturnGas, error) {
+	if c.ChainClient.Debug {
+		fmt.Println()
+		util.LogWithPurple("[ DryRun   method ]", "code_versions")
+	}
+	v, gas, err := chain.DryRunInk[[]Tuple_75](
+		c,
+		__ink_params.Origin,
+		__ink_params.PayAmount,
+		__ink_params.GasLimit,
+		__ink_params.StorageDepositLimit,
+		util.InkContractInput{
+			Selector: "0xef58ed57",
+			Args:     []any{},
+		},
+	)
+	if err != nil && !errors.Is(err, chain.ErrContractReverted) {
+		return nil, nil, err
+	}
 	return v, gas, nil
 }

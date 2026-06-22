@@ -4,19 +4,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupGatewayCacheTest(t *testing.T) func() {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := store.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	store.DBINS = &store.DB{DB: db}
 
 	return func() {
-		store.DBINS = nil
+		store.SECRET_DB = nil
 		db.Close()
 	}
 }

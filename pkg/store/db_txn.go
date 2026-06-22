@@ -7,7 +7,6 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/cosmos/gogoproto/proto"
 )
@@ -30,7 +29,7 @@ func (txn *Txn) GetKey(namespace, key string, value proto.Message) ([]byte, erro
 
 func (txn *Txn) Set(key, value []byte) error {
 	// fmt.Println("----------------------txn set ==>  ", string(key))
-	val, err := util.SealWithProductKey(value, nil)
+	val, err := SECRET_DB.Seal(value)
 	if err != nil {
 		return err
 	}
@@ -44,7 +43,7 @@ func (txn *Txn) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return util.Unseal(v, nil)
+	return SECRET_DB.Unseal(v)
 }
 
 func (txn *Txn) ListByPrefix(prefix []byte) ([][]byte, [][]byte, error) {
@@ -68,7 +67,7 @@ func (txn *Txn) ListByPrefix(prefix []byte) ([][]byte, [][]byte, error) {
 		v := iter.Value()
 		valueCopy := make([]byte, len(v))
 		copy(valueCopy, v)
-		decrypted, err := util.Unseal(valueCopy, nil)
+		decrypted, err := SECRET_DB.Unseal(valueCopy)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -112,7 +111,7 @@ func (txn *Txn) ListByPrefixLimit(prefix []byte, offset, limit uint64) ([][]byte
 		v := iter.Value()
 		valueCopy := make([]byte, len(v))
 		copy(valueCopy, v)
-		decrypted, err := util.Unseal(valueCopy, nil)
+		decrypted, err := SECRET_DB.Unseal(valueCopy)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -186,7 +185,7 @@ func TxnGetProtoMessageList[T any](txn *Txn, key []byte) (list []*T, err error) 
 
 	for iter.First(); iter.Valid(); iter.Next() {
 		v := iter.Value()
-		value, err := util.Unseal(v, nil)
+		value, err := SECRET_DB.Unseal(v)
 		if err != nil {
 			return nil, err
 		}

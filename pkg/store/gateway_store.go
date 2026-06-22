@@ -45,12 +45,12 @@ type GatewayDailyUsage struct {
 
 // SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。
 func SetGatewayTokenByKey(t *GatewayTokenInfo) error {
-	return SetJson("GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t)
+	return DBSetJson(SECRET_DB, "GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t)
 }
 
 // GetGatewayTokenByKey 通过 API Key 直接查询 token（O(1)，不遍历）。
 func GetGatewayTokenByKey(key string) (*GatewayTokenInfo, error) {
-	return GetJson[GatewayTokenInfo]("GATEWAY", fmt.Sprintf("token_by_key:%s", key))
+	return DBGetJson[GatewayTokenInfo](SECRET_DB, "GATEWAY", fmt.Sprintf("token_by_key:%s", key))
 }
 
 // FindGatewayTokenByKey 通过 key 索引直接查询（O(1)），同时检查是否过期。
@@ -71,7 +71,7 @@ func FindGatewayTokenByKey(key string) *GatewayTokenInfo {
 // 先删除数据，成功后再清理索引；若数据删除失败则保留索引，确保后续清理仍能定位该记录。
 func DeleteGatewayTokenByKey(key string) error {
 	tk, _ := GetGatewayTokenByKey(key)
-	if err := DeleteKey("GATEWAY", fmt.Sprintf("token_by_key:%s", key)); err != nil {
+	if err := SECRET_DB.DeleteKey("GATEWAY", fmt.Sprintf("token_by_key:%s", key)); err != nil {
 		return err
 	}
 	if tk != nil {
@@ -84,14 +84,14 @@ func DeleteGatewayTokenByKey(key string) error {
 // 优先使用时间排序的过期索引，避免全表扫描。
 func CleanupExpiredGatewayTokens() error {
 	return CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
-		return DeleteKey("GATEWAY", subKey)
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
 	})
 }
 
 // ── NextID ───────────────────────────────────────────────
 
 func GetNextID(key string) uint64 {
-	val, err := GetJson[uint64]("GATEWAY", "next:"+key)
+	val, err := DBGetJson[uint64](SECRET_DB, "GATEWAY", "next:"+key)
 	if err != nil || val == nil {
 		return 0
 	}
@@ -99,5 +99,5 @@ func GetNextID(key string) uint64 {
 }
 
 func SetNextID(key string, id uint64) error {
-	return SetJson("GATEWAY", "next:"+key, &id)
+	return DBSetJson(SECRET_DB, "GATEWAY", "next:"+key, &id)
 }

@@ -84,7 +84,7 @@ func (p *BTFReactor) savePendingMsg(msg *model.PeerMsg) error {
 	store.Msgs = append(store.Msgs, msg)
 
 	// 保存到数据库
-	if err := dbstore.SetJson("", p.pendingMsgKey(), store); err != nil {
+	if err := dbstore.DBSetJson(dbstore.SECRET_DB, "", p.pendingMsgKey(), store); err != nil {
 		return fmt.Errorf("save pending msgs failed: %w", err)
 	}
 
@@ -98,7 +98,7 @@ type pendingMsgsStore struct {
 
 // loadPendingMsgsStore 从数据库加载待发送消息
 func (p *BTFReactor) loadPendingMsgsStore() (*pendingMsgsStore, error) {
-	store, err := dbstore.GetJson[pendingMsgsStore]("", p.pendingMsgKey())
+	store, err := dbstore.DBGetJson[pendingMsgsStore](dbstore.SECRET_DB, "", p.pendingMsgKey())
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (p *BTFReactor) loadPendingMsgs() {
 
 // clearPendingMsgs 清空数据库中的待发送消息
 func (p *BTFReactor) clearPendingMsgs() error {
-	return dbstore.DeleteKey("", p.pendingMsgKey())
+	return dbstore.SECRET_DB.DeleteKey("", p.pendingMsgKey())
 }
 
 // flushPendingMsgs 发送所有暂存的消息（P2P就绪后调用）

@@ -191,7 +191,7 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 // 优先读本地（最新），若本地没有或链上数据更完整则读链上合约。
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*store.AuthUser, error) {
 	// 本地数据通常最新（如 setPassword 后尚未异步上链）
-	localUser, _ := store.GetJson[store.AuthUser](store.Web3AuthNamespace, "u:"+email)
+	localUser, _ := store.DBGetJson[store.AuthUser](store.SECRET_DB, store.Web3AuthNamespace, "u:"+email)
 
 	if tc != nil {
 		ref := "auth_user:" + email

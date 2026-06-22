@@ -64,11 +64,11 @@ func createRuntimeV0(wasmBytes []byte, desc string) error {
 		return err
 	}
 
-	if err := store.SetCodec("", RuntimeVersionKey, RuntimeDefaultVersion); err != nil {
+	if err := store.DBSetCodec(store.SECRET_DB, "", RuntimeVersionKey, RuntimeDefaultVersion); err != nil {
 		return err
 	}
 
-	if err := store.SetCodec("", RuntimeAtHeightPrefix+"0", RuntimeDefaultVersion); err != nil {
+	if err := store.DBSetCodec(store.SECRET_DB, "", RuntimeAtHeightPrefix+"0", RuntimeDefaultVersion); err != nil {
 		return err
 	}
 	return nil
@@ -76,7 +76,7 @@ func createRuntimeV0(wasmBytes []byte, desc string) error {
 
 // GetCurrentRuntimeVersion 获取当前激活的运行时版本
 func GetCurrentRuntimeVersion() (uint32, error) {
-	v, err := store.GetCodecOrDefault("", RuntimeVersionKey, RuntimeDefaultVersion)
+	v, err := store.DBGetCodecOrDefault(store.SECRET_DB, "", RuntimeVersionKey, RuntimeDefaultVersion)
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
@@ -85,7 +85,7 @@ func GetCurrentRuntimeVersion() (uint32, error) {
 
 // GetRuntimeVersionAtHeight 获取指定区块高度使用的运行时版本
 func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
-	v, err := store.GetCodec[uint32]("", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
+	v, err := store.DBGetCodec[uint32](store.SECRET_DB, "", RuntimeAtHeightPrefix+strconv.FormatInt(height, 10))
 	if err != nil {
 		return RuntimeDefaultVersion, err
 	}
@@ -113,12 +113,12 @@ func GetRuntimeVersionAtHeight(height int64) (uint32, error) {
 
 // GetRuntimeVersionInfo 获取指定版本的元数据
 func GetRuntimeVersionInfo(version uint32) (*domain.RuntimeVersionInfo, error) {
-	return store.GetJson[domain.RuntimeVersionInfo]("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(version), 10))
+	return store.DBGetJson[domain.RuntimeVersionInfo](store.SECRET_DB, "", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(version), 10))
 }
 
 // SetRuntimeVersionInfo 保存版本元数据
 func SetRuntimeVersionInfo(info *domain.RuntimeVersionInfo) error {
-	return store.SetJson("", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10), info)
+	return store.DBSetJson(store.SECRET_DB, "", RuntimeMetaKeyPrefix+strconv.FormatUint(uint64(info.Version), 10), info)
 }
 
 // ApplyRuntimeUpgrade 应用运行时升级（用于 v1+，版本号递增）

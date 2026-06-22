@@ -15,7 +15,7 @@ import (
 // 对 Contract 类型交易进行 nonce 预校验，确保区块中不包含 nonce 无效的交易，
 // 避免浪费区块空间（FinalizeBlock 中 nonce 无效会标记失败但仍占用空间）。
 func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.ResponseProcessProposal_ProposalStatus {
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	for _, txbt := range txs {

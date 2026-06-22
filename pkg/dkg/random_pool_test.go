@@ -3,7 +3,6 @@ package dkg
 import (
 	"testing"
 
-	"github.com/cockroachdb/pebble"
 	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/store"
@@ -13,10 +12,9 @@ import (
 
 func setupTestDB(t *testing.T) {
 	t.Helper()
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := store.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	store.DBINS = &store.DB{DB: db}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 }
 
 func TestRandomSharePool_AddShareAndAcquire(t *testing.T) {

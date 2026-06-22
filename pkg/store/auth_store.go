@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // Web3AuthNamespace 是 Web3Auth 相关数据在 KV 存储中的命名空间。
@@ -54,7 +53,7 @@ func PutAuthUser(u *AuthUser) error {
 	if err != nil {
 		return err
 	}
-	return SetKey(Web3AuthNamespace, "u:"+u.Email, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, "u:"+u.Email, b)
 }
 
 // SignSession 签名会话（密码验证后的短期授权）
@@ -73,14 +72,14 @@ func PutSignSession(s *SignSession) error {
 		return err
 	}
 	key := "sig:" + s.Token
-	if err := SetKey(Web3AuthNamespace, key, b); err != nil {
+	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
 		return err
 	}
 	return ScheduleExpiration(Web3AuthNamespace, key, s.ExpiresAt)
 }
 
 func GetSignSession(token string) (*SignSession, error) {
-	s, err := GetJson[SignSession](Web3AuthNamespace, "sig:"+token)
+	s, err := DBGetJson[SignSession](SECRET_DB, Web3AuthNamespace, "sig:"+token)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +93,10 @@ func GetSignSession(token string) (*SignSession, error) {
 
 func DeleteSignSession(token string) error {
 	key := "sig:" + token
-	if s, _ := GetJson[SignSession](Web3AuthNamespace, key); s != nil {
+	if s, _ := DBGetJson[SignSession](SECRET_DB, Web3AuthNamespace, key); s != nil {
 		_ = CancelExpiration(Web3AuthNamespace, key, s.ExpiresAt)
 	}
-	return DeleteKey(Web3AuthNamespace, key)
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 }
 
 // ── Challenge ─────────────────────────────────────────────
@@ -126,7 +125,7 @@ func PutChallenge(email, challenge string, ttlSeconds int) error {
 		return err
 	}
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	if err := SetKey(Web3AuthNamespace, key, b); err != nil {
+	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
 		return err
 	}
 	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
@@ -134,7 +133,7 @@ func PutChallenge(email, challenge string, ttlSeconds int) error {
 
 func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	rec, err := GetJson[ChallengeRecord](Web3AuthNamespace, key)
+	rec, err := DBGetJson[ChallengeRecord](SECRET_DB, Web3AuthNamespace, key)
 	if err != nil {
 		return nil, err
 	}
@@ -158,21 +157,21 @@ func MarkChallengeUsed(email, challenge string) error {
 	}
 	rec.Used = true
 	b, _ := json.Marshal(rec)
-	return SetKey(Web3AuthNamespace, key, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, key, b)
 }
 
 func DeleteChallenge(email, challenge string) error {
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	if rec, _ := GetJson[ChallengeRecord](Web3AuthNamespace, key); rec != nil {
+	if rec, _ := DBGetJson[ChallengeRecord](SECRET_DB, Web3AuthNamespace, key); rec != nil {
 		_ = CancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 	}
-	return DeleteKey(Web3AuthNamespace, key)
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 }
 
 // ClearAllChallenges 清除用户所有未使用的 challenge（避免多 challenge 残留导致验证错位）
 func ClearAllChallenges(email string) error {
 	prefix := []byte(comboKey(Web3AuthNamespace, fmt.Sprintf("c:%s:", email)))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
+	iter, err := SECRET_DB.NewIter(&pebble.IterOptions{
 		LowerBound: prefix,
 	})
 	if err != nil {
@@ -183,7 +182,7 @@ func ClearAllChallenges(email string) error {
 	// 收集所有需要删除的 key
 	var toDelete []string
 	for iter.First(); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
-		raw, err := util.Unseal(iter.Value(), nil)
+		raw, err := SECRET_DB.Unseal(iter.Value())
 		if err != nil {
 			continue
 		}
@@ -203,14 +202,14 @@ func ClearAllChallenges(email string) error {
 
 func IncrFailedChallenge(email string) (int, error) {
 	key := fmt.Sprintf("fl:%s", email)
-	b, err := GetKey(Web3AuthNamespace, key)
+	b, err := SECRET_DB.GetKey(Web3AuthNamespace, key)
 	var count int
 	if err == nil && len(b) > 0 {
 		_ = json.Unmarshal(b, &count)
 	}
 	count++
 	nb, _ := json.Marshal(count)
-	if err := SetKey(Web3AuthNamespace, key, nb); err != nil {
+	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, nb); err != nil {
 		return count, err
 	}
 	// TTL 1 hour: tee-node Pebble 无原生 TTL，需外部清理或接受长期存储
@@ -219,13 +218,13 @@ func IncrFailedChallenge(email string) (int, error) {
 }
 
 func ResetFailedChallenge(email string) error {
-	return DeleteKey(Web3AuthNamespace, fmt.Sprintf("fl:%s", email))
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, fmt.Sprintf("fl:%s", email))
 }
 
 func IsLocked(email string) bool {
 	// // 简化实现：检查失败次数 >= 5
 	// key := fmt.Sprintf("fl:%s", email)
-	// b, err := GetKey(Web3AuthNamespace, key)
+	// b, err := SECRET_DB.GetKey(Web3AuthNamespace, key)
 	// if err != nil || len(b) == 0 {
 	// 	return false
 	// }
@@ -242,21 +241,21 @@ func PutEncryptedKey(k *EncryptedKey) error {
 	if err != nil {
 		return err
 	}
-	return SetKey(Web3AuthNamespace, "k:"+k.Email, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, "k:"+k.Email, b)
 }
 
 func GetEncryptedKey(email string) (*EncryptedKey, error) {
-	return GetJson[EncryptedKey](Web3AuthNamespace, "k:"+email)
+	return DBGetJson[EncryptedKey](SECRET_DB, Web3AuthNamespace, "k:"+email)
 }
 
 // ── OTP ───────────────────────────────────────────────────
 
 func PutOTP(email, otp string) error {
-	return SetKey(Web3AuthNamespace, "o:"+email, []byte(otp))
+	return SECRET_DB.SetKey(Web3AuthNamespace, "o:"+email, []byte(otp))
 }
 
 func GetOTP(email string) (string, error) {
-	b, err := GetKey(Web3AuthNamespace, "o:"+email)
+	b, err := SECRET_DB.GetKey(Web3AuthNamespace, "o:"+email)
 	if err != nil {
 		return "", err
 	}
@@ -264,7 +263,7 @@ func GetOTP(email string) (string, error) {
 }
 
 func DeleteOTP(email string) error {
-	return DeleteKey(Web3AuthNamespace, "o:"+email)
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, "o:"+email)
 }
 
 // ── Recovery ──────────────────────────────────────────────
@@ -274,11 +273,11 @@ func PutRecoveryConfig(c *RecoveryConfig) error {
 	if err != nil {
 		return err
 	}
-	return SetKey(Web3AuthNamespace, "r:"+c.UserEmail, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, "r:"+c.UserEmail, b)
 }
 
 func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
-	iter, err := DBINS.NewIter(&pebble.IterOptions{})
+	iter, err := SECRET_DB.NewIter(&pebble.IterOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +285,7 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 
 	prefix := []byte(comboKey(Web3AuthNamespace, "r:"))
 	for iter.SeekGE(prefix); iter.Valid() && strings.HasPrefix(string(iter.Key()), string(prefix)); iter.Next() {
-		raw, err := util.Unseal(iter.Value(), nil)
+		raw, err := SECRET_DB.Unseal(iter.Value())
 		if err != nil {
 			continue
 		}
@@ -302,7 +301,7 @@ func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
 	expiresAt := time.Now().Add(time.Duration(ttlSeconds) * time.Second).Unix()
 	data := fmt.Sprintf("%d:%s", expiresAt, otp)
 	key := "ro:" + userEmail
-	if err := SetKey(Web3AuthNamespace, key, []byte(data)); err != nil {
+	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, []byte(data)); err != nil {
 		return err
 	}
 	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
@@ -310,7 +309,7 @@ func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
 
 func GetRecoveryOTP(userEmail string) (string, error) {
 	key := "ro:" + userEmail
-	b, err := GetKey(Web3AuthNamespace, key)
+	b, err := SECRET_DB.GetKey(Web3AuthNamespace, key)
 	if err != nil {
 		return "", err
 	}
@@ -330,7 +329,7 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 
 func DeleteRecoveryOTP(userEmail string) error {
 	key := "ro:" + userEmail
-	if b, _ := GetKey(Web3AuthNamespace, key); len(b) > 0 {
+	if b, _ := SECRET_DB.GetKey(Web3AuthNamespace, key); len(b) > 0 {
 		parts := strings.SplitN(string(b), ":", 2)
 		if len(parts) == 2 {
 			if expiresAt, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
@@ -338,7 +337,7 @@ func DeleteRecoveryOTP(userEmail string) error {
 			}
 		}
 	}
-	return DeleteKey(Web3AuthNamespace, key)
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 }
 
 // ── Wallet Login Nonce ────────────────────────────────────
@@ -367,7 +366,7 @@ func PutWalletNonce(address, nonce string, ttlSeconds int) error {
 		return err
 	}
 	key := "wn:" + address + ":" + nonce
-	if err := SetKey(Web3AuthNamespace, key, b); err != nil {
+	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
 		return err
 	}
 	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
@@ -375,12 +374,12 @@ func PutWalletNonce(address, nonce string, ttlSeconds int) error {
 
 func GetWalletNonce(address, nonce string) (*WalletNonceRecord, error) {
 	key := "wn:" + address + ":" + nonce
-	rec, err := GetJson[WalletNonceRecord](Web3AuthNamespace, key)
+	rec, err := DBGetJson[WalletNonceRecord](SECRET_DB, Web3AuthNamespace, key)
 	if err != nil {
 		return nil, err
 	}
 	if rec != nil && time.Now().Unix() > rec.ExpiresAt {
-		_ = DeleteKey(Web3AuthNamespace, key)
+		_ = SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 		_ = CancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 		return nil, nil
 	}
@@ -397,33 +396,33 @@ func MarkWalletNonceUsed(address, nonce string) error {
 	}
 	rec.Used = true
 	b, _ := json.Marshal(rec)
-	return SetKey(Web3AuthNamespace, "wn:"+address+":"+nonce, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, "wn:"+address+":"+nonce, b)
 }
 
 // CleanupExpiredWalletNonces 基于过期索引删除所有已过期的钱包登录 nonce。
 func CleanupExpiredWalletNonces() error {
 	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return DeleteKey(Web3AuthNamespace, subKey)
+		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
 	})
 }
 
 // CleanupExpiredSignSessions 基于过期索引删除过期的短期签名 session。
 func CleanupExpiredSignSessions() error {
 	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return DeleteKey(Web3AuthNamespace, subKey)
+		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
 	})
 }
 
 // CleanupExpiredChallenges 基于过期索引删除过期的 challenge 记录。
 func CleanupExpiredChallenges() error {
 	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return DeleteKey(Web3AuthNamespace, subKey)
+		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
 	})
 }
 
 // CleanupExpiredRecoveryOTPs 基于过期索引删除过期的恢复 OTP。
 func CleanupExpiredRecoveryOTPs() error {
 	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return DeleteKey(Web3AuthNamespace, subKey)
+		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
 	})
 }

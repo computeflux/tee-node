@@ -158,9 +158,10 @@ func (app *TeeChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*
 func (app *TeeChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
 	fmt.Println()
 	util.LogWithGreen("START BLOCK", "--------------------------------------------------------------")
-	LogWithTime("🚀 CheckTx")
+	ok := app.checkTx(req.Tx)
+	LogWithTime("🚀 CheckTx", ok)
 
-	return &abci.ResponseCheckTx{Code: app.checkTx(req.Tx)}, nil
+	return &abci.ResponseCheckTx{Code: ok}, nil
 }
 
 func (app *TeeChain) PrepareProposal(_ context.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
@@ -264,7 +265,7 @@ func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64)
 
 func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	// Iterate over Tx in current block
-	app.onGoingBlock = store.DBINS.NewTransaction()
+	app.onGoingBlock = store.SECRET_DB.NewTransaction()
 	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.Time, req.ProposerAddress)
 	if err != nil {
 		app.onGoingBlock.Rollback()

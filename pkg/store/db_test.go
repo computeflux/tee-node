@@ -13,16 +13,20 @@ import (
 
 func TestSetGet(t *testing.T) {
 	os.RemoveAll(DBPath)
-	NewDB()
-	defer DBINS.Close()
+	db, err := NewDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db
+	defer SECRET_DB.Close()
 
-	_, err := Get("test")
+	_, err = SECRET_DB.Get("test")
 	if !errors.Is(err, pebble.ErrNotFound) {
 		t.Error("except ErrNotFound")
 	}
 
-	Set("test", []byte("test"))
-	v, err := Get("test")
+	SECRET_DB.Set("test", []byte("test"))
+	v, err := SECRET_DB.Get("test")
 	if err != nil {
 		t.Error(err)
 	}
@@ -33,16 +37,20 @@ func TestSetGet(t *testing.T) {
 
 func TestSetGetKey(t *testing.T) {
 	os.RemoveAll(DBPath)
-	NewDB()
-	defer DBINS.Close()
+	db, err := NewDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db
+	defer SECRET_DB.Close()
 
-	_, err := GetKey("GG", "test")
+	_, err = SECRET_DB.GetKey("GG", "test")
 	if !errors.Is(err, pebble.ErrNotFound) {
 		t.Error("except ErrNotFound")
 	}
 
-	SetKey("GG", "test", []byte("test"))
-	v, err := GetKey("GG", "test")
+	SECRET_DB.SetKey("GG", "test", []byte("test"))
+	v, err := SECRET_DB.GetKey("GG", "test")
 	if err != nil {
 		t.Error(err)
 	}
@@ -54,23 +62,27 @@ func TestSetGetKey(t *testing.T) {
 
 func TestGetProtoMessage(t *testing.T) {
 	os.RemoveAll(DBPath)
-	NewDB()
-	defer DBINS.Close()
+	db, err := NewDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db
+	defer SECRET_DB.Close()
 
 	initv := types.ValidatorUpdate{Power: 10000}
 
 	key := "validator" + fmt.Sprint(time.Now().Unix())
-	err := SetProtoMessage("", key, &initv)
+	err = DBSetProtoMessage(SECRET_DB, "", key, &initv)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = SetProtoMessage("", "val", &initv)
+	err = DBSetProtoMessage(SECRET_DB, "", "val", &initv)
 	if err != nil {
 		t.Error(err)
 	}
 
-	returnValue, err := GetProtoMessage[types.ValidatorUpdate]("", key)
+	returnValue, err := DBGetProtoMessage[types.ValidatorUpdate](SECRET_DB, "", key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,7 +91,7 @@ func TestGetProtoMessage(t *testing.T) {
 		t.Error("value not equal")
 	}
 
-	list, _, err := GetProtoMessageList[types.ValidatorUpdate]("", "validator")
+	list, _, err := DBGetProtoMessageList[types.ValidatorUpdate](SECRET_DB, "", "validator")
 	if err != nil {
 		t.Error(err)
 	}

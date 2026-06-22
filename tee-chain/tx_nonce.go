@@ -20,7 +20,7 @@ func GetNodeNextNonce(node ink.SignerType) uint64 {
 // DB 仅在 FinalizeTx 成功提交时通过 txn 更新。
 func GetNextCallerNonce(caller []byte, callerType uint32) uint64 {
 	key := GetCallerNonceKey(caller, callerType)
-	bt, err := dbstore.GetFromByteKey([]byte(key))
+	bt, err := dbstore.SECRET_DB.GetFromByteKey([]byte(key))
 	if err != nil || len(bt) == 0 {
 		return 1
 	}

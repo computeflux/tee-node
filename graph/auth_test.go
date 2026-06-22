@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
@@ -22,9 +21,8 @@ import (
 
 // setupAuthTest 初始化内存数据库和认证服务，返回 resolver 和 cleanup 函数
 func setupAuthTest(t *testing.T, seedSecret string) (*Resolver, func()) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := store.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	store.DBINS = &store.DB{DB: db}
 
 	auth.SetCachedConfigForTest(&auth.AuthConfig{
 		SeedSecret: seedSecret,
@@ -44,7 +42,7 @@ func setupAuthTest(t *testing.T, seedSecret string) (*Resolver, func()) {
 	cleanup := func() {
 		otpCancel()
 		auth.ResetConfigCache()
-		db.Close()
+		_ = db.Close()
 	}
 
 	return resolver, cleanup
@@ -456,7 +454,7 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 	rec.CreatedAt = time.Now().Unix() - 600
 	rec.ExpiresAt = rec.CreatedAt + 300
 	b, _ := json.Marshal(rec)
-	_ = store.SetKey(store.Web3AuthNamespace, "wn:"+address+":"+nonce, b)
+	_ = store.SECRET_DB.SetKey(store.Web3AuthNamespace, "wn:"+address+":"+nonce, b)
 
 	message := "Sign in to TEE Node"
 	sig, _ := signEIP191(privKeyHex, message+nonce)

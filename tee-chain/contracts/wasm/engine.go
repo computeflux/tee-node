@@ -71,7 +71,7 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 		return e.cachedMod, nil
 	}
 
-	info, err := dbstore.GetJson[domain.RuntimeVersionInfo]("", "RUNTIME_META_"+fmt.Sprint(version))
+	info, err := dbstore.DBGetJson[domain.RuntimeVersionInfo](dbstore.SECRET_DB, "", "RUNTIME_META_"+fmt.Sprint(version))
 	if err != nil {
 		util.LogError("wasm.LoadModule", fmt.Errorf("get runtime meta v%d: %w", version, err))
 		return nil, fmt.Errorf("get runtime meta: %w", err)

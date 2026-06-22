@@ -4,7 +4,6 @@ import (
 	"bytes"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // GetList 基于游标分页获取列表。
@@ -13,7 +12,7 @@ import (
 // 返回: 本页数据、下一页游标（无更多为 nil）、错误。
 func GetList(namespace string, subkey string, cursor []byte, size int) ([][]byte, []byte, error) {
 	key := []byte(comboKey(namespace, subkey))
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
+	iter, err := SECRET_DB.NewIter(&pebble.IterOptions{
 		LowerBound: key,
 		UpperBound: keyUpperBound(key),
 	})
@@ -43,7 +42,7 @@ func GetList(namespace string, subkey string, cursor []byte, size int) ([][]byte
 
 	for ; iter.Valid() && len(list) < size; iter.Next() {
 		v := iter.Value()
-		value, err := util.Unseal(v, nil)
+		value, err := SECRET_DB.Unseal(v)
 		if err != nil {
 			return nil, nil, err
 		}

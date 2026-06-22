@@ -573,3 +573,11 @@ type Tuple_64 struct { // Tuple
 	F1 SecretNode
 	F2 uint32
 }
+type CodeVersion struct { // Composite
+	Signer    []byte
+	Signature []byte
+}
+type Tuple_75 struct { // Tuple
+	F0 uint64
+	F1 CodeVersion
+}

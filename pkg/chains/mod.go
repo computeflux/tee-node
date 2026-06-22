@@ -44,6 +44,9 @@ type MainChainApi interface {
 	GetChainUrls() []string
 	GetSignerAddress() string
 
+	// CodeVersions 返回主链上登记的可信代码版本列表，用于 TEE 入网策略。
+	GetCodeVersions() ([]*chaintypes.CodeVersion, error)
+
 	// Node / validator discovery.
 	GetBootPeers() ([]chaintypes.P2PAddr, error)
 	GetNodes() ([]*chaintypes.Validator, []*crypto.PubKey, error)

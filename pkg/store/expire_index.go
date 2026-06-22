@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 const expireIndexPrefix = "expire:"
@@ -20,7 +19,7 @@ func ScheduleExpiration(namespace, subKey string, expiresAt int64) error {
 	if expiresAt <= 0 {
 		return nil
 	}
-	return SetKey(namespace, expireIndexKey(expiresAt, subKey), []byte(subKey))
+	return SECRET_DB.SetKey(namespace, expireIndexKey(expiresAt, subKey), []byte(subKey))
 }
 
 // CancelExpiration 删除指定记录的过期索引。
@@ -30,7 +29,7 @@ func CancelExpiration(namespace, subKey string, expiresAt int64) error {
 	if expiresAt <= 0 {
 		return nil
 	}
-	return DeleteKey(namespace, expireIndexKey(expiresAt, subKey))
+	return SECRET_DB.DeleteKey(namespace, expireIndexKey(expiresAt, subKey))
 }
 
 // CleanupExpiredByIndex 基于过期索引扫描并删除已过期记录。
@@ -50,7 +49,7 @@ func CleanupExpiredByIndexBatch(namespace string, deleteFn func(subKey string) e
 	lower := []byte(comboKey(namespace, expireIndexPrefix))
 	upper := []byte(comboKey(namespace, fmt.Sprintf("%s%s:", expireIndexPrefix, formatExpireTimestamp(now))))
 
-	iter, err := DBINS.NewIter(&pebble.IterOptions{
+	iter, err := SECRET_DB.NewIter(&pebble.IterOptions{
 		LowerBound: lower,
 		UpperBound: upper,
 	})
@@ -67,7 +66,7 @@ func CleanupExpiredByIndexBatch(namespace string, deleteFn func(subKey string) e
 	var cleaned int
 
 	for iter.First(); iter.Valid(); iter.Next() {
-		raw, err := util.Unseal(iter.Value(), nil)
+		raw, err := SECRET_DB.Unseal(iter.Value())
 		var subKey string
 		if err == nil {
 			subKey = string(raw)
@@ -98,7 +97,7 @@ func flushExpiredBatch(batch []struct {
 	for _, item := range batch {
 		if item.subKey == "" {
 			// 索引本身损坏或无法解密，直接删除索引
-			if err := DeleteByteKey(item.indexKey); err == nil {
+			if err := SECRET_DB.DeleteByteKey(item.indexKey); err == nil {
 				cleaned++
 			}
 			continue
@@ -106,7 +105,7 @@ func flushExpiredBatch(batch []struct {
 
 		// 只有实际数据删除成功后才删除索引，避免永久丢失对数据的清理能力
 		if err := deleteFn(item.subKey); err == nil {
-			if err := DeleteByteKey(item.indexKey); err == nil {
+			if err := SECRET_DB.DeleteByteKey(item.indexKey); err == nil {
 				cleaned++
 			} else {
 				fmt.Printf("[cleanup] failed to delete index for %s: %v\n", item.subKey, err)

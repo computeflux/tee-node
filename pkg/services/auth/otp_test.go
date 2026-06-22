@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,10 +14,9 @@ import (
 func setupTestOTP(t *testing.T) (*OTPService, context.CancelFunc) {
 	t.Helper()
 
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := store.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	store.DBINS = &store.DB{DB: db}
+	t.Cleanup(func() { _ = db.Close() })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

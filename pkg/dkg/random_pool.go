@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkg/types"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	dbstore "github.com/computeflux/tee-provider/pkg/store"
 )
 
@@ -149,11 +149,11 @@ func (pool *RandomSharePool) save() error {
 		Shares:     pool.shares,
 		TxMappings: pool.txMappings,
 	}
-	return dbstore.SetJson(RandomShareNamespace, pool.persistKey, &store)
+	return dbstore.DBSetJson(dbstore.SECRET_DB, RandomShareNamespace, pool.persistKey, &store)
 }
 
 func (pool *RandomSharePool) load() error {
-	store, err := dbstore.GetJson[RandomSharePoolStore](RandomShareNamespace, pool.persistKey)
+	store, err := dbstore.DBGetJson[RandomSharePoolStore](dbstore.SECRET_DB, RandomShareNamespace, pool.persistKey)
 	if err != nil || store == nil {
 		// Ignore errors (e.g. old format) and start with an empty pool.
 		pool.shares = make(map[uint32]*dkgtypes.DistKeyShare)

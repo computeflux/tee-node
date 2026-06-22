@@ -17,7 +17,7 @@ const contractPoolNS = "POOL_TX"
 
 // HasPendingContract 检查指定 dedupKey 是否已在交易池中有待处理的调用。
 func (app *TeeChain) HasPendingContract(dedupKey string) bool {
-	pending, _ := dbstore.GetJson[batch.BatchCall](contractPoolNS, dedupKey)
+	pending, _ := dbstore.DBGetJson[batch.BatchCall](dbstore.SECRET_DB, contractPoolNS, dedupKey)
 	return pending != nil
 }
 
@@ -38,12 +38,12 @@ func (app *TeeChain) SubmitContractWithDedup(contract string, method []byte, arg
 	var key string
 	if dedupKey != "" {
 		key = dedupKey
-		_ = dbstore.DeleteKey(contractPoolNS, key)
+		_ = dbstore.SECRET_DB.DeleteKey(contractPoolNS, key)
 	} else {
 		key = contractPoolKey()
 	}
 
-	if err := dbstore.SetJson(contractPoolNS, key, call); err != nil {
+	if err := dbstore.DBSetJson(dbstore.SECRET_DB, contractPoolNS, key, call); err != nil {
 		return fmt.Errorf("persist contract call: %w", err)
 	}
 
@@ -82,7 +82,7 @@ func (app *TeeChain) ApplyToChain() {
 		return
 	}
 
-	calls, keys, err := dbstore.GetJsonList[batch.BatchCall](contractPoolNS, "")
+	calls, keys, err := dbstore.DBGetJsonList[batch.BatchCall](dbstore.SECRET_DB, contractPoolNS, "")
 	if err != nil {
 		util.LogWithRed("TX-POOL", "read pool failed:", err)
 		return
@@ -98,7 +98,7 @@ func (app *TeeChain) ApplyToChain() {
 	validKeys := make([][]byte, 0, len(calls))
 	for i, c := range calls {
 		if c == nil {
-			_ = dbstore.DeleteByteKey(keys[i])
+			_ = dbstore.SECRET_DB.DeleteByteKey(keys[i])
 			continue
 		}
 		batchCalls = append(batchCalls, *c)
@@ -144,7 +144,7 @@ func (app *TeeChain) ApplyToChain() {
 
 	// 5) 提交成功，清空池中的所有相关 pending calls
 	for _, k := range validKeys {
-		err = dbstore.DeleteByteKey(k)
+		err = dbstore.SECRET_DB.DeleteByteKey(k)
 		fmt.Println("TX-POOL delete key", string(k))
 		if err != nil {
 			util.LogWithRed("TX-POOL", "delete key failed:", err)

@@ -159,6 +159,23 @@ func (c *Contract) GetEpoch() (uint32, uint32, uint32, uint32, crypto.PubKey, er
 	return d.Epoch, d.EpochSlot, d.LastEpochBlock, d.Now, *crypto.PubKeyFromByte(d.TeeChainPub[:]), nil
 }
 
+// code versions
+func (c *Contract) GetCodeVersions() ([]*chaintypes.CodeVersion, error) {
+	versions, _, err := c.subnet.QueryCodeVersions(chain.DefaultParamWithOrigin(types.AccountID(c.signer.AccountID())))
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*chaintypes.CodeVersion, 0, len(*versions))
+	for _, v := range *versions {
+		out = append(out, &chaintypes.CodeVersion{
+			Signer:    v.F1.Signer,
+			Signature: v.F1.Signature,
+		})
+	}
+	return out, nil
+}
+
 // go to new epoch
 func (c *Contract) SetNewEpoch(nodeId uint64) error {
 	return c.subnet.ExecSetNextEpoch(nodeId, chain.ExecParams{

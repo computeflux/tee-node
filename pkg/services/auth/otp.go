@@ -178,7 +178,7 @@ func (s *OTPService) dailyCountKey(email string) string {
 
 func (s *OTPService) getDailySendCount(email string) (int, error) {
 	key := s.dailyCountKey(email)
-	b, err := store.GetKey(store.Web3AuthNamespace, key)
+	b, err := store.SECRET_DB.GetKey(store.Web3AuthNamespace, key)
 	if err != nil {
 		return 0, nil
 	}
@@ -190,7 +190,7 @@ func (s *OTPService) incrementDailySendCount(email string) {
 	key := s.dailyCountKey(email)
 	count, _ := s.getDailySendCount(email)
 	count++
-	store.SetKey(store.Web3AuthNamespace, key, []byte(strconv.Itoa(count)))
+	store.SECRET_DB.SetKey(store.Web3AuthNamespace, key, []byte(strconv.Itoa(count)))
 }
 
 // cleanup 清理过期的内存记录

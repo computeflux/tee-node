@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,11 +18,9 @@ import (
 func setupTestWallet(t *testing.T) *WalletService {
 	t.Helper()
 
-	// 初始化临时 PebbleDB
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := store.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-	store.DBINS = &store.DB{DB: db}
+	t.Cleanup(func() { _ = db.Close() })
 
 	// 重置并设置测试配置
 	auth.ResetConfigCache()

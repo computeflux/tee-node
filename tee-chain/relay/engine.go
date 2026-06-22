@@ -199,7 +199,7 @@ func setLastNonce(txn store.StoreTx, chainID uint32, v uint64) error {
 
 // getLastNonceBg 读取 nonce (直接读 DB, CheckTx/ProcessProposal 用) | Read nonce (direct DB read, for CheckTx/ProcessProposal)
 func getLastNonceBg(chainID uint32) (uint64, error) {
-	n, err := dbstore.GetCodec[uint64](RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
+	n, err := dbstore.DBGetCodec[uint64](dbstore.SECRET_DB, RELAY_KEY, fmt.Sprintf("nonce_%d", chainID))
 	if err != nil {
 		return 0, fmt.Errorf("chain %d read error: %w", chainID, err)
 	}

@@ -12,11 +12,11 @@ import (
 )
 
 func setupTxnTest(t *testing.T) *Txn {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	DBINS = &DB{DB: db}
-	t.Cleanup(func() { DBINS.Close() })
-	return DBINS.NewTransaction()
+	SECRET_DB = db
+	t.Cleanup(func() { SECRET_DB.Close() })
+	return SECRET_DB.NewTransaction()
 }
 
 // ── Set / Get / Delete ─────────────────────────────────────
@@ -216,19 +216,19 @@ func TestTxn_DeletekeysByPrefix(t *testing.T) {
 // ── Rollback ───────────────────────────────────────────────
 
 func TestTxn_Rollback(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	DBINS = &DB{DB: db}
-	defer DBINS.Close()
+	SECRET_DB = db
+	defer SECRET_DB.Close()
 
-	tx := DBINS.NewTransaction()
+	tx := SECRET_DB.NewTransaction()
 	tx.Set([]byte("rollback_key"), []byte("rollback_val"))
 
 	err = tx.Rollback()
 	require.NoError(t, err)
 
 	// New transaction should not see the rolled-back data
-	tx2 := DBINS.NewTransaction()
+	tx2 := SECRET_DB.NewTransaction()
 	_, err = tx2.Get([]byte("rollback_key"))
 	assert.True(t, errors.Is(err, pebble.ErrNotFound))
 }
@@ -236,19 +236,19 @@ func TestTxn_Rollback(t *testing.T) {
 // ── Commit ─────────────────────────────────────────────────
 
 func TestTxn_Commit(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
-	DBINS = &DB{DB: db}
-	defer DBINS.Close()
+	SECRET_DB = db
+	defer SECRET_DB.Close()
 
-	tx := DBINS.NewTransaction()
+	tx := SECRET_DB.NewTransaction()
 	tx.Set([]byte("commit_key"), []byte("commit_val"))
 
 	err = tx.Commit()
 	require.NoError(t, err)
 
 	// New transaction should see committed data
-	tx2 := DBINS.NewTransaction()
+	tx2 := SECRET_DB.NewTransaction()
 	v, err := tx2.Get([]byte("commit_key"))
 	require.NoError(t, err)
 	assert.Equal(t, "commit_val", string(v))

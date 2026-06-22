@@ -9,7 +9,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cometbft/cometbft/crypto"
-	"github.com/computeflux/tee-provider/pkg/dkg/types"
+	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/store"
 )
 
@@ -50,7 +50,7 @@ func (s *TeeChain) ProposerAddressToNodeKey(proposer []byte) ([]byte, error) {
 }
 
 func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
-	key, err := store.GetKey(GLOABL_STATE, DKG_PUB_KEY)
+	key, err := store.SECRET_DB.GetKey(GLOABL_STATE, DKG_PUB_KEY)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_key error")
 	}
@@ -64,7 +64,7 @@ func (s *TeeChain) GetDkgPubkey() (*types.AccountID, error) {
 }
 
 func GetDkgCommits() (*dkgtypes.KyberPoints, error) {
-	bt, err := store.GetKey(GLOABL_STATE, DKG_PUB_COMMITS)
+	bt, err := store.SECRET_DB.GetKey(GLOABL_STATE, DKG_PUB_COMMITS)
 	if err != nil {
 		return nil, errors.New("get G-dkg_pub_commits error")
 	}

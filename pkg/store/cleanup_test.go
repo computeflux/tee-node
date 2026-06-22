@@ -11,10 +11,10 @@ import (
 )
 
 func TestFindGatewayTokenByKey_LazyDeletesExpired(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	key := "auth_tee_test_lazy_cleanup"
 	token := &GatewayTokenInfo{
@@ -36,15 +36,15 @@ func TestFindGatewayTokenByKey_LazyDeletesExpired(t *testing.T) {
 }
 
 func TestCleanupExpiredGatewayTokens(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	expiredKey := "auth_tee_expired"
 	validKey := "auth_tee_valid"
 	expiredToken := &GatewayTokenInfo{
-		ID:        1, Owner: "a", Key: expiredKey, IsActive: true,
+		ID: 1, Owner: "a", Key: expiredKey, IsActive: true,
 		CreatedAt: uint64(time.Now().Add(-48 * time.Hour).Unix()),
 		ExpiresAt: uint64(time.Now().Add(-1 * time.Hour).Unix()),
 	}
@@ -52,7 +52,7 @@ func TestCleanupExpiredGatewayTokens(t *testing.T) {
 	require.NoError(t, ScheduleExpiration("GATEWAY", "token_by_key:"+expiredKey, int64(expiredToken.ExpiresAt)))
 
 	validToken := &GatewayTokenInfo{
-		ID:        2, Owner: "b", Key: validKey, IsActive: true,
+		ID: 2, Owner: "b", Key: validKey, IsActive: true,
 		CreatedAt: uint64(time.Now().Unix()),
 		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()),
 	}
@@ -66,10 +66,10 @@ func TestCleanupExpiredGatewayTokens(t *testing.T) {
 }
 
 func TestFindRefreshToken_LazyDeletesExpired(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	token := "refresh_tee_test_lazy_cleanup"
 	require.NoError(t, SetRefreshToken(token, &RefreshTokenInfo{
@@ -87,10 +87,10 @@ func TestFindRefreshToken_LazyDeletesExpired(t *testing.T) {
 }
 
 func TestCleanupExpiredRefreshTokens(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	expired := "refresh_tee_expired"
 	valid := "refresh_tee_valid"
@@ -119,13 +119,13 @@ func TestCleanupExpiredRefreshTokens(t *testing.T) {
 // TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure verifies that if deleteFn fails,
 // the expiration index is preserved so the next cleanup can retry.
 func TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure(t *testing.T) {
-	db, err := pebble.Open(t.TempDir(), &pebble.Options{})
+	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
-	DBINS = &DB{DB: db}
+	SECRET_DB = db
 
 	key := "sub:protected"
-	require.NoError(t, SetKey("GATEWAY", key, []byte("data")))
+	require.NoError(t, SECRET_DB.SetKey("GATEWAY", key, []byte("data")))
 	require.NoError(t, ScheduleExpiration("GATEWAY", key, time.Now().Add(-1*time.Hour).Unix()))
 
 	// 第一次清理：deleteFn 失败，索引应保留
@@ -134,15 +134,15 @@ func TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure(t *testing.T) {
 	}))
 
 	// 数据应仍存在
-	v, err := GetKey("GATEWAY", key)
+	v, err := SECRET_DB.GetKey("GATEWAY", key)
 	require.NoError(t, err)
 	assert.Equal(t, "data", string(v))
 
 	// 索引也应仍存在
 	require.NoError(t, CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
-		return DeleteKey("GATEWAY", subKey)
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
 	}))
 
-	_, err = GetKey("GATEWAY", key)
+	_, err = SECRET_DB.GetKey("GATEWAY", key)
 	assert.ErrorIs(t, err, pebble.ErrNotFound)
 }

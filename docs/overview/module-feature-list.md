@@ -67,7 +67,7 @@
 
 | 子模块 | 功能 |
 |--------|------|
-| **数据库** | `db.go` / `db_txn.go` — PebbleDB 封装（`DBINS` 单例），所有 value 经 TEE `SealWithProductKey` 密封；提供 JSON / Protobuf / SCALE 编解码辅助；事务 Set/Get/Delete、前缀扫描（ListByPrefix / ListByPrefixLimit）、Rollback / Commit |
+| **数据库** | `db.go` / `db_txn.go` — PebbleDB 封装（`SECRET_DB` 单例），所有 value 经 TEE `SealWithProductKey` 密封；提供 JSON / Protobuf / SCALE 编解码辅助；事务 Set/Get/Delete、前缀扫描（ListByPrefix / ListByPrefixLimit）、Rollback / Commit |
 | **密钥管理** | `key_*.go` — Ed25519 / secp256k1 / BLS12-381 私钥/公钥封装、SS58 编码、H160 / AccountID 转换 |
 
 > ✅ 测试覆盖：`key_pub_test.go`（26 个）— SuiteType 检测、Point 转换、TeeChainNodeID、SS58/H160/AccountID round-trip、JSON marshal/unmarshal、全部构造器

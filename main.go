@@ -16,8 +16,8 @@ import (
 	"github.com/computeflux/tee-provider/pkg/chains"
 	chain "github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/crypto"
-	"github.com/computeflux/tee-provider/pkg/indexer"
 	"github.com/computeflux/tee-provider/pkg/dkg"
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
@@ -111,6 +111,13 @@ func main() {
 	// 	fmt.Println("LoadRuntimeForDebug:", err)
 	// 	os.Exit(1)
 	// }
+
+	// codeVersions, err := chains.MainChain.GetCodeVersions()
+	// if err != nil {
+	// 	fmt.Println("Get code versions error:", err)
+	// 	os.Exit(1)
+	// }
+	// fmt.Println("Codes", codeVersions)
 
 	// load chains
 	err = teeChain.LoadChains()

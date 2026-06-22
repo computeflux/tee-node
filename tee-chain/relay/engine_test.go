@@ -72,7 +72,7 @@ func TestBuildSyncEvent(t *testing.T) {
 // ── Nonce 读写 ────────────────────────────────────────
 
 func TestNonceSetAndGet(t *testing.T) {
-	txn := store.DBINS.NewTransaction()
+	txn := store.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	err := setLastNonce(txn, 1, 0)
@@ -91,7 +91,7 @@ func TestNonceSetAndGet(t *testing.T) {
 }
 
 func TestGetLastNonce_NotRegistered(t *testing.T) {
-	txn := store.DBINS.NewTransaction()
+	txn := store.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	n, err := getLastNonce(txn, 999)
@@ -129,14 +129,14 @@ func (m *mockAPI) Query(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error)
 }
 
 func newMockEngine() (*Engine, *store.Txn) {
-	txn := store.DBINS.NewTransaction()
+	txn := store.SECRET_DB.NewTransaction()
 	return NewEngine(), txn
 }
 
 // commitAndRefresh 提交 txn 并创建新 txn
 func commitAndRefresh(_ *Engine, oldTxn *store.Txn) *store.Txn {
 	oldTxn.Commit()
-	return store.DBINS.NewTransaction()
+	return store.SECRET_DB.NewTransaction()
 }
 
 // ── CheckRelayEvent ───────────────────────────────────

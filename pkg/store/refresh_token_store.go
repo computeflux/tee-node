@@ -24,12 +24,12 @@ func (t *RefreshTokenInfo) IsExpired() bool {
 
 // SetRefreshToken 存储 refresh token 信息。
 func SetRefreshToken(token string, info *RefreshTokenInfo) error {
-	return SetJson("GATEWAY", fmt.Sprintf("refresh_token:%s", token), info)
+	return DBSetJson(SECRET_DB, "GATEWAY", fmt.Sprintf("refresh_token:%s", token), info)
 }
 
 // GetRefreshToken 通过 refresh token 查询对应的信息。
 func GetRefreshToken(token string) (*RefreshTokenInfo, error) {
-	return GetJson[RefreshTokenInfo]("GATEWAY", fmt.Sprintf("refresh_token:%s", token))
+	return DBGetJson[RefreshTokenInfo](SECRET_DB, "GATEWAY", fmt.Sprintf("refresh_token:%s", token))
 }
 
 // FindRefreshToken 查询 refresh token，并检查是否有效（存在、活跃、未过期）。
@@ -49,7 +49,7 @@ func FindRefreshToken(token string) *RefreshTokenInfo {
 // CleanupExpiredRefreshTokens 基于过期索引删除过期 refresh token。
 func CleanupExpiredRefreshTokens() error {
 	return CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
-		return DeleteKey("GATEWAY", subKey)
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
 	})
 }
 
@@ -57,7 +57,7 @@ func CleanupExpiredRefreshTokens() error {
 // 先删除数据，成功后再清理索引；若数据删除失败则保留索引，确保后续清理仍能定位该记录。
 func DeleteRefreshToken(token string) error {
 	tk, _ := GetRefreshToken(token)
-	if err := DeleteKey("GATEWAY", fmt.Sprintf("refresh_token:%s", token)); err != nil {
+	if err := SECRET_DB.DeleteKey("GATEWAY", fmt.Sprintf("refresh_token:%s", token)); err != nil {
 		return err
 	}
 	if tk != nil {

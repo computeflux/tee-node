@@ -43,7 +43,7 @@ func (s *TeeChain) submitSyncTxEnd(chainId uint32, ids []uint64, isSeccseed bool
 
 func saveCallIds(txIndex int64, chainId uint32, ids []uint64) error {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
-	if err := store.SetJson(GLOABL_STATE, baseKey+TxIndexHubCallsSuffix, &hubCallsByIdsStore{Ids: ids}); err != nil {
+	if err := store.DBSetJson(store.SECRET_DB, GLOABL_STATE, baseKey+TxIndexHubCallsSuffix, &hubCallsByIdsStore{Ids: ids}); err != nil {
 		return errors.Wrap(err, "Set tx hubcalls error")
 	}
 	return nil
@@ -52,7 +52,7 @@ func saveCallIds(txIndex int64, chainId uint32, ids []uint64) error {
 // loadHubCallIds 从 tx_index 存储中恢复 hub call IDs
 func loadHubCallIds(txIndex int64, chainId uint32) ([]uint64, error) {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
-	stored, err := store.GetJson[hubCallsByIdsStore](GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
+	stored, err := store.DBGetJson[hubCallsByIdsStore](store.SECRET_DB, GLOABL_STATE, baseKey+TxIndexHubCallsSuffix)
 	if err != nil || stored == nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func saveBatchCall(txIndex int64, chainId uint32, call *chaintypes.ChainCall) er
 		return errors.Wrap(err, "saveBatchCall codec error")
 	}
 
-	if err := store.SetKey(GLOABL_STATE, baseKey+TxIndexCallSuffix, bt); err != nil {
+	if err := store.SECRET_DB.SetKey(GLOABL_STATE, baseKey+TxIndexCallSuffix, bt); err != nil {
 		return errors.Wrap(err, "saveBatchCall db error")
 	}
 
@@ -89,7 +89,7 @@ func saveBatchCall(txIndex int64, chainId uint32, call *chaintypes.ChainCall) er
 // loadStoredCall 从 tx_index 存储中加载已构造的 ChainCall（回退路径）
 func loadBatchCall(txIndex int64, chainId uint32) (*chaintypes.ChainCall, error) {
 	baseKey := TxIndexPrefix + fmt.Sprint(txIndex) + "_" + fmt.Sprint(chainId)
-	bt, err := store.GetKey(GLOABL_STATE, baseKey+TxIndexCallSuffix)
+	bt, err := store.SECRET_DB.GetKey(GLOABL_STATE, baseKey+TxIndexCallSuffix)
 	if err != nil {
 		return nil, errors.New("stored call not found")
 	}
@@ -106,7 +106,7 @@ func buildBatchCallFromIDs(dkgInst *dkg.DKG, chainId uint32, ids []uint64) (*cha
 		return nil, errors.Wrap(err, "getChain error")
 	}
 
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion)
@@ -160,7 +160,7 @@ func IsHubSyncRuning() bool {
 }
 
 func isHubSyncRuningForChain(chainId uint32) bool {
-	tx, err := store.GetJson[AsyncBatchState](GLOABL_STATE, hubSyncIndexKey(chainId))
+	tx, err := store.DBGetJson[AsyncBatchState](store.SECRET_DB, GLOABL_STATE, hubSyncIndexKey(chainId))
 	if err != nil {
 		LogWithTime("IsHubSyncRuning get error: " + err.Error())
 		return false
@@ -224,7 +224,7 @@ func (app *TeeChain) targetSyncRelay() bool {
 	}
 
 	height := app.state.Height
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, chaintypes.UniAddr{

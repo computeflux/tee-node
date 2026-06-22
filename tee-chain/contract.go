@@ -20,10 +20,10 @@ func (app *TeeChain) ContractRuntime() (*contracts.Runtime, error) {
 // ContractRuntimeWithCaller 构造一个指定调用方 caller 的合约运行时上下文。
 // 主要用于 GetProviderByOwner 等依赖 caller 身份的查询。
 func (app *TeeChain) ContractRuntimeWithCaller(caller chaintypes.UniAddr) (*contracts.Runtime, error) {
-	if dbstore.DBINS == nil {
-		return nil, fmt.Errorf("DBINS is nil")
+	if dbstore.SECRET_DB == nil {
+		return nil, fmt.Errorf("SECRET_DB is nil")
 	}
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	// NOTE: caller does NOT call txn.Commit() for read-only queries.
 	// The caller must defer txn.Rollback().
 
@@ -102,7 +102,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 	}()
 
 	height := app.state.Height
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	address := chaintypes.UniAddr{
@@ -138,7 +138,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 	}()
 
 	height := app.state.Height
-	txn := dbstore.DBINS.NewTransaction()
+	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	address := chaintypes.UniAddr{
