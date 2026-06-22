@@ -31,24 +31,35 @@ var (
 	usageFlushCh = make(chan struct{}, 1)
 	usageWg      sync.WaitGroup
 	usageOnce    sync.Once
+	usageMu      sync.Mutex // 保护 usage:* 读写，避免 flush 与 settle 竞态
 )
 
 func initUsageWriter() {
 	usageOnce.Do(func() {
-		usageWg.Add(1)
-		go func() {
-			defer usageWg.Done()
+		usageWg.Go(func() {
 			batch := make(map[string]*store.GatewayDailyUsage, 64)
-			ticker := time.NewTicker(100 * time.Millisecond)
+			ticker := time.NewTicker(1000 * time.Millisecond)
 			defer ticker.Stop()
 
 			flush := func() {
-				if len(batch) > 0 {
-					for k, u := range batch {
+				if len(batch) == 0 {
+					return
+				}
+				usageMu.Lock()
+				for k, u := range batch {
+					existing, _ := store.DBGetJson[store.GatewayDailyUsage](store.SECRET_DB, "GATEWAY", "usage:"+k)
+					if existing != nil {
+						existing.Count += u.Count
+						existing.TokenIn += u.TokenIn
+						existing.TokenOut += u.TokenOut
+						existing.CachedToken += u.CachedToken
+						store.DBSetJson(store.SECRET_DB, "GATEWAY", "usage:"+k, existing)
+					} else {
 						store.DBSetJson(store.SECRET_DB, "GATEWAY", "usage:"+k, u)
 					}
-					batch = make(map[string]*store.GatewayDailyUsage, 64)
 				}
+				usageMu.Unlock()
+				batch = make(map[string]*store.GatewayDailyUsage, 64)
 			}
 
 			for {
@@ -77,7 +88,7 @@ func initUsageWriter() {
 					flush()
 				}
 			}
-		}()
+		})
 	})
 }
 
@@ -196,11 +207,15 @@ func settlePendingUsage() error {
 	GATEWAYLOG().Printf("[SETTLE] SUBMIT: pool empty, collecting usage records")
 
 	// 1. 扫描本地 usage: 前缀的所有记录
+	//    加锁防止 flush 在读和删之间写入，导致新写入的数据被误删。
+	usageMu.Lock()
 	records, keys, err := store.DBGetJsonList[store.GatewayDailyUsage](store.SECRET_DB, "GATEWAY", "usage:")
 	if err != nil {
+		usageMu.Unlock()
 		return fmt.Errorf("list usage: %w", err)
 	}
 	if len(records) == 0 {
+		usageMu.Unlock()
 		return nil
 	}
 
@@ -213,6 +228,7 @@ func settlePendingUsage() error {
 
 		nonce := make([]byte, 16)
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			usageMu.Unlock()
 			return fmt.Errorf("generate nonce: %w", err)
 		}
 
@@ -228,11 +244,15 @@ func settlePendingUsage() error {
 		})
 	}
 	if len(settlements) == 0 {
+		usageMu.Unlock()
 		return nil
 	}
 
-	// 3. 一次性提交所有结算记录
+	// 3. 一次性提交所有结算记录。
+	//    保持加锁：submit 只是把调用写入本地交易池（非阻塞上链），耗时很短；
+	//    若在此处释放锁，flush 可能在读和删之间写入同 key 的新数据，导致数据丢失。
 	if err := submitSettleUsage(settlements); err != nil {
+		usageMu.Unlock()
 		GATEWAYLOG().Printf("[SETTLE] batch submit %d records failed: %v", len(settlements), err)
 		return fmt.Errorf("submit settlements: %w", err)
 	}
@@ -244,11 +264,13 @@ func settlePendingUsage() error {
 	deleted := 0
 	for _, k := range keys {
 		if err := store.SECRET_DB.DeleteByteKey(k); err != nil {
+			usageMu.Unlock()
 			GATEWAYLOG().Printf("[SETTLE] delete usage key=%x failed: %v", k, err)
 			return fmt.Errorf("[SETTLE] delete usage key failed: %w", err)
 		}
 		deleted++
 	}
+	usageMu.Unlock()
 	GATEWAYLOG().Printf("[SETTLE] deleted %d local usage records", deleted)
 
 	return nil

@@ -95,6 +95,7 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 				util.LogWithGray("PrepareTx", "Skip contract tx: failed to set nonce, err:", err)
 				continue
 			}
+
 			*finaltx = append(*finaltx, txbt)
 		default:
 			break

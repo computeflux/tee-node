@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/p2p"
+	"github.com/cometbft/cometbft/privval"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/graph"
 	"github.com/computeflux/tee-provider/pkg/chains"
@@ -88,10 +88,6 @@ func main() {
 	chains.ConnectChain(chainEnv, nodePriv)
 
 	// TEE attestation verifier for p2p handshake.
-	// All CometBFT p2p connections will exchange and verify TEE reports.
-	// NOTE: use the p2p node key (loaded from node_key.json), not the validator key,
-	// because the attestation report must be bound to the public key used by the
-	// CometBFT p2p SecretConnection.
 	p2p.DefaultTEEAttestationVerifier = teetypes.NewP2PTEEVerifier(
 		p2pKey.ToSigner(crypto.SuiteEd25519),
 	)
