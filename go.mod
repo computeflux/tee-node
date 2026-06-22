@@ -140,7 +140,7 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
-	github.com/cometbft/cometbft-db v0.14.1 // indirect
+	github.com/cometbft/cometbft-db v0.14.1
 	github.com/consensys/gnark-crypto v0.19.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -230,5 +230,8 @@ require (
 )
 
 replace github.com/wetee-dao/ink.go => ../../wetee/ink.go
+
+// Local overrides for development.
+replace github.com/cometbft/cometbft => /home/wetee/work/Query-Web3/cometbft
 
 // replace go.dedis.ch/kyber/v4 => ../../wetee/kyber

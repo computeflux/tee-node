@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cometbft/cometbft/privval"
+	"github.com/cometbft/cometbft/p2p"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/graph"
 	"github.com/computeflux/tee-provider/pkg/chains"
@@ -21,6 +22,7 @@ import (
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/teetypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	_ "github.com/computeflux/tee-provider/pkg/util/cgostubs"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -85,10 +87,22 @@ func main() {
 
 	chains.ConnectChain(chainEnv, nodePriv)
 
+	// TEE attestation verifier for p2p handshake.
+	// All CometBFT p2p connections will exchange and verify TEE reports.
+	// NOTE: use the p2p node key (loaded from node_key.json), not the validator key,
+	// because the attestation report must be bound to the public key used by the
+	// CometBFT p2p SecretConnection.
+	p2p.DefaultTEEAttestationVerifier = teetypes.NewP2PTEEVerifier(
+		p2pKey.ToSigner(crypto.SuiteEd25519),
+	)
+
 	// Init node
-	nodeFunc, teeChain, dkgReactor, err := teechain.InitTeeChain(nodePriv, chainPort, false, func() {
-		util.LogWithYellow("Main Chain", chainConfig.Urls)
-	})
+	nodeFunc, teeChain, dkgReactor, err := teechain.InitTeeChain(
+		nodePriv, chainPort, false,
+		func() {
+			util.LogWithYellow("Main Chain", chainConfig.Urls)
+		},
+	)
 	if err != nil {
 		log.Fatalf("failed to init node: %v", err)
 		os.Exit(1)
