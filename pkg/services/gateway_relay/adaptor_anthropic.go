@@ -149,12 +149,12 @@ func (a *AnthropicAdaptor) handleAnthropicNormal(ctx *RelayContext, resp *http.R
 
 	cachedTokens := antResp.Usage.CacheReadInputTokens
 
-	oaiResp := map[string]interface{}{
+	oaiResp := map[string]any{
 		"id":      antResp.Id,
 		"object":  "chat.completion",
 		"model":   antResp.Model,
-		"choices": []map[string]interface{}{{"index": 0, "message": map[string]string{"role": "assistant", "content": content}, "finish_reason": "stop"}},
-		"usage": map[string]interface{}{
+		"choices": []map[string]any{{"index": 0, "message": map[string]string{"role": "assistant", "content": content}, "finish_reason": "stop"}},
+		"usage": map[string]any{
 			"prompt_tokens":     antResp.Usage.InputTokens,
 			"completion_tokens": antResp.Usage.OutputTokens,
 			"total_tokens":      antResp.Usage.InputTokens + antResp.Usage.OutputTokens,
@@ -202,12 +202,12 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 		}
 
 		// Convert to OpenAI SSE format
-		chunk := map[string]interface{}{
+		chunk := map[string]any{
 			"object":  "chat.completion.chunk",
-			"choices": []map[string]interface{}{{"index": 0, "delta": map[string]string{}}},
+			"choices": []map[string]any{{"index": 0, "delta": map[string]string{}}},
 		}
 		if evt.Delta != nil && evt.Delta.Text != "" {
-			chunk["choices"].([]map[string]interface{})[0]["delta"] = map[string]string{"content": evt.Delta.Text}
+			chunk["choices"].([]map[string]any)[0]["delta"] = map[string]string{"content": evt.Delta.Text}
 		}
 
 		// Collect usage from stream events
