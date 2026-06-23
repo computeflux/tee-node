@@ -71,13 +71,13 @@ func LookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
 // providerDefaultURL 返回各供应商的默认官方地址。
 func providerDefaultURL(providerType uint16) string {
 	switch providerType {
-	case 1: // openai
+	case cgateway.ProviderOpenAI:
 		return "https://api.openai.com"
-	case 2: // anthropic
+	case cgateway.ProviderClaude:
 		return "https://api.anthropic.com"
-	case 3: // googleapis
+	case cgateway.ProviderGemini:
 		return "https://generativelanguage.googleapis.com"
-	case 9999: // local
+	case cgateway.ProviderLocal, cgateway.ProviderPersonal:
 		return "local://yamux" // 本地模型通过反向隧道转发，不需要真实 URL
 	default:
 		return ""
@@ -92,7 +92,7 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 	}
 
 	// 本地模型使用 Yamux 反向隧道，不需要 APIKeys 也不依赖 URI
-	if m.ProviderType == 9999 || m.ProviderType == 9 {
+	if m.ProviderType == cgateway.ProviderLocal || m.ProviderType == cgateway.ProviderPersonal {
 		return []*store.GatewayEndpoint{{
 			ID:         m.ProviderID,
 			ProviderID: m.ProviderID,
@@ -186,7 +186,7 @@ func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
 		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s not found or inactive under provider=%d", modelName, providerID)
 		return 0, false
 	}
-	if model.Data.ProviderType != cgateway.ProviderLocal && model.Data.ProviderType != 9999 {
+	if model.Data.ProviderType != cgateway.ProviderLocal && model.Data.ProviderType != cgateway.ProviderPersonal {
 		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s provider=%d providerType=%d is not local", modelName, providerID, model.Data.ProviderType)
 		return 0, false
 	}

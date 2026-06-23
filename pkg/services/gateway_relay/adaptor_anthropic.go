@@ -2,36 +2,23 @@ package relay
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 )
 
-// ── Anthropic types ──────────────────────────────────────
-
-type AnthropicRequest struct {
-	Model     string             `json:"model"`
-	Messages  []AnthropicMessage `json:"messages"`
-	System    string             `json:"system,omitempty"`
-	MaxTokens int                `json:"max_tokens"`
-	Stream    bool               `json:"stream,omitempty"`
-}
-
-type AnthropicMessage struct {
-	Role    string             `json:"role"`
-	Content []AnthropicContent `json:"content"`
-}
-
-type AnthropicContent struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
-}
+// ── Anthropic types（仅用于解析 usage / error）────────────────
 
 type AnthropicResponse struct {
 	Id      string             `json:"id"`
+	Type    string             `json:"type,omitempty"`
 	Model   string             `json:"model"`
+	Role    string             `json:"role,omitempty"`
 	Content []AnthropicContent `json:"content"`
 	Usage   struct {
 		InputTokens              int `json:"input_tokens"`
@@ -43,6 +30,11 @@ type AnthropicResponse struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+type AnthropicContent struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
 }
 
 // anthropicStreamEvent 表示 Anthropic SSE 流中的各种事件
@@ -66,53 +58,56 @@ type anthropicStreamEvent struct {
 }
 
 // ── AnthropicAdaptor ─────────────────────────────────────
-
-type AnthropicAdaptor struct {
-	OpenAIAdaptor
-}
+// AnthropicAdaptor 以 Anthropic 原生格式与上游通信：请求体/响应体均直接透传，
+// 不再在 relay 层做 OpenAI ↔ Anthropic 转换。协议转换统一在 gateway/protocol 层完成。
+type AnthropicAdaptor struct{}
 
 func (a *AnthropicAdaptor) Init(meta *Meta) {}
 
 func (a *AnthropicAdaptor) GetRequestURL(meta *Meta) (string, error) {
-	return meta.BaseURL + "/v1/messages", nil
+	base := strings.TrimRight(meta.BaseURL, "/")
+	path := meta.RequestURLPath
+	if path == "" {
+		path = "/v1/messages"
+	}
+
+	// 去重：例如 base 末尾有 /v1 而 path 以 /v1 开头
+	base = strings.TrimRight(base, "/")
+	pathParts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
+	if len(pathParts) > 0 && pathParts[0] != "" && strings.HasSuffix(base, "/"+pathParts[0]) {
+		base = strings.TrimSuffix(base, "/"+pathParts[0])
+	}
+
+	return base + path, nil
 }
 
 func (a *AnthropicAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error {
 	req.Header.Set("x-api-key", meta.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("Content-Type", "application/json")
+
+	// 透传客户端指定的 anthropic-version，缺省用官方默认版本。
+	if v := ctx.R.Header.Get("anthropic-version"); v != "" {
+		req.Header.Set("anthropic-version", v)
+	} else {
+		req.Header.Set("anthropic-version", "2023-06-01")
+	}
+
+	// 透传 beta header（prompt caching、extended thinking 等能力依赖它）。
+	if v := ctx.R.Header.Get("anthropic-beta"); v != "" {
+		req.Header.Set("anthropic-beta", v)
+	}
 	return nil
 }
 
 func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader) (*http.Response, error) {
-	// Read OpenAI-format body
 	raw, _ := io.ReadAll(body)
-	var oaiReq GeneralOpenAIRequest
-	json.Unmarshal(raw, &oaiReq)
 
-	// Convert to Anthropic format
-	antReq := AnthropicRequest{
-		Model:     oaiReq.Model,
-		MaxTokens: oaiReq.MaxTokens,
-		Stream:    oaiReq.Stream,
-	}
-	if antReq.MaxTokens == 0 {
-		antReq.MaxTokens = 4096
-	}
-	for _, msg := range oaiReq.Messages {
-		if msg.Role == "system" && antReq.System == "" {
-			antReq.System = msg.Content
-			continue
-		}
-		antReq.Messages = append(antReq.Messages, AnthropicMessage{
-			Role:    msg.Role,
-			Content: []AnthropicContent{{Type: "text", Text: msg.Content}},
-		})
+	url, err := a.GetRequestURL(meta)
+	if err != nil {
+		return nil, err
 	}
 
-	antBody, _ := json.Marshal(antReq)
-	url, _ := a.GetRequestURL(meta)
-	req, err := http.NewRequestWithContext(ctx.Context(), "POST", url, strings.NewReader(string(antBody)))
+	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -121,76 +116,93 @@ func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Read
 }
 
 func (a *AnthropicAdaptor) DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (*Usage, *ErrorWithStatusCode) {
-	if meta.IsStream {
-		return a.handleAnthropicStream(ctx, resp)
+	contentType := resp.Header.Get("Content-Type")
+	if strings.Contains(contentType, "text/event-stream") || meta.IsStream {
+		return a.handleStream(ctx, resp)
 	}
-	return a.handleAnthropicNormal(ctx, resp)
+	return a.handleNormal(ctx, resp)
 }
 
-func (a *AnthropicAdaptor) handleAnthropicNormal(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
+func (a *AnthropicAdaptor) handleNormal(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
 	body, _ := io.ReadAll(resp.Body)
-	var antResp AnthropicResponse
-	json.Unmarshal(body, &antResp)
 
-	if antResp.Error != nil {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		msg := string(body)
+		errType := "upstream_error"
+		if msg == "" {
+			msg = http.StatusText(resp.StatusCode)
+		}
+		// 尝试解析 Anthropic 错误结构以保留类型信息
+		var antResp AnthropicResponse
+		if json.Unmarshal(body, &antResp) == nil && antResp.Error != nil {
+			if antResp.Error.Message != "" {
+				msg = antResp.Error.Message
+			}
+			if antResp.Error.Type != "" {
+				errType = antResp.Error.Type
+			}
+		}
 		return nil, &ErrorWithStatusCode{
 			StatusCode: resp.StatusCode,
-			Error:      ErrorDetail{Message: antResp.Error.Message, Type: antResp.Error.Type},
-		}
-	}
-
-	// Convert to OpenAI format
-	content := ""
-	for _, c := range antResp.Content {
-		if c.Type == "text" {
-			content += c.Text
-		}
-	}
-
-	cachedTokens := antResp.Usage.CacheReadInputTokens
-
-	oaiResp := map[string]any{
-		"id":      antResp.Id,
-		"object":  "chat.completion",
-		"model":   antResp.Model,
-		"choices": []map[string]any{{"index": 0, "message": map[string]string{"role": "assistant", "content": content}, "finish_reason": "stop"}},
-		"usage": map[string]any{
-			"prompt_tokens":     antResp.Usage.InputTokens,
-			"completion_tokens": antResp.Usage.OutputTokens,
-			"total_tokens":      antResp.Usage.InputTokens + antResp.Usage.OutputTokens,
-			"prompt_tokens_details": map[string]int{
-				"cached_tokens": cachedTokens,
+			Error: ErrorDetail{
+				Message: msg,
+				Type:    errType,
 			},
-		},
+		}
 	}
 
-	ctx.W.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(ctx.W).Encode(oaiResp)
+	// 透传响应头（过滤 hop-by-hop headers）
+	for k, vv := range resp.Header {
+		if hopByHopHeaders[k] {
+			continue
+		}
+		for _, v := range vv {
+			ctx.W.Header().Add(k, v)
+		}
+	}
+	ctx.W.WriteHeader(resp.StatusCode)
+	ctx.W.Write(body)
 
-	return &Usage{
-		PromptTokens:     antResp.Usage.InputTokens,
-		CompletionTokens: antResp.Usage.OutputTokens,
-		TotalTokens:      antResp.Usage.InputTokens + antResp.Usage.OutputTokens,
-		PromptTokensDetails: PromptTokensDetails{
-			CachedTokens: cachedTokens,
-		},
-	}, nil
+	// 尝试解析 usage
+	var antResp AnthropicResponse
+	if json.Unmarshal(body, &antResp) == nil && antResp.Usage.InputTokens+antResp.Usage.OutputTokens > 0 {
+		return &Usage{
+			PromptTokens:     antResp.Usage.InputTokens + antResp.Usage.CacheCreationInputTokens + antResp.Usage.CacheReadInputTokens,
+			CompletionTokens: antResp.Usage.OutputTokens,
+			TotalTokens:      antResp.Usage.InputTokens + antResp.Usage.CacheCreationInputTokens + antResp.Usage.CacheReadInputTokens + antResp.Usage.OutputTokens,
+			PromptTokensDetails: PromptTokensDetails{
+				CachedTokens: antResp.Usage.CacheReadInputTokens,
+			},
+		}, nil
+	}
+	return nil, nil
 }
 
-func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
-	flusher, _ := ctx.W.(http.Flusher)
+func (a *AnthropicAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
+	flusher, ok := ctx.W.(http.Flusher)
+	if !ok {
+		return nil, &ErrorWithStatusCode{
+			StatusCode: http.StatusInternalServerError,
+			Error: ErrorDetail{
+				Message: "streaming response writer must implement http.Flusher",
+				Type:    "server_error",
+			},
+		}
+	}
+
 	ctx.W.Header().Set("Content-Type", "text/event-stream")
 	ctx.W.Header().Set("Cache-Control", "no-cache")
+	ctx.W.Header().Set("Connection", "keep-alive")
 
 	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
+	scanner.Buffer(make([]byte, 0, protocol.DefaultSSEBufferSize), protocol.DefaultSSEBufferSize)
 
-	promptTokens := 0
-	completionTokens := 0
-	cachedTokens := 0
-
+	usage := &Usage{}
 	for scanner.Scan() {
 		line := scanner.Text()
+		fmt.Fprintln(ctx.W, line)
+		flusher.Flush()
+
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
@@ -201,45 +213,29 @@ func (a *AnthropicAdaptor) handleAnthropicStream(ctx *RelayContext, resp *http.R
 			continue
 		}
 
-		// Convert to OpenAI SSE format
-		chunk := map[string]any{
-			"object":  "chat.completion.chunk",
-			"choices": []map[string]any{{"index": 0, "delta": map[string]string{}}},
-		}
-		if evt.Delta != nil && evt.Delta.Text != "" {
-			chunk["choices"].([]map[string]any)[0]["delta"] = map[string]string{"content": evt.Delta.Text}
-		}
-
-		// Collect usage from stream events
 		if evt.Message != nil && evt.Message.Usage != nil {
-			promptTokens = evt.Message.Usage.InputTokens
-			cachedTokens = evt.Message.Usage.CacheReadInputTokens
+			usage.PromptTokens = evt.Message.Usage.InputTokens +
+				evt.Message.Usage.CacheCreationInputTokens +
+				evt.Message.Usage.CacheReadInputTokens
+			usage.PromptTokensDetails.CachedTokens = evt.Message.Usage.CacheReadInputTokens
 		}
 		if evt.Usage != nil {
-			completionTokens = evt.Usage.OutputTokens
-		}
-
-		b, _ := json.Marshal(chunk)
-		fmt.Fprintf(ctx.W, "data: %s\n\n", b)
-		if flusher != nil {
-			flusher.Flush()
+			usage.CompletionTokens = evt.Usage.OutputTokens
 		}
 	}
 
-	fmt.Fprintf(ctx.W, "data: [DONE]\n\n")
-	if flusher != nil {
-		flusher.Flush()
+	if err := scanner.Err(); err != nil {
+		return nil, &ErrorWithStatusCode{
+			StatusCode: http.StatusBadGateway,
+			Error: ErrorDetail{
+				Message: fmt.Sprintf("stream read error: %v", err),
+				Type:    "upstream_error",
+			},
+		}
 	}
 
-	totalTokens := promptTokens + completionTokens
-	return &Usage{
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TotalTokens:      totalTokens,
-		PromptTokensDetails: PromptTokensDetails{
-			CachedTokens: cachedTokens,
-		},
-	}, nil
+	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	return usage, nil
 }
 
 func (a *AnthropicAdaptor) GetProviderName() string {

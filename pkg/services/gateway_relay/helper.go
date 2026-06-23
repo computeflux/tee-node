@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
 // ── Common adaptor helpers ───────────────────────────────
@@ -87,11 +89,11 @@ func GetAdaptorForProviderType(providerType string) Adaptor {
 // 优先用于已知 providerType 的场景（如合约模型元数据），避免通过 URL 字符串猜测。
 func GetAdaptorForProviderTypeCode(providerType uint16) Adaptor {
 	switch providerType {
-	case 2: // ProviderClaude
+	case cgateway.ProviderClaude:
 		return &AnthropicAdaptor{}
-	case 3: // ProviderGemini
+	case cgateway.ProviderGemini:
 		return &GeminiAdaptor{}
-	case 9999: // ProviderLocal
+	case cgateway.ProviderLocal, cgateway.ProviderPersonal:
 		return &LocalAdaptor{}
 	default:
 		return &OpenAIAdaptor{}

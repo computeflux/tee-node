@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 )
 
 // ── Panic Recovery ───────────────────────────────────────
@@ -22,9 +24,9 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				GATEWAYLOG().Printf("[PANIC] %v\n%s", err, debug.Stack())
+				GATEWAYLOG().Printf("[PANIC] %s %s: %v\n%s", r.Method, r.URL.Path, err, debug.Stack())
 				// 不将 panic 详情泄露给客户端，返回通用 500
-				writeError(w, http.StatusInternalServerError,
+				writeProtocolError(w, r, http.StatusInternalServerError,
 					"internal server error", "server_error")
 			}
 		}()
@@ -146,7 +148,7 @@ func RateLimitMiddleware(maxReq int, duration time.Duration) func(http.Handler) 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := r.RemoteAddr
 			if !limiter.allow(key, maxReq, duration) {
-				writeError(w, http.StatusTooManyRequests, "rate limit exceeded", "rate_limit")
+				writeProtocolError(w, r, http.StatusTooManyRequests, "rate limit exceeded", "rate_limit")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -237,6 +239,17 @@ func writeError(w http.ResponseWriter, code int, msg, typ string) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error": map[string]string{"message": msg, "type": typ},
 	})
+}
+
+// writeProtocolError 根据入口协议返回对应格式的错误响应。
+func writeProtocolError(w http.ResponseWriter, r *http.Request, code int, msg, typ string) {
+	if protocol.IsAnthropic(protocol.FromContext(r)) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		w.Write(protocol.AnthropicErrorResponse(msg, typ))
+		return
+	}
+	writeError(w, code, msg, typ)
 }
 
 func readRequestBody(r *http.Request) ([]byte, error) {

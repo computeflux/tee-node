@@ -24,20 +24,20 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if key == "" {
-			writeError(w, http.StatusUnauthorized, "missing api key", "auth_error")
+			writeProtocolError(w, r, http.StatusUnauthorized, "missing api key", "auth_error")
 			return
 		}
 
 		token := findTokenCachedFn(key)
 		if token == nil {
 			GATEWAYLOG().Printf("[AUTH] token not found for key prefix: %s...", key[:min(16, len(key))])
-			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
+			writeProtocolError(w, r, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
 
 		if !token.IsActive {
 			GATEWAYLOG().Printf("[AUTH] token inactive for key prefix: %s...", key[:min(16, len(key))])
-			writeError(w, http.StatusUnauthorized, "invalid api key", "auth_error")
+			writeProtocolError(w, r, http.StatusUnauthorized, "invalid api key", "auth_error")
 			return
 		}
 
@@ -53,7 +53,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		// Body is reset so downstream handler can re-read it.
 		bodyBytes, err := readRequestBody(r)
 		if err != nil || bodyBytes == nil {
-			writeError(w, http.StatusBadRequest, "failed to read request body", "invalid_request")
+			writeProtocolError(w, r, http.StatusBadRequest, "failed to read request body", "invalid_request")
 			return
 		}
 
@@ -65,13 +65,13 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 				if s, ok := v.(string); ok {
 					modelNameArg = s
 				} else {
-					writeError(w, http.StatusBadRequest, "model must be a string", "invalid_request")
+					writeProtocolError(w, r, http.StatusBadRequest, "model must be a string", "invalid_request")
 					return
 				}
 			}
 		}
 		if modelNameArg == "" {
-			writeError(w, http.StatusNotFound, "model is null", "not_found")
+			writeProtocolError(w, r, http.StatusNotFound, "model is null", "not_found")
 			return
 		}
 
@@ -87,12 +87,12 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		// 用 ProviderID 查询 Provider，验证名称与活跃状态
 		provider := findProviderNameFn(providerName)
 		if provider == nil || !provider.Data.IsActive {
-			writeError(w, http.StatusServiceUnavailable,
+			writeProtocolError(w, r, http.StatusServiceUnavailable,
 				"provider not available for model "+modelName, "server_error")
 			return
 		}
 		if provider.Data.Name != providerName {
-			writeError(w, http.StatusBadRequest,
+			writeProtocolError(w, r, http.StatusBadRequest,
 				"provider name \""+providerName+"\" mismatch for model "+modelName+"\"provider.name"+provider.Data.Name+"\"", "invalid_request")
 			return
 		}
@@ -100,14 +100,14 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		// 1. 从合约查询模型（必须存在且活跃）
 		model := findGatewayModelByNameFn(provider.ID, modelName)
 		if model == nil {
-			writeError(w, http.StatusNotFound, "model not found: "+modelName, "not_found")
+			writeProtocolError(w, r, http.StatusNotFound, "model not found: "+modelName, "not_found")
 			return
 		}
 
 		// 3. 从合约构建 endpoints（URI + APIKeys） ProviderType 为动态注册
 		endpoints := buildEndpointsFromModel(&model.Data)
 		if len(endpoints) == 0 {
-			writeError(w, http.StatusServiceUnavailable,
+			writeProtocolError(w, r, http.StatusServiceUnavailable,
 				"no available endpoints for model "+modelName, "server_error")
 			return
 		}
@@ -122,7 +122,7 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 				GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
 			} else if credit <= 0 {
 				GATEWAYLOG().Printf("[AUTH] insufficient credit for owner=%s, credit=%d", token.Owner, credit)
-				writeError(w, http.StatusPaymentRequired, "insufficient credit", "insufficient_credit")
+				writeProtocolError(w, r, http.StatusPaymentRequired, "insufficient credit", "insufficient_credit")
 				return
 			}
 		}
@@ -133,14 +133,14 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 		}
 		b := store.NewEndpointBalancerFromEndpoints(endpoints)
 		if b == nil {
-			writeError(w, http.StatusServiceUnavailable,
+			writeProtocolError(w, r, http.StatusServiceUnavailable,
 				"no available endpoint for model "+modelName, "server_error")
 			return
 		}
 
 		endpoint := b.Pick(userKey + ":" + modelName)
 		if endpoint == nil {
-			writeError(w, http.StatusServiceUnavailable,
+			writeProtocolError(w, r, http.StatusServiceUnavailable,
 				"no available endpoint for model "+modelName, "server_error")
 			return
 		}
