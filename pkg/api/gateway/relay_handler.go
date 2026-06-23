@@ -169,15 +169,15 @@ func providerTypeToLimiterKey(providerType uint16) string {
 }
 
 func HandleListModels(w http.ResponseWriter, r *http.Request) {
-	models := make([]map[string]interface{}, 0)
+	models := make([]map[string]any, 0)
 
 	// 从合约读取模型列表
 	for _, m := range getCachedGatewayModelsFn() {
-		models = append(models, map[string]interface{}{
+		models = append(models, map[string]any{
 			"id": m.Name, "object": "model", "owned_by": fmt.Sprintf("%x", m.Owner.V),
 		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"object": "list", "data": models})
+	json.NewEncoder(w).Encode(map[string]any{"object": "list", "data": models})
 }
