@@ -122,12 +122,12 @@ func main() {
 	// 	os.Exit(1)
 	// }
 
-	// codeVersions, err := chains.MainChain.GetCodeVersions()
-	// if err != nil {
-	// 	fmt.Println("Get code versions error:", err)
-	// 	os.Exit(1)
-	// }
-	// fmt.Println("Codes", codeVersions)
+	codeVersions, err := chains.MainChain.GetCodeVersions()
+	if err != nil {
+		fmt.Println("Get code versions error:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Codes", codeVersions)
 
 	// load chains
 	err = teeChain.LoadChains()
@@ -157,6 +157,7 @@ func main() {
 	walletSvc := wallet.NewWalletService(teeChain)
 	emailSvc := authsvc.NewEmailService(teeChain)
 	oauthSvc := authsvc.NewOAuthService(teeChain)
+
 	// Start GraphQL server
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

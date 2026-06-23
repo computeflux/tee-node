@@ -82,7 +82,7 @@ func SgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	// TODO TODO TODO TODO TODO must open
 	if report.Debug {
 		util.LogError("TEE", "debug model")
-		// 	return nil, errors.New("debug mode is not allowed")
+		return nil, errors.New("debug mode is not allowed")
 	}
 
 	return &model.TeeVerifyResult{

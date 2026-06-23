@@ -3,6 +3,7 @@ package teetypes
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/ed25519"
@@ -70,8 +71,16 @@ func (v *P2PTEEVerifier) VerifyReport(report []byte, remotePubKey crypto.PubKey)
 	if err != nil {
 		return fmt.Errorf("verify report: %w", err)
 	}
+
+	fmt.Println("CodeSigner", result.CodeSigner)
+	fmt.Println("CodeSignature", result.CodeSignature)
+
 	if result == nil {
 		return fmt.Errorf("verify report returned nil result")
+	}
+
+	if time.Now().Unix()-call.Time > 3 {
+		return fmt.Errorf("repost is out time")
 	}
 
 	// TODO: add policy checks here (e.g. whitelist code signer/product id, time window).
