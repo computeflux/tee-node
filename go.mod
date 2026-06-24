@@ -28,6 +28,7 @@ require (
 )
 
 require (
+	cloud.google.com/go v0.123.0 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.14.5 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect

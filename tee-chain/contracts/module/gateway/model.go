@@ -459,21 +459,51 @@ func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInf
 	return out, nil
 }
 
-// maskAPIKey 保留最后一个 '-' 及之前前缀，再保留其后 3 个字符明文，其余替换为 *
+// maskAPIKey 对 API Key 脱敏：
+//   - 三段及以上（如 sk-cp-xxx...）：保留前两段及第三段前少量字符（不超过总长 1/8，且最多 4 个）。
+//   - 两段（如 sk-xxx）：保留第一段及第二段前 3 个字符。
+//   - 无 '-'：保留前 min(3, n/8 向上至少 1) 个字符。
 func maskAPIKey(key string) string {
-	if len(key) <= 3 {
-		return strings.Repeat("*", len(key))
+	n := len(key)
+	if n <= 3 {
+		return strings.Repeat("*", n)
 	}
-	idx := strings.LastIndex(key, "-")
-	if idx == -1 {
-		// 没有 '-' 时保留前 3 个字符
-		return key[:3] + strings.Repeat("*", len(key)-3)
+
+	parts := strings.Split(key, "-")
+
+	// 三段及以上：暴露前缀 sk-cp- 及后续少量字符
+	if len(parts) >= 3 {
+		visibleSecret := n / 8
+		if visibleSecret > 4 {
+			visibleSecret = 4
+		}
+		if visibleSecret < 1 {
+			visibleSecret = 1
+		}
+		prefix := parts[0] + "-" + parts[1] + "-"
+		secret := parts[2]
+		if visibleSecret > len(secret) {
+			visibleSecret = len(secret)
+		}
+		visibleLen := len(prefix) + visibleSecret
+		return key[:visibleLen] + strings.Repeat("*", n-visibleLen)
 	}
-	visibleEnd := idx + 1 + 3
-	if visibleEnd > len(key) {
-		visibleEnd = len(key)
+
+	// 两段：保持原有行为，暴露 '-' 后 3 个字符
+	if len(parts) == 2 {
+		visibleEnd := len(parts[0]) + 1 + 3
+		if visibleEnd > n {
+			visibleEnd = n
+		}
+		return key[:visibleEnd] + strings.Repeat("*", n-visibleEnd)
 	}
-	return key[:visibleEnd] + strings.Repeat("*", len(key)-visibleEnd)
+
+	// 无 '-'
+	visible := 3
+	if visible > n {
+		visible = n
+	}
+	return key[:visible] + strings.Repeat("*", n-visible)
 }
 
 // maskAPIKeys 对所有 API Key 做脱敏处理

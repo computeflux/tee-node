@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
@@ -14,7 +15,9 @@ func providerNativeProtocol(providerType uint16) protocol.Protocol {
 	switch providerType {
 	case cgateway.ProviderClaude:
 		return protocol.ProtocolAnthropic
-	case cgateway.ProviderOpenAI, cgateway.ProviderGemini, cgateway.ProviderLocal, cgateway.ProviderPersonal:
+	case cgateway.ProviderGemini:
+		return protocol.ProtocolGemini
+	case cgateway.ProviderOpenAI, cgateway.ProviderPersonal:
 		return protocol.ProtocolOpenAI
 	default:
 		GATEWAYLOG().Printf("[WARN] unknown provider type %d, defaulting to openai protocol", providerType)
@@ -22,19 +25,13 @@ func providerNativeProtocol(providerType uint16) protocol.Protocol {
 	}
 }
 
-// canonicalAnthropicPath 把入口路由 /anthropic/* 归一化为标准的 /v1/* Anthropic 路径，
+// canonicalAnthropicPath 把入口路由 /anthropic/v1/* 归一化为标准的 /v1/* Anthropic 路径，
 // 便于后续做 provider 协议判断和 upstream 路径映射。
 func canonicalAnthropicPath(path string) string {
-	switch path {
-	case "/anthropic/messages":
-		return "/v1/messages"
-	case "/anthropic/messages/count_tokens":
-		return "/v1/messages/count_tokens"
-	case "/anthropic/complete":
-		return "/v1/complete"
-	default:
-		GATEWAYLOG().Printf("[WARN] unrecognized anthropic path: %s", path)
+	if strings.HasPrefix(path, "/anthropic/v1/") {
+		return "/v1/" + strings.TrimPrefix(path, "/anthropic/v1/")
 	}
+	GATEWAYLOG().Printf("[WARN] unrecognized anthropic path: %s", path)
 	return path
 }
 
@@ -75,6 +72,13 @@ func resolveUpstreamPath(inboundProto, providerProto protocol.Protocol, requestP
 			return "", errUnsupportedConversion
 		}
 		return mapOpenAIPathToAnthropic(requestPath), nil
+	}
+	if inboundProto == protocol.ProtocolOpenAI && providerProto == protocol.ProtocolGemini {
+		// GeminiAdaptor 自己根据模型构造 URL path，这里保持原路径即可。
+		if requestPath != "/v1/chat/completions" {
+			return "", errUnsupportedConversion
+		}
+		return requestPath, nil
 	}
 	return "", errUnsupportedConversion
 }

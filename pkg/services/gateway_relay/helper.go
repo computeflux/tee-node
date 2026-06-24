@@ -11,6 +11,17 @@ import (
 
 // ── Common adaptor helpers ───────────────────────────────
 
+// redactAuthHeader 返回一份脱敏后的 header 副本，用于日志输出。
+func redactAuthHeader(h http.Header) http.Header {
+	out := h.Clone()
+	for _, k := range []string{"Authorization", "X-Api-Key", "X-Google-Api-Key"} {
+		if out.Get(k) != "" {
+			out.Set(k, "***")
+		}
+	}
+	return out
+}
+
 // SetupCommonRequestHeader sets common headers for upstream requests
 func SetupCommonRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) {
 	req.Header.Set("Content-Type", "application/json")
@@ -93,7 +104,7 @@ func GetAdaptorForProviderTypeCode(providerType uint16) Adaptor {
 		return &AnthropicAdaptor{}
 	case cgateway.ProviderGemini:
 		return &GeminiAdaptor{}
-	case cgateway.ProviderLocal, cgateway.ProviderPersonal:
+	case cgateway.ProviderPersonal:
 		return &LocalAdaptor{}
 	default:
 		return &OpenAIAdaptor{}

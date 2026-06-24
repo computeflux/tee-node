@@ -73,3 +73,28 @@ func TestStreamAnthropicResponseToOpenAI_RequiresFlusher(t *testing.T) {
 		t.Fatal("expected error when response writer does not implement http.Flusher")
 	}
 }
+
+func TestStreamAnthropicResponseToOpenAI_Thinking(t *testing.T) {
+	input := "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"model\":\"claude-opus-4\",\"usage\":{\"input_tokens\":7}}}\n\n" +
+		"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Let me think\"}}\n\n" +
+		"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Done\"}}\n\n" +
+		"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":3}}\n\n"
+
+	var buf flushWriter
+	_, err := StreamAnthropicResponseToOpenAI(strings.NewReader(input), &buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	out := buf.String()
+	for _, want := range []string{
+		`"reasoning_content":"Let me think"`,
+		`"content":"Done"`,
+		`"finish_reason":"stop"`,
+		"data: [DONE]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+}

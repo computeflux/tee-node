@@ -11,6 +11,7 @@ type Protocol string
 const (
 	ProtocolOpenAI    Protocol = "openai"
 	ProtocolAnthropic Protocol = "anthropic"
+	ProtocolGemini    Protocol = "gemini"
 )
 
 type protocolKey struct{}

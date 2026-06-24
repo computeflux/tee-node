@@ -56,7 +56,7 @@ func TestHandleRelay_MatchingAnthropicProtocol(t *testing.T) {
 	}
 
 	body := []byte(`{"model":"anthropic/claude-3","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`)
-	req := requestWithBody(makeTestToken(true), makeTestModelWithProviderType("claude-3", 2), makeTestEndpoint("https://api.anthropic.com"), body, "/anthropic/messages", protocol.ProtocolAnthropic)
+	req := requestWithBody(makeTestToken(true), makeTestModelWithProviderType("claude-3", 2), makeTestEndpoint("https://api.anthropic.com"), body, "/anthropic/v1/messages", protocol.ProtocolAnthropic)
 
 	w := httptest.NewRecorder()
 	HandleRelay(w, req)
@@ -91,7 +91,7 @@ func TestHandleRelay_AnthropicToOpenAI(t *testing.T) {
 	}
 
 	body := []byte(`{"model":"openai/gpt-4","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`)
-	req := requestWithBody(makeTestToken(true), makeTestModelWithProviderType("gpt-4", 1), makeTestEndpoint("https://api.openai.com"), body, "/anthropic/messages", protocol.ProtocolAnthropic)
+	req := requestWithBody(makeTestToken(true), makeTestModelWithProviderType("gpt-4", 1), makeTestEndpoint("https://api.openai.com"), body, "/anthropic/v1/messages", protocol.ProtocolAnthropic)
 
 	w := httptest.NewRecorder()
 	HandleRelay(w, req)

@@ -82,6 +82,7 @@ func (a *AnthropicAdaptor) GetRequestURL(meta *Meta) (string, error) {
 }
 
 func (a *AnthropicAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error {
+	forwardClientHeaders(ctx, req)
 	req.Header.Set("x-api-key", meta.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -106,6 +107,7 @@ func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Read
 	if err != nil {
 		return nil, err
 	}
+	// util.DebugLog("[anthropic] do request url=%s", url)
 
 	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {

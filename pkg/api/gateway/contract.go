@@ -77,7 +77,7 @@ func providerDefaultURL(providerType uint16) string {
 		return "https://api.anthropic.com"
 	case cgateway.ProviderGemini:
 		return "https://generativelanguage.googleapis.com"
-	case cgateway.ProviderLocal, cgateway.ProviderPersonal:
+	case cgateway.ProviderPersonal:
 		return "local://yamux" // 本地模型通过反向隧道转发，不需要真实 URL
 	default:
 		return ""
@@ -92,7 +92,7 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 	}
 
 	// 本地模型使用 Yamux 反向隧道，不需要 APIKeys 也不依赖 URI
-	if m.ProviderType == cgateway.ProviderLocal || m.ProviderType == cgateway.ProviderPersonal {
+	if m.ProviderType == cgateway.ProviderPersonal {
 		return []*store.GatewayEndpoint{{
 			ID:         m.ProviderID,
 			ProviderID: m.ProviderID,
@@ -186,7 +186,7 @@ func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
 		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s not found or inactive under provider=%d", modelName, providerID)
 		return 0, false
 	}
-	if model.Data.ProviderType != cgateway.ProviderLocal && model.Data.ProviderType != cgateway.ProviderPersonal {
+	if model.Data.ProviderType != cgateway.ProviderPersonal {
 		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s provider=%d providerType=%d is not local", modelName, providerID, model.Data.ProviderType)
 		return 0, false
 	}

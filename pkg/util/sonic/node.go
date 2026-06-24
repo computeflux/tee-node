@@ -27,15 +27,15 @@ func (n Node) Raw() (string, error) {
 
 // String returns the string representation of the node.
 // For JSON strings the quotes are stripped; for other values the raw JSON is returned.
-func (n Node) String() string {
+func (n Node) String() (string, error) {
 	if !n.exists {
-		return ""
+		return "", nil
 	}
 	if s, ok := n.value.(string); ok {
-		return s
+		return s, nil
 	}
-	b, _ := json.Marshal(n.value)
-	return string(b)
+	b, err := json.Marshal(n.value)
+	return string(b), err
 }
 
 // Get searches and locates the given path from src json.

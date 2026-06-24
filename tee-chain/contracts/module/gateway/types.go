@@ -31,12 +31,9 @@ const (
 	ProviderOpenAI uint16 = iota + 1 // 1
 	ProviderClaude                   // 2
 	ProviderGemini                   // 3
-	ProviderLocal uint16 = 9         // 本地私有化部署模型
+	// ProviderPersonal 是个人算力（本地隧道）的 ProviderType 取值，
+	ProviderPersonal uint16 = 9999
 )
-
-// ProviderPersonal 是个人算力（本地隧道）的 ProviderType 取值，
-// 与 ProviderLocal 语义相同，保留以兼容历史数据。
-const ProviderPersonal uint16 = 9999
 
 // ── Model ────────────────────────────────────────────────
 

@@ -6,85 +6,79 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/maximhq/bifrost/core/providers/anthropic"
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-// DefaultSSEBufferSize 是 SSE 流扫描器的默认缓冲区大小。
 const DefaultSSEBufferSize = 64 * 1024
 
 // StreamOpenAIResponseToAnthropic 读取 OpenAI SSE 流并实时转换为 Anthropic SSE 事件写入 w。
-// 返回从流最后一个 chunk 解析出的 usage（如果有）。
-func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer) (*schemas.BifrostLLMUsage, error) {
+func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer, dropThinking bool, toolSchemas ...schemas.ChatTool) (*schemas.BifrostLLMUsage, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, DefaultSSEBufferSize), DefaultSSEBufferSize)
 
-	state := &streamState{currentBlockIndex: -1}
+	s := &streamState{currentBlockIndex: -1, dropThinking: dropThinking}
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		if !strings.HasPrefix(line, "data: ") {
+		if line == "" || !strings.HasPrefix(line, "data: ") {
 			continue
 		}
 		data := strings.TrimPrefix(line, "data: ")
 		if data == "[DONE]" {
 			break
 		}
-
 		var chunk openAIStreamChunk
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			return nil, fmt.Errorf("parse openai stream chunk: %w", err)
 		}
-
-		if err := state.handleChunk(w, chunk); err != nil {
+		if err := s.handleChunk(w, chunk); err != nil {
 			return nil, err
 		}
 	}
-
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read openai stream: %w", err)
 	}
-
-	if err := state.finish(w); err != nil {
+	if err := s.finish(w); err != nil {
 		return nil, err
 	}
-
-	return state.usage, nil
+	return s.usage, nil
 }
 
-type blockType string
+// ============== 状态机 ==============
+
+type blockType int
 
 const (
-	blockTypeNone     blockType = ""
-	blockTypeText     blockType = "text"
-	blockTypeThinking blockType = "thinking"
-	blockTypeToolUse  blockType = "tool_use"
+	blockNone blockType = iota
+	blockText
+	blockThinking
+	blockToolUse
 )
 
 type streamState struct {
-	started      bool
-	id           string
-	model        string
-	usage        *schemas.BifrostLLMUsage
-	finishReason *string
-
+	started           bool
+	id, model         string
+	usage             *schemas.BifrostLLMUsage
+	finishReason      *string
+	dropThinking      bool
 	currentBlockIndex int
 	currentBlockType  blockType
 	currentToolCall   *toolCallState
-	toolCallStates    map[int]*toolCallState // key: tool call index from OpenAI
+	toolCallStates    map[int]*toolCallState
 }
 
 type toolCallState struct {
-	id        string
-	name      string
-	arguments string
-	started   bool
-	stopped   bool
-	blockIdx  int // Anthropic content block index
+	id, name, arguments string
+	started             bool
+	blockIdx            int
+	done                bool
 }
 
 func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
@@ -92,40 +86,32 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 		s.started = true
 		s.id = chunk.ID
 		s.model = chunk.Model
-		if err := writeEvent(w, "message_start", map[string]any{
-			"type": "message_start",
-			"message": map[string]any{
-				"type":    "message",
-				"id":      chunk.ID,
-				"role":    "assistant",
-				"model":   chunk.Model,
-				"content": []any{},
-				"usage": map[string]any{
-					"input_tokens":  0,
-					"output_tokens": 0,
-				},
+		if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+			Type: anthropic.AnthropicStreamEventTypeMessageStart,
+			Message: &anthropic.AnthropicMessageResponse{
+				ID:      chunk.ID,
+				Type:    "message",
+				Role:    "assistant",
+				Model:   chunk.Model,
+				Content: []anthropic.AnthropicContentBlock{},
+				Usage:   &anthropic.AnthropicUsage{},
 			},
 		}); err != nil {
 			return err
 		}
 	}
-
 	if chunk.Usage != nil {
 		s.usage = chunk.Usage
 	}
 
-	// 当前转换只支持单条非空 choice；多条 choice 会共享同一组 content block，导致内容交错。
-	nonEmptyChoices := 0
-	for _, choice := range chunk.Choices {
-		if choice.Delta == nil {
-			continue
-		}
-		delta := choice.Delta
-		if delta.Content != "" || delta.Reasoning != "" || delta.ReasoningContent != "" || len(delta.ToolCalls) > 0 {
-			nonEmptyChoices++
+	// 仅支持单 choice
+	nonEmpty := 0
+	for _, c := range chunk.Choices {
+		if c.Delta != nil && (c.Delta.Content != "" || c.Delta.Reasoning != "" || c.Delta.ReasoningContent != "" || len(c.Delta.ToolCalls) > 0) {
+			nonEmpty++
 		}
 	}
-	if nonEmptyChoices > 1 {
+	if nonEmpty > 1 {
 		return fmt.Errorf("multiple non-empty choices not supported")
 	}
 
@@ -138,101 +124,104 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 		}
 		delta := choice.Delta
 
-		// thinking / reasoning
 		reasoning := delta.Reasoning
-		if reasoning == "" && delta.ReasoningContent != "" {
+		if reasoning == "" {
 			reasoning = delta.ReasoningContent
 		}
-		if reasoning != "" {
-			if err := s.startBlock(w, blockTypeThinking); err != nil {
+		if reasoning != "" && !s.dropThinking {
+			if err := s.startBlock(w, blockThinking); err != nil {
 				return err
 			}
-			if err := writeEvent(w, "thinking_delta", map[string]any{
-				"type":  "thinking_delta",
-				"index": s.currentBlockIndex,
-				"delta": map[string]any{"type": "thinking_delta", "thinking": reasoning},
+			if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+				Type:  anthropic.AnthropicStreamEventTypeContentBlockDelta,
+				Index: &s.currentBlockIndex,
+				Delta: &anthropic.AnthropicStreamDelta{
+					Type:     anthropic.AnthropicStreamDeltaTypeThinking,
+					Thinking: &reasoning,
+				},
 			}); err != nil {
 				return err
 			}
 		}
 
-		// text content
 		if delta.Content != "" {
-			if err := s.startBlock(w, blockTypeText); err != nil {
+			if err := s.startBlock(w, blockText); err != nil {
 				return err
 			}
-			if err := writeEvent(w, "content_block_delta", map[string]any{
-				"type":  "content_block_delta",
-				"index": s.currentBlockIndex,
-				"delta": map[string]any{"type": "text_delta", "text": delta.Content},
+			if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+				Type:  anthropic.AnthropicStreamEventTypeContentBlockDelta,
+				Index: &s.currentBlockIndex,
+				Delta: &anthropic.AnthropicStreamDelta{
+					Type: anthropic.AnthropicStreamDeltaTypeText,
+					Text: &delta.Content,
+				},
 			}); err != nil {
 				return err
 			}
 		}
 
-		// tool_calls
 		for _, tc := range delta.ToolCalls {
 			if s.toolCallStates == nil {
 				s.toolCallStates = make(map[int]*toolCallState)
 			}
-			state, ok := s.toolCallStates[tc.Index]
+			st, ok := s.toolCallStates[tc.Index]
 			if !ok {
-				// 切换到一个新的 tool_use block
 				if err := s.closeCurrentBlock(w); err != nil {
 					return err
 				}
-				state = &toolCallState{blockIdx: s.currentBlockIndex}
-				s.toolCallStates[tc.Index] = state
-				s.currentToolCall = state
+				st = &toolCallState{blockIdx: s.currentBlockIndex}
+				s.toolCallStates[tc.Index] = st
+				s.currentToolCall = st
 			}
 			if tc.ID != "" {
-				state.id = tc.ID
+				st.id = tc.ID
 			}
 			if tc.Function.Name != "" {
-				state.name = tc.Function.Name
+				st.name = strings.ToLower(tc.Function.Name)
 			}
-
 			if tc.Function.Arguments != "" {
-				if !state.started {
-					// 在 content_block_start 之前先缓存参数片段
-					state.arguments += tc.Function.Arguments
+				if !st.started {
+					st.arguments += tc.Function.Arguments
 				} else {
-					if err := writeEvent(w, "input_json_delta", map[string]any{
-						"type":  "input_json_delta",
-						"index": state.blockIdx,
-						"delta": map[string]any{"type": "input_json_delta", "partial_json": tc.Function.Arguments},
+					if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+						Type:  anthropic.AnthropicStreamEventTypeContentBlockDelta,
+						Index: &st.blockIdx,
+						Delta: &anthropic.AnthropicStreamDelta{
+							Type:        anthropic.AnthropicStreamDeltaTypeInputJSON,
+							PartialJSON: &tc.Function.Arguments,
+						},
 					}); err != nil {
 						return err
 					}
-					state.arguments += tc.Function.Arguments
+					st.arguments += tc.Function.Arguments
 				}
 			}
-
-			// 等 id 和 name 都到齐后再 emit content_block_start，避免 name 为空。
-			if !state.started && state.id != "" && state.name != "" {
-				state.started = true
-				s.currentBlockType = blockTypeToolUse
+			if !st.started && st.id != "" && st.name != "" {
+				st.started = true
+				s.currentBlockType = blockToolUse
 				s.currentBlockIndex++
-				state.blockIdx = s.currentBlockIndex
-				s.currentToolCall = state
-				if err := writeEvent(w, "content_block_start", map[string]any{
-					"type":  "content_block_start",
-					"index": state.blockIdx,
-					"content_block": map[string]any{
-						"type":  "tool_use",
-						"id":    state.id,
-						"name":  state.name,
-						"input": map[string]any{},
+				st.blockIdx = s.currentBlockIndex
+				s.currentToolCall = st
+				if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+					Type:  anthropic.AnthropicStreamEventTypeContentBlockStart,
+					Index: &st.blockIdx,
+					ContentBlock: &anthropic.AnthropicContentBlock{
+						Type:  anthropic.AnthropicContentBlockTypeToolUse,
+						ID:    &st.id,
+						Name:  &st.name,
+						Input: json.RawMessage("{}"),
 					},
 				}); err != nil {
 					return err
 				}
-				// 补发缓存的参数增量
-				if state.arguments != "" {
-					if err := writeEvent(w, "input_json_delta", map[string]any{
-						"type":  "input_json_delta",
-						"index": state.blockIdx,
-						"delta": map[string]any{"type": "input_json_delta", "partial_json": state.arguments},
+				if st.arguments != "" {
+					if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+						Type:  anthropic.AnthropicStreamEventTypeContentBlockDelta,
+						Index: &st.blockIdx,
+						Delta: &anthropic.AnthropicStreamDelta{
+							Type:        anthropic.AnthropicStreamDeltaTypeInputJSON,
+							PartialJSON: &st.arguments,
+						},
 					}); err != nil {
 						return err
 					}
@@ -240,7 +229,6 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -254,17 +242,23 @@ func (s *streamState) startBlock(w io.Writer, t blockType) error {
 	s.currentBlockType = t
 	s.currentBlockIndex++
 	switch t {
-	case blockTypeText:
-		return writeEvent(w, "content_block_start", map[string]any{
-			"type":          "content_block_start",
-			"index":         s.currentBlockIndex,
-			"content_block": map[string]any{"type": "text", "text": ""},
+	case blockText:
+		return writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+			Type:  anthropic.AnthropicStreamEventTypeContentBlockStart,
+			Index: &s.currentBlockIndex,
+			ContentBlock: &anthropic.AnthropicContentBlock{
+				Type: anthropic.AnthropicContentBlockTypeText,
+				Text: schemas.Ptr(""),
+			},
 		})
-	case blockTypeThinking:
-		return writeEvent(w, "content_block_start", map[string]any{
-			"type":          "content_block_start",
-			"index":         s.currentBlockIndex,
-			"content_block": map[string]any{"type": "thinking", "thinking": ""},
+	case blockThinking:
+		return writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+			Type:  anthropic.AnthropicStreamEventTypeContentBlockStart,
+			Index: &s.currentBlockIndex,
+			ContentBlock: &anthropic.AnthropicContentBlock{
+				Type:     anthropic.AnthropicContentBlockTypeThinking,
+				Thinking: schemas.Ptr(""),
+			},
 		})
 	}
 	return nil
@@ -272,49 +266,21 @@ func (s *streamState) startBlock(w io.Writer, t blockType) error {
 
 func (s *streamState) closeCurrentBlock(w io.Writer) error {
 	switch s.currentBlockType {
-	case blockTypeText:
-		if err := writeEvent(w, "content_block_stop", map[string]any{
-			"type":          "content_block_stop",
-			"index":         s.currentBlockIndex,
-			"content_block": map[string]any{"type": "text", "text": ""},
-		}); err != nil {
-			return err
-		}
-	case blockTypeThinking:
-		if err := writeEvent(w, "content_block_stop", map[string]any{
-			"type":          "content_block_stop",
-			"index":         s.currentBlockIndex,
-			"content_block": map[string]any{"type": "thinking", "thinking": ""},
-		}); err != nil {
-			return err
-		}
-	case blockTypeToolUse:
-		tc := s.currentToolCall
-		contentBlock := map[string]any{"type": "tool_use"}
-		var input any = map[string]any{}
-		if tc != nil {
-			contentBlock["id"] = tc.id
-			contentBlock["name"] = tc.name
-			if tc.arguments != "" {
-				if err := json.Unmarshal([]byte(tc.arguments), &input); err != nil {
-					// JSON 不合法时回退为空对象，避免破坏下游 Anthropic SDK 解析
-					input = map[string]any{}
-				}
+	case blockText, blockThinking, blockToolUse:
+		if s.currentBlockType == blockToolUse {
+			if tc := s.currentToolCall; tc != nil && tc.arguments != "" {
+				dumpOpenAIToolArgs(tc.name, tc.arguments)
+				tc.done = true
 			}
 		}
-		contentBlock["input"] = input
-		if err := writeEvent(w, "content_block_stop", map[string]any{
-			"type":          "content_block_stop",
-			"index":         s.currentBlockIndex,
-			"content_block": contentBlock,
+		if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+			Type:  anthropic.AnthropicStreamEventTypeContentBlockStop,
+			Index: &s.currentBlockIndex,
 		}); err != nil {
 			return err
 		}
-		if tc != nil {
-			tc.stopped = true
-		}
 	}
-	s.currentBlockType = blockTypeNone
+	s.currentBlockType = blockNone
 	s.currentToolCall = nil
 	return nil
 }
@@ -323,68 +289,54 @@ func (s *streamState) finish(w io.Writer) error {
 	if !s.started {
 		return nil
 	}
-
 	if err := s.closeCurrentBlock(w); err != nil {
 		return err
 	}
-
 	for _, tc := range s.toolCallStates {
-		if !tc.started || tc.stopped {
+		if !tc.started || tc.done {
 			continue
 		}
-		var input any = map[string]any{}
 		if tc.arguments != "" {
-			if err := json.Unmarshal([]byte(tc.arguments), &input); err != nil {
-				input = map[string]any{}
-			}
+			dumpOpenAIToolArgs(tc.name, tc.arguments)
 		}
-		if err := writeEvent(w, "content_block_stop", map[string]any{
-			"type":  "content_block_stop",
-			"index": tc.blockIdx,
-			"content_block": map[string]any{
-				"type":  "tool_use",
-				"id":    tc.id,
-				"name":  tc.name,
-				"input": input,
-			},
+		if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+			Type:  anthropic.AnthropicStreamEventTypeContentBlockStop,
+			Index: &tc.blockIdx,
 		}); err != nil {
 			return err
 		}
 	}
 
-	stopReason := "end_turn"
+	stopReason := anthropic.AnthropicStopReasonEndTurn
 	if s.finishReason != nil {
-		stopReason = mapOpenAIFinishReasonToAnthropic(*s.finishReason)
+		stopReason = anthropic.ConvertBifrostFinishReasonToAnthropic(*s.finishReason)
 	}
-
 	usageOut := 0
 	if s.usage != nil {
 		usageOut = s.usage.CompletionTokens
 	}
-	if err := writeEvent(w, "message_delta", map[string]any{
-		"type": "message_delta",
-		"delta": map[string]any{
-			"stop_reason":   stopReason,
-			"stop_sequence": nil,
+	if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+		Type: anthropic.AnthropicStreamEventTypeMessageDelta,
+		Delta: &anthropic.AnthropicStreamDelta{
+			StopReason: &stopReason,
 		},
-		"usage": map[string]any{
-			"output_tokens": usageOut,
-		},
+		Usage: &anthropic.AnthropicUsage{OutputTokens: usageOut},
 	}); err != nil {
 		return err
 	}
-
-	return writeEvent(w, "message_stop", map[string]any{
-		"type": "message_stop",
+	return writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
+		Type: anthropic.AnthropicStreamEventTypeMessageStop,
 	})
 }
 
-func writeEvent(w io.Writer, event string, data any) error {
-	b, err := json.Marshal(data)
+// ============== 输出 ==============
+
+func writeAnthropicSSE(w io.Writer, event *anthropic.AnthropicStreamEvent) error {
+	b, err := providerUtils.MarshalSorted(event)
 	if err != nil {
 		return fmt.Errorf("marshal sse event: %w", err)
 	}
-	if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, string(b)); err != nil {
+	if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Type, string(b)); err != nil {
 		return fmt.Errorf("write sse event: %w", err)
 	}
 	if f, ok := w.(http.Flusher); ok {
@@ -393,25 +345,21 @@ func writeEvent(w io.Writer, event string, data any) error {
 	return nil
 }
 
-func mapOpenAIFinishReasonToAnthropic(reason string) string {
-	switch reason {
-	case "stop":
-		return "end_turn"
-	case "length":
-		return "max_tokens"
-	case "tool_calls":
-		return "tool_use"
-	case "content_filter":
-		return "content_filter"
-	default:
-		return reason
+func dumpOpenAIToolArgs(toolName string, args string) {
+	for _, dir := range []string{"/token_chain_data", "."} {
+		os.MkdirAll(dir, 0755)
+		path := filepath.Join(dir, fmt.Sprintf("gateway_openai_tool_args_%s_%d.json", toolName, time.Now().UnixMilli()))
+		if os.WriteFile(path, []byte(args), 0644) == nil {
+			return
+		}
 	}
 }
+
+// ============== OpenAI SSE 解析类型 ==============
 
 type openAIStreamChunk struct {
 	ID      string                   `json:"id"`
 	Object  string                   `json:"object"`
-	Created int                      `json:"created"`
 	Model   string                   `json:"model"`
 	Choices []openAIStreamChoice     `json:"choices"`
 	Usage   *schemas.BifrostLLMUsage `json:"usage,omitempty"`

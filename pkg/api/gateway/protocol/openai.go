@@ -112,6 +112,9 @@ func buildOpenAIChatCompletionResponse(resp *schemas.BifrostChatResponse) ([]byt
 				msgMap["content"] = chatMessageContentToOpenAI(msg.Content)
 			}
 			if msg.ChatAssistantMessage != nil {
+				if reasoning := reasoningContentFromAssistantMessage(msg.ChatAssistantMessage); reasoning != "" {
+					msgMap["reasoning_content"] = reasoning
+				}
 				if len(msg.ChatAssistantMessage.ToolCalls) > 0 {
 					toolCalls := make([]map[string]any, 0, len(msg.ChatAssistantMessage.ToolCalls))
 					for _, tc := range msg.ChatAssistantMessage.ToolCalls {
@@ -175,6 +178,23 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// reasoningContentFromAssistantMessage 从 Bifrost assistant message 中提取 reasoning 文本。
+func reasoningContentFromAssistantMessage(msg *schemas.ChatAssistantMessage) string {
+	if msg == nil {
+		return ""
+	}
+	if msg.Reasoning != nil && *msg.Reasoning != "" {
+		return *msg.Reasoning
+	}
+	var buf strings.Builder
+	for _, rd := range msg.ReasoningDetails {
+		if rd.Type == schemas.BifrostReasoningDetailsTypeText && rd.Text != nil {
+			buf.WriteString(*rd.Text)
+		}
+	}
+	return buf.String()
 }
 
 // chatMessageContentToOpenAI 把 Bifrost 的 ChatMessageContent 转为 OpenAI 的 content（string 或 content blocks）。

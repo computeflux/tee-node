@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,7 +158,7 @@ func TestConvertOpenAIResponseToAnthropic_Simple(t *testing.T) {
 		}
 	}`)
 
-	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody)
+	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody, false)
 	require.NoError(t, err)
 
 	var anthropicResp map[string]any
@@ -182,6 +183,79 @@ func TestConvertOpenAIResponseToAnthropic_Simple(t *testing.T) {
 	assert.Equal(t, float64(5), usage["output_tokens"])
 }
 
+func TestConvertOpenAIResponseToAnthropic_ToolSchemaFilter(t *testing.T) {
+	openAIBody := []byte(`{
+		"id": "chatcmpl-tool",
+		"object": "chat.completion",
+		"created": 1677652288,
+		"model": "gpt-4",
+		"choices": [{
+			"index": 0,
+			"message": {
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [{
+					"id": "call_1",
+					"type": "function",
+					"function": {"name": "Bash", "arguments": "{\"command\":\"ls\",\"description\":\"list files\"}"}
+				}]
+			},
+			"finish_reason": "tool_calls"
+		}],
+		"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+	}`)
+
+	toolSchemas := []schemas.ChatTool{makeBashToolSchema()}
+
+	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody, false, toolSchemas...)
+	require.NoError(t, err)
+
+	var anthropicResp map[string]any
+	require.NoError(t, json.Unmarshal(anthropicBody, &anthropicResp))
+	content := anthropicResp["content"].([]any)
+	require.Len(t, content, 1)
+	block := content[0].(map[string]any)
+	assert.Equal(t, "tool_use", block["type"])
+	input := block["input"].(map[string]any)
+	assert.Equal(t, "ls", input["command"])
+	assert.NotContains(t, input, "description")
+}
+
+func TestConvertOpenAIResponseToAnthropic_ToolSchemaFillsRequired(t *testing.T) {
+	openAIBody := []byte(`{
+		"id": "chatcmpl-empty",
+		"object": "chat.completion",
+		"created": 1677652288,
+		"model": "gpt-4",
+		"choices": [{
+			"index": 0,
+			"message": {
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [{
+					"id": "call_1",
+					"type": "function",
+					"function": {"name": "Bash", "arguments": "{}"}
+				}]
+			},
+			"finish_reason": "tool_calls"
+		}],
+		"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+	}`)
+
+	toolSchemas := []schemas.ChatTool{makeBashToolSchema()}
+
+	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody, false, toolSchemas...)
+	require.NoError(t, err)
+
+	var anthropicResp map[string]any
+	require.NoError(t, json.Unmarshal(anthropicBody, &anthropicResp))
+	content := anthropicResp["content"].([]any)
+	require.Len(t, content, 1)
+	input := content[0].(map[string]any)["input"].(map[string]any)
+	assert.Equal(t, "", input["command"])
+}
+
 func TestStreamOpenAIResponseToAnthropic_Text(t *testing.T) {
 	openAIStream := `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
@@ -195,7 +269,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	assert.Equal(t, 10, usage.PromptTokens)
@@ -229,7 +303,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	assert.Equal(t, 20, usage.PromptTokens)
@@ -237,7 +311,7 @@ data: [DONE]
 
 	output := buf.String()
 	assert.Contains(t, output, "event: content_block_start")
-	assert.Contains(t, output, "event: input_json_delta")
+	assert.Contains(t, output, "event: content_block_delta")
 	assert.Contains(t, output, "event: content_block_stop")
 	assert.Contains(t, output, `"name":"get_weather"`)
 	assert.Contains(t, output, `"stop_reason":"tool_use"`)
@@ -259,7 +333,7 @@ data: [DONE]
 		if err := json.Unmarshal([]byte(data), &event); err != nil {
 			continue
 		}
-		if event.Type == "input_json_delta" {
+		if event.Type == "content_block_delta" && event.Delta.Type == "input_json_delta" {
 			deltas = append(deltas, event.Delta.PartialJSON)
 		}
 	}
@@ -286,7 +360,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -310,7 +384,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -324,7 +398,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple non-empty choices")
 }
@@ -342,13 +416,58 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "event: thinking_delta")
+	assert.Contains(t, output, "event: content_block_delta")
 	assert.Contains(t, output, `"thinking":"Let me think"`)
 	assert.Contains(t, output, `"text":"Done"`)
+}
+
+func TestStreamOpenAIResponseToAnthropic_ToolSchemaFilter(t *testing.T) {
+	openAIStream := `data: {"id":"chatcmpl-filter","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":null},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-filter","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_f","type":"function","function":{"name":"Bash","arguments":"{\"command\":\"ls\",\"description\":\"list\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-filter","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
+
+data: [DONE]
+`
+
+	toolSchemas := []schemas.ChatTool{makeBashToolSchema()}
+
+	var buf bytes.Buffer
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false, toolSchemas...)
+	require.NoError(t, err)
+
+	// 验证标准 Anthropic 格式：content_block_delta + content_block_stop（无 content_block）
+	output := buf.String()
+	assert.Contains(t, output, "event: content_block_start")
+	assert.Contains(t, output, "event: content_block_delta")
+	assert.Contains(t, output, "event: content_block_stop")
+	assert.NotContains(t, output, "event: input_json_delta")
+}
+
+func TestStreamOpenAIResponseToAnthropic_ToolSchemaFillsRequired(t *testing.T) {
+	openAIStream := `data: {"id":"chatcmpl-empty","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_e","type":"function","function":{"name":"Bash","arguments":"{}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-empty","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}
+
+data: [DONE]
+`
+
+	toolSchemas := []schemas.ChatTool{makeBashToolSchema()}
+
+	var buf bytes.Buffer
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false, toolSchemas...)
+	require.NoError(t, err)
+
+	// 验证标准 Anthropic 格式：事件类型正确
+	output := buf.String()
+	assert.Contains(t, output, "event: content_block_start")
+	assert.Contains(t, output, "event: content_block_delta")
+	assert.Contains(t, output, "event: content_block_stop")
 }
 
 func TestAnthropicErrorResponse(t *testing.T) {
@@ -361,4 +480,82 @@ func TestAnthropicErrorResponse(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "not_found", errObj["type"])
 	assert.Equal(t, "model not found", errObj["message"])
+}
+
+func makeBashToolSchema() schemas.ChatTool {
+	return schemas.ChatTool{
+		Type: schemas.ChatToolTypeFunction,
+		Function: &schemas.ChatToolFunction{
+			Name: "Bash",
+			Parameters: &schemas.ToolFunctionParameters{
+				Type: "object",
+				Properties: schemas.OrderedMapFromMap(map[string]any{
+					"command": map[string]any{"type": "string"},
+				}),
+				Required: []string{"command"},
+			},
+		},
+	}
+}
+
+func TestConvertOpenAIResponseToAnthropic_DropThinking(t *testing.T) {
+	openAIBody := []byte(`{
+		"id": "chatcmpl-thinking",
+		"object": "chat.completion",
+		"created": 1,
+		"model": "deepseek-v4-pro",
+		"choices": [{
+			"index": 0,
+			"message": {
+				"role": "assistant",
+				"content": "",
+				"reasoning_content": "some reasoning",
+				"tool_calls": [{
+					"id": "call_1",
+					"type": "function",
+					"function": {"name": "bash", "arguments": "{\"command\":\"ls\"}"}
+				}]
+			},
+			"finish_reason": "tool_calls"
+		}],
+		"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+	}`)
+
+	tools := []schemas.ChatTool{makeBashToolSchema()}
+	out, err := ConvertOpenAIResponseToAnthropic(openAIBody, true, tools...)
+	require.NoError(t, err)
+
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(out, &resp))
+	content, ok := resp["content"].([]any)
+	require.True(t, ok)
+	require.Len(t, content, 1)
+	assert.Equal(t, "tool_use", content[0].(map[string]any)["type"])
+}
+
+func TestStreamOpenAIResponseToAnthropic_DropThinking(t *testing.T) {
+	openAIStream := `data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"content":null,"reasoning_content":"some reasoning"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"bash","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"command\":\"ls\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
+
+data: [DONE]
+`
+
+	var buf bytes.Buffer
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, true)
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.NotContains(t, output, "\"type\":\"thinking\"")
+	assert.NotContains(t, output, "thinking_delta")
+	assert.Contains(t, output, "\"type\":\"tool_use\"")
+	// 验证 Anthropic 标准事件类型
+	assert.Contains(t, output, "event: content_block_delta")
+	assert.Contains(t, output, "event: content_block_stop")
 }

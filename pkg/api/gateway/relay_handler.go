@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"time"
 
@@ -17,6 +19,29 @@ import (
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/maximhq/bifrost/core/schemas"
 )
+
+// dumpOpenAIRequestBodyIfNeeded 把带有 tools 的 Anthropic->OpenAI 转换后请求体写入
+// 带时间戳的文件，避免被后续无 tool 请求覆盖。优先写入 /token_chain_data，
+// 不可写时回退到当前目录。
+func dumpOpenAIRequestBodyIfNeeded(body []byte) string {
+	var req struct {
+		Tools []json.RawMessage `json:"tools"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil || len(req.Tools) == 0 {
+		return ""
+	}
+	candidates := []string{"/token_chain_data", "."}
+	for _, dir := range candidates {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			continue
+		}
+		path := filepath.Join(dir, fmt.Sprintf("gateway_openai_request_%d.json", time.Now().UnixMilli()))
+		if err := os.WriteFile(path, body, 0644); err == nil {
+			return path
+		}
+	}
+	return ""
+}
 
 func RegisterGatewayRoutes(r chi.Router) {
 	common := func(r chi.Router) {
@@ -63,9 +88,9 @@ func RegisterGatewayRoutes(r chi.Router) {
 			r.Use(TokenAuthMiddleware)
 			r.Group(func(r chi.Router) {
 				r.Use(DistributeMiddleware)
-				r.Post("/messages", HandleRelay)
-				r.Post("/messages/count_tokens", HandleRelay)
-				r.Post("/complete", HandleRelay)
+				r.Post("/v1/messages", HandleRelay)
+				r.Post("/v1/messages/count_tokens", HandleRelay)
+				r.Post("/v1/complete", HandleRelay)
 			})
 		})
 	})
@@ -81,6 +106,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	inboundProto := protocol.FromContext(r)
+	// util.DebugLog("[relay] %s %s inbound=%s providerType=%d model=%s endpoint=%s", r.Method, r.URL.Path, inboundProto, modelData.Data.ProviderType, modelData.Data.Name, endpoint.URL)
 
 	// Endpoint 级别限流 — 这才是真正的瓶颈
 	// 优先使用合约中的 ProviderType 做限流分类，本地模型不再被误判为 openai。
@@ -126,22 +152,42 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	var (
 		requestConverter  func([]byte, uint16) ([]byte, error)
 		responseConverter func([]byte, uint16) ([]byte, error)
-		streamRelay       func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error)
+		streamRelay       func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, uint16, bool) (*relay.Usage, *relay.ErrorWithStatusCode, error)
 	)
+
+	// Anthropic -> OpenAI 转换时，提前提取原始请求里的 tool schemas，
+	// 用于在响应转换阶段过滤上游模型生成的非法 tool 参数。
+	var toolSchemas []schemas.ChatTool
+	if inboundProto == protocol.ProtocolAnthropic {
+		toolSchemas = protocol.ExtractBifrostChatTools(bodyBytes, modelData.Data.ProviderType)
+		toolSchemas = protocol.HardenToolParameters(toolSchemas, modelData.Data.Name)
+	}
+
+	// Anthropic -> OpenAI 路径的上游不是 Anthropic 原生模型，返回的 reasoning/thinking
+	// 没有 Anthropic 要求的 signature，不能直接以 thinking 块转发给客户端，所以统一丢弃。
+	dropThinking := inboundProto == protocol.ProtocolAnthropic && providerProto == protocol.ProtocolOpenAI
 
 	switch {
 	case inboundProto == providerProto:
 		// 协议一致，不需要转换。
 	case inboundProto == protocol.ProtocolAnthropic && providerProto == protocol.ProtocolOpenAI:
 		requestConverter = func(body []byte, pt uint16) ([]byte, error) {
-			return protocol.ConvertAnthropicRequestToOpenAI(body, pt)
+			return protocol.ConvertAnthropicRequestToOpenAI(body, pt, toolSchemas...)
 		}
-		responseConverter = func(body []byte, _ uint16) ([]byte, error) { return protocol.ConvertOpenAIResponseToAnthropic(body) }
-		streamRelay = relayAnthropicStream
+		responseConverter = func(body []byte, _ uint16) ([]byte, error) {
+			return protocol.ConvertOpenAIResponseToAnthropic(body, dropThinking, toolSchemas...)
+		}
+		streamRelay = func(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, dropThinking bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+			return relayAnthropicStream(w, r, endpoint, modelName, bodyBytes, providerType, dropThinking, toolSchemas)
+		}
 	case inboundProto == protocol.ProtocolOpenAI && providerProto == protocol.ProtocolAnthropic:
 		requestConverter = protocol.ConvertOpenAIRequestToAnthropic
 		responseConverter = func(body []byte, _ uint16) ([]byte, error) { return protocol.ConvertAnthropicResponseToOpenAI(body) }
 		streamRelay = relayOpenAIStreamFromAnthropic
+	case inboundProto == protocol.ProtocolOpenAI && providerProto == protocol.ProtocolGemini:
+		requestConverter = protocol.ConvertOpenAIRequestToGemini
+		responseConverter = func(body []byte, _ uint16) ([]byte, error) { return protocol.ConvertGeminiResponseToOpenAI(body) }
+		streamRelay = relayGeminiStream
 	}
 
 	var usage *relay.Usage
@@ -163,21 +209,34 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		bodyBytes = converted
+
+		// Anthropic -> OpenAI 路径仅在请求带 tools 时落盘/记录，防止被后续无 tool 请求覆盖。
+		if inboundProto == protocol.ProtocolAnthropic && providerProto == protocol.ProtocolOpenAI {
+			if dumpPath := dumpOpenAIRequestBodyIfNeeded(bodyBytes); dumpPath != "" {
+				// 同时把转换后的 OpenAI 请求体完整写入 gateway.log，便于直接分析。
+				GATEWAYLOG().Printf("[OPENAI-REQUEST-BODY] %s", string(bodyBytes))
+			}
+		}
 	}
 
-	// 协议转换后可能改变 stream 标志，需从实际转发给上游的请求体重新解析。
+	// 协议转换后可能改变 stream 标志，优先从实际转发给上游的请求体重新解析；
+	// 若转换后的请求体没有显式声明 stream，则保留原始请求的 stream 标志（Gemini 等请求体不含 stream 字段）。
 	isStream := reqBody.Stream
 	if requestConverter != nil {
 		var convertedReq struct {
-			Stream bool `json:"stream"`
+			Stream *bool `json:"stream,omitempty"`
 		}
 		json.Unmarshal(bodyBytes, &convertedReq)
-		isStream = convertedReq.Stream
+		if convertedReq.Stream != nil {
+			isStream = *convertedReq.Stream
+		}
 	}
 
 	if isStream && streamRelay != nil {
-		usage, bizErr, err = streamRelay(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType)
+		// util.DebugLog("[relay] streaming via %s", providerTypeToLimiterKey(modelData.Data.ProviderType))
+		usage, bizErr, err = streamRelay(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, dropThinking)
 	} else {
+		// util.DebugLog("[relay] non-stream via %s", providerTypeToLimiterKey(modelData.Data.ProviderType))
 		var origW http.ResponseWriter
 		var recorder *protocol.ResponseRecorder
 		if responseConverter != nil {
@@ -208,6 +267,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			recorder.Header().Set("Content-Type", "application/json")
+			recorder.Header().Del("Content-Length")
 			recorder.FlushStatus()
 			if _, writeErr := recorder.ResponseWriter().Write(convertedResp); writeErr != nil {
 				GATEWAYLOG().Printf("[relay] failed to write converted response: %v", writeErr)
@@ -272,10 +332,12 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	adaptor := relay.GetAdaptorForProviderTypeCode(providerType)
 	adaptor.Init(meta)
 
+	// util.DebugLog("[relay] upstream request provider=%s url=%s body=%d stream=%v", adaptor.GetProviderName(), r.URL.String(), len(bodyBytes), isStream)
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, nil, fmt.Errorf("upstream: %w", err)
 	}
+	// util.DebugLog("[relay] upstream response status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
 
 	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
 	// 立即关闭 body，避免 defer 在函数返回时才执行可能引入的并发时序问题
@@ -283,17 +345,16 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 		resp.Body.Close()
 	}
 	if bizErr != nil {
-		GATEWAYLOG().Printf("[MONITOR] upstream error: %s (status=%d)", bizErr.Error.Message, bizErr.StatusCode)
-		// Return the bizErr so the caller writes the error response once.
 		return nil, bizErr, nil
 	}
+	// util.DebugLog("[relay] upstream response handled usage=%+v", usage)
 	return usage, nil, nil
 }
 
-type streamConverter func(io.Reader, io.Writer) (*schemas.BifrostLLMUsage, error)
+type streamConverter func(io.Reader, io.Writer, bool, []schemas.ChatTool) (*schemas.BifrostLLMUsage, error)
 
 // relayStream 把已转好的请求体发给上游，并把返回的 SSE 流通过 converter 实时转换后写给客户端。
-func relayStream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, convert streamConverter, logLabel string) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+func relayStream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, convert streamConverter, logLabel string, dropThinking bool, toolSchemas []schemas.ChatTool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
 
 	meta := relay.GetMetaByContext(ctx)
@@ -333,7 +394,22 @@ func relayStream(w http.ResponseWriter, r *http.Request, endpoint *store.Gateway
 	// 注意：第一个 SSE 事件写入时会隐式提交 HTTP 200。如果 convert 在写出数据后失败，
 	// 响应已提交，外层不应再尝试写入错误响应。
 
-	bifrostUsage, err := convert(resp.Body, w)
+	// 落盘原始 SSE，便于排查模型实际返回。
+	dumpFile, _ := dumpGatewayStreamResponse(logLabel)
+	if dumpFile != nil {
+		defer dumpFile.Close()
+		resp.Body = &teeReadCloser{Reader: io.TeeReader(resp.Body, dumpFile), Closer: resp.Body}
+	}
+
+	// 落盘转换后的 Anthropic SSE，便于调试对比 OpenAI 输出和最终 Anthropic 返回。
+	anthropicDumpFile, _ := dumpGatewayAnthropicOutput(logLabel)
+	var outWriter io.Writer = w
+	if anthropicDumpFile != nil {
+		defer anthropicDumpFile.Close()
+		outWriter = &anthropicOutputDumper{w: w, dump: anthropicDumpFile}
+	}
+
+	bifrostUsage, err := convert(resp.Body, outWriter, dropThinking, toolSchemas)
 	if err != nil {
 		GATEWAYLOG().Printf("[MONITOR] %s stream convert error: %v", logLabel, err)
 		// 流已启动时无法安全地返回 HTTP 错误，直接结束。
@@ -350,14 +426,87 @@ func relayStream(w http.ResponseWriter, r *http.Request, endpoint *store.Gateway
 	return nil, nil, nil
 }
 
+// anthropicOutputDumper 同时把 Anthropic SSE 输出写入 HTTP ResponseWriter 和落盘文件，
+// 同时实现 http.Flusher 以支持 SSE 的实时刷新。
+type anthropicOutputDumper struct {
+	w    http.ResponseWriter
+	dump *os.File
+}
+
+func (d *anthropicOutputDumper) Write(p []byte) (int, error) {
+	if d.dump != nil {
+		d.dump.Write(p)
+	}
+	return d.w.Write(p)
+}
+
+func (d *anthropicOutputDumper) Flush() {
+	if f, ok := d.w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// dumpGatewayAnthropicOutput 为转换后的 Anthropic SSE 输出创建落盘文件。
+func dumpGatewayAnthropicOutput(logLabel string) (*os.File, error) {
+	candidates := []string{"/token_chain_data", "."}
+	for _, dir := range candidates {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			continue
+		}
+		path := filepath.Join(dir, fmt.Sprintf("gateway_anthropic_output_%s_%d.sse", logLabel, time.Now().UnixMilli()))
+		f, err := os.Create(path)
+		if err == nil {
+			return f, nil
+		}
+	}
+	return nil, nil
+}
+
+// teeReadCloser 把 io.Reader 和 io.Closer 组合成 io.ReadCloser，用于在读取时
+// 通过 io.TeeReader 把原始 SSE 同步写入调试文件。
+type teeReadCloser struct {
+	io.Reader
+	io.Closer
+}
+
+// dumpGatewayStreamResponse 为原始 SSE 流创建落盘文件。
+func dumpGatewayStreamResponse(logLabel string) (*os.File, string) {
+	candidates := []string{"/token_chain_data", "."}
+	for _, dir := range candidates {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			continue
+		}
+		path := filepath.Join(dir, fmt.Sprintf("gateway_stream_response_%s_%d.sse", logLabel, time.Now().UnixMilli()))
+		f, err := os.Create(path)
+		if err == nil {
+			return f, path
+		}
+	}
+	return nil, ""
+}
+
 // relayAnthropicStream 发送 OpenAI 流式请求并实时把 SSE 转换为 Anthropic 格式。
-func relayAnthropicStream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-	return relayStream(w, r, endpoint, modelName, bodyBytes, providerType, protocol.StreamOpenAIResponseToAnthropic, "anthropic")
+func relayAnthropicStream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, dropThinking bool, toolSchemas []schemas.ChatTool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	convert := func(reader io.Reader, writer io.Writer, dropThinking bool, schemas []schemas.ChatTool) (*schemas.BifrostLLMUsage, error) {
+		return protocol.StreamOpenAIResponseToAnthropic(reader, writer, dropThinking, schemas...)
+	}
+	return relayStream(w, r, endpoint, modelName, bodyBytes, providerType, convert, "anthropic", dropThinking, toolSchemas)
 }
 
 // relayOpenAIStreamFromAnthropic 发送 Anthropic 流式请求并实时把 SSE 转换为 OpenAI 格式。
-func relayOpenAIStreamFromAnthropic(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-	return relayStream(w, r, endpoint, modelName, bodyBytes, providerType, protocol.StreamAnthropicResponseToOpenAI, "openai")
+func relayOpenAIStreamFromAnthropic(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, _ bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	convert := func(reader io.Reader, writer io.Writer, _ bool, _ []schemas.ChatTool) (*schemas.BifrostLLMUsage, error) {
+		return protocol.StreamAnthropicResponseToOpenAI(reader, writer)
+	}
+	return relayStream(w, r, endpoint, modelName, bodyBytes, providerType, convert, "openai", false, nil)
+}
+
+// relayGeminiStream 发送 Gemini 流式请求并实时把 SSE 转换为 OpenAI 格式。
+func relayGeminiStream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, _ bool) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	convert := func(reader io.Reader, writer io.Writer, _ bool, _ []schemas.ChatTool) (*schemas.BifrostLLMUsage, error) {
+		return protocol.StreamGeminiResponseToOpenAI(reader, writer)
+	}
+	return relayStream(w, r, endpoint, modelName, bodyBytes, providerType, convert, "gemini", false, nil)
 }
 
 // providerTypeToLimiterKey 将合约 ProviderType 数值映射为限流配置中的字符串 key。
@@ -367,7 +516,7 @@ func providerTypeToLimiterKey(providerType uint16) string {
 		return "anthropic"
 	case cgateway.ProviderGemini:
 		return "gemini"
-	case cgateway.ProviderLocal, cgateway.ProviderPersonal:
+	case cgateway.ProviderPersonal:
 		return "local"
 	default:
 		return "openai"

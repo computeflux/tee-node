@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,37 +10,14 @@ import (
 	"strings"
 )
 
-// ── Gemini types ─────────────────────────────────────────
+// ── Gemini response types（仅用于解析 usage / error）────────────────
 
-type GeminiRequest struct {
-	Contents         []GeminiContent  `json:"contents"`
-	GenerationConfig *GeminiGenConfig `json:"generationConfig,omitempty"`
-	SafetySettings   []GeminiSafety   `json:"safetySettings,omitempty"`
-}
-
-type GeminiContent struct {
-	Role  string       `json:"role,omitempty"`
-	Parts []GeminiPart `json:"parts"`
-}
-
-type GeminiPart struct {
-	Text string `json:"text,omitempty"`
-}
-
-type GeminiGenConfig struct {
-	Temperature     float64 `json:"temperature,omitempty"`
-	MaxOutputTokens int     `json:"maxOutputTokens,omitempty"`
-}
-
-type GeminiSafety struct {
-	Category  string `json:"category"`
-	Threshold string `json:"threshold"`
-}
-
-type GeminiResponse struct {
+type geminiResponseLite struct {
 	Candidates []struct {
 		Content struct {
-			Parts []GeminiPart `json:"parts"`
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
 		} `json:"content"`
 		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
@@ -56,10 +34,12 @@ type GeminiResponse struct {
 }
 
 // geminiStreamEvent 解析 Gemini SSE 流中的事件
-type geminiStreamEvent struct {
+type geminiStreamEventLite struct {
 	Candidates []struct {
 		Content struct {
-			Parts []GeminiPart `json:"parts"`
+			Parts []struct {
+				Text string `json:"text"`
+			} `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
 	UsageMetadata *struct {
@@ -70,8 +50,9 @@ type geminiStreamEvent struct {
 	} `json:"usageMetadata"`
 }
 
-// ── GeminiAdaptor ────────────────────────────────────────
-
+// ── GeminiAdaptor ────────────────────────────────────────────────
+// GeminiAdaptor 以 Gemini 原生格式与上游通信：请求体/响应体均直接透传，
+// 协议转换统一在 gateway/protocol 层完成。
 type GeminiAdaptor struct{}
 
 func (a *GeminiAdaptor) Init(meta *Meta) {}
@@ -85,6 +66,7 @@ func (a *GeminiAdaptor) GetRequestURL(meta *Meta) (string, error) {
 }
 
 func (a *GeminiAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error {
+	forwardClientHeaders(ctx, req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", meta.APIKey)
 	return nil
@@ -92,37 +74,14 @@ func (a *GeminiAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request,
 
 func (a *GeminiAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader) (*http.Response, error) {
 	raw, _ := io.ReadAll(body)
-	var oaiReq GeneralOpenAIRequest
-	json.Unmarshal(raw, &oaiReq)
 
-	// Convert to Gemini format
-	gemReq := GeminiRequest{
-		SafetySettings: []GeminiSafety{
-			{Category: "HARM_CATEGORY_HARASSMENT", Threshold: "BLOCK_NONE"},
-			{Category: "HARM_CATEGORY_HATE_SPEECH", Threshold: "BLOCK_NONE"},
-			{Category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", Threshold: "BLOCK_NONE"},
-			{Category: "HARM_CATEGORY_DANGEROUS_CONTENT", Threshold: "BLOCK_NONE"},
-		},
-		GenerationConfig: &GeminiGenConfig{
-			Temperature:     oaiReq.Temperature,
-			MaxOutputTokens: oaiReq.MaxTokens,
-		},
+	url, err := a.GetRequestURL(meta)
+	if err != nil {
+		return nil, err
 	}
+	// util.DebugLog("[gemini] do request url=%s", url)
 
-	for _, msg := range oaiReq.Messages {
-		role := "user"
-		if msg.Role == "assistant" || msg.Role == "model" {
-			role = "model"
-		}
-		gemReq.Contents = append(gemReq.Contents, GeminiContent{
-			Role:  role,
-			Parts: []GeminiPart{{Text: msg.Content}},
-		})
-	}
-
-	gemBody, _ := json.Marshal(gemReq)
-	url, _ := a.GetRequestURL(meta)
-	req, err := http.NewRequestWithContext(ctx.Context(), "POST", url, strings.NewReader(string(gemBody)))
+	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -132,125 +91,117 @@ func (a *GeminiAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 
 func (a *GeminiAdaptor) DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (*Usage, *ErrorWithStatusCode) {
 	if meta.IsStream {
-		return a.handleGeminiStream(ctx, resp)
+		return a.handleStream(ctx, resp)
 	}
-	return a.handleGeminiNormal(ctx, resp)
+	return a.handleNormal(ctx, resp)
 }
 
-func (a *GeminiAdaptor) handleGeminiNormal(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
+func (a *GeminiAdaptor) handleNormal(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
 	body, _ := io.ReadAll(resp.Body)
-	var gemResp GeminiResponse
-	json.Unmarshal(body, &gemResp)
 
-	if gemResp.Error != nil {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		msg := string(body)
+		errType := "upstream_error"
+		if msg == "" {
+			msg = http.StatusText(resp.StatusCode)
+		}
+		var gemResp geminiResponseLite
+		if json.Unmarshal(body, &gemResp) == nil && gemResp.Error != nil {
+			if gemResp.Error.Message != "" {
+				msg = gemResp.Error.Message
+			}
+		}
 		return nil, &ErrorWithStatusCode{
 			StatusCode: resp.StatusCode,
-			Error:      ErrorDetail{Message: gemResp.Error.Message, Type: "gemini_error"},
+			Error: ErrorDetail{
+				Message: msg,
+				Type:    errType,
+			},
 		}
 	}
 
-	// Convert to OpenAI format
-	content := ""
-	if len(gemResp.Candidates) > 0 && len(gemResp.Candidates[0].Content.Parts) > 0 {
-		content = gemResp.Candidates[0].Content.Parts[0].Text
-	}
-	usage := &Usage{}
-	cachedTokens := 0
-	if gemResp.UsageMetadata != nil {
-		usage.PromptTokens = gemResp.UsageMetadata.PromptTokenCount
-		usage.CompletionTokens = gemResp.UsageMetadata.CandidatesTokenCount
-		usage.TotalTokens = gemResp.UsageMetadata.TotalTokenCount
-		cachedTokens = gemResp.UsageMetadata.CachedContentTokenCount
-		usage.PromptTokensDetails = PromptTokensDetails{CachedTokens: cachedTokens}
-	}
-
-	usageMap := map[string]interface{}{
-		"prompt_tokens":     usage.PromptTokens,
-		"completion_tokens": usage.CompletionTokens,
-		"total_tokens":      usage.TotalTokens,
-	}
-	if cachedTokens > 0 {
-		usageMap["prompt_tokens_details"] = map[string]int{
-			"cached_tokens": cachedTokens,
+	// 透传响应头（过滤 hop-by-hop headers）
+	for k, vv := range resp.Header {
+		if hopByHopHeaders[k] {
+			continue
+		}
+		for _, v := range vv {
+			ctx.W.Header().Add(k, v)
 		}
 	}
+	ctx.W.WriteHeader(resp.StatusCode)
+	ctx.W.Write(body)
 
-	oaiResp := map[string]interface{}{
-		"object": "chat.completion",
-		"choices": []map[string]interface{}{{
-			"index":         0,
-			"message":       map[string]string{"role": "assistant", "content": content},
-			"finish_reason": "stop",
-		}},
-		"usage": usageMap,
+	// 尝试解析 usage
+	var gemResp geminiResponseLite
+	if json.Unmarshal(body, &gemResp) == nil && gemResp.UsageMetadata != nil {
+		return &Usage{
+			PromptTokens:     gemResp.UsageMetadata.PromptTokenCount,
+			CompletionTokens: gemResp.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      gemResp.UsageMetadata.TotalTokenCount,
+			PromptTokensDetails: PromptTokensDetails{
+				CachedTokens: gemResp.UsageMetadata.CachedContentTokenCount,
+			},
+		}, nil
 	}
-
-	ctx.W.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(ctx.W).Encode(oaiResp)
-	return usage, nil
+	return nil, nil
 }
 
-func (a *GeminiAdaptor) handleGeminiStream(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
-	flusher, _ := ctx.W.(http.Flusher)
+func (a *GeminiAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*Usage, *ErrorWithStatusCode) {
+	flusher, ok := ctx.W.(http.Flusher)
+	if !ok {
+		return nil, &ErrorWithStatusCode{
+			StatusCode: http.StatusInternalServerError,
+			Error: ErrorDetail{
+				Message: "streaming response writer must implement http.Flusher",
+				Type:    "server_error",
+			},
+		}
+	}
+
 	ctx.W.Header().Set("Content-Type", "text/event-stream")
 	ctx.W.Header().Set("Cache-Control", "no-cache")
+	ctx.W.Header().Set("Connection", "keep-alive")
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 
-	promptTokens := 0
-	completionTokens := 0
-	totalTokens := 0
-	cachedTokens := 0
-
+	usage := &Usage{}
 	for scanner.Scan() {
 		line := scanner.Text()
+		fmt.Fprintln(ctx.W, line)
+		flusher.Flush()
+
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
 		data := strings.TrimPrefix(line, "data: ")
 
-		var evt geminiStreamEvent
-		json.Unmarshal([]byte(data), &evt)
-
-		text := ""
-		if len(evt.Candidates) > 0 && len(evt.Candidates[0].Content.Parts) > 0 {
-			text = evt.Candidates[0].Content.Parts[0].Text
+		var evt geminiStreamEventLite
+		if json.Unmarshal([]byte(data), &evt) != nil {
+			continue
 		}
-
-		// Collect usage from stream events
 		if evt.UsageMetadata != nil {
-			promptTokens = evt.UsageMetadata.PromptTokenCount
-			completionTokens = evt.UsageMetadata.CandidatesTokenCount
-			totalTokens = evt.UsageMetadata.TotalTokenCount
-			cachedTokens = evt.UsageMetadata.CachedContentTokenCount
-		}
-
-		chunk := map[string]interface{}{
-			"object": "chat.completion.chunk",
-			"choices": []map[string]interface{}{{
-				"index": 0, "delta": map[string]string{"content": text},
-			}},
-		}
-		b, _ := json.Marshal(chunk)
-		fmt.Fprintf(ctx.W, "data: %s\n\n", b)
-		if flusher != nil {
-			flusher.Flush()
+			usage.PromptTokens = evt.UsageMetadata.PromptTokenCount
+			usage.CompletionTokens = evt.UsageMetadata.CandidatesTokenCount
+			usage.TotalTokens = evt.UsageMetadata.TotalTokenCount
+			usage.PromptTokensDetails = PromptTokensDetails{
+				CachedTokens: evt.UsageMetadata.CachedContentTokenCount,
+			}
 		}
 	}
-	fmt.Fprintf(ctx.W, "data: [DONE]\n\n")
-	if flusher != nil {
-		flusher.Flush()
+
+	if err := scanner.Err(); err != nil {
+		return nil, &ErrorWithStatusCode{
+			StatusCode: http.StatusBadGateway,
+			Error: ErrorDetail{
+				Message: fmt.Sprintf("stream read error: %v", err),
+				Type:    "upstream_error",
+			},
+		}
 	}
 
-	return &Usage{
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TotalTokens:      totalTokens,
-		PromptTokensDetails: PromptTokensDetails{
-			CachedTokens: cachedTokens,
-		},
-	}, nil
+	return usage, nil
 }
 
 func (a *GeminiAdaptor) GetProviderName() string {

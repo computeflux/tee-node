@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertOpenAIRequestToAnthropic(t *testing.T) {
@@ -138,4 +141,30 @@ func TestStreamAnthropicResponseToOpenAI(t *testing.T) {
 	if !strings.Contains(out, "data: [DONE]") {
 		t.Errorf("missing done marker: %s", out)
 	}
+}
+
+func TestConvertAnthropicResponseToOpenAI_WithReasoning(t *testing.T) {
+	body := []byte(`{
+		"id": "msg_2",
+		"type": "message",
+		"role": "assistant",
+		"model": "claude-opus-4",
+		"content": [
+			{"type": "thinking", "thinking": "Let me think"},
+			{"type": "text", "text": "Done"}
+		],
+		"stop_reason": "end_turn",
+		"usage": {"input_tokens": 5, "output_tokens": 3}
+	}`)
+
+	out, err := ConvertAnthropicResponseToOpenAI(body)
+	require.NoError(t, err)
+
+	var oaiResp map[string]any
+	require.NoError(t, json.Unmarshal(out, &oaiResp))
+
+	choices := oaiResp["choices"].([]any)
+	msg := choices[0].(map[string]any)["message"].(map[string]any)
+	assert.Equal(t, "Done", msg["content"])
+	assert.Equal(t, "Let me think", msg["reasoning_content"])
 }

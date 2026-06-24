@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
+
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // ── Dynamic Connection Pool ──────────────────────────────
@@ -88,7 +90,14 @@ func DoHTTP(req *http.Request) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	return client.Do(req)
+	// util.DebugLog("[http] client.Do start url=%s method=%s", req.URL.String(), req.Method)
+	resp, err := client.Do(req)
+	if err != nil {
+		util.DebugLog("[http] client.Do error: %v", err)
+		return nil, err
+	}
+	// util.DebugLog("[http] client.Do done status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	return resp, nil
 }
 
 // GetPoolStats returns approximate pool stats

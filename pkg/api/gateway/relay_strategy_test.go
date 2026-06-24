@@ -14,8 +14,7 @@ func TestProviderNativeProtocol(t *testing.T) {
 	}{
 		{cgateway.ProviderOpenAI, protocol.ProtocolOpenAI},
 		{cgateway.ProviderClaude, protocol.ProtocolAnthropic},
-		{cgateway.ProviderGemini, protocol.ProtocolOpenAI},
-		{cgateway.ProviderLocal, protocol.ProtocolOpenAI},
+		{cgateway.ProviderGemini, protocol.ProtocolGemini},
 		{cgateway.ProviderPersonal, protocol.ProtocolOpenAI},
 	}
 	for _, tt := range tests {
@@ -30,9 +29,9 @@ func TestCanonicalAnthropicPath(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"/anthropic/messages", "/v1/messages"},
-		{"/anthropic/messages/count_tokens", "/v1/messages/count_tokens"},
-		{"/anthropic/complete", "/v1/complete"},
+		{"/anthropic/v1/messages", "/v1/messages"},
+		{"/anthropic/v1/messages/count_tokens", "/v1/messages/count_tokens"},
+		{"/anthropic/v1/complete", "/v1/complete"},
 		{"/v1/messages", "/v1/messages"},
 		{"/unknown", "/unknown"},
 	}
@@ -77,12 +76,12 @@ func TestMapOpenAIPathToAnthropic(t *testing.T) {
 
 func TestResolveUpstreamPath(t *testing.T) {
 	tests := []struct {
-		name        string
-		inbound     protocol.Protocol
-		provider    protocol.Protocol
-		path        string
-		wantPath    string
-		wantErr     bool
+		name     string
+		inbound  protocol.Protocol
+		provider protocol.Protocol
+		path     string
+		wantPath string
+		wantErr  bool
 	}{
 		{"matching openai", protocol.ProtocolOpenAI, protocol.ProtocolOpenAI, "/v1/chat/completions", "/v1/chat/completions", false},
 		{"matching anthropic", protocol.ProtocolAnthropic, protocol.ProtocolAnthropic, "/v1/messages", "/v1/messages", false},

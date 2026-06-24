@@ -107,6 +107,10 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 				if evt.Delta.Text != "" {
 					delta["content"] = evt.Delta.Text
 				}
+			case "thinking_delta":
+				if evt.Delta.Thinking != "" {
+					delta["reasoning_content"] = evt.Delta.Thinking
+				}
 			case "input_json_delta":
 				idx := 0
 				if evt.Index != nil {
@@ -189,6 +193,7 @@ type anthropicStreamEventReverse struct {
 	Delta *struct {
 		Type        string `json:"type"`
 		Text        string `json:"text"`
+		Thinking    string `json:"thinking"`
 		PartialJson string `json:"partial_json"`
 		StopReason  string `json:"stop_reason"`
 	} `json:"delta"`
