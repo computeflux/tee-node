@@ -4,10 +4,9 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // ── Dynamic Connection Pool ──────────────────────────────
@@ -25,6 +24,9 @@ type PoolConfig struct {
 	KeepAlive           time.Duration
 	IdleTimeout         time.Duration
 	RequestTimeout      time.Duration
+	// InsecureSkipVerify 关闭 TLS 证书校验。仅当上游使用自签证书且无法
+	// 分发 CA 时才应开启；保持 false 是安全默认值。
+	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
 }
 
 var (
@@ -41,16 +43,37 @@ var (
 	// 原子指针，支持运行时替换
 	currentTransport atomic.Value // *http.Transport
 	currentClient    atomic.Value // *http.Client
+
+	// defaultPoolConfigMu 保护 defaultPoolConfig 的并发读写。
+	// 实际请求使用 currentClient/Transport，不受锁影响。
+	defaultPoolConfigMu sync.RWMutex
 )
 
 func init() {
 	ApplyPoolConfig(defaultPoolConfig)
 }
 
+// GetDefaultPoolConfig 线程安全地读取当前默认池配置（主要用于诊断/测试）。
+func GetDefaultPoolConfig() PoolConfig {
+	defaultPoolConfigMu.RLock()
+	defer defaultPoolConfigMu.RUnlock()
+	return defaultPoolConfig
+}
+
 // ApplyPoolConfig replaces the connection pool atomically.
 // In-flight requests continue using old pool; new requests use new pool.
 func ApplyPoolConfig(cfg PoolConfig) {
+	defaultPoolConfigMu.Lock()
 	defaultPoolConfig = cfg
+	defaultPoolConfigMu.Unlock()
+
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	if cfg.InsecureSkipVerify {
+		// 仅在显式配置时跳过证书校验；调用方需自行承担风险。
+		tlsCfg.InsecureSkipVerify = true
+	}
 
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -64,10 +87,8 @@ func ApplyPoolConfig(cfg PoolConfig) {
 		IdleConnTimeout:       cfg.IdleTimeout,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-		ForceAttemptHTTP2: false,
+		TLSClientConfig:       tlsCfg,
+		ForceAttemptHTTP2:     false,
 	}
 
 	client := &http.Client{
@@ -85,12 +106,10 @@ func DoHTTP(req *http.Request) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	// util.DebugLog("[http] client.Do start url=%s method=%s", req.URL.String(), req.Method)
+
 	resp, err := client.Do(req)
 	if err != nil {
-		util.DebugLog("[http] client.Do error: %v", err)
 		return nil, err
 	}
-	// util.DebugLog("[http] client.Do done status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	return resp, nil
 }

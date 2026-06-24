@@ -23,7 +23,7 @@ func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer, dropThinking bool
 	s := &streamState{currentBlockIndex: -1, dropThinking: dropThinking}
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		if line == "" || !strings.HasPrefix(line, "data: ") {
 			continue
 		}
@@ -101,10 +101,15 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 		s.usage = chunk.Usage
 	}
 
-	// 仅支持单 choice
+	// 仅支持单 choice；tool_calls 增量不计入"非空"判定，避免与其它 choice 的
+	// finish_reason 同时到达时误报为多个非空 choice。
 	nonEmpty := 0
 	for _, c := range chunk.Choices {
-		if c.Delta != nil && (c.Delta.Content != "" || c.Delta.Reasoning != "" || c.Delta.ReasoningContent != "" || len(c.Delta.ToolCalls) > 0) {
+		if c.Delta == nil {
+			continue
+		}
+		hasContent := c.Delta.Content != "" || c.Delta.Reasoning != "" || c.Delta.ReasoningContent != ""
+		if hasContent {
 			nonEmpty++
 		}
 	}
@@ -166,7 +171,8 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 				if err := s.closeCurrentBlock(w); err != nil {
 					return err
 				}
-				st = &toolCallState{blockIdx: s.currentBlockIndex}
+				// blockIdx 留待实际开 block 时再设置，避免指向刚关闭的旧 block。
+				st = &toolCallState{blockIdx: -1}
 				s.toolCallStates[tc.Index] = st
 				s.currentToolCall = st
 			}
@@ -199,6 +205,9 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 				s.currentBlockIndex++
 				st.blockIdx = s.currentBlockIndex
 				s.currentToolCall = st
+				// Input 留空：delta 自身就是合法 JSON 的片段，累加结果即为完整 JSON。
+				// 若 start 时把 input 写成 "{}"，再叠加 {"foo":"bar"} 这种 delta，
+				// 客户端拼接后会得到 "{}{foo":"bar}"，不是合法 JSON。
 				if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
 					Type:  anthropic.AnthropicStreamEventTypeContentBlockStart,
 					Index: &st.blockIdx,
@@ -206,7 +215,7 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 						Type:  anthropic.AnthropicContentBlockTypeToolUse,
 						ID:    &st.id,
 						Name:  &st.name,
-						Input: json.RawMessage("{}"),
+						Input: json.RawMessage(""),
 					},
 				}); err != nil {
 					return err
@@ -265,7 +274,9 @@ func (s *streamState) closeCurrentBlock(w io.Writer) error {
 	switch s.currentBlockType {
 	case blockText, blockThinking, blockToolUse:
 		if s.currentBlockType == blockToolUse {
-			if tc := s.currentToolCall; tc != nil && tc.arguments != "" {
+			if tc := s.currentToolCall; tc != nil {
+				// 标记为已关闭，避免 finish() 重复发送 content_block_stop。
+				// 即使 arguments 为空也需要标记，否则无参工具会触发双 stop。
 				tc.done = true
 			}
 		}

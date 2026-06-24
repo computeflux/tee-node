@@ -30,8 +30,13 @@ func ConvertOpenAIRequestToGemini(body []byte, targetProvider uint16) ([]byte, e
 	chatReq.Provider = schemas.Gemini
 
 	// OpenAI 的 max_tokens 等价于 max_completion_tokens
-	if chatReq.Params != nil && chatReq.Params.MaxCompletionTokens == nil && oaiReq.MaxTokens != nil {
-		chatReq.Params.MaxCompletionTokens = oaiReq.MaxTokens
+	if oaiReq.MaxTokens != nil {
+		if chatReq.Params == nil {
+			chatReq.Params = &schemas.ChatParameters{}
+		}
+		if chatReq.Params.MaxCompletionTokens == nil {
+			chatReq.Params.MaxCompletionTokens = oaiReq.MaxTokens
+		}
 	}
 
 	gemReq, err := gemini.ToGeminiChatCompletionRequest(ctx, chatReq)

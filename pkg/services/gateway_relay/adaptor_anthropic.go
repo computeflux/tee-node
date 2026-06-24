@@ -107,7 +107,6 @@ func (a *AnthropicAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Read
 	if err != nil {
 		return nil, err
 	}
-	// util.DebugLog("[anthropic] do request url=%s", url)
 
 	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
@@ -201,7 +200,7 @@ func (a *AnthropicAdaptor) handleStream(ctx *RelayContext, resp *http.Response) 
 
 	usage := &Usage{}
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		fmt.Fprintln(ctx.W, line)
 		flusher.Flush()
 
@@ -222,7 +221,14 @@ func (a *AnthropicAdaptor) handleStream(ctx *RelayContext, resp *http.Response) 
 			usage.PromptTokensDetails.CachedTokens = evt.Message.Usage.CacheReadInputTokens
 		}
 		if evt.Usage != nil {
+			// message_delta 可能修订输入侧的 cache tokens，重新汇总。
 			usage.CompletionTokens = evt.Usage.OutputTokens
+			if evt.Message != nil && evt.Message.Usage != nil {
+				usage.PromptTokens = evt.Message.Usage.InputTokens +
+					evt.Message.Usage.CacheCreationInputTokens +
+					evt.Message.Usage.CacheReadInputTokens
+				usage.PromptTokensDetails.CachedTokens = evt.Message.Usage.CacheReadInputTokens
+			}
 		}
 	}
 

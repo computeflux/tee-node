@@ -251,3 +251,38 @@ func (n *noopResponseWriter) WriteHeader(int)     {}
 func (n *noopResponseWriter) Write(p []byte) (int, error) {
 	return n.Buffer.Write(p)
 }
+
+func TestAnthropicAdaptor_DoResponse_Stream_CacheRevision(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":5}}}\n\n"))
+		w.Write([]byte("data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi\"}}\n\n"))
+		w.Write([]byte("data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":2},\"message\":{\"usage\":{\"input_tokens\":5,\"cache_creation_input_tokens\":3,\"cache_read_input_tokens\":2}}}\n\n"))
+	}))
+	defer upstream.Close()
+
+	body := []byte(`{"model":"claude-3","max_tokens":1024,"stream":true,"messages":[]}`)
+	req := httptest.NewRequest(http.MethodPost, "/anthropic/messages", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	ctx := NewRelayContext(rec, req)
+
+	a := &AnthropicAdaptor{}
+	meta := &Meta{BaseURL: upstream.URL, APIKey: "sk-test", RequestURLPath: "/v1/messages"}
+
+	resp, err := a.DoRequest(ctx, meta, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	outRec := httptest.NewRecorder()
+	outCtx := NewRelayContext(outRec, req)
+	usage, bizErr := a.DoResponse(outCtx, resp, &Meta{IsStream: true})
+	if bizErr != nil {
+		t.Fatalf("unexpected bizErr: %v", bizErr)
+	}
+	if usage == nil || usage.PromptTokens != 10 || usage.PromptTokensDetails.CachedTokens != 2 || usage.CompletionTokens != 2 {
+		t.Fatalf("unexpected usage: %+v", usage)
+	}
+}

@@ -314,7 +314,10 @@ data: [DONE]
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, `"input":{}`)
+	// tool_use 块的 start 事件必须存在；input 字段在 start 时为空（json.RawMessage("")）
+	// 序列化时被省略，delta 自身承载有效 JSON 片段。
+	assert.Contains(t, output, `"type":"tool_use","id":"call_i","name":"fn"`)
+	assert.Contains(t, output, `"partial_json":"not-json"`)
 }
 
 func TestStreamOpenAIResponseToAnthropic_MultipleChoices(t *testing.T) {

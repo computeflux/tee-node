@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/maximhq/bifrost/core/providers/gemini"
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -16,7 +15,6 @@ import (
 // StreamGeminiResponseToOpenAI 读取 Gemini SSE 流，对每个事件调用 Bifrost 流式转换，
 // 然后实时写成 OpenAI chat.completion.chunk SSE 流。
 func StreamGeminiResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.BifrostLLMUsage, error) {
-	// util.DebugLog("[stream] StreamGeminiResponseToOpenAI started")
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, DefaultSSEBufferSize), DefaultSSEBufferSize)
 
@@ -29,7 +27,7 @@ func StreamGeminiResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.BifrostLLM
 	usage := &schemas.BifrostLLMUsage{}
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
@@ -45,12 +43,6 @@ func StreamGeminiResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.BifrostLLM
 
 		chunk, bifrostErr, isLastChunk := evt.ToBifrostChatCompletionStream(state)
 		if bifrostErr != nil {
-			msg := ""
-			if bifrostErr.Error != nil {
-				msg = bifrostErr.Error.Message
-			}
-			util.DebugLog("[stream] gemini stream conversion error: %s", msg)
-			// 流已启动，无法返回 HTTP 错误，静默结束。
 			break
 		}
 		if chunk == nil && !isLastChunk {
@@ -78,7 +70,6 @@ func StreamGeminiResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.BifrostLLM
 	}
 	flusher.Flush()
 
-	// util.DebugLog("[stream] StreamGeminiResponseToOpenAI done usage=%+v", usage)
 	return usage, nil
 }
 

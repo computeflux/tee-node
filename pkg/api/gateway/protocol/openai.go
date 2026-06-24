@@ -3,11 +3,11 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"runtime/debug"
 	"strings"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	bifrostOpenAI "github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -28,8 +28,13 @@ func ConvertOpenAIRequestToAnthropic(body []byte, targetProvider uint16) ([]byte
 	chatReq.Provider = providerTypeToBifrost(targetProvider)
 
 	// OpenAI 的 max_tokens 等价于 max_completion_tokens
-	if chatReq.Params != nil && chatReq.Params.MaxCompletionTokens == nil && oaiReq.MaxTokens != nil {
-		chatReq.Params.MaxCompletionTokens = oaiReq.MaxTokens
+	if oaiReq.MaxTokens != nil {
+		if chatReq.Params == nil {
+			chatReq.Params = &schemas.ChatParameters{}
+		}
+		if chatReq.Params.MaxCompletionTokens == nil {
+			chatReq.Params.MaxCompletionTokens = oaiReq.MaxTokens
+		}
 	}
 
 	antReq, err := anthropic.ToAnthropicChatRequest(ctx, chatReq)
@@ -51,7 +56,7 @@ func ConvertOpenAIRequestToAnthropic(body []byte, targetProvider uint16) ([]byte
 func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Printf("[protocol] panic in ConvertAnthropicResponseToOpenAI: %v\n%s", rec, debug.Stack())
+			util.LogWithRed("[protocol] panic in ConvertAnthropicResponseToOpenAI: %v\n%s", rec, debug.Stack())
 			err = fmt.Errorf("panic in ConvertAnthropicResponseToOpenAI: %v", rec)
 		}
 	}()

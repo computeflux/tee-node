@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -84,10 +83,9 @@ func ConvertOpenAIResponseToAnthropic(body []byte, dropThinking bool) (out []byt
 			if previewLen > 500 {
 				previewLen = 500
 			}
-			util.DebugLog("[protocol] ConvertOpenAIResponseToAnthropic parse error: %v, len=%d, preview=%q", err, len(body), string(body[:previewLen]))
+
 			return nil, fmt.Errorf("parse openai response: %w", err)
 		}
-		util.DebugLog("[protocol] ConvertOpenAIResponseToAnthropic recovered from trailing garbage after first JSON value")
 	}
 
 	if dropThinking {

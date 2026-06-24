@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -48,15 +47,12 @@ func (a *OpenAIAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 	if err != nil {
 		return nil, err
 	}
-	// util.DebugLog("[openai] do request url=%s", url)
 
 	rawBody, _ := io.ReadAll(body)
-	// util.DebugLog("[openai] request body len=%d", len(rawBody))
 	previewLen := len(rawBody)
 	if previewLen > 500 {
 		previewLen = 500
 	}
-	// util.DebugLog("[openai] request body preview=%s", string(rawBody[:previewLen]))
 
 	requestBody := bytes.NewReader(rawBody)
 	if meta.IsStream {
@@ -67,7 +63,6 @@ func (a *OpenAIAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 				if newRaw, err := json.Marshal(reqMap); err == nil {
 					requestBody = bytes.NewReader(newRaw)
 				}
-				// util.DebugLog("[openai] added stream_options include_usage")
 			}
 		}
 	}
@@ -78,14 +73,13 @@ func (a *OpenAIAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 	}
 
 	a.SetupRequestHeader(ctx, req, meta)
-	// util.DebugLog("[openai] request headers=%v", redactAuthHeader(req.Header))
 
 	return DoHTTP(req)
 }
 
 func (a *OpenAIAdaptor) DoResponse(ctx *RelayContext, resp *http.Response, meta *Meta) (*Usage, *ErrorWithStatusCode) {
-	log.Printf("[openai] response status=%d content-type=%s stream=%v", resp.StatusCode, resp.Header.Get("Content-Type"), meta.IsStream)
-	if resp.StatusCode != 200 {
+	// log.Printf("[openai] response status=%d content-type=%s stream=%v", resp.StatusCode, resp.Header.Get("Content-Type"), meta.IsStream)
+	if resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, &ErrorWithStatusCode{
 			StatusCode: resp.StatusCode,
@@ -120,7 +114,7 @@ func (a *OpenAIAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*U
 
 	usage := &Usage{}
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		// 写入客户端
 		fmt.Fprintf(ctx.W, "%s\n", line)
 		flusher.Flush()
@@ -178,6 +172,6 @@ func (a *OpenAIAdaptor) GetProviderName() string {
 	return "openai"
 }
 
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
+// func init() {
+// 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+// }

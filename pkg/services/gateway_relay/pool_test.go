@@ -25,10 +25,15 @@ func TestApplyPoolConfig(t *testing.T) {
 	}
 	ApplyPoolConfig(cfg)
 
-	got := defaultPoolConfig
+	got := GetDefaultPoolConfig()
 	assert.Equal(t, 100, got.MaxIdleConns)
 	assert.Equal(t, 10, got.MaxIdleConnsPerHost)
 	assert.Equal(t, 50, got.MaxConnsPerHost)
+	assert.False(t, got.InsecureSkipVerify, "TLS verification must be on by default")
+
+	// 显式开启 insecure 校验也被尊重
+	ApplyPoolConfig(PoolConfig{InsecureSkipVerify: true, RequestTimeout: time.Second})
+	assert.True(t, GetDefaultPoolConfig().InsecureSkipVerify)
 
 	// restore default
 	ApplyPoolConfig(defaultPoolConfig)

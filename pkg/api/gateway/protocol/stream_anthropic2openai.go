@@ -26,11 +26,26 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 	created := int(time.Now().Unix())
 	roleEmitted := false
 
-	// Anthropic 的 content block index 对应 OpenAI 中单个 choice 里的 tool_calls index。
-	blockTypes := make(map[int]string)
+	// Anthropic content_block index -> OpenAI tool_calls index；同一 message 中
+	// 可能夹杂 text/thinking/tool_use，OpenAI 端要求 tool_calls 数组的 index
+	// 紧凑递增，所以单独维护一份计数器。
+	blockToToolIndex := make(map[int]int)
+	nextToolIndex := 0
+
+	emitRole := func() error {
+		if roleEmitted {
+			return nil
+		}
+		chunk := buildOpenAIStreamChunk(msgID, model, created, 0, map[string]any{"role": "assistant"}, nil)
+		if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
+			return err
+		}
+		roleEmitted = true
+		return nil
+	}
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
@@ -58,24 +73,26 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 					evt.Message.Usage.CacheCreationInputTokens +
 					evt.Message.Usage.CacheReadInputTokens
 			}
-			if !roleEmitted {
-				chunk := buildOpenAIStreamChunk(msgID, model, created, 0, map[string]any{"role": "assistant"}, nil)
-				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
-					return nil, err
-				}
-				roleEmitted = true
+			if err := emitRole(); err != nil {
+				return nil, err
 			}
 
 		case "content_block_start":
 			if evt.Index == nil || evt.ContentBlock == nil {
 				continue
 			}
-			idx := *evt.Index
-			blockTypes[idx] = evt.ContentBlock.Type
+			blockIdx := *evt.Index
 			if evt.ContentBlock.Type == "tool_use" {
+				if _, ok := blockToToolIndex[blockIdx]; !ok {
+					blockToToolIndex[blockIdx] = nextToolIndex
+					nextToolIndex++
+				}
+				if err := emitRole(); err != nil {
+					return nil, err
+				}
 				delta := map[string]any{
 					"tool_calls": []map[string]any{{
-						"index": idx,
+						"index": blockToToolIndex[blockIdx],
 						"id":    evt.ContentBlock.ID,
 						"type":  "function",
 						"function": map[string]any{
@@ -88,13 +105,10 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
 					return nil, err
 				}
-			}
-			if !roleEmitted {
-				chunk := buildOpenAIStreamChunk(msgID, model, created, 0, map[string]any{"role": "assistant"}, nil)
-				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
+			} else if !roleEmitted {
+				if err := emitRole(); err != nil {
 					return nil, err
 				}
-				roleEmitted = true
 			}
 
 		case "content_block_delta":
@@ -112,29 +126,36 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 					delta["reasoning_content"] = evt.Delta.Thinking
 				}
 			case "input_json_delta":
-				idx := 0
+				toolIdx := 0
 				if evt.Index != nil {
-					idx = *evt.Index
+					if mapped, ok := blockToToolIndex[*evt.Index]; ok {
+						toolIdx = mapped
+					} else {
+						// 见到 input_json_delta 时必然已经过 content_block_start
+						// 注册过 tool index；这里保留 0 作为兜底。
+						toolIdx = 0
+					}
 				}
 				delta["tool_calls"] = []map[string]any{{
-					"index": idx,
+					"index": toolIdx,
 					"function": map[string]any{
 						"arguments": evt.Delta.PartialJson,
 					},
 				}}
 			}
 			if len(delta) > 0 {
+				// role 必须先于任何 content/tool_calls 发出。
+				if err := emitRole(); err != nil {
+					return nil, err
+				}
 				chunk := buildOpenAIStreamChunk(msgID, model, created, 0, delta, nil)
 				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
 					return nil, err
 				}
-			}
-			if !roleEmitted {
-				chunk := buildOpenAIStreamChunk(msgID, model, created, 0, map[string]any{"role": "assistant"}, nil)
-				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
+			} else if !roleEmitted {
+				if err := emitRole(); err != nil {
 					return nil, err
 				}
-				roleEmitted = true
 			}
 
 		case "message_delta":
@@ -144,6 +165,10 @@ func StreamAnthropicResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.Bifrost
 				finishReason = &fr
 			}
 			if finishReason != nil {
+				// finish_reason 也必须在 role 之后。
+				if err := emitRole(); err != nil {
+					return nil, err
+				}
 				chunk := buildOpenAIStreamChunk(msgID, model, created, 0, map[string]any{}, finishReason)
 				if err := writeOpenAIStreamChunk(w, flusher, chunk); err != nil {
 					return nil, err

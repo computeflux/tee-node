@@ -62,7 +62,8 @@ func (a *GeminiAdaptor) GetRequestURL(meta *Meta) (string, error) {
 	if meta.IsStream {
 		action = "streamGenerateContent?alt=sse"
 	}
-	return fmt.Sprintf("%s/v1beta/models/%s:%s", meta.BaseURL, meta.OriginModelName, action), nil
+	base := strings.TrimRight(meta.BaseURL, "/")
+	return fmt.Sprintf("%s/v1beta/models/%s:%s", base, meta.OriginModelName, action), nil
 }
 
 func (a *GeminiAdaptor) SetupRequestHeader(ctx *RelayContext, req *http.Request, meta *Meta) error {
@@ -79,7 +80,6 @@ func (a *GeminiAdaptor) DoRequest(ctx *RelayContext, meta *Meta, body io.Reader)
 	if err != nil {
 		return nil, err
 	}
-	// util.DebugLog("[gemini] do request url=%s", url)
 
 	req, err := http.NewRequestWithContext(ctx.Context(), http.MethodPost, url, bytes.NewReader(raw))
 	if err != nil {
@@ -168,7 +168,7 @@ func (a *GeminiAdaptor) handleStream(ctx *RelayContext, resp *http.Response) (*U
 
 	usage := &Usage{}
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimRight(scanner.Text(), "\r")
 		fmt.Fprintln(ctx.W, line)
 		flusher.Flush()
 

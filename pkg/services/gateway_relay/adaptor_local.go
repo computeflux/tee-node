@@ -110,10 +110,11 @@ func (a *LocalAdaptor) handleLocalStream(ctx *RelayContext, resp *http.Response)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 
 	usage := &Usage{}
+	doneSeen := false
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimRight(strings.TrimSpace(line), "\r")
 		if trimmed == "" {
 			fmt.Fprintln(ctx.W)
 			flusher.Flush()
@@ -135,9 +136,14 @@ func (a *LocalAdaptor) handleLocalStream(ctx *RelayContext, resp *http.Response)
 				usage = chunk.Usage
 			}
 		}
+		if strings.Contains(trimmed, "[DONE]") {
+			doneSeen = true
+		}
 	}
 
-	writeSSEDone(ctx)
+	if !doneSeen {
+		writeSSEDone(ctx)
+	}
 	return usage, nil
 }
 
