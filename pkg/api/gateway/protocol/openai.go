@@ -60,8 +60,6 @@ func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, err error) {
 	if err = json.Unmarshal(body, &antResp); err != nil {
 		return nil, fmt.Errorf("parse anthropic response: %w", err)
 	}
-	log.Printf("[protocol] ConvertAnthropicResponseToOpenAI: id=%s model=%s stop_reason=%s", antResp.ID, antResp.Model, antResp.StopReason)
-
 	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
 	responsesResp := antResp.ToBifrostResponsesResponse(ctx)
 	if responsesResp == nil {
@@ -76,7 +74,6 @@ func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[protocol] ConvertAnthropicResponseToOpenAI: output size=%d", len(out))
 	return out, nil
 }
 
@@ -85,8 +82,6 @@ func buildOpenAIChatCompletionResponse(resp *schemas.BifrostChatResponse) ([]byt
 	if resp == nil {
 		return nil, fmt.Errorf("empty response: cannot build openai chat completion from nil")
 	}
-	log.Printf("[protocol] buildOpenAIChatCompletionResponse: id=%s model=%s choices=%d usage=%v", resp.ID, resp.Model, len(resp.Choices), resp.Usage)
-
 	created := resp.Created
 	if created == 0 {
 		created = int(time.Now().Unix())
@@ -257,7 +252,6 @@ func chatMessageContentToOpenAI(content *schemas.ChatMessageContent) any {
 			if block.Text != nil {
 				b["text"] = *block.Text
 			}
-			log.Printf("[protocol] chatMessageContentToOpenAI: preserving unknown block type %q", block.Type)
 		}
 		blocks = append(blocks, b)
 	}

@@ -2,38 +2,25 @@ package relay
 
 import (
 	"time"
-
-	"github.com/computeflux/tee-provider/pkg/store"
 )
 
-// Meta 中继请求上下文（替代 token 的 meta.Meta）
+// Meta 中继请求上下文
 type Meta struct {
 	ProviderId      uint64
 	BaseURL         string
 	APIKey          string
-	Config          store.GatewayProviderInfo
+	Config          interface{}
 	IsStream        bool
 	OriginModelName string
 	RequestURLPath  string
 	StartTime       time.Time
-	ProviderType    uint16 // 供应商类型代码，用于选择 Adaptor
+	ProviderType    uint16
 }
 
-// GetByContext 从 RelayContext 构建 Meta（替代 token 的 GetByContext）
+// GetMetaByContext 从 RelayContext 构建 Meta
 func GetMetaByContext(ctx *RelayContext) *Meta {
-	meta := &Meta{
+	return &Meta{
 		RequestURLPath: ctx.R.URL.String(),
 		StartTime:      time.Now(),
 	}
-
-	if meta.BaseURL == "" {
-		v, ok := ctx.Get("provider")
-		if ok {
-			if ch, ok2 := v.(*store.GatewayProviderInfo); ok2 {
-				meta.ProviderId = ch.ID
-			}
-		}
-	}
-
-	return meta
 }

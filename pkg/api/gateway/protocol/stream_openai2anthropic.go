@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
@@ -19,7 +16,7 @@ import (
 const DefaultSSEBufferSize = 64 * 1024
 
 // StreamOpenAIResponseToAnthropic 读取 OpenAI SSE 流并实时转换为 Anthropic SSE 事件写入 w。
-func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer, dropThinking bool, toolSchemas ...schemas.ChatTool) (*schemas.BifrostLLMUsage, error) {
+func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer, dropThinking bool) (*schemas.BifrostLLMUsage, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, DefaultSSEBufferSize), DefaultSSEBufferSize)
 
@@ -269,7 +266,6 @@ func (s *streamState) closeCurrentBlock(w io.Writer) error {
 	case blockText, blockThinking, blockToolUse:
 		if s.currentBlockType == blockToolUse {
 			if tc := s.currentToolCall; tc != nil && tc.arguments != "" {
-				dumpOpenAIToolArgs(tc.name, tc.arguments)
 				tc.done = true
 			}
 		}
@@ -295,9 +291,6 @@ func (s *streamState) finish(w io.Writer) error {
 	for _, tc := range s.toolCallStates {
 		if !tc.started || tc.done {
 			continue
-		}
-		if tc.arguments != "" {
-			dumpOpenAIToolArgs(tc.name, tc.arguments)
 		}
 		if err := writeAnthropicSSE(w, &anthropic.AnthropicStreamEvent{
 			Type:  anthropic.AnthropicStreamEventTypeContentBlockStop,
@@ -343,16 +336,6 @@ func writeAnthropicSSE(w io.Writer, event *anthropic.AnthropicStreamEvent) error
 		f.Flush()
 	}
 	return nil
-}
-
-func dumpOpenAIToolArgs(toolName string, args string) {
-	for _, dir := range []string{"/token_chain_data", "."} {
-		os.MkdirAll(dir, 0755)
-		path := filepath.Join(dir, fmt.Sprintf("gateway_openai_tool_args_%s_%d.json", toolName, time.Now().UnixMilli()))
-		if os.WriteFile(path, []byte(args), 0644) == nil {
-			return
-		}
-	}
 }
 
 // ============== OpenAI SSE 解析类型 ==============

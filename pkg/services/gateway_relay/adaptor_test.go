@@ -7,49 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ── GetAdaptor ─────────────────────────────────────────────
-
-func TestGetAdaptor(t *testing.T) {
-	assert.IsType(t, &OpenAIAdaptor{}, GetAdaptor(0))
-	assert.IsType(t, &AnthropicAdaptor{}, GetAdaptor(1))
-	assert.IsType(t, &GeminiAdaptor{}, GetAdaptor(2))
-	assert.IsType(t, &OpenAIAdaptor{}, GetAdaptor(99)) // default
-}
-
-// ── GetRelayMode ───────────────────────────────────────────
-
-func TestGetRelayMode(t *testing.T) {
-	tests := []struct {
-		path string
-		want int
-	}{
-		{"/v1/chat/completions", 1},
-		{"/v1/chat/completions?model=gpt-4", 1},
-		{"/v1/completions", 2},
-		{"/v1/embeddings", 3},
-		{"/v1/images/generations", 5},
-		{"/v1/audio/speech", 8},
-		{"/v1/audio/transcriptions", 9},
-		{"/v1/models", 0},
-		{"/v1/unknown", 0},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.path, func(t *testing.T) {
-			assert.Equal(t, tt.want, GetRelayMode(tt.path))
-		})
-	}
-}
-
-// ── GetAdaptorForProviderType ──────────────────────────────
-
-func TestGetAdaptorForProviderType(t *testing.T) {
-	assert.IsType(t, &OpenAIAdaptor{}, GetAdaptorForProviderType("openai"))
-	assert.IsType(t, &AnthropicAdaptor{}, GetAdaptorForProviderType("anthropic"))
-	assert.IsType(t, &GeminiAdaptor{}, GetAdaptorForProviderType("gemini"))
-	assert.IsType(t, &OpenAIAdaptor{}, GetAdaptorForProviderType("unknown"))
-}
-
 // ── OpenAIAdaptor ──────────────────────────────────────────
 
 func TestOpenAIAdaptor_GetRequestURL(t *testing.T) {

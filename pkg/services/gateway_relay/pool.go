@@ -47,11 +47,6 @@ func init() {
 	ApplyPoolConfig(defaultPoolConfig)
 }
 
-// GetPoolConfig returns current config
-func GetPoolConfig() PoolConfig {
-	return defaultPoolConfig
-}
-
 // ApplyPoolConfig replaces the connection pool atomically.
 // In-flight requests continue using old pool; new requests use new pool.
 func ApplyPoolConfig(cfg PoolConfig) {
@@ -98,15 +93,4 @@ func DoHTTP(req *http.Request) (*http.Response, error) {
 	}
 	// util.DebugLog("[http] client.Do done status=%d content-type=%s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	return resp, nil
-}
-
-// GetPoolStats returns approximate pool stats
-func GetPoolStats() map[string]interface{} {
-	cfg := GetPoolConfig()
-	return map[string]interface{}{
-		"maxConnsPerHost":     cfg.MaxConnsPerHost,
-		"maxIdleConns":        cfg.MaxIdleConns,
-		"maxIdleConnsPerHost": cfg.MaxIdleConnsPerHost,
-		"requestTimeout":      cfg.RequestTimeout.String(),
-	}
 }

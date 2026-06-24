@@ -25,7 +25,7 @@ func TestApplyPoolConfig(t *testing.T) {
 	}
 	ApplyPoolConfig(cfg)
 
-	got := GetPoolConfig()
+	got := defaultPoolConfig
 	assert.Equal(t, 100, got.MaxIdleConns)
 	assert.Equal(t, 10, got.MaxIdleConnsPerHost)
 	assert.Equal(t, 50, got.MaxConnsPerHost)
@@ -65,14 +65,6 @@ func TestDoHTTP_Error(t *testing.T) {
 	resp, err := DoHTTP(req)
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-}
-
-func TestGetPoolStats(t *testing.T) {
-	stats := GetPoolStats()
-	assert.NotNil(t, stats)
-	assert.Contains(t, stats, "maxConnsPerHost")
-	assert.Contains(t, stats, "maxIdleConns")
-	assert.Contains(t, stats, "maxIdleConnsPerHost")
 }
 
 func TestDoHTTP_PostJSON(t *testing.T) {

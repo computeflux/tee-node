@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 	"github.com/computeflux/tee-provider/pkg/store"
@@ -32,6 +33,7 @@ func setupMockFns(t *testing.T) func() {
 		"gatewayGetCreditFn":       gatewayGetCreditFn,
 		"getCachedGatewayModelsFn": getCachedGatewayModelsFn,
 		"relayToUpstreamFn":        relayToUpstreamFn,
+		"streamRelayFn":            streamRelayFn,
 		"recordUsageAsyncFn":       recordUsageAsyncFn,
 	}
 
@@ -47,6 +49,7 @@ func setupMockFns(t *testing.T) func() {
 		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
 		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
 		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, bool, uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error))
+		streamRelayFn = old["streamRelayFn"].(func(http.ResponseWriter, *http.Request, *store.GatewayEndpoint, string, []byte, uint16, bool, bool, protocol.Protocol, protocol.Protocol, []byte))
 		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
 	}
 }
