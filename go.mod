@@ -10,7 +10,7 @@ require (
 	github.com/cometbft/cometbft v0.39.3
 	github.com/cosmos/gogoproto v1.7.2
 	github.com/decred/base58 v1.0.4
-	github.com/edgelesssys/ego v1.8.1
+	github.com/edgelesssys/ego v1.9.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.3.1

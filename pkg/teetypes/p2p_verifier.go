@@ -51,6 +51,7 @@ func (v *P2PTEEVerifier) VerifyReport(report []byte, remotePubKey crypto.PubKey)
 	if remotePubKey == nil {
 		return fmt.Errorf("remote public key is nil")
 	}
+
 	if len(report) == 0 {
 		return fmt.Errorf("empty attestation report")
 	}

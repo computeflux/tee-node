@@ -1,4 +1,4 @@
-FROM wetee/ego-ubuntu-24-04:1.8.1
+FROM wetee/ego-ubuntu-24-04:1.9.0
 WORKDIR /
 
 ADD hack/build/dsecret  /

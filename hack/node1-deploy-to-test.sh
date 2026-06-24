@@ -11,6 +11,15 @@ done
 DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
+# build binary
+ego-go build -o ./hack/build/dsecret ./main.go
+
+# sign binary
+cd ./hack/build/
+ego sign dsecret
+
+cd $DIR/../
+
 ROOT_DIR="$(pwd)"
 REMOTE_HOST="computefluxtest"
 REMOTE_NODE_DIR="/srv/token_node1"
