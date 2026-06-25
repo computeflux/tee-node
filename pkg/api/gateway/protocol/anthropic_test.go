@@ -157,7 +157,7 @@ func TestConvertOpenAIResponseToAnthropic_Simple(t *testing.T) {
 		}
 	}`)
 
-	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody, false)
+	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody)
 	require.NoError(t, err)
 
 	var anthropicResp map[string]any
@@ -195,7 +195,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	assert.Equal(t, 10, usage.PromptTokens)
@@ -229,7 +229,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	usage, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 	require.NotNil(t, usage)
 	assert.Equal(t, 20, usage.PromptTokens)
@@ -286,7 +286,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -310,7 +310,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -327,7 +327,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple non-empty choices")
 }
@@ -345,7 +345,7 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, false)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
@@ -354,53 +354,7 @@ data: [DONE]
 	assert.Contains(t, output, `"text":"Done"`)
 }
 
-// func TestAnthropicErrorResponse(t *testing.T) {
-// 	body := AnthropicErrorResponse("model not found", "not_found")
-// 	var resp map[string]any
-// 	require.NoError(t, json.Unmarshal(body, &resp))
-
-// 	assert.Equal(t, "error", resp["type"])
-// 	errObj, ok := resp["error"].(map[string]any)
-// 	require.True(t, ok)
-// 	assert.Equal(t, "not_found", errObj["type"])
-// 	assert.Equal(t, "model not found", errObj["message"])
-// }
-
-func TestConvertOpenAIResponseToAnthropic_DropThinking(t *testing.T) {
-	openAIBody := []byte(`{
-		"id": "chatcmpl-thinking",
-		"object": "chat.completion",
-		"created": 1,
-		"model": "deepseek-v4-pro",
-		"choices": [{
-			"index": 0,
-			"message": {
-				"role": "assistant",
-				"content": "",
-				"reasoning_content": "some reasoning",
-				"tool_calls": [{
-					"id": "call_1",
-					"type": "function",
-					"function": {"name": "bash", "arguments": "{\"command\":\"ls\"}"}
-				}]
-			},
-			"finish_reason": "tool_calls"
-		}],
-		"usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-	}`)
-
-	out, err := ConvertOpenAIResponseToAnthropic(openAIBody, true)
-	require.NoError(t, err)
-
-	var resp map[string]any
-	require.NoError(t, json.Unmarshal(out, &resp))
-	content, ok := resp["content"].([]any)
-	require.True(t, ok)
-	require.Len(t, content, 1)
-	assert.Equal(t, "tool_use", content[0].(map[string]any)["type"])
-}
-
-func TestStreamOpenAIResponseToAnthropic_DropThinking(t *testing.T) {
+func TestStreamOpenAIResponseToAnthropic_Thinking(t *testing.T) {
 	openAIStream := `data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
 data: {"id":"chatcmpl-thinking","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-pro","choices":[{"index":0,"delta":{"content":null,"reasoning_content":"some reasoning"},"finish_reason":null}]}
@@ -415,12 +369,13 @@ data: [DONE]
 `
 
 	var buf bytes.Buffer
-	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf, true)
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.NotContains(t, output, "\"type\":\"thinking\"")
-	assert.NotContains(t, output, "thinking_delta")
+	assert.Contains(t, output, "\"type\":\"thinking\"")
+	assert.Contains(t, output, "thinking_delta")
+	assert.Contains(t, output, "\"thinking\":\"some reasoning\"")
 	assert.Contains(t, output, "\"type\":\"tool_use\"")
 	// 验证 Anthropic 标准事件类型
 	assert.Contains(t, output, "event: content_block_delta")

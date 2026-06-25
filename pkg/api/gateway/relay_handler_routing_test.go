@@ -67,7 +67,7 @@ func TestHandleRelay_AnthropicToOpenAI(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, dropThinking bool, inbound, provider protocol.Protocol, origBody []byte) {
+	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"claude-3","stop_reason":"end_turn","usage":{"input_tokens":2,"output_tokens":1}}`))
 	}
@@ -86,7 +86,7 @@ func TestHandleRelay_OpenAIToAnthropic(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, dropThinking bool, inbound, provider protocol.Protocol, origBody []byte) {
+	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`))
 	}

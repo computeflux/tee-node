@@ -16,11 +16,11 @@ import (
 const DefaultSSEBufferSize = 64 * 1024
 
 // StreamOpenAIResponseToAnthropic 读取 OpenAI SSE 流并实时转换为 Anthropic SSE 事件写入 w。
-func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer, dropThinking bool) (*schemas.BifrostLLMUsage, error) {
+func StreamOpenAIResponseToAnthropic(r io.Reader, w io.Writer) (*schemas.BifrostLLMUsage, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, DefaultSSEBufferSize), DefaultSSEBufferSize)
 
-	s := &streamState{currentBlockIndex: -1, dropThinking: dropThinking}
+	s := &streamState{currentBlockIndex: -1}
 
 	for scanner.Scan() {
 		line := strings.TrimRight(scanner.Text(), "\r")
@@ -64,7 +64,6 @@ type streamState struct {
 	id, model         string
 	usage             *schemas.BifrostLLMUsage
 	finishReason      *string
-	dropThinking      bool
 	currentBlockIndex int
 	currentBlockType  blockType
 	currentToolCall   *toolCallState
@@ -130,7 +129,7 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 		if reasoning == "" {
 			reasoning = delta.ReasoningContent
 		}
-		if reasoning != "" && !s.dropThinking {
+		if reasoning != "" {
 			if err := s.startBlock(w, blockThinking); err != nil {
 				return err
 			}

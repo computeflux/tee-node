@@ -68,7 +68,7 @@ func convertAnthropicBodyToChatReq(body []byte, targetProvider uint16) (*schemas
 }
 
 // ConvertOpenAIResponseToAnthropic 把 OpenAI Chat Completions 响应转换为 Anthropic Messages API 响应。
-func ConvertOpenAIResponseToAnthropic(body []byte, dropThinking bool) (out []byte, err error) {
+func ConvertOpenAIResponseToAnthropic(body []byte) (out []byte, err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			err = fmt.Errorf("panic in ConvertOpenAIResponseToAnthropic: %v\n%s", rec, debug.Stack())
@@ -86,10 +86,6 @@ func ConvertOpenAIResponseToAnthropic(body []byte, dropThinking bool) (out []byt
 
 			return nil, fmt.Errorf("parse openai response: %w", err)
 		}
-	}
-
-	if dropThinking {
-		stripThinkingFromChatResponse(&chatResp)
 	}
 
 	anthropicResp := anthropic.ToAnthropicChatResponse(&chatResp)
@@ -117,30 +113,4 @@ func AnthropicErrorResponse(message string, typ string) []byte {
 		return []byte(`{"type":"error","error":{"type":"server_error","message":"failed to encode error response"}}`)
 	}
 	return b
-}
-
-func stripThinkingFromChatResponse(resp *schemas.BifrostChatResponse) {
-	if resp == nil {
-		return
-	}
-	for i := range resp.Choices {
-		choice := &resp.Choices[i]
-		if choice.ChatNonStreamResponseChoice == nil || choice.ChatNonStreamResponseChoice.Message == nil {
-			continue
-		}
-		msg := choice.ChatNonStreamResponseChoice.Message
-		if msg.ChatAssistantMessage != nil {
-			msg.ChatAssistantMessage.Reasoning = nil
-			msg.ChatAssistantMessage.ReasoningDetails = nil
-		}
-		if msg.Content != nil && len(msg.Content.ContentBlocks) > 0 {
-			filtered := msg.Content.ContentBlocks[:0]
-			for _, b := range msg.Content.ContentBlocks {
-				if string(b.Type) != "thinking" {
-					filtered = append(filtered, b)
-				}
-			}
-			msg.Content.ContentBlocks = filtered
-		}
-	}
 }

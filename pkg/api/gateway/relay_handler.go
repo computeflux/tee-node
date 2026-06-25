@@ -120,8 +120,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 跨协议转换
-	dropThinking := inboundProto == protocol.ProtocolAnthropic && providerProto == protocol.ProtocolOpenAI
-	streamRelayFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, reqBody.Stream, dropThinking, inboundProto, providerProto, bodyBytes)
+	streamRelayFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, reqBody.Stream, inboundProto, providerProto, bodyBytes)
 }
 
 var relayToUpstreamFn = relayToUpstream
@@ -143,6 +142,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	if err != nil {
 		return nil, nil, fmt.Errorf("upstream: %w", err)
 	}
+
 	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
 	if resp != nil && resp.Body != nil {
 		resp.Body.Close()
@@ -153,7 +153,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	return usage, nil, nil
 }
 
-func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, dropThinking bool, inbound, provider protocol.Protocol, origBody []byte) {
+func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) {
 	if !isStream {
 		converted, conv := convertRequest(bodyBytes, inbound, provider, modelName, providerType)
 		if conv != nil {
@@ -185,12 +185,12 @@ func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.Gateway
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
-		streamConvert(resp.Body, w, inbound, provider, dropThinking)
+		streamConvert(resp.Body, w, inbound, provider)
 		return
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	converted, conv := convertResponse(body, inbound, provider, dropThinking, origBody, providerType)
+	converted, conv := convertResponse(body, inbound, provider, origBody, providerType)
 	if conv != nil {
 		writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
 		return
@@ -211,10 +211,10 @@ func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, model
 	return bodyBytes, nil
 }
 
-func convertResponse(body []byte, inbound, provider protocol.Protocol, dropThinking bool, origBody []byte, providerType uint16) ([]byte, error) {
+func convertResponse(body []byte, inbound, provider protocol.Protocol, origBody []byte, providerType uint16) ([]byte, error) {
 	switch {
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
-		return protocol.ConvertOpenAIResponseToAnthropic(body, dropThinking)
+		return protocol.ConvertOpenAIResponseToAnthropic(body)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolAnthropic:
 		return protocol.ConvertAnthropicResponseToOpenAI(body)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
@@ -223,10 +223,10 @@ func convertResponse(body []byte, inbound, provider protocol.Protocol, dropThink
 	return body, nil
 }
 
-func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol, dropThinking bool) {
+func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol) {
 	switch {
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
-		protocol.StreamOpenAIResponseToAnthropic(r, w, dropThinking)
+		protocol.StreamOpenAIResponseToAnthropic(r, w)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolAnthropic:
 		protocol.StreamAnthropicResponseToOpenAI(r, w)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
