@@ -2,7 +2,7 @@
     "exe": "dsecret",
     "key": "./keys/private.pem",
     "debug": true,
-    "heapSize": 512,
+    "heapSize": 2048,
     "executableHeap": false,
     "productID": 1,
     "securityVersion": 1,
