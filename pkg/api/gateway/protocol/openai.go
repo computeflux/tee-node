@@ -53,33 +53,35 @@ func ConvertOpenAIRequestToAnthropic(body []byte, targetProvider uint16) ([]byte
 }
 
 // ConvertAnthropicResponseToOpenAI 把 Anthropic Messages API 响应转换为 OpenAI Chat Completions 响应。
-func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, err error) {
+func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, usage *schemas.BifrostLLMUsage, err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			util.LogWithRed("[protocol] panic in ConvertAnthropicResponseToOpenAI: %v\n%s", rec, debug.Stack())
 			err = fmt.Errorf("panic in ConvertAnthropicResponseToOpenAI: %v", rec)
+			out = nil
+			usage = nil
 		}
 	}()
 
 	var antResp anthropic.AnthropicMessageResponse
 	if err = json.Unmarshal(body, &antResp); err != nil {
-		return nil, fmt.Errorf("parse anthropic response: %w", err)
+		return nil, nil, fmt.Errorf("parse anthropic response: %w", err)
 	}
 	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
 	responsesResp := antResp.ToBifrostResponsesResponse(ctx)
 	if responsesResp == nil {
-		return nil, fmt.Errorf("ToBifrostResponsesResponse returned nil")
+		return nil, nil, fmt.Errorf("ToBifrostResponsesResponse returned nil")
 	}
 	chatResp := responsesResp.ToBifrostChatResponse()
 	if chatResp == nil {
-		return nil, fmt.Errorf("ToBifrostChatResponse returned nil")
+		return nil, nil, fmt.Errorf("ToBifrostChatResponse returned nil")
 	}
 
 	out, err = buildOpenAIChatCompletionResponse(chatResp)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return out, nil
+	return out, chatResp.Usage, nil
 }
 
 // buildOpenAIChatCompletionResponse 从 BifrostChatResponse 构建 OpenAI 标准响应 JSON。

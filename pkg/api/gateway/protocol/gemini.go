@@ -67,18 +67,22 @@ func ConvertOpenAIRequestToGemini(body []byte, targetProvider uint16) ([]byte, e
 }
 
 // ConvertGeminiResponseToOpenAI 把 Gemini 原生响应转换为 OpenAI Chat Completions 响应。
-func ConvertGeminiResponseToOpenAI(body []byte) ([]byte, error) {
+func ConvertGeminiResponseToOpenAI(body []byte) ([]byte, *schemas.BifrostLLMUsage, error) {
 	var gemResp gemini.GenerateContentResponse
 	if err := json.Unmarshal(body, &gemResp); err != nil {
-		return nil, fmt.Errorf("parse gemini response: %w", err)
+		return nil, nil, fmt.Errorf("parse gemini response: %w", err)
 	}
 
 	chatResp := gemResp.ToBifrostChatResponse()
 	if chatResp == nil {
-		return nil, fmt.Errorf("ToBifrostChatResponse returned nil")
+		return nil, nil, fmt.Errorf("ToBifrostChatResponse returned nil")
 	}
 
-	return buildOpenAIChatCompletionResponse(chatResp)
+	resp, err := buildOpenAIChatCompletionResponse(chatResp)
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, chatResp.Usage, nil
 }
 
 // stripTopLevelJSONField 从 JSON 对象中删除指定顶层字段。

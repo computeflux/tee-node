@@ -209,7 +209,7 @@ func TestConvertGeminiResponseToOpenAI_Text(t *testing.T) {
 		}
 	}`)
 
-	out, err := ConvertGeminiResponseToOpenAI(body)
+	out, _, err := ConvertGeminiResponseToOpenAI(body)
 	require.NoError(t, err)
 
 	var resp map[string]any
@@ -242,7 +242,7 @@ func TestConvertGeminiResponseToOpenAI_ToolCall(t *testing.T) {
 		"usageMetadata": {"promptTokenCount": 15, "candidatesTokenCount": 8, "totalTokenCount": 23}
 	}`)
 
-	out, err := ConvertGeminiResponseToOpenAI(body)
+	out, _, err := ConvertGeminiResponseToOpenAI(body)
 	require.NoError(t, err)
 
 	var resp map[string]any
@@ -273,7 +273,7 @@ func TestConvertGeminiResponseToOpenAI_Reasoning(t *testing.T) {
 		"usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3, "totalTokenCount": 8}
 	}`)
 
-	out, err := ConvertGeminiResponseToOpenAI(body)
+	out, _, err := ConvertGeminiResponseToOpenAI(body)
 	require.NoError(t, err)
 
 	var resp map[string]any

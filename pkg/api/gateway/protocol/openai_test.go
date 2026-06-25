@@ -72,9 +72,12 @@ func TestConvertAnthropicResponseToOpenAI(t *testing.T) {
 		}
 	}`)
 
-	out, err := ConvertAnthropicResponseToOpenAI(body)
+	out, usage, err := ConvertAnthropicResponseToOpenAI(body)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if usage == nil {
+		t.Fatal("expected usage but got nil")
 	}
 
 	var oaiResp map[string]any
@@ -99,9 +102,9 @@ func TestConvertAnthropicResponseToOpenAI(t *testing.T) {
 		t.Errorf("message mismatch: %v", msg)
 	}
 
-	usage := oaiResp["usage"].(map[string]any)
-	if usage["prompt_tokens"] != float64(10) || usage["completion_tokens"] != float64(2) {
-		t.Errorf("usage mismatch: %v", usage)
+	respUsage := oaiResp["usage"].(map[string]any)
+	if respUsage["prompt_tokens"] != float64(10) || respUsage["completion_tokens"] != float64(2) {
+		t.Errorf("usage mismatch: %v", respUsage)
 	}
 }
 
@@ -157,7 +160,7 @@ func TestConvertAnthropicResponseToOpenAI_WithReasoning(t *testing.T) {
 		"usage": {"input_tokens": 5, "output_tokens": 3}
 	}`)
 
-	out, err := ConvertAnthropicResponseToOpenAI(body)
+	out, _, err := ConvertAnthropicResponseToOpenAI(body)
 	require.NoError(t, err)
 
 	var oaiResp map[string]any

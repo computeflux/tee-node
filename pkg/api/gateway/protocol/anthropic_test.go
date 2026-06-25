@@ -157,8 +157,12 @@ func TestConvertOpenAIResponseToAnthropic_Simple(t *testing.T) {
 		}
 	}`)
 
-	anthropicBody, err := ConvertOpenAIResponseToAnthropic(openAIBody)
+	anthropicBody, usage, err := ConvertOpenAIResponseToAnthropic(openAIBody)
 	require.NoError(t, err)
+	require.NotNil(t, usage)
+	assert.Equal(t, 10, usage.PromptTokens)
+	assert.Equal(t, 5, usage.CompletionTokens)
+	assert.Equal(t, 15, usage.TotalTokens)
 
 	var anthropicResp map[string]any
 	require.NoError(t, json.Unmarshal(anthropicBody, &anthropicResp))
@@ -176,10 +180,10 @@ func TestConvertOpenAIResponseToAnthropic_Simple(t *testing.T) {
 	assert.Equal(t, "text", block["type"])
 	assert.Equal(t, "Hi there", block["text"])
 
-	usage, ok := anthropicResp["usage"].(map[string]any)
+	respUsage, ok := anthropicResp["usage"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(10), usage["input_tokens"])
-	assert.Equal(t, float64(5), usage["output_tokens"])
+	assert.Equal(t, float64(10), respUsage["input_tokens"])
+	assert.Equal(t, float64(5), respUsage["output_tokens"])
 }
 
 func TestStreamOpenAIResponseToAnthropic_Text(t *testing.T) {

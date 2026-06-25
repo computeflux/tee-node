@@ -68,10 +68,12 @@ func convertAnthropicBodyToChatReq(body []byte, targetProvider uint16) (*schemas
 }
 
 // ConvertOpenAIResponseToAnthropic 把 OpenAI Chat Completions 响应转换为 Anthropic Messages API 响应。
-func ConvertOpenAIResponseToAnthropic(body []byte) (out []byte, err error) {
+func ConvertOpenAIResponseToAnthropic(body []byte) (out []byte, usage *schemas.BifrostLLMUsage, err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			err = fmt.Errorf("panic in ConvertOpenAIResponseToAnthropic: %v\n%s", rec, debug.Stack())
+			out = nil
+			usage = nil
 		}
 	}()
 
@@ -84,20 +86,20 @@ func ConvertOpenAIResponseToAnthropic(body []byte) (out []byte, err error) {
 				previewLen = 500
 			}
 
-			return nil, fmt.Errorf("parse openai response: %w", err)
+			return nil, nil, fmt.Errorf("parse openai response: %w", err)
 		}
 	}
 
 	anthropicResp := anthropic.ToAnthropicChatResponse(&chatResp)
 	if anthropicResp == nil {
-		return nil, fmt.Errorf("ToAnthropicChatResponse returned nil")
+		return nil, nil, fmt.Errorf("ToAnthropicChatResponse returned nil")
 	}
 
 	out, err = json.Marshal(anthropicResp)
 	if err != nil {
-		return nil, fmt.Errorf("marshal anthropic response: %w", err)
+		return nil, nil, fmt.Errorf("marshal anthropic response: %w", err)
 	}
-	return out, nil
+	return out, chatResp.Usage, nil
 }
 
 func AnthropicErrorResponse(message string, typ string) []byte {

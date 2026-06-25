@@ -14,6 +14,7 @@ import (
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 	"github.com/computeflux/tee-provider/pkg/store"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 func RegisterGatewayRoutes(r chi.Router) {
@@ -120,7 +121,13 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 跨协议转换
-	streamRelayFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, reqBody.Stream, inboundProto, providerProto, bodyBytes)
+	usage, success := streamRelayFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, reqBody.Stream, inboundProto, providerProto, bodyBytes)
+	EmitProviderMetric(modelData.Data.ProviderID, success)
+	token := GetTokenFromContext(r)
+	if usage != nil && token != nil {
+		recordUsageAsyncFn(token.Addr, token.ID, modelData,
+			uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
+	}
 }
 
 var relayToUpstreamFn = relayToUpstream
@@ -153,12 +160,12 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	return usage, nil, nil
 }
 
-func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) {
+func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
 	if !isStream {
 		converted, conv := convertRequest(bodyBytes, inbound, provider, modelName, providerType)
 		if conv != nil {
 			writeProtocolError(w, r, http.StatusBadRequest, conv.Error(), "invalid_request")
-			return
+			return nil, false
 		}
 		bodyBytes = converted
 	}
@@ -177,7 +184,7 @@ func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.Gateway
 	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
 	if err != nil {
 		writeProtocolError(w, r, http.StatusBadGateway, err.Error(), "server_error")
-		return
+		return nil, false
 	}
 	defer resp.Body.Close()
 
@@ -185,18 +192,25 @@ func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.Gateway
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
-		streamConvert(resp.Body, w, inbound, provider)
-		return
+		usage, err := streamConvert(resp.Body, w, inbound, provider)
+		if err != nil {
+			writeProtocolError(w, r, http.StatusInternalServerError, err.Error(), "server_error")
+			return nil, false
+		}
+		return usage, true
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	converted, conv := convertResponse(body, inbound, provider, origBody, providerType)
+	converted, usage, conv := convertResponse(body, inbound, provider, origBody, providerType)
 	if conv != nil {
 		writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
-		return
+		return nil, false
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(converted)
+	if _, err := w.Write(converted); err != nil {
+		fmt.Printf("[relay] write response body: %v", err)
+	}
+	return usage, true
 }
 
 func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, modelName string, providerType uint16) ([]byte, error) {
@@ -211,26 +225,74 @@ func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, model
 	return bodyBytes, nil
 }
 
-func convertResponse(body []byte, inbound, provider protocol.Protocol, origBody []byte, providerType uint16) ([]byte, error) {
+func convertResponse(body []byte, inbound, provider protocol.Protocol, origBody []byte, providerType uint16) ([]byte, *relay.Usage, error) {
 	switch {
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
-		return protocol.ConvertOpenAIResponseToAnthropic(body)
+		out, usage, err := protocol.ConvertOpenAIResponseToAnthropic(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolAnthropic:
-		return protocol.ConvertAnthropicResponseToOpenAI(body)
+		out, usage, err := protocol.ConvertAnthropicResponseToOpenAI(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
-		return protocol.ConvertGeminiResponseToOpenAI(body)
+		out, usage, err := protocol.ConvertGeminiResponseToOpenAI(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
+	default:
+		return body, nil, fmt.Errorf("unsupported protocol pair: inbound=%v provider=%v", inbound, provider)
 	}
-	return body, nil
 }
 
-func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol) {
+// bifrostUsageToRelay 将 Bifrost 的 usage 转换为 relay 层的 usage。
+// 注意：Bifrost 端的 CompletionTokensDetails.ReasoningTokens 等字段被故意忽略，
+// 因为 relay.Usage 当前不携带这些信息。若后续计费/限流需要，应在 relay.Usage 中新增字段并在此补充映射。
+func bifrostUsageToRelay(u *schemas.BifrostLLMUsage) *relay.Usage {
+	if u == nil {
+		return nil
+	}
+	cachedTokens := 0
+	if u.PromptTokensDetails != nil {
+		cachedTokens = u.PromptTokensDetails.CachedReadTokens
+	}
+	return &relay.Usage{
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		TotalTokens:      u.TotalTokens,
+		PromptTokensDetails: relay.PromptTokensDetails{
+			CachedTokens: cachedTokens,
+		},
+	}
+}
+
+func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol) (*relay.Usage, error) {
 	switch {
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
-		protocol.StreamOpenAIResponseToAnthropic(r, w)
+		usage, err := protocol.StreamOpenAIResponseToAnthropic(r, w)
+		if err != nil {
+			return nil, err
+		}
+		return bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolAnthropic:
-		protocol.StreamAnthropicResponseToOpenAI(r, w)
+		usage, err := protocol.StreamAnthropicResponseToOpenAI(r, w)
+		if err != nil {
+			return nil, err
+		}
+		return bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
-		protocol.StreamGeminiResponseToOpenAI(r, w)
+		usage, err := protocol.StreamGeminiResponseToOpenAI(r, w)
+		if err != nil {
+			return nil, err
+		}
+		return bifrostUsageToRelay(usage), nil
+	default:
+		return nil, fmt.Errorf("unsupported stream protocol pair: inbound=%v provider=%v", inbound, provider)
 	}
 }
 
