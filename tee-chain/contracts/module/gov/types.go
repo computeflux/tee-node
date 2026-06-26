@@ -135,3 +135,12 @@ type VoteRef struct {
 	ProposalID uint32 // 提案ID
 	VoteIndex  uint32 // 投票索引
 }
+// PendingRuntimeUpgrade 待处理的运行时升级信息
+// scale-codec-gen:generate
+type PendingRuntimeUpgrade struct {
+	Version          uint32 // 升级后版本号
+	CodeHash         []byte // 代码哈希
+	WasmBytes        []byte // WASM 字节码
+	Description      string // 升级描述
+	ActivationHeight uint64 // 激活区块高度（合约执行时设置为当前区块高度）
+}

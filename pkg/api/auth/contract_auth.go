@@ -38,6 +38,21 @@ func AuthStoreAuthUser(chain *teechain.TeeChain, ref string, ciphertext []byte) 
 	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_auth_user"), [][]byte{refBytes, cipherBytes, nonceBytes})
 }
 
+// AuthGetPrivateKey 查询用户加密私钥（跨节点同步）。
+func AuthGetPrivateKey(chain *teechain.TeeChain, ref string) (*cauth.PrivateKeyRecord, error) {
+	return runAuthQuery(chain, func(q cauth.AuthQuery) (*cauth.PrivateKeyRecord, error) {
+		return q.GetPrivateKey(ref)
+	})
+}
+
+// AuthStorePrivateKey 将用户加密私钥提交到链上合约（跨节点同步）。
+func AuthStorePrivateKey(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
+	refBytes, _ := store.ScaleEncode(ref)
+	cipherBytes, _ := store.ScaleEncode(ciphertext)
+	nonceBytes, _ := store.ScaleEncode([]byte{})
+	return chain.SubmitContract("auth", store.MethodToSelectorBytes("store_private_key"), [][]byte{refBytes, cipherBytes, nonceBytes})
+}
+
 // AuthGetConfig 查询认证服务配置（TEE 内部，不对外）。
 func AuthGetConfig(chain *teechain.TeeChain) (*cauth.AuthConfig, error) {
 	return runAuthSecret(chain, func(s cauth.AuthSecret) (*cauth.AuthConfig, error) {

@@ -25,6 +25,15 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("add_track: %w", err)
 		}
 		return m.AddTrack(track)
+	case [4]byte{0xbf, 0x09, 0x74, 0x06}:
+		if err := store.RequireArgLen(args, 1, "call_as_sudo"); err != nil {
+			return err
+		}
+		calls, err := store.DecodeScaleArgBytes[[]store.InContractCall](args[0])
+		if err != nil {
+			return fmt.Errorf("call_as_sudo: calls: %w", err)
+		}
+		return m.CallAsSudo(calls)
 	case [4]byte{0x46, 0xc4, 0x21, 0xdb}:
 		if err := store.RequireArgLen(args, 1, "cancel_proposal"); err != nil {
 			return err
@@ -60,6 +69,8 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("deposit_proposal: amount: %w", err)
 		}
 		return m.DepositProposal(proposalID, amount)
+	case [4]byte{0x6d, 0x64, 0x22, 0x5d}:
+		return m.DisableSudo()
 	case [4]byte{0x3e, 0x44, 0x34, 0x0e}:
 		if err := store.RequireArgLen(args, 1, "exec_proposal"); err != nil {
 			return err
@@ -112,6 +123,15 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 		return m.Payout(spendID)
 	case [4]byte{0x6d, 0x6f, 0x07, 0x72}:
 		return m.PublicJoin()
+	case [4]byte{0xa4, 0x77, 0x1d, 0x9e}:
+		if err := store.RequireArgLen(args, 1, "runtime_upgrade"); err != nil {
+			return err
+		}
+		upgrade, err := store.DecodeScaleArgBytes[PendingRuntimeUpgrade](args[0])
+		if err != nil {
+			return fmt.Errorf("runtime_upgrade: upgrade: %w", err)
+		}
+		return m.RuntimeUpgrade(upgrade)
 	case [4]byte{0x29, 0x87, 0xd4, 0xba}:
 		if err := store.RequireArgLen(args, 1, "set_default_track"); err != nil {
 			return err
@@ -130,6 +150,15 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("set_public_join: %w", err)
 		}
 		return m.SetPublicJoin(publicJoin)
+	case [4]byte{0xd3, 0x6b, 0x8f, 0xb0}:
+		if err := store.RequireArgLen(args, 1, "set_sudo"); err != nil {
+			return err
+		}
+		addr, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
+		if err != nil {
+			return fmt.Errorf("set_sudo: addr: %w", err)
+		}
+		return m.SetSudo(addr)
 	case [4]byte{0x87, 0x2c, 0x40, 0xe9}:
 		if err := store.RequireArgLen(args, 3, "spend"); err != nil {
 			return err
@@ -242,6 +271,12 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0xba, 0x54, 0x98, 0x65}:
+		out, err := q.IsSudoDisabled()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0x53, 0x55, 0x0f, 0x05}:
 		out, err := q.Members()
 		if err != nil {
@@ -287,6 +322,44 @@ func (q GovQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("proposals: size: %w", err)
 		}
 		out, err := q.Proposals(startKey, size)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0xd1, 0xea, 0xd9, 0xdb}:
+		if err := store.RequireArgLen(args, 1, "runtime_at_height"); err != nil {
+			return nil, err
+		}
+		height, err := store.DecodeScaleArgBytes[int64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("runtime_at_height: height: %w", err)
+		}
+		out, err := q.RuntimeAtHeight(height)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x6f, 0x29, 0xbd, 0xa3}:
+		if err := store.RequireArgLen(args, 1, "runtime_meta"); err != nil {
+			return nil, err
+		}
+		version, err := store.DecodeScaleArgBytes[uint32](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("runtime_meta: version: %w", err)
+		}
+		out, err := q.RuntimeMeta(version)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0xa6, 0x39, 0xf6, 0x3d}:
+		out, err := q.RuntimeVersion()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x65, 0x1b, 0x38, 0x45}:
+		out, err := q.Sudo()
 		if err != nil {
 			return nil, err
 		}
@@ -397,6 +470,12 @@ func NewGov(api store.ContractApi) *Gov {
 		votes:            store.NewStoreList2D[uint32, uint32, Vote]("gov", "votes_v4_k1_to_id_", "votes_v4_k1_length_", "votes_v4_k2_next_", "votes_v4_store_"),
 		spends:           &store.StoreMapping[uint64, Spend]{Namespace: "gov", KeyPrefix: "spend_"},
 		proposalResults:  &store.StoreMapping[uint32, ProposalResult]{Namespace: "gov", KeyPrefix: "proposal_result_"},
+		sudo:             &store.StoreValue[store.UniAddr]{Namespace: "gov", Key: "sudo"},
+		sudoDisabled:     &store.StoreValue[bool]{Namespace: "gov", Key: "sudo_disabled"},
+		runtimeVersion:   &store.StoreValue[uint32]{Namespace: "gov", Key: "runtime_version_"},
+		runtimeMetas:     &store.StoreMapping[uint32, PendingRuntimeUpgrade]{Namespace: "gov", KeyPrefix: "runtime_meta_"},
+		runtimeAtHeight:  &store.StoreMapping[uint64, uint32]{Namespace: "gov", KeyPrefix: "runtime_at_height_"},
+		dkgPub:           &store.StoreValue[store.UniAddr]{Namespace: "gov", Key: "dkg_pub"},
 	}
 }
 
@@ -404,10 +483,15 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x87, 0xe0, 0xff, 0x32}: "balance_of",
 	[4]byte{0x36, 0x26, 0xe9, 0xbf}: "default_track",
 	[4]byte{0x76, 0xf2, 0x07, 0x24}: "get_public_join",
+	[4]byte{0xba, 0x54, 0x98, 0x65}: "is_sudo_disabled",
 	[4]byte{0x53, 0x55, 0x0f, 0x05}: "members",
 	[4]byte{0x79, 0x9f, 0xe2, 0xdd}: "proposal",
 	[4]byte{0xfd, 0x88, 0x90, 0x7b}: "proposal_status",
 	[4]byte{0xfe, 0x26, 0xfd, 0x17}: "proposals",
+	[4]byte{0xd1, 0xea, 0xd9, 0xdb}: "runtime_at_height",
+	[4]byte{0x6f, 0x29, 0xbd, 0xa3}: "runtime_meta",
+	[4]byte{0xa6, 0x39, 0xf6, 0x3d}: "runtime_version",
+	[4]byte{0x65, 0x1b, 0x38, 0x45}: "sudo",
 	[4]byte{0x77, 0x17, 0x71, 0xf7}: "total_supply",
 	[4]byte{0xb9, 0xfd, 0x54, 0xc4}: "track",
 	[4]byte{0x3c, 0x05, 0xbe, 0x89}: "tracks",

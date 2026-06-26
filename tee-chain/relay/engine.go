@@ -69,6 +69,7 @@ func (e *Engine) CheckRelayEvent(ev SyncEvent) error {
 // ApplyRelayEvent 执行 relay 事件并更新 nonce (FinalizeTx 阶段) | Execute relay event and update nonce (FinalizeTx phase)
 func (e *Engine) ApplyRelayEvent(ev SyncEvent, api store.ContractApi) error {
 	txn := api.GetTxn()
+
 	// 二次校验 (区块内可能有多个 relay tx) | double-check (block may contain multiple relay txs)
 	last, err := getLastNonce(txn, ev.ChainID)
 	if err != nil {

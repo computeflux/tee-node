@@ -108,54 +108,6 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 					return nil, errors.Wrap(err, "delete batch call store")
 				}
 			}
-		case *model.SysCall_RuntimeUpgrade:
-			upgrade := p.RuntimeUpgrade
-			if upgrade == nil {
-				return nil, errors.New("runtime upgrade is nil")
-			}
-
-			caller := tx.GetCaller()
-			callerType := tx.GetCallerType()
-			address := chaintypes.UniAddr{T: callerType, V: caller}
-
-			pub, err := app.GetDkgPubkey()
-			if err != nil {
-				return nil, errors.Wrap(err, "get dkg pubkey for runtime upgrade")
-			}
-
-			sudo := chaintypes.UniAddr{V: pub.ToBytes()}
-			if !bytes.Equal(address.V, sudo.V) || address.T != sudo.T {
-				return nil, errors.New("runtime upgrade: caller is not system account")
-			}
-
-			currentVersion, err := GetCurrentRuntimeVersion()
-			if err != nil {
-				return nil, errors.Wrap(err, "get current runtime version")
-			}
-
-			expectedVersion := currentVersion + 1
-			if upgrade.Version != expectedVersion {
-				return nil, errors.Errorf(
-					"runtime upgrade version invalid: expected %d, got %d",
-					expectedVersion, upgrade.Version,
-				)
-			}
-
-			if len(upgrade.WasmBytes) == 0 {
-				return nil, errors.New("runtime upgrade: wasm_bytes is empty")
-			}
-
-			info := &domain.RuntimeVersionInfo{
-				Version:          upgrade.Version,
-				ActivationHeight: height,
-				CodeHash:         upgrade.CodeHash,
-				WasmBytes:        upgrade.WasmBytes,
-				Description:      upgrade.Description,
-			}
-			if err := ApplyRuntimeUpgrade(txn, info, height); err != nil {
-				return nil, errors.Wrap(err, "apply runtime upgrade")
-			}
-			app.state.RuntimeVersion = upgrade.Version
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
@@ -200,6 +152,11 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 		res = append(res, &abci.ExecTxResult{Code: uint32(abci.CodeTypeOK)})
 	}
 
+	// 同步链上运行时版本状态（合约已通过 RuntimeUpgrade 完成版本管理）
+	if v, _ := GetCurrentRuntimeVersion(txn); v != app.state.RuntimeVersion {
+		app.state.RuntimeVersion = v
+	}
+
 	return res, nil
 }
 
@@ -208,10 +165,12 @@ func (app *TeeChain) buildContractRuntime(txn *dbstore.Txn, height int64, ts tim
 	if err != nil || pub == nil {
 		return nil, errors.Wrap(err, "get dkg pubkey for relay sync")
 	}
-	version, err := GetRuntimeVersionAtHeight(height)
+
+	version, err := GetRuntimeVersionAtHeight(txn, height)
 	if err != nil {
 		return nil, errors.Wrap(err, "get runtime version for relay sync")
 	}
+
 	runtime := contracts.NewRuntimeWithVersion(height, ts, txn, chaintypes.UniAddr{
 		V: pub.ToBytes(),
 	}, chaintypes.UniAddr{

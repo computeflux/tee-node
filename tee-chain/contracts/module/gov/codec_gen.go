@@ -207,6 +207,65 @@ func (v *Member) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
+// Encode SCALE 编码 PendingRuntimeUpgrade。
+func (v *PendingRuntimeUpgrade) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.Version))
+	buf = store.EncodeCompact(buf, uint64(len(v.CodeHash)))
+	buf = append(buf, v.CodeHash...)
+	buf = store.EncodeCompact(buf, uint64(len(v.WasmBytes)))
+	buf = append(buf, v.WasmBytes...)
+	buf = store.EncodeCompact(buf, uint64(len(v.Description)))
+	buf = append(buf, v.Description...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ActivationHeight))
+	return buf, nil
+}
+
+// Decode SCALE 解码 PendingRuntimeUpgrade。
+func (v *PendingRuntimeUpgrade) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading Version")
+	}
+	v.Version = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeHash")
+		}
+		v.CodeHash = make([]byte, n)
+		copy(v.CodeHash, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading WasmBytes")
+		}
+		v.WasmBytes = make([]byte, n)
+		copy(v.WasmBytes, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Description")
+		}
+		v.Description = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ActivationHeight")
+	}
+	v.ActivationHeight = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
+
 // Encode SCALE 编码 Proposal。
 func (v *Proposal) Encode() ([]byte, error) {
 	var buf []byte

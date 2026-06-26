@@ -182,30 +182,22 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 }
 
 // getAuthUserFromContract 读取 AuthUser。
-// 优先读本地（最新），若本地没有或链上数据更完整则读链上合约。
+// 链上合约为数据源，本地缓存仅在异步上链窗口期内回退。
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*store.AuthUser, error) {
-	// 本地数据通常最新（如 setPassword 后尚未异步上链）
-	localUser, _ := store.DBGetJson[store.AuthUser](store.SECRET_DB, store.Web3AuthNamespace, "u:"+email)
-
+	// 1. 链上合约为数据源
 	if tc != nil {
 		ref := "auth_user:" + email
 		rec, err := authpkg.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var chainUser store.AuthUser
 			if json.Unmarshal(rec.Ciphertext, &chainUser) == nil {
-				// 链上数据已包含密码信息，直接使用
-				if chainUser.Salt != "" && chainUser.DKHash != "" {
-					return &chainUser, nil
-				}
-				// 链上数据不完整（如旧记录），优先使用本地
-				if localUser != nil && (localUser.Salt != "" || localUser.DKHash != "") {
-					return localUser, nil
-				}
 				return &chainUser, nil
 			}
 		}
 	}
 
+	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口）
+	localUser, _ := store.DBGetJson[store.AuthUser](store.SECRET_DB, store.Web3AuthNamespace, "u:"+email)
 	if localUser != nil {
 		return localUser, nil
 	}

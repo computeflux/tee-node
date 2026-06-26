@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 50
+        "type": 55
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 51
+        "type": 56
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -128,7 +128,7 @@
               "displayName": [
                 "CallContent"
               ],
-              "type": 17
+              "type": 22
             }
           },
           {
@@ -218,7 +218,7 @@
               "displayName": [
                 "Option"
               ],
-              "type": 37
+              "type": 40
             }
           },
           {
@@ -241,7 +241,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 49
+          "type": 54
         },
         "selector": "0x340f2cf4"
       },
@@ -256,7 +256,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 22
+          "type": 25
         },
         "selector": "0x3626e9bf"
       },
@@ -271,7 +271,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 44
+          "type": 49
         },
         "selector": "0x3c05be89"
       },
@@ -361,7 +361,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 47
+          "type": 52
         },
         "selector": "0x4d151cf1"
       },
@@ -376,7 +376,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 26
+          "type": 29
         },
         "selector": "0x53550f05"
       },
@@ -400,6 +400,37 @@
         "args": [],
         "default": false,
         "docs": [],
+        "label": "sudo",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 44
+        },
+        "selector": "0x651b3845"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "disable_sudo",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x6d64225d"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
         "label": "public_join",
         "mutates": true,
         "payable": false,
@@ -413,6 +444,32 @@
         "selector": "0x6d6f0772"
       },
       {
+        "args": [
+          {
+            "docs": [],
+            "label": "version",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "runtime_meta",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 43
+        },
+        "selector": "0x6f29bda3"
+      },
+      {
         "args": [],
         "default": false,
         "docs": [],
@@ -423,7 +480,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 23
+          "type": 26
         },
         "selector": "0x76f20724"
       },
@@ -438,7 +495,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 21
+          "type": 24
         },
         "selector": "0x771771f7"
       },
@@ -464,7 +521,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 33
+          "type": 36
         },
         "selector": "0x799fe2dd"
       },
@@ -537,7 +594,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 21
+          "type": 24
         },
         "selector": "0x87e0ff32"
       },
@@ -598,6 +655,33 @@
         "args": [
           {
             "docs": [],
+            "label": "upgrade",
+            "type": {
+              "displayName": [
+                "PendingRuntimeUpgrade"
+              ],
+              "type": 21
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "runtime_upgrade",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xa4771d9e"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "spend_i_d",
             "type": {
               "displayName": [
@@ -620,6 +704,21 @@
           "type": 11
         },
         "selector": "0xa4f0196c"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "runtime_version",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 25
+        },
+        "selector": "0xa639f63d"
       },
       {
         "args": [
@@ -680,9 +779,24 @@
           "displayName": [
             "Result"
           ],
-          "type": 41
+          "type": 46
         },
         "selector": "0xb9fd54c4"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "is_sudo_disabled",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 26
+        },
+        "selector": "0xba549865"
       },
       {
         "args": [
@@ -735,6 +849,33 @@
         "args": [
           {
             "docs": [],
+            "label": "calls",
+            "type": {
+              "displayName": [
+                "Vec"
+              ],
+              "type": 20
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "call_as_sudo",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xbf097406"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
             "label": "new_user",
             "type": {
               "displayName": [
@@ -767,6 +908,59 @@
           "type": 11
         },
         "selector": "0xc6c83af9"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "height",
+            "type": {
+              "displayName": [
+                "i64"
+              ],
+              "type": 4
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "runtime_at_height",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 25
+        },
+        "selector": "0xd1ead9db"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "addr",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "set_sudo",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xd36b8fb0"
       },
       {
         "args": [
@@ -901,7 +1095,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 36
+          "type": 39
         },
         "selector": "0xfd88907b"
       },
@@ -914,7 +1108,7 @@
               "displayName": [
                 "Option"
               ],
-              "type": 37
+              "type": 40
             }
           },
           {
@@ -937,7 +1131,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 39
+          "type": 42
         },
         "selector": "0xfe26fd17"
       },
@@ -960,7 +1154,7 @@
               "displayName": [
                 "Option"
               ],
-              "type": 37
+              "type": 40
             }
           },
           {
@@ -983,7 +1177,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 49
+          "type": 54
         },
         "selector": "0xfeadee12"
       }
@@ -1184,36 +1378,51 @@
               {
                 "fields": [],
                 "index": 16,
-                "name": "PropNotOngoing"
+                "name": "NotSudo"
               },
               {
                 "fields": [],
                 "index": 17,
-                "name": "ProposalInDecision"
+                "name": "PropNotOngoing"
               },
               {
                 "fields": [],
                 "index": 18,
-                "name": "ProposalNotConfirmed"
+                "name": "ProposalInDecision"
               },
               {
                 "fields": [],
                 "index": 19,
-                "name": "PublicJoinNotAllowed"
+                "name": "ProposalNotConfirmed"
               },
               {
                 "fields": [],
                 "index": 20,
-                "name": "SpendAlreadyExecuted"
+                "name": "PublicJoinNotAllowed"
               },
               {
                 "fields": [],
                 "index": 21,
-                "name": "SpendNotFound"
+                "name": "SpendAlreadyExecuted"
               },
               {
                 "fields": [],
                 "index": 22,
+                "name": "SpendNotFound"
+              },
+              {
+                "fields": [],
+                "index": 23,
+                "name": "SudoDisabled"
+              },
+              {
+                "fields": [],
+                "index": 24,
+                "name": "SudoNotSet"
+              },
+              {
+                "fields": [],
+                "index": 25,
                 "name": "TransferDisabled"
               }
             ]
@@ -1432,26 +1641,22 @@
           "composite": {
             "fields": [
               {
-                "name": "Contract",
+                "name": "Name",
                 "type": 18
               },
               {
-                "name": "Selector",
-                "type": 19
+                "name": "Method",
+                "type": 18
               },
               {
                 "name": "Args",
-                "type": 20
-              },
-              {
-                "name": "Amount",
-                "type": 8
+                "type": 19
               }
             ]
           }
         },
         "path": [
-          "CallContent"
+          "InContractCall"
         ]
       }
     },
@@ -1478,17 +1683,6 @@
       "id": 19,
       "type": {
         "def": {
-          "array": {
-            "len": 4,
-            "type": 0
-          }
-        }
-      }
-    },
-    {
-      "id": 20,
-      "type": {
-        "def": {
           "sequence": {
             "type": 18
           }
@@ -1505,7 +1699,101 @@
       }
     },
     {
+      "id": 20,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 17
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 17
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
       "id": 21,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Version",
+                "type": 2
+              },
+              {
+                "name": "CodeHash",
+                "type": 18
+              },
+              {
+                "name": "WasmBytes",
+                "type": 18
+              },
+              {
+                "name": "Description",
+                "type": 15
+              },
+              {
+                "name": "ActivationHeight",
+                "type": 3
+              }
+            ]
+          }
+        },
+        "path": [
+          "PendingRuntimeUpgrade"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Contract",
+                "type": 18
+              },
+              {
+                "name": "Selector",
+                "type": 23
+              },
+              {
+                "name": "Args",
+                "type": 19
+              },
+              {
+                "name": "Amount",
+                "type": 8
+              }
+            ]
+          }
+        },
+        "path": [
+          "CallContent"
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": {
+        "def": {
+          "array": {
+            "len": 4,
+            "type": 0
+          }
+        }
+      }
+    },
+    {
+      "id": 24,
       "type": {
         "def": {
           "variant": {
@@ -1547,7 +1835,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 25,
       "type": {
         "def": {
           "variant": {
@@ -1589,7 +1877,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 26,
       "type": {
         "def": {
           "variant": {
@@ -1631,7 +1919,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 27,
       "type": {
         "def": {
           "composite": {
@@ -1653,17 +1941,17 @@
       }
     },
     {
-      "id": 25,
+      "id": 28,
       "type": {
         "def": {
           "sequence": {
-            "type": 24
+            "type": 27
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 24
+            "type": 27
           }
         ],
         "path": [
@@ -1672,7 +1960,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 29,
       "type": {
         "def": {
           "variant": {
@@ -1680,7 +1968,7 @@
               {
                 "fields": [
                   {
-                    "type": 25
+                    "type": 28
                   }
                 ],
                 "index": 0,
@@ -1701,7 +1989,7 @@
         "params": [
           {
             "name": "T",
-            "type": 25
+            "type": 28
           },
           {
             "name": "E",
@@ -1714,7 +2002,7 @@
       }
     },
     {
-      "id": 27,
+      "id": 30,
       "type": {
         "def": {
           "composite": {
@@ -1725,7 +2013,7 @@
               },
               {
                 "name": "Proposal",
-                "type": 28
+                "type": 31
               }
             ]
           }
@@ -1736,14 +2024,14 @@
       }
     },
     {
-      "id": 28,
+      "id": 31,
       "type": {
         "def": {
           "composite": {
             "fields": [
               {
                 "name": "Call",
-                "type": 29
+                "type": 32
               },
               {
                 "name": "TrackID",
@@ -1755,7 +2043,7 @@
               },
               {
                 "name": "Status",
-                "type": 30
+                "type": 33
               },
               {
                 "name": "SubmitBlock",
@@ -1763,7 +2051,7 @@
               },
               {
                 "name": "Deposit",
-                "type": 31
+                "type": 34
               }
             ]
           }
@@ -1774,7 +2062,7 @@
       }
     },
     {
-      "id": 29,
+      "id": 32,
       "type": {
         "def": {
           "variant": {
@@ -1786,7 +2074,7 @@
               {
                 "fields": [
                   {
-                    "type": 17
+                    "type": 22
                   }
                 ],
                 "index": 1,
@@ -1798,7 +2086,7 @@
         "params": [
           {
             "name": "T",
-            "type": 17
+            "type": 22
           }
         ],
         "path": [
@@ -1807,7 +2095,7 @@
       }
     },
     {
-      "id": 30,
+      "id": 33,
       "type": {
         "def": {
           "composite": {
@@ -1829,7 +2117,7 @@
       }
     },
     {
-      "id": 31,
+      "id": 34,
       "type": {
         "def": {
           "composite": {
@@ -1855,111 +2143,6 @@
       }
     },
     {
-      "id": 32,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "index": 0,
-                "name": "None"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 27
-                  }
-                ],
-                "index": 1,
-                "name": "Some"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 27
-          }
-        ],
-        "path": [
-          "Option"
-        ]
-      }
-    },
-    {
-      "id": 33,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 32
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 32
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 34,
-      "type": {
-        "def": {
-          "composite": {
-            "fields": [
-              {
-                "name": "State",
-                "type": 0
-              },
-              {
-                "name": "BlockHeight",
-                "type": 4
-              },
-              {
-                "name": "ConfirmedNumber",
-                "type": 2
-              },
-              {
-                "name": "LastConfirmedBlock",
-                "type": 4
-              }
-            ]
-          }
-        },
-        "path": [
-          "ProposalStatusQuery"
-        ]
-      }
-    },
-    {
       "id": 35,
       "type": {
         "def": {
@@ -1972,7 +2155,7 @@
               {
                 "fields": [
                   {
-                    "type": 34
+                    "type": 30
                   }
                 ],
                 "index": 1,
@@ -1984,7 +2167,7 @@
         "params": [
           {
             "name": "T",
-            "type": 34
+            "type": 30
           }
         ],
         "path": [
@@ -2038,6 +2221,36 @@
       "id": 37,
       "type": {
         "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "State",
+                "type": 0
+              },
+              {
+                "name": "BlockHeight",
+                "type": 4
+              },
+              {
+                "name": "ConfirmedNumber",
+                "type": 2
+              },
+              {
+                "name": "LastConfirmedBlock",
+                "type": 4
+              }
+            ]
+          }
+        },
+        "path": [
+          "ProposalStatusQuery"
+        ]
+      }
+    },
+    {
+      "id": 38,
+      "type": {
+        "def": {
           "variant": {
             "variants": [
               {
@@ -2047,7 +2260,7 @@
               {
                 "fields": [
                   {
-                    "type": 2
+                    "type": 37
                   }
                 ],
                 "index": 1,
@@ -2059,30 +2272,11 @@
         "params": [
           {
             "name": "T",
-            "type": 2
+            "type": 37
           }
         ],
         "path": [
           "Option"
-        ]
-      }
-    },
-    {
-      "id": 38,
-      "type": {
-        "def": {
-          "sequence": {
-            "type": 27
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 27
-          }
-        ],
-        "path": [
-          "Vec"
         ]
       }
     },
@@ -2141,6 +2335,184 @@
               {
                 "fields": [
                   {
+                    "type": 2
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 2
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 41,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 30
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 30
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 42,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 41
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 41
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 21
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 21
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 44,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 13
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 13
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 45,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
                     "type": 14
                   }
                 ],
@@ -2162,7 +2534,7 @@
       }
     },
     {
-      "id": 41,
+      "id": 46,
       "type": {
         "def": {
           "variant": {
@@ -2170,7 +2542,7 @@
               {
                 "fields": [
                   {
-                    "type": 40
+                    "type": 45
                   }
                 ],
                 "index": 0,
@@ -2191,7 +2563,7 @@
         "params": [
           {
             "name": "T",
-            "type": 40
+            "type": 45
           },
           {
             "name": "E",
@@ -2204,7 +2576,7 @@
       }
     },
     {
-      "id": 42,
+      "id": 47,
       "type": {
         "def": {
           "composite": {
@@ -2226,199 +2598,17 @@
       }
     },
     {
-      "id": 43,
-      "type": {
-        "def": {
-          "sequence": {
-            "type": 42
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 42
-          }
-        ],
-        "path": [
-          "Vec"
-        ]
-      }
-    },
-    {
-      "id": 44,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 43
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 43
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 45,
-      "type": {
-        "def": {
-          "composite": {
-            "fields": [
-              {
-                "name": "Index",
-                "type": 2
-              },
-              {
-                "name": "ProposalID",
-                "type": 2
-              },
-              {
-                "name": "Caller",
-                "type": 13
-              },
-              {
-                "name": "Pledge",
-                "type": 8
-              },
-              {
-                "name": "OpinionYes",
-                "type": 6
-              },
-              {
-                "name": "VoteWeight",
-                "type": 8
-              },
-              {
-                "name": "VoteBlock",
-                "type": 4
-              },
-              {
-                "name": "Deleted",
-                "type": 6
-              }
-            ]
-          }
-        },
-        "path": [
-          "Vote"
-        ]
-      }
-    },
-    {
-      "id": 46,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "index": 0,
-                "name": "None"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 45
-                  }
-                ],
-                "index": 1,
-                "name": "Some"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 45
-          }
-        ],
-        "path": [
-          "Option"
-        ]
-      }
-    },
-    {
-      "id": 47,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 46
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 46
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
       "id": 48,
       "type": {
         "def": {
           "sequence": {
-            "type": 45
+            "type": 47
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 45
+            "type": 47
           }
         ],
         "path": [
@@ -2472,6 +2662,188 @@
       "id": 50,
       "type": {
         "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Index",
+                "type": 2
+              },
+              {
+                "name": "ProposalID",
+                "type": 2
+              },
+              {
+                "name": "Caller",
+                "type": 13
+              },
+              {
+                "name": "Pledge",
+                "type": 8
+              },
+              {
+                "name": "OpinionYes",
+                "type": 6
+              },
+              {
+                "name": "VoteWeight",
+                "type": 8
+              },
+              {
+                "name": "VoteBlock",
+                "type": 4
+              },
+              {
+                "name": "Deleted",
+                "type": 6
+              }
+            ]
+          }
+        },
+        "path": [
+          "Vote"
+        ]
+      }
+    },
+    {
+      "id": 51,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "index": 0,
+                "name": "None"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 50
+                  }
+                ],
+                "index": 1,
+                "name": "Some"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 50
+          }
+        ],
+        "path": [
+          "Option"
+        ]
+      }
+    },
+    {
+      "id": 52,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 51
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 51
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 53,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 50
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 50
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 54,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 53
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 53
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 55,
+      "type": {
+        "def": {
           "primitive": "u128"
         },
         "path": [
@@ -2480,7 +2852,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 56,
       "type": {
         "def": {
           "composite": {

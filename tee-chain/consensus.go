@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/store"
 	"github.com/computeflux/tee-provider/pkg/teetypes"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
 
@@ -117,32 +120,49 @@ func (app *TeeChain) InitChain(_ context.Context, req *abci.RequestInitChain) (*
 	util.LogWithGreen("InitChain")
 	app.initValidators(req.Validators)
 
-	// 从 genesis app_state 读取初始 WASM（若提供则直接使用，无需本地文件）
-	initRuntimeFromGenesis := func() []byte {
+	// 从 genesis app_state 读取初始 WASM 和 sudo 账户
+	initRuntimeFromGenesis := func() (wasm []byte, sudo cstore.UniAddr) {
 		if len(req.AppStateBytes) == 0 {
-			return nil
+			return
 		}
 		var state struct {
 			Runtime struct {
 				Wasm string `json:"wasm"` // base64
 			} `json:"runtime"`
+			Sudo string `json:"sudo"` // hex address
 		}
 		if err := json.Unmarshal(req.AppStateBytes, &state); err != nil {
 			util.LogError("InitChain parse app_state", err)
-			return nil
+			return
 		}
-		if state.Runtime.Wasm == "" {
-			return nil
+		if state.Runtime.Wasm != "" {
+			b, err := base64.StdEncoding.DecodeString(state.Runtime.Wasm)
+			if err != nil {
+				util.LogError("InitChain decode wasm", err)
+			} else {
+				wasm = b
+			}
 		}
-		b, err := base64.StdEncoding.DecodeString(state.Runtime.Wasm)
-		if err != nil {
-			util.LogError("InitChain decode wasm", err)
-			return nil
+		if state.Sudo != "" {
+			sudoBytes, err := hex.DecodeString(strings.TrimPrefix(state.Sudo, "0x"))
+			if err != nil {
+				util.LogError("InitChain decode sudo hex", err)
+			} else if err := cstore.ScaleDecode(&sudo, sudoBytes); err != nil {
+				util.LogError("InitChain decode sudo codec", err)
+			}
 		}
-		return b
-	}()
+		return
+	}
 
-	if err := InitRuntimeVersion(initRuntimeFromGenesis); err != nil {
+	wasm, sudo := initRuntimeFromGenesis()
+	if len(wasm) == 0 {
+		return nil, fmt.Errorf("genesis app_state.wasm is empty")
+	}
+	if len(sudo.V) == 0 {
+		return nil, fmt.Errorf("genesis app_state.sudo is empty")
+	}
+
+	if err := InitGenesis(wasm, sudo); err != nil {
 		return nil, fmt.Errorf("init runtime version: %w", err)
 	}
 

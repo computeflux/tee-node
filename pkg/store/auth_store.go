@@ -53,7 +53,11 @@ func PutAuthUser(u *AuthUser) error {
 	if err != nil {
 		return err
 	}
-	return SECRET_DB.SetKey(Web3AuthNamespace, "u:"+u.Email, b)
+
+	// Cache locally with 1-hour TTL — enough for async chain upload to complete.
+	// After TTL expires, chain becomes the sole source of truth.
+	expiresAt := time.Now().Add(1 * time.Hour).Unix()
+	return SECRET_DB.CacheKey(Web3AuthNamespace, "u:"+u.Email, b, expiresAt)
 }
 
 // SignSession 签名会话（密码验证后的短期授权）
@@ -235,7 +239,11 @@ func PutEncryptedKey(k *EncryptedKey) error {
 	if err != nil {
 		return err
 	}
-	return SECRET_DB.SetKey(Web3AuthNamespace, "k:"+k.Email, b)
+
+	// Cache locally with 1-hour TTL — enough for async chain upload to complete.
+	// After TTL expires, chain becomes the sole source of truth.
+	expiresAt := time.Now().Add(1 * time.Hour).Unix()
+	return SECRET_DB.CacheKey(Web3AuthNamespace, "k:"+k.Email, b, expiresAt)
 }
 
 func GetEncryptedKey(email string) (*EncryptedKey, error) {

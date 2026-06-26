@@ -46,8 +46,6 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 				util.LogWithYellow("CHECK TX", "DryRun error", err.Error())
 				return CodeInvalidNode
 			}
-		case *model.SysCall_RuntimeUpgrade:
-			// RuntimeUpgrade 不需要 nonce 和 DryRun 预校验
 		}
 	}
 

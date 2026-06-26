@@ -37,11 +37,18 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 	}
 	ciphertext := gcm.Seal(nonce, nonce, keyBytes, nil)
 
-	return store.PutEncryptedKey(&store.EncryptedKey{
+	record := &store.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString(ciphertext),
 		BlobType: "aes-256-gcm",
-	})
+	}
+	if err := store.PutEncryptedKey(record); err != nil {
+		return err
+	}
+
+	// 异步上链：同步 EncryptedKey 到合约，支持跨节点解密
+	s.persistEncryptedKeyToChain(email, record)
+	return nil
 }
 
 // DecryptPrivateKey 用用户密码解密私钥

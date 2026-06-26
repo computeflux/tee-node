@@ -32,7 +32,7 @@ func (app *TeeChain) ContractRuntimeWithCaller(caller chaintypes.UniAddr) (*cont
 		sudo = chaintypes.UniAddr{V: app.dkg.SystemPubKey().Byte()}
 	}
 
-	version, err := GetRuntimeVersionAtHeight(app.state.Height)
+	version, err := GetRuntimeVersionAtHeight(txn, app.state.Height)
 	if err != nil {
 		txn.Rollback()
 		return nil, fmt.Errorf("get runtime version: %w", err)
@@ -79,7 +79,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbs
 		return fmt.Errorf("dkg pubkey is nil")
 	}
 
-	version, err := GetRuntimeVersionAtHeight(height)
+	version, err := GetRuntimeVersionAtHeight(txn, height)
 	if err != nil {
 		return fmt.Errorf("get runtime version: %w", err)
 	}
@@ -110,7 +110,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 		V: caller,
 	}
 
-	version, err := GetRuntimeVersionAtHeight(height)
+	version, err := GetRuntimeVersionAtHeight(txn, height)
 	if err != nil {
 		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
@@ -146,7 +146,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 		V: caller,
 	}
 
-	version, err := GetRuntimeVersionAtHeight(height)
+	version, err := GetRuntimeVersionAtHeight(txn, height)
 	if err != nil {
 		return fmt.Errorf("get runtime version: %w", err)
 	}

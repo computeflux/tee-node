@@ -8,12 +8,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
+	authpkg "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/store"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
@@ -27,8 +29,8 @@ func NewWalletService(tc *teechain.TeeChain) *WalletService {
 	return &WalletService{tc: tc}
 }
 
-func (s *WalletService) cfg() *auth.AuthConfig {
-	return auth.LoadConfig(s.tc)
+func (s *WalletService) cfg() *authpkg.AuthConfig {
+	return authpkg.LoadConfig(s.tc)
 }
 
 // DeriveSeed email → 确定性种子 (HMAC-SHA256)
@@ -77,11 +79,18 @@ func (s *WalletService) encryptWithServerKey(email string, keyBytes []byte) erro
 	io.ReadFull(rand.Reader, nonce)
 	ciphertext := gcm.Seal(nonce, nonce, keyBytes, nil)
 
-	return store.PutEncryptedKey(&store.EncryptedKey{
+	record := &store.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString(ciphertext),
 		BlobType: "aes-256-gcm-server",
-	})
+	}
+	if err := store.PutEncryptedKey(record); err != nil {
+		return err
+	}
+
+	// 异步上链：同步 EncryptedKey 到合约，支持跨节点解密
+	s.persistEncryptedKeyToChain(email, record)
+	return nil
 }
 
 // DecryptWithServerKey 用服务端密钥解密私钥
@@ -100,15 +109,62 @@ func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
 	return gcm.Open(nil, ciphertext[:nonceSize], ciphertext[nonceSize:], nil)
 }
 
-// HasEncryptedKey 检查用户是否已有加密存储的密钥
+// HasEncryptedKey 检查用户是否已有加密存储的密钥（先查本地，再查链上）。
 func (s *WalletService) HasEncryptedKey(email string) bool {
+	record, _ := s.getEncryptedKey(email)
+	return record != nil
+}
+
+// getEncryptedKey 获取加密私钥（链上合约为数据源，本地缓存仅在异步上链窗口期内回退）。
+func (s *WalletService) getEncryptedKey(email string) (*store.EncryptedKey, error) {
+	// 1. 链上合约为数据源（跨节点同步）
+	if s.tc != nil {
+		rec, err := authpkg.AuthGetPrivateKey(s.tc, "private_key:"+email)
+		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
+			var key store.EncryptedKey
+			if json.Unmarshal(rec.Ciphertext, &key) == nil {
+				return &key, nil
+			}
+		}
+	}
+	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口）
 	record, err := store.GetEncryptedKey(email)
-	return err == nil && record != nil
+	if err == nil && record != nil {
+		return record, nil
+	}
+	return nil, fmt.Errorf("no stored key for %s", email)
+}
+
+// persistEncryptedKeyToChain 异步将 EncryptedKey 上传到链上合约，支持跨节点访问。
+func (s *WalletService) persistEncryptedKeyToChain(email string, record *store.EncryptedKey) {
+	if s.tc == nil || record == nil {
+		return
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+			}
+		}()
+		plain, err := json.Marshal(record)
+		if err != nil {
+			return
+		}
+		key := "private_key:" + email
+		const maxRetries = 3
+		for i := 0; i < maxRetries; i++ {
+			if i > 0 {
+				time.Sleep(time.Duration(i) * 500 * time.Millisecond)
+			}
+			if err := authpkg.AuthStorePrivateKey(s.tc, key, plain); err == nil {
+				return
+			}
+		}
+	}()
 }
 
 // decryptKeyByType 根据 BlobType 选择正确的解密方式
 func (s *WalletService) decryptKeyByType(email, passwordHash string) (*ecdsa.PrivateKey, error) {
-	record, err := store.GetEncryptedKey(email)
+	record, err := s.getEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no stored key for %s", email)
 	}

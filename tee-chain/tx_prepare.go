@@ -15,31 +15,6 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
-	// RuntimeUpgrade 独占整个区块：有升级交易时忽略其他所有交易
-	var runtimeUpgradeTx []byte
-	hasRuntimeUpgrade := false
-	for _, txbt := range txs {
-		txbox := new(model.Tx)
-		if protoio.ReadMessage(bytes.NewBuffer(txbt), txbox) != nil {
-			continue
-		}
-		tx := new(model.SysCall)
-		if protoio.ReadMessage(bytes.NewBuffer(txbox.Call), tx) != nil {
-			continue
-		}
-		if _, ok := tx.Payload.(*model.SysCall_RuntimeUpgrade); ok {
-			runtimeUpgradeTx = txbt
-			hasRuntimeUpgrade = true
-			break
-		}
-	}
-
-	if hasRuntimeUpgrade {
-		*finaltx = append(*finaltx, runtimeUpgradeTx)
-		util.LogWithGreen("PrepareTx", "RuntimeUpgrade: exclusive block, only upgrade tx included")
-		return
-	}
-
 	// 同一区块内每个 caller 只允许一笔交易
 	seenCallers := make(map[string]bool)
 
