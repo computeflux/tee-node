@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 )

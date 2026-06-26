@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/network/local"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/stretchr/testify/require"
 
@@ -24,9 +24,9 @@ import (
 func TestDSS(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
-	db, err := store.NewDB()
+	db, err := types.NewDB()
 	if err != nil {
-		require.NoErrorf(t, err, "failed store.InitDB")
+		require.NoErrorf(t, err, "failed types.InitDB")
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -127,9 +127,9 @@ func TestDSS(t *testing.T) {
 func TestDssSubmitTx(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
-	db, err := store.NewDB()
+	db, err := types.NewDB()
 	if err != nil {
-		require.NoErrorf(t, err, "failed store.InitDB")
+		require.NoErrorf(t, err, "failed types.InitDB")
 		os.Exit(1)
 	}
 	defer db.Close()

@@ -9,18 +9,18 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	ctypes "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // SystemContractInit is the resolver for the systemContractInit field.
 func (r *mutationResolver) SystemContractInit(ctx context.Context, contract string) (bool, error) {
-	txn := store.SECRET_DB.NewTransaction()
+	txn := types.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	if contracts.IsContractIsInited(txn, "gov") {
@@ -33,7 +33,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 
 	// 构造合约调用
 	argBytes := [][]byte{}
-	method := cstore.MethodToSelectorBytes("Init")
+	method := ctypes.MethodToSelectorBytes("Init")
 
 	// 节点合约交易走 TxManager
 	err := teeChain.SubmitContract(contract, method, argBytes)
@@ -63,14 +63,14 @@ func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType
 		V: callerBytes,
 		T: uint32(callerType),
 	}
-	tobt, _ := cstore.ScaleEncode(to)
-	var value cstore.Amount = cstore.NewU256(big.NewInt(100000000))
-	valuebt, _ := cstore.ScaleEncode(value)
+	tobt, _ := ctypes.ScaleEncode(to)
+	var value ctypes.Amount = ctypes.NewU256(big.NewInt(100000000))
+	valuebt, _ := ctypes.ScaleEncode(value)
 
 	// 创建合同调用
 	argBytes := [][]byte{tobt, valuebt}
 	contract := "gov"
-	method := cstore.MethodToSelectorBytes("Mint")
+	method := ctypes.MethodToSelectorBytes("Mint")
 
 	// 节点合约交易走 TxManager
 	err = teeChain.SubmitContract(contract, method, argBytes)
@@ -110,7 +110,7 @@ func (r *mutationResolver) ContractCall(ctx context.Context, caller string, call
 	}
 
 	// 用户交易走原始路径，不经 TxManager（TxManager 仅用于节点自身交易）
-	txHash, err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, cstore.MethodToSelector(method), argBytes, sig)
+	txHash, err := SubmitContractCall(callerBytes, uint32(callerType), uint64(nonce), contract, ctypes.MethodToSelector(method), argBytes, sig)
 	if err != nil {
 		return "", gqlerror.Errorf("SubmitTx: %v", err)
 	}

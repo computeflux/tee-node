@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -56,7 +56,7 @@ func checkSecretOwnership(ctx context.Context, user string) (*crypto.PubKey, err
 	}
 	pubAddr := pubkey.H160Address()
 
-	targetAddr := cstore.UniAddr{T: 2, V: pubAddr[:]}
+	targetAddr := store.UniAddr{T: 2, V: pubAddr[:]}
 	if targetAddr.T != token.Addr.T || !bytes.Equal(targetAddr.V, token.Addr.V) {
 		return nil, gqlerror.Errorf("user address does not match authenticated token owner")
 	}

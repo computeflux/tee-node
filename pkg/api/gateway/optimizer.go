@@ -1,17 +1,16 @@
 package gateway
 
 import (
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
-
 	"crypto/rand"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 
 // ── Async usage writer ───────────────────────────────────
@@ -37,7 +36,7 @@ var (
 func initUsageWriter() {
 	usageOnce.Do(func() {
 		usageWg.Go(func() {
-			batch := make(map[string]*store.GatewayDailyUsage, 64)
+			batch := make(map[string]*types.GatewayDailyUsage, 64)
 			ticker := time.NewTicker(1000 * time.Millisecond)
 			defer ticker.Stop()
 
@@ -47,19 +46,19 @@ func initUsageWriter() {
 				}
 				usageMu.Lock()
 				for k, u := range batch {
-					existing, _ := store.DBGetJson[store.GatewayDailyUsage](store.SECRET_DB, "GATEWAY", "usage:"+k)
+					existing, _ := types.DBGetJson[types.GatewayDailyUsage](types.SECRET_DB, "GATEWAY", "usage:"+k)
 					if existing != nil {
 						existing.Count += u.Count
 						existing.TokenIn += u.TokenIn
 						existing.TokenOut += u.TokenOut
 						existing.CachedToken += u.CachedToken
-						store.DBSetJson(store.SECRET_DB, "GATEWAY", "usage:"+k, existing)
+						types.DBSetJson(types.SECRET_DB, "GATEWAY", "usage:"+k, existing)
 					} else {
-						store.DBSetJson(store.SECRET_DB, "GATEWAY", "usage:"+k, u)
+						types.DBSetJson(types.SECRET_DB, "GATEWAY", "usage:"+k, u)
 					}
 				}
 				usageMu.Unlock()
-				batch = make(map[string]*store.GatewayDailyUsage, 64)
+				batch = make(map[string]*types.GatewayDailyUsage, 64)
 			}
 
 			for {
@@ -72,7 +71,7 @@ func initUsageWriter() {
 						u.TokenOut += r.tokenOut
 						u.CachedToken += r.cachedToken
 					} else {
-						batch[key] = &store.GatewayDailyUsage{
+						batch[key] = &types.GatewayDailyUsage{
 							User:        r.user,
 							ModelID:     r.model.ID,
 							ProviderID:  r.model.Data.ProviderID,
@@ -209,7 +208,7 @@ func settlePendingUsage() error {
 	// 1. 扫描本地 usage: 前缀的所有记录
 	//    加锁防止 flush 在读和删之间写入，导致新写入的数据被误删。
 	usageMu.Lock()
-	records, keys, err := store.DBGetJsonList[store.GatewayDailyUsage](store.SECRET_DB, "GATEWAY", "usage:")
+	records, keys, err := types.DBGetJsonList[types.GatewayDailyUsage](types.SECRET_DB, "GATEWAY", "usage:")
 	if err != nil {
 		usageMu.Unlock()
 		return fmt.Errorf("list usage: %w", err)
@@ -263,7 +262,7 @@ func settlePendingUsage() error {
 	//    等到 ApplyToChain 消费 pool 后，下次成功 tick 才会提交新一轮 usage。
 	deleted := 0
 	for _, k := range keys {
-		if err := store.SECRET_DB.DeleteByteKey(k); err != nil {
+		if err := types.SECRET_DB.DeleteByteKey(k); err != nil {
 			usageMu.Unlock()
 			GATEWAYLOG().Printf("[SETTLE] delete usage key=%x failed: %v", k, err)
 			return fmt.Errorf("[SETTLE] delete usage key failed: %w", err)

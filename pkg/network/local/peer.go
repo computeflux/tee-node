@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"go.dedis.ch/kyber/v4"
 )
 

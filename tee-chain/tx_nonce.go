@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/wetee-dao/ink.go"
 )
 

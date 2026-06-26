@@ -1,6 +1,6 @@
 package config
 
-import "github.com/computeflux/tee-provider/pkg/chaintypes"
+import "github.com/computeflux/tee-provider/pkg/types/chaintypes"
 
 var LocalChainConfig = chaintypes.ChainConfigType{
 	ChainID:       0,

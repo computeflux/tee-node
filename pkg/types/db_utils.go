@@ -1,4 +1,4 @@
-package store
+package types
 
 func keyUpperBound(b []byte) []byte {
 	end := make([]byte, len(b))

@@ -10,7 +10,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cometbft/cometbft/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
-	"github.com/computeflux/tee-provider/pkg/store"
+	store "github.com/computeflux/tee-provider/pkg/types"
 )
 
 const (

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -94,7 +94,7 @@ func (s *OTPService) Generate(email, clientID string) (string, error) {
 
 	// 5. 存储到 Pebble（带过期时间戳前缀）
 	data := fmt.Sprintf("%d:%s:%s", time.Now().Add(s.ttl).Unix(), otp, clientID)
-	if err := store.PutOTP(key, data); err != nil {
+	if err := types.PutOTP(key, data); err != nil {
 		return "", fmt.Errorf("store otp: %w", err)
 	}
 
@@ -120,7 +120,7 @@ func (s *OTPService) Verify(email, otp, clientID string) error {
 		return fmt.Errorf("account locked due to too many failed attempts, please request a new OTP")
 	}
 
-	stored, err := store.GetOTP(key)
+	stored, err := types.GetOTP(key)
 	if err != nil {
 		return fmt.Errorf("no OTP requested for this email")
 	}
@@ -142,7 +142,7 @@ func (s *OTPService) Verify(email, otp, clientID string) error {
 	}
 
 	if time.Now().Unix() > expiresAt && expiresAt > 0 {
-		store.DeleteOTP(key)
+		types.DeleteOTP(key)
 		delete(s.verifyFailCount, key)
 		return fmt.Errorf("OTP expired")
 	}
@@ -151,7 +151,7 @@ func (s *OTPService) Verify(email, otp, clientID string) error {
 		s.verifyFailCount[key]++
 		remaining := s.maxVerifyFails - s.verifyFailCount[key]
 		if remaining <= 0 {
-			store.DeleteOTP(key)
+			types.DeleteOTP(key)
 			return fmt.Errorf("too many failed attempts, OTP has been invalidated, please request a new one")
 		}
 		return fmt.Errorf("invalid OTP, %d attempts remaining", remaining)
@@ -163,7 +163,7 @@ func (s *OTPService) Verify(email, otp, clientID string) error {
 	}
 
 	// 验证成功，清理
-	store.DeleteOTP(key)
+	types.DeleteOTP(key)
 	delete(s.verifyFailCount, key)
 	delete(s.sendRecords, key)
 	return nil
@@ -178,7 +178,7 @@ func (s *OTPService) dailyCountKey(email string) string {
 
 func (s *OTPService) getDailySendCount(email string) (int, error) {
 	key := s.dailyCountKey(email)
-	b, err := store.SECRET_DB.GetKey(store.Web3AuthNamespace, key)
+	b, err := types.SECRET_DB.GetKey(types.Web3AuthNamespace, key)
 	if err != nil {
 		return 0, nil
 	}
@@ -190,7 +190,7 @@ func (s *OTPService) incrementDailySendCount(email string) {
 	key := s.dailyCountKey(email)
 	count, _ := s.getDailySendCount(email)
 	count++
-	store.SECRET_DB.SetKey(store.Web3AuthNamespace, key, []byte(strconv.Itoa(count)))
+	types.SECRET_DB.SetKey(types.Web3AuthNamespace, key, []byte(strconv.Itoa(count)))
 }
 
 // cleanup 清理过期的内存记录

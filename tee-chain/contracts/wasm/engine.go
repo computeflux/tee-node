@@ -19,7 +19,7 @@ import (
 	"sync"
 
 	"github.com/computeflux/tee-provider/pkg/domain"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/tetratelabs/wazero"

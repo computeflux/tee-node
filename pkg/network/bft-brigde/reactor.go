@@ -10,8 +10,8 @@ import (
 	"github.com/cometbft/cometbft/types"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 

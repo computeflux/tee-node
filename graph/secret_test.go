@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/store"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,8 +24,8 @@ func mustHex(s string) []byte {
 }
 
 func TestCheckSecretOwnership(t *testing.T) {
-	targetAddr := cstore.UniAddr{T: 2, V: mustHex("82ca18a28793a7149247d1f20dc4d26393e56986")}
-	otherAddr := cstore.UniAddr{T: 2, V: mustHex("1111111111111111111111111111111111111111")}
+	targetAddr := store.UniAddr{T: 2, V: mustHex("82ca18a28793a7149247d1f20dc4d26393e56986")}
+	otherAddr := store.UniAddr{T: 2, V: mustHex("1111111111111111111111111111111111111111")}
 
 	t.Run("missing token", func(t *testing.T) {
 		ctx := context.Background()
@@ -35,7 +35,7 @@ func TestCheckSecretOwnership(t *testing.T) {
 	})
 
 	t.Run("mismatched owner address", func(t *testing.T) {
-		token := &store.GatewayTokenInfo{Addr: otherAddr}
+		token := &types.GatewayTokenInfo{Addr: otherAddr}
 		ctx := context.WithValue(context.Background(), gatewayTokenCtxKey, token)
 		_, err := checkSecretOwnership(ctx, knownTestSS58)
 		require.Error(t, err)
@@ -43,7 +43,7 @@ func TestCheckSecretOwnership(t *testing.T) {
 	})
 
 	t.Run("matching owner address", func(t *testing.T) {
-		token := &store.GatewayTokenInfo{Addr: targetAddr}
+		token := &types.GatewayTokenInfo{Addr: targetAddr}
 		ctx := context.WithValue(context.Background(), gatewayTokenCtxKey, token)
 		pub, err := checkSecretOwnership(ctx, knownTestSS58)
 		require.NoError(t, err)

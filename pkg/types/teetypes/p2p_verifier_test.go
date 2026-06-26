@@ -6,7 +6,7 @@ import (
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/stretchr/testify/require"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 func TestP2PTEEVerifierRoundtrip(t *testing.T) {

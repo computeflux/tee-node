@@ -1,7 +1,7 @@
 package revive
 
 import (
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	chain "github.com/wetee-dao/ink.go"
 )
 

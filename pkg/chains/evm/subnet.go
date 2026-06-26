@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	inkutil "github.com/wetee-dao/ink.go/util"
 )
 

@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 // ── TEECallToCall ──────────────────────────────────────────

@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 var TestChainConfig = chaintypes.ChainConfigType{

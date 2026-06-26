@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"go.dedis.ch/kyber/v4"
 	"go.dedis.ch/kyber/v4/share"
 )

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 const (

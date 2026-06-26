@@ -11,9 +11,9 @@ import (
 	"go.dedis.ch/kyber/v4/suites"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 

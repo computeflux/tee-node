@@ -16,7 +16,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 )
 
 // RequestOtp is the resolver for the requestOTP field.
@@ -46,10 +46,10 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	} else {
 		address = r.WalletSvc.DeriveAddress(email)
 		if existing == nil {
-			existing = &store.AuthUser{Email: email}
+			existing = &types.AuthUser{Email: email}
 		}
 		existing.Address = address
-		store.PutAuthUser(existing)
+		types.PutAuthUser(existing)
 	}
 
 	// 异步上链：确保跨节点能读取到统一的地址（带重试和可观测性）
@@ -121,10 +121,10 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	} else {
 		address = r.WalletSvc.DeriveAddress(oauthUser.Email)
 		if existing == nil {
-			existing = &store.AuthUser{Email: oauthUser.Email}
+			existing = &types.AuthUser{Email: oauthUser.Email}
 		}
 		existing.Address = address
-		store.PutAuthUser(existing)
+		types.PutAuthUser(existing)
 	}
 
 	// 异步上链：确保跨节点能读取到统一的地址（带重试和可观测性）
@@ -168,12 +168,12 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	// 存储密码信息到用户记录
 	user, _ := getAuthUserFromContract(r.TeeChain, email)
 	if user == nil {
-		user = &store.AuthUser{Email: email}
+		user = &types.AuthUser{Email: email}
 	}
 	user.PasswordHash = passwordHash
 	user.Salt = salt
 	user.DKHash = dkHash
-	if err := store.PutAuthUser(user); err != nil {
+	if err := types.PutAuthUser(user); err != nil {
 		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 
@@ -206,7 +206,7 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 			return &model.SignSessionResult{Status: "error", Error: &e}, nil
 		}
 		user.PasswordHash = passwordHash
-		store.PutAuthUser(user)
+		types.PutAuthUser(user)
 	} else if user.PasswordHash != passwordHash {
 		e := "wrong password"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
@@ -215,7 +215,7 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 	// 生成短期签名 token（5 分钟有效）
 	signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), email)
 	expiresAt := time.Now().Add(5 * time.Minute).Unix()
-	if err := store.PutSignSession(&store.SignSession{
+	if err := types.PutSignSession(&types.SignSession{
 		Token:     signToken,
 		Email:     email,
 		ExpiresAt: expiresAt,
@@ -243,7 +243,7 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 	}
 
 	// 检查是否被锁定
-	if store.IsLocked(email) {
+	if types.IsLocked(email) {
 		e := "Too many failed attempts"
 		return &model.SignSessionResult{Status: "locked", Error: &e}, nil
 	}
@@ -261,7 +261,7 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 	}
 
 	// 获取指定的 challenge 记录
-	rec, err := store.GetChallenge(email, challenge)
+	rec, err := types.GetChallenge(email, challenge)
 	if err != nil || rec == nil {
 		e := "invalid challenge"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil
@@ -277,16 +277,16 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 	isValid := hmac.Equal([]byte(expected), []byte(response))
 
 	// 标记该 challenge 已使用（无论成败）
-	store.MarkChallengeUsed(email, challenge)
+	types.MarkChallengeUsed(email, challenge)
 
 	if isValid {
 		// 重置失败计数
-		store.ResetFailedChallenge(email)
+		types.ResetFailedChallenge(email)
 
 		// 生成短期签名 token（60 秒有效）
 		signToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), email)
 		expiresAt := time.Now().Add(60 * time.Second).Unix()
-		if err := store.PutSignSession(&store.SignSession{
+		if err := types.PutSignSession(&types.SignSession{
 			Token:        signToken,
 			Email:        email,
 			ExpiresAt:    expiresAt,
@@ -305,7 +305,7 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 	}
 
 	// 失败计数
-	fails, _ := store.IncrFailedChallenge(email)
+	fails, _ := types.IncrFailedChallenge(email)
 	if fails >= 5 {
 		// 锁定 30 分钟：实际由 IsLocked 检查失败次数 >= 5
 	}
@@ -325,13 +325,13 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 	// 获取 passwordHash：如果是 signToken，从 session 中获取（一次性）
 	var passwordHash string
 	if len(token) > 4 && token[:4] == "sig_" {
-		session, err := store.GetSignSession(token)
+		session, err := types.GetSignSession(token)
 		if err != nil || session == nil {
 			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
 		}
 		passwordHash = session.PasswordHash
 		// 使用后删除 signToken（一次性）
-		store.DeleteSignSession(token)
+		types.DeleteSignSession(token)
 	} else {
 		// API Key 模式下需要传入 passwordHash
 		passwordHash = tx.PasswordHash
@@ -365,13 +365,13 @@ func (r *mutationResolver) SignMessage(ctx context.Context, token string, messag
 	var pwd string
 	if len(token) > 4 && token[:4] == "sig_" {
 		// signToken 模式：从 session 获取 passwordHash（一次性）
-		session, err := store.GetSignSession(token)
+		session, err := types.GetSignSession(token)
 		if err != nil || session == nil {
 			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
 		}
 		pwd = session.PasswordHash
 		// 使用后删除 signToken
-		store.DeleteSignSession(token)
+		types.DeleteSignSession(token)
 	} else if passwordHash != nil {
 		pwd = *passwordHash
 	}
@@ -385,7 +385,7 @@ func (r *mutationResolver) SignMessage(ctx context.Context, token string, messag
 
 // RequestRecovery is the resolver for the requestRecovery field.
 func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error) {
-	rec, err := store.FindRecoveryByEmail(recoveryEmail)
+	rec, err := types.FindRecoveryByEmail(recoveryEmail)
 	if err != nil || rec == nil {
 		return &auth.RecoveryResult{Status: "error", Error: "no recovery config for this email"}, nil
 	}
@@ -397,7 +397,7 @@ func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail st
 	}
 
 	// 存储并设置 10 分钟过期
-	if err := store.PutRecoveryOTP(rec.UserEmail, otp, 600); err != nil {
+	if err := types.PutRecoveryOTP(rec.UserEmail, otp, 600); err != nil {
 		return &auth.RecoveryResult{Status: "error", Error: "failed to store OTP"}, nil
 	}
 
@@ -411,21 +411,21 @@ func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail st
 
 // VerifyRecovery is the resolver for the verifyRecovery field.
 func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error) {
-	rec, err := store.FindRecoveryByEmail(recoveryEmail)
+	rec, err := types.FindRecoveryByEmail(recoveryEmail)
 	if err != nil || rec == nil {
 		return &auth.RecoveryResult{Status: "error", Error: "not found"}, nil
 	}
 
-	stored, _ := store.GetRecoveryOTP(rec.UserEmail)
+	stored, _ := types.GetRecoveryOTP(rec.UserEmail)
 	if stored != otp {
 		return &auth.RecoveryResult{Status: "error", Error: "invalid OTP"}, nil
 	}
-	store.DeleteRecoveryOTP(rec.UserEmail)
+	types.DeleteRecoveryOTP(rec.UserEmail)
 
 	// 生成恢复用的短期签名 token（10 分钟有效）
 	recoveryToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), rec.UserEmail)
 	expiresAt := time.Now().Add(10 * time.Minute).Unix()
-	if err := store.PutSignSession(&store.SignSession{
+	if err := types.PutSignSession(&types.SignSession{
 		Token:        recoveryToken,
 		Email:        rec.UserEmail,
 		ExpiresAt:    expiresAt,
@@ -477,7 +477,7 @@ func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address strin
 	if err != nil {
 		return "", err
 	}
-	if err := store.PutWalletNonce(address, nonce, 300); err != nil {
+	if err := types.PutWalletNonce(address, nonce, 300); err != nil {
 		return "", err
 	}
 	return nonce, nil
@@ -488,7 +488,7 @@ func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address strin
 // 签名内容为 message + nonce（nonce 通过 requestWalletNonce 获取）。
 func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error) {
 	// 1. 验证 nonce 存在、未过期、未使用
-	rec, err := store.GetWalletNonce(address, nonce)
+	rec, err := types.GetWalletNonce(address, nonce)
 	if err != nil || rec == nil {
 		return &auth.AuthResponse{Success: false, Error: "invalid or expired nonce"}, nil
 	}
@@ -508,7 +508,7 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 	}
 
 	// 3. 标记 nonce 为已使用（防重放）
-	_ = store.MarkWalletNonceUsed(address, nonce)
+	_ = types.MarkWalletNonceUsed(address, nonce)
 
 	// 4. 生成 API Key
 	apiKey, err := createUserAPIKey(address, address)
@@ -534,7 +534,7 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 // 使用 refreshToken 校验用户身份并颁发新的 API Key（UserAPIKey），
 // 同时执行 Refresh Token Rotation：旧 refresh token 立即失效并返回新的 refresh token。
 func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string) (*auth.AuthResponse, error) {
-	tk := store.FindRefreshToken(refreshToken)
+	tk := types.FindRefreshToken(refreshToken)
 	if tk == nil {
 		return &auth.AuthResponse{Success: false, Error: "invalid or expired refresh token"}, nil
 	}
@@ -547,14 +547,14 @@ func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string
 	// 生成新的 refresh token；若失败则回滚已创建的 API Key，避免孤儿凭证。
 	newRefreshToken, err := createRefreshToken(tk.Owner, tk.Address)
 	if err != nil {
-		_ = store.DeleteGatewayTokenByKey(apiKey)
+		_ = types.DeleteGatewayTokenByKey(apiKey)
 		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 旧的 refresh token 立即失效并清理。
-	if err := store.DeleteRefreshToken(refreshToken); err != nil {
-		_ = store.DeleteGatewayTokenByKey(apiKey)
-		_ = store.DeleteRefreshToken(newRefreshToken)
+	if err := types.DeleteRefreshToken(refreshToken); err != nil {
+		_ = types.DeleteGatewayTokenByKey(apiKey)
+		_ = types.DeleteRefreshToken(newRefreshToken)
 		return &auth.AuthResponse{Success: false, Error: "failed to rotate refresh token"}, nil
 	}
 
@@ -626,7 +626,7 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 	}
 
 	// 检查是否被锁定
-	if store.IsLocked(email) {
+	if types.IsLocked(email) {
 		return &model.ChallengeResult{Status: "locked", Error: strPtr("Too many failed attempts")}, nil
 	}
 
@@ -641,7 +641,7 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 	}
 
 	// 生成 16 字节随机 challenge 前，清除该用户所有旧未使用的 challenge
-	if err := store.ClearAllChallenges(email); err != nil {
+	if err := types.ClearAllChallenges(email); err != nil {
 		// 非致命错误，继续
 		fmt.Printf("[GetChallenge] clear old challenges warning: %v\n", err)
 	}
@@ -654,7 +654,7 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 	challenge := hex.EncodeToString(challengeBytes)
 
 	// 存储 challenge（5 分钟过期）— 简化实现，无原生 TTL
-	if err := store.PutChallenge(email, challenge, 300); err != nil {
+	if err := types.PutChallenge(email, challenge, 300); err != nil {
 		return &model.ChallengeResult{Status: "error", Error: strPtr("failed to store challenge")}, nil
 	}
 

@@ -9,7 +9,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/indexer"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -30,12 +30,12 @@ type Resolver struct {
 func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
 	// 先尝试作为签名 token 解析
 	if len(token) > 4 && token[:4] == "sig_" {
-		session, err := store.GetSignSession(token)
+		session, err := types.GetSignSession(token)
 		if err != nil || session == nil {
 			return "", fmt.Errorf("invalid sign token")
 		}
 		if time.Now().Unix() > session.ExpiresAt {
-			store.DeleteSignSession(token)
+			types.DeleteSignSession(token)
 			return "", fmt.Errorf("sign token expired")
 		}
 		return session.Email, nil
@@ -43,7 +43,7 @@ func (r *Resolver) ResolveSignerEmail(token string) (string, error) {
 
 	// 尝试作为 API Key 解析（FindGatewayTokenByKey 内部已检查 IsActive + IsExpired，
 	// 这里显式再检查一次过期，消除与 resolveEmailFromToken 的验证漂移）
-	tk := store.FindGatewayTokenByKey(token)
+	tk := types.FindGatewayTokenByKey(token)
 	if tk != nil && tk.IsActive && !tk.IsExpired() {
 		return tk.Owner, nil
 	}

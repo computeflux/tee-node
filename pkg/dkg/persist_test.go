@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.dedis.ch/kyber/v4"

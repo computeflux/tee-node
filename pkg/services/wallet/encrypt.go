@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -37,12 +37,12 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 	}
 	ciphertext := gcm.Seal(nonce, nonce, keyBytes, nil)
 
-	record := &store.EncryptedKey{
+	record := &types.EncryptedKey{
 		Email:    email,
 		Blob:     hex.EncodeToString(ciphertext),
 		BlobType: "aes-256-gcm",
 	}
-	if err := store.PutEncryptedKey(record); err != nil {
+	if err := types.PutEncryptedKey(record); err != nil {
 		return err
 	}
 
@@ -53,7 +53,7 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 
 // DecryptPrivateKey 用用户密码解密私钥
 func (s *WalletService) DecryptPrivateKey(email, passwordHash string) (*ecdsa.PrivateKey, error) {
-	record, err := store.GetEncryptedKey(email)
+	record, err := types.GetEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no encrypted key found — set a transaction password first")
 	}

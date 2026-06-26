@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 )
 
 const eaNamespace = "EARLY_POINTS"
@@ -81,7 +81,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 	wallet = strings.ToLower(wallet)
 
 	// 检查用户是否已存在
-	existing, err := store.DBGetJson[dbEarlyAccessUser](store.SECRET_DB, eaNamespace, "user:"+wallet)
+	existing, err := types.DBGetJson[dbEarlyAccessUser](types.SECRET_DB, eaNamespace, "user:"+wallet)
 	if err != nil {
 		return false, err
 	}
@@ -113,7 +113,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 
 	// 初始积分 100
 	initialPoints := int64(100)
-	if err := store.DBSetJson(store.SECRET_DB, eaNamespace, "points:"+wallet, &initialPoints); err != nil {
+	if err := types.DBSetJson(types.SECRET_DB, eaNamespace, "points:"+wallet, &initialPoints); err != nil {
 		return false, err
 	}
 	if err := s.appendHistory(wallet, "100", "join_early_access", now, nil); err != nil {
@@ -168,7 +168,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 	}
 
 	// 写入用户、码映射、邮箱映射、统计
-	if err := store.DBSetJson(store.SECRET_DB, eaNamespace, "user:"+wallet, user); err != nil {
+	if err := types.DBSetJson(types.SECRET_DB, eaNamespace, "user:"+wallet, user); err != nil {
 		return false, err
 	}
 	if err := s.saveCodeToWallet(code, wallet); err != nil {
@@ -185,7 +185,7 @@ func (s *EarlyAccessStore) join(wallet, email string, referralCode *string) (boo
 
 	// 自动标记 JOIN_EARLY_ACCESS 任务完成
 	tasks := map[string]string{"JOIN_EARLY_ACCESS": now}
-	if err := store.DBSetJson(store.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks); err != nil {
+	if err := types.DBSetJson(types.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks); err != nil {
 		return false, err
 	}
 
@@ -199,7 +199,7 @@ func (s *EarlyAccessStore) claimTask(wallet, task string) (bool, int64, int64, e
 	wallet = strings.ToLower(wallet)
 
 	// 用户必须先加入 Early Access
-	user, err := store.DBGetJson[dbEarlyAccessUser](store.SECRET_DB, eaNamespace, "user:"+wallet)
+	user, err := types.DBGetJson[dbEarlyAccessUser](types.SECRET_DB, eaNamespace, "user:"+wallet)
 	if err != nil {
 		return false, 0, 0, err
 	}
@@ -260,7 +260,7 @@ func (s *EarlyAccessStore) updateReferralCode(wallet, referralCode string) (bool
 	refCode := strings.ToLower(referralCode)
 
 	// 检查用户是否存在
-	user, err := store.DBGetJson[dbEarlyAccessUser](store.SECRET_DB, eaNamespace, "user:"+wallet)
+	user, err := types.DBGetJson[dbEarlyAccessUser](types.SECRET_DB, eaNamespace, "user:"+wallet)
 	if err != nil {
 		return false, err
 	}
@@ -325,7 +325,7 @@ func (s *EarlyAccessStore) updateReferralCode(wallet, referralCode string) (bool
 	stats.TotalReferrals++
 
 	// 保存用户和统计
-	if err := store.DBSetJson(store.SECRET_DB, eaNamespace, "user:"+wallet, user); err != nil {
+	if err := types.DBSetJson(types.SECRET_DB, eaNamespace, "user:"+wallet, user); err != nil {
 		return false, err
 	}
 	if err := s.saveStats(stats); err != nil {
@@ -359,7 +359,7 @@ func (s *EarlyAccessStore) getTasks(wallet string) []*taskStatusRecord {
 // ── Helpers ──────────────────────────────────────────────
 
 func (s *EarlyAccessStore) loadPoints(wallet string) (int64, error) {
-	v, err := store.DBGetJson[int64](store.SECRET_DB, eaNamespace, "points:"+wallet)
+	v, err := types.DBGetJson[int64](types.SECRET_DB, eaNamespace, "points:"+wallet)
 	if err != nil {
 		return 0, err
 	}
@@ -375,12 +375,12 @@ func (s *EarlyAccessStore) addPoints(wallet string, delta int64) error {
 		return err
 	}
 	next := cur + delta
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "points:"+wallet, &next)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "points:"+wallet, &next)
 }
 
 func (s *EarlyAccessStore) appendHistory(wallet, amount, reason, timestamp string, relatedUser *string) error {
 	key := "history:" + wallet
-	list, err := store.DBGetJson[[]dbPointsHistoryRecord](store.SECRET_DB, eaNamespace, key)
+	list, err := types.DBGetJson[[]dbPointsHistoryRecord](types.SECRET_DB, eaNamespace, key)
 	if err != nil {
 		return err
 	}
@@ -394,11 +394,11 @@ func (s *EarlyAccessStore) appendHistory(wallet, amount, reason, timestamp strin
 		Timestamp:   timestamp,
 		RelatedUser: relatedUser,
 	})
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, key, &records)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, key, &records)
 }
 
 func (s *EarlyAccessStore) loadStats() (dbEarlyAccessStats, error) {
-	v, err := store.DBGetJson[dbEarlyAccessStats](store.SECRET_DB, eaNamespace, "stats")
+	v, err := types.DBGetJson[dbEarlyAccessStats](types.SECRET_DB, eaNamespace, "stats")
 	if err != nil {
 		return dbEarlyAccessStats{}, err
 	}
@@ -409,11 +409,11 @@ func (s *EarlyAccessStore) loadStats() (dbEarlyAccessStats, error) {
 }
 
 func (s *EarlyAccessStore) saveStats(stats dbEarlyAccessStats) error {
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "stats", &stats)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "stats", &stats)
 }
 
 func (s *EarlyAccessStore) loadCodeToWallet(code string) (string, error) {
-	v, err := store.DBGetJson[string](store.SECRET_DB, eaNamespace, "code:"+code)
+	v, err := types.DBGetJson[string](types.SECRET_DB, eaNamespace, "code:"+code)
 	if err != nil {
 		return "", err
 	}
@@ -424,11 +424,11 @@ func (s *EarlyAccessStore) loadCodeToWallet(code string) (string, error) {
 }
 
 func (s *EarlyAccessStore) saveCodeToWallet(code, wallet string) error {
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "code:"+code, &wallet)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "code:"+code, &wallet)
 }
 
 func (s *EarlyAccessStore) loadEmailToWallet(email string) (string, error) {
-	v, err := store.DBGetJson[string](store.SECRET_DB, eaNamespace, "email:"+email)
+	v, err := types.DBGetJson[string](types.SECRET_DB, eaNamespace, "email:"+email)
 	if err != nil {
 		return "", err
 	}
@@ -439,11 +439,11 @@ func (s *EarlyAccessStore) loadEmailToWallet(email string) (string, error) {
 }
 
 func (s *EarlyAccessStore) saveEmailToWallet(email, wallet string) error {
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "email:"+email, &wallet)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "email:"+email, &wallet)
 }
 
 func (s *EarlyAccessStore) loadReferrals(code string) ([]string, error) {
-	v, err := store.DBGetJson[[]string](store.SECRET_DB, eaNamespace, "referrals:"+code)
+	v, err := types.DBGetJson[[]string](types.SECRET_DB, eaNamespace, "referrals:"+code)
 	if err != nil {
 		return nil, err
 	}
@@ -459,11 +459,11 @@ func (s *EarlyAccessStore) appendReferral(code, wallet string) error {
 		return err
 	}
 	list = append(list, wallet)
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "referrals:"+code, &list)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "referrals:"+code, &list)
 }
 
 func (s *EarlyAccessStore) loadTasks(wallet string) (map[string]string, error) {
-	v, err := store.DBGetJson[map[string]string](store.SECRET_DB, eaNamespace, "tasks:"+wallet)
+	v, err := types.DBGetJson[map[string]string](types.SECRET_DB, eaNamespace, "tasks:"+wallet)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (s *EarlyAccessStore) loadTasks(wallet string) (map[string]string, error) {
 }
 
 func (s *EarlyAccessStore) saveTasks(wallet string, tasks map[string]string) error {
-	return store.DBSetJson(store.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks)
+	return types.DBSetJson(types.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks)
 }
 
 // ── Read-only accessors ──────────────────────────────────
@@ -499,7 +499,7 @@ func (s *EarlyAccessStore) getUserByEmail(email string) *earlyAccessUserRecord {
 
 func (s *EarlyAccessStore) getUser(wallet string) *earlyAccessUserRecord {
 	wallet = strings.ToLower(wallet)
-	v, err := store.DBGetJson[dbEarlyAccessUser](store.SECRET_DB, eaNamespace, "user:"+wallet)
+	v, err := types.DBGetJson[dbEarlyAccessUser](types.SECRET_DB, eaNamespace, "user:"+wallet)
 	if err != nil || v == nil {
 		return nil
 	}
@@ -522,7 +522,7 @@ func (s *EarlyAccessStore) getPoints(wallet string) string {
 
 func (s *EarlyAccessStore) getReferralInfo(wallet string) (code, referrer string, earnings int64, referrals []string) {
 	wallet = strings.ToLower(wallet)
-	u, err := store.DBGetJson[dbEarlyAccessUser](store.SECRET_DB, eaNamespace, "user:"+wallet)
+	u, err := types.DBGetJson[dbEarlyAccessUser](types.SECRET_DB, eaNamespace, "user:"+wallet)
 	if err == nil && u != nil {
 		code = u.ReferralCode
 		referrer = u.Referrer
@@ -540,7 +540,7 @@ func (s *EarlyAccessStore) getReferralInfo(wallet string) (code, referrer string
 
 func (s *EarlyAccessStore) getPointsHistory(wallet string, offset, limit int) ([]*pointsHistoryRecord, int) {
 	wallet = strings.ToLower(wallet)
-	list, err := store.DBGetJson[[]dbPointsHistoryRecord](store.SECRET_DB, eaNamespace, "history:"+wallet)
+	list, err := types.DBGetJson[[]dbPointsHistoryRecord](types.SECRET_DB, eaNamespace, "history:"+wallet)
 	if err != nil || list == nil {
 		return nil, 0
 	}

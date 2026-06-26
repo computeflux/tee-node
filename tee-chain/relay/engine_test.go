@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/store"
+	store "github.com/computeflux/tee-provider/pkg/types"
 	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/stretchr/testify/require"
 )

@@ -9,12 +9,12 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 )
 
-func makeTestEndpoint(url string) *store.GatewayEndpoint {
-	return &store.GatewayEndpoint{ID: 1, URL: url, APIKey: "sk-test", ProviderID: 1}
+func makeTestEndpoint(url string) *types.GatewayEndpoint {
+	return &types.GatewayEndpoint{ID: 1, URL: url, APIKey: "sk-test", ProviderID: 1}
 }
 
 func makeTestModelWithProviderType(name string, providerType uint16) *cgateway.ModelInfoWithID {
@@ -23,7 +23,7 @@ func makeTestModelWithProviderType(name string, providerType uint16) *cgateway.M
 	return m
 }
 
-func requestWithBody(token *store.GatewayTokenInfo, modelData *cgateway.ModelInfoWithID, endpoint *store.GatewayEndpoint, body []byte, path string, proto protocol.Protocol) *http.Request {
+func requestWithBody(token *types.GatewayTokenInfo, modelData *cgateway.ModelInfoWithID, endpoint *types.GatewayEndpoint, body []byte, path string, proto protocol.Protocol) *http.Request {
 	req := requestWithContext(token, modelData, endpoint, string(body))
 	req = req.WithContext(context.WithValue(req.Context(), ctxBody, body))
 	req.URL.Path = path
@@ -39,7 +39,7 @@ func TestHandleRelay_MatchingAnthropicProtocol(t *testing.T) {
 
 	var gotBody []byte
 	var gotPath string
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		gotBody = body
 		gotPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)
@@ -67,7 +67,7 @@ func TestHandleRelay_AnthropicToOpenAI(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
+	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}],"model":"claude-3","stop_reason":"end_turn","usage":{"input_tokens":2,"output_tokens":1}}`))
 		return nil, true
@@ -87,10 +87,10 @@ func TestHandleRelay_OpenAIToAnthropic(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
+	streamRelayFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`))
-			return nil, true
+		return nil, true
 	}
 
 	body := []byte(`{"model":"anthropic/claude-3","messages":[{"role":"user","content":"hello"}],"max_tokens":256}`)
@@ -109,7 +109,7 @@ func TestHandleRelay_MatchingOpenAIProtocol(t *testing.T) {
 
 	var gotBody []byte
 	var gotPath string
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *store.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 		gotBody = body
 		gotPath = r.URL.Path
 		w.WriteHeader(http.StatusOK)

@@ -1,6 +1,6 @@
 package evm
 
-import "github.com/computeflux/tee-provider/pkg/chaintypes"
+import "github.com/computeflux/tee-provider/pkg/types/chaintypes"
 
 func (e *EvmChain) GetLatestNonce() (uint64, error) { return 0, nil }
 

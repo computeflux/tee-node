@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ import (
 func setupTestOTP(t *testing.T) (*OTPService, context.CancelFunc) {
 	t.Helper()
 
-	db, err := store.NewDBWithPath(t.TempDir())
+	db, err := types.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
@@ -57,7 +57,7 @@ func TestOTPService_Verify_Expired(t *testing.T) {
 
 	// 篡改存储的数据使其过期
 	past := time.Now().Add(-10 * time.Minute).Unix()
-	store.PutOTP(normalizeEmail(email), formatOTPData(past, otp, "web"))
+	types.PutOTP(normalizeEmail(email), formatOTPData(past, otp, "web"))
 
 	err = svc.Verify(email, otp, "web")
 	require.Error(t, err)

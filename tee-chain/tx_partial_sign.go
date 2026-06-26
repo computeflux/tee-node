@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"

@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/teetypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"golang.org/x/crypto/blake2b"
 )

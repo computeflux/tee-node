@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"

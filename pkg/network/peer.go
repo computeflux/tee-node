@@ -1,8 +1,8 @@
 package peer
 
 import (
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 type Peer interface {

@@ -3,7 +3,7 @@ package model
 import (
 	"bytes"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 // p2p send msg to modes

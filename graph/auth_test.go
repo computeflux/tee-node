@@ -12,7 +12,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ import (
 
 // setupAuthTest 初始化内存数据库和认证服务，返回 resolver 和 cleanup 函数
 func setupAuthTest(t *testing.T, seedSecret string) (*Resolver, func()) {
-	db, err := store.NewDBWithPath(t.TempDir())
+	db, err := types.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 
 	auth.SetCachedConfigForTest(&auth.AuthConfig{
@@ -155,7 +155,7 @@ func TestSocialLogin_AddressConsistency(t *testing.T) {
 	// 由于 OAuthSvc 未配置真实客户端，SocialLogin 的完整 resolver 测试较难模拟。
 	// 这里改为直接验证核心逻辑：getAuthUserFromContract 读取已有地址，
 	// 以及 DeriveAddress 会生成不同值。
-	_ = store.PutAuthUser(&store.AuthUser{Email: email, Address: "0xOAuthAddress123"})
+	_ = types.PutAuthUser(&types.AuthUser{Email: email, Address: "0xOAuthAddress123"})
 
 	user, err := getAuthUserFromContract(nil, email)
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestCompleteRecovery_KeepsAddress(t *testing.T) {
 
 	// 模拟恢复流程：创建一个恢复 token
 	recoveryToken := fmt.Sprintf("sig_%d_%s", time.Now().Unix(), email)
-	store.PutSignSession(&store.SignSession{
+	types.PutSignSession(&types.SignSession{
 		Token:     recoveryToken,
 		Email:     email,
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -203,7 +203,7 @@ func TestRequestRecovery_RandomOTPAndDelivery(t *testing.T) {
 	recoveryEmail := "recovery@example.com"
 
 	// 先设置恢复配置
-	_ = store.PutRecoveryConfig(&store.RecoveryConfig{
+	_ = types.PutRecoveryConfig(&types.RecoveryConfig{
 		UserEmail:     userEmail,
 		RecoveryEmail: recoveryEmail,
 	})
@@ -214,7 +214,7 @@ func TestRequestRecovery_RandomOTPAndDelivery(t *testing.T) {
 	require.Equal(t, "ok", resp.Status)
 
 	// 验证 OTP 已存储且非空
-	storedOTP, err := store.GetRecoveryOTP(userEmail)
+	storedOTP, err := types.GetRecoveryOTP(userEmail)
 	require.NoError(t, err)
 	require.NotEmpty(t, storedOTP)
 	require.Len(t, storedOTP, 6)
@@ -229,7 +229,7 @@ func TestRequestRecovery_RandomOTPAndDelivery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ok", resp2.Status)
 
-	storedOTP2, err := store.GetRecoveryOTP(userEmail)
+	storedOTP2, err := types.GetRecoveryOTP(userEmail)
 	require.NoError(t, err)
 	assert.NotEqual(t, storedOTP, storedOTP2, "两次请求的 OTP 应该不同")
 }
@@ -241,13 +241,13 @@ func TestVerifyRecovery_ExpiredOTP(t *testing.T) {
 	userEmail := "user@example.com"
 	recoveryEmail := "recovery@example.com"
 
-	_ = store.PutRecoveryConfig(&store.RecoveryConfig{
+	_ = types.PutRecoveryConfig(&types.RecoveryConfig{
 		UserEmail:     userEmail,
 		RecoveryEmail: recoveryEmail,
 	})
 
 	// 手动写入一个已过期的 OTP
-	_ = store.PutRecoveryOTP(userEmail, "123456", -600)
+	_ = types.PutRecoveryOTP(userEmail, "123456", -600)
 
 	m := &mutationResolver{Resolver: resolver}
 	resp, err := m.VerifyRecovery(context.Background(), recoveryEmail, "123456")
@@ -264,7 +264,7 @@ func TestResolveSignerEmail_ExpiredAPIKey(t *testing.T) {
 	apiKey := "auth_tee_" + strings.Repeat("a", 64)
 
 	// 创建一个已过期的 API Key
-	store.SetGatewayTokenByKey(&store.GatewayTokenInfo{
+	types.SetGatewayTokenByKey(&types.GatewayTokenInfo{
 		ID:        1,
 		Owner:     email,
 		Key:       apiKey,
@@ -278,7 +278,7 @@ func TestResolveSignerEmail_ExpiredAPIKey(t *testing.T) {
 
 	// 创建一个未过期的 API Key
 	apiKey2 := "auth_tee_" + strings.Repeat("b", 64)
-	store.SetGatewayTokenByKey(&store.GatewayTokenInfo{
+	types.SetGatewayTokenByKey(&types.GatewayTokenInfo{
 		ID:        2,
 		Owner:     email,
 		Key:       apiKey2,
@@ -299,7 +299,7 @@ func TestResolveEmailFromToken_ExpiredAPIKey(t *testing.T) {
 	apiKey := "auth_tee_" + strings.Repeat("c", 64)
 
 	// 创建一个已过期的 API Key（本地存储，合约查询路径在 TeeChain=nil 时跳过）
-	store.SetGatewayTokenByKey(&store.GatewayTokenInfo{
+	types.SetGatewayTokenByKey(&types.GatewayTokenInfo{
 		ID:        3,
 		Owner:     email,
 		Key:       apiKey,
@@ -313,7 +313,7 @@ func TestResolveEmailFromToken_ExpiredAPIKey(t *testing.T) {
 
 	// 未过期
 	apiKey2 := "auth_tee_" + strings.Repeat("d", 64)
-	store.SetGatewayTokenByKey(&store.GatewayTokenInfo{
+	types.SetGatewayTokenByKey(&types.GatewayTokenInfo{
 		ID:        4,
 		Owner:     email,
 		Key:       apiKey2,
@@ -334,7 +334,7 @@ func TestGetAuthUserFromContract_LocalFallback(t *testing.T) {
 	expectedAddr := "0x1234567890abcdef1234567890abcdef12345678"
 
 	// 直接写入本地存储
-	err := store.PutAuthUser(&store.AuthUser{
+	err := types.PutAuthUser(&types.AuthUser{
 		Email:   email,
 		Address: expectedAddr,
 	})
@@ -377,7 +377,7 @@ func TestRequestWalletNonce(t *testing.T) {
 	require.NotEmpty(t, nonce)
 
 	// 验证 nonce 已写入存储
-	rec, err := store.GetWalletNonce(address, nonce)
+	rec, err := types.GetWalletNonce(address, nonce)
 	require.NoError(t, err)
 	require.NotNil(t, rec)
 	assert.Equal(t, address, rec.Address)
@@ -410,7 +410,7 @@ func TestLoginWithWallet_Success(t *testing.T) {
 	assert.Equal(t, address, resp.Address)
 
 	// 4. 验证 nonce 已被标记为已使用
-	rec, _ := store.GetWalletNonce(address, nonce)
+	rec, _ := types.GetWalletNonce(address, nonce)
 	require.NotNil(t, rec)
 	assert.True(t, rec.Used)
 }
@@ -447,14 +447,14 @@ func TestLoginWithWallet_ExpiredNonce(t *testing.T) {
 
 	// 手动写入一个已过期的 nonce
 	nonce := "expired_nonce_123"
-	err := store.PutWalletNonce(address, nonce, 300)
+	err := types.PutWalletNonce(address, nonce, 300)
 	require.NoError(t, err)
 	// 修改记录为 10 分钟前创建并已过期
-	rec, _ := store.GetWalletNonce(address, nonce)
+	rec, _ := types.GetWalletNonce(address, nonce)
 	rec.CreatedAt = time.Now().Unix() - 600
 	rec.ExpiresAt = rec.CreatedAt + 300
 	b, _ := json.Marshal(rec)
-	_ = store.SECRET_DB.SetKey(store.Web3AuthNamespace, "wn:"+address+":"+nonce, b)
+	_ = types.SECRET_DB.SetKey(types.Web3AuthNamespace, "wn:"+address+":"+nonce, b)
 
 	message := "Sign in to TEE Node"
 	sig, _ := signEIP191(privKeyHex, message+nonce)
@@ -520,7 +520,7 @@ func TestPersistAuthUserToChain_RetryAndObservability(t *testing.T) {
 		return fmt.Errorf("simulated chain failure")
 	}
 
-	user := &store.AuthUser{Email: "retry-test@example.com", Address: "0x1234"}
+	user := &types.AuthUser{Email: "retry-test@example.com", Address: "0x1234"}
 	persistAuthUserToChain(&teechain.TeeChain{}, user)
 
 	// Wait for goroutine + retries: 3 retries with 0ms, 500ms, 1000ms backoff.
@@ -531,7 +531,7 @@ func TestPersistAuthUserToChain_RetryAndObservability(t *testing.T) {
 
 // TestPersistAuthUserToChain_NilChain_NoPanic ensures nil chain/user is safe.
 func TestPersistAuthUserToChain_NilChain_NoPanic(t *testing.T) {
-	persistAuthUserToChain(nil, &store.AuthUser{Email: "x@example.com"})
+	persistAuthUserToChain(nil, &types.AuthUser{Email: "x@example.com"})
 	persistAuthUserToChain(&teechain.TeeChain{}, nil)
 	// No panic = pass
 }
@@ -606,7 +606,7 @@ func TestLoginWithWallet_ReturnsRefreshToken(t *testing.T) {
 	assert.True(t, strings.HasPrefix(resp.RefreshToken, "refresh_tee_"))
 
 	// Verify refresh token is stored and active
-	rt, err := store.GetRefreshToken(resp.RefreshToken)
+	rt, err := types.GetRefreshToken(resp.RefreshToken)
 	require.NoError(t, err)
 	require.NotNil(t, rt)
 	assert.Equal(t, address, rt.Owner)
@@ -663,7 +663,7 @@ func TestRefreshToken_ExpiredToken(t *testing.T) {
 	defer cleanup()
 
 	refreshToken := "refresh_tee_expiredtoken"
-	err := store.SetRefreshToken(refreshToken, &store.RefreshTokenInfo{
+	err := types.SetRefreshToken(refreshToken, &types.RefreshTokenInfo{
 		Owner:     "user@example.com",
 		Address:   "0x1234",
 		IsActive:  true,

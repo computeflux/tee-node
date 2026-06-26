@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
 )
 

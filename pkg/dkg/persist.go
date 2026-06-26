@@ -8,10 +8,10 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cockroachdb/pebble"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
-	"github.com/computeflux/tee-provider/pkg/store"
+	store "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 

@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/indexer"
 	"github.com/computeflux/tee-provider/pkg/model"
 	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
@@ -26,7 +26,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 		return nil, fmt.Errorf("unauthorized")
 	}
 
-	txn := dbstore.SECRET_DB.NewTransaction()
+	txn := types.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
 	// 使用当前用户地址作为 caller 创建 runtime，以便 GetProviderByOwner 能正确识别

@@ -27,8 +27,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 )
 
 func main() {

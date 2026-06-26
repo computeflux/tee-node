@@ -12,7 +12,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -133,7 +133,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 var relayToUpstreamFn = relayToUpstream
 var streamRelayFn = streamRelay
 
-func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
+func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *types.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
 	ctx := relay.NewRelayContext(w, r)
 	meta := relay.GetMetaByContext(ctx)
 	meta.BaseURL = endpoint.URL
@@ -160,7 +160,7 @@ func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *store.Gat
 	return usage, nil, nil
 }
 
-func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *store.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
+func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *types.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
 	if !isStream {
 		converted, conv := convertRequest(bodyBytes, inbound, provider, modelName, providerType)
 		if conv != nil {

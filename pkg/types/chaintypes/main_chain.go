@@ -7,7 +7,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/cometbft/cometbft/crypto"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/wetee-dao/ink.go/util"
 )
 

@@ -11,7 +11,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
@@ -26,8 +26,8 @@ type contextKey struct {
 
 // GatewayTokenFromContext extracts the authenticated gateway token from context.
 // Returns nil if no token was injected by AuthMiddleware.
-func GatewayTokenFromContext(ctx context.Context) *store.GatewayTokenInfo {
-	token, _ := ctx.Value(gatewayTokenCtxKey).(*store.GatewayTokenInfo)
+func GatewayTokenFromContext(ctx context.Context) *types.GatewayTokenInfo {
+	token, _ := ctx.Value(gatewayTokenCtxKey).(*types.GatewayTokenInfo)
 	return token
 }
 
@@ -64,7 +64,7 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 
 // initToken decodes the Authorization header and validates the API Key.
 // Supports: Bearer <apiKey>
-func initToken(r *http.Request) *store.GatewayTokenInfo {
+func initToken(r *http.Request) *types.GatewayTokenInfo {
 	header := r.Header
 	token, ok := header["Authorization"]
 	if !ok || len(token) == 0 {
@@ -85,11 +85,11 @@ func initToken(r *http.Request) *store.GatewayTokenInfo {
 
 var authStoreAuthUserFn = auth.AuthStoreAuthUser
 
-func persistAuthUserToChain(chain *teechain.TeeChain, user *store.AuthUser) {
+func persistAuthUserToChain(chain *teechain.TeeChain, user *types.AuthUser) {
 	if chain == nil || user == nil {
 		return
 	}
-	go func(u *store.AuthUser) {
+	go func(u *types.AuthUser) {
 		plain, err := json.Marshal(u)
 		if err != nil {
 			fmt.Printf("[AUTH] failed to marshal auth user %s: %v\n", u.Email, err)

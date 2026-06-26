@@ -6,8 +6,8 @@ import (
 
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/chains/revive"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
 	"github.com/wetee-dao/ink.go"

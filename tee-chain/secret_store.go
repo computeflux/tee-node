@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	proxy_reenc "github.com/computeflux/tee-provider/pkg/proxy-reenc"
-	"github.com/computeflux/tee-provider/pkg/store"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	store "github.com/computeflux/tee-provider/pkg/types"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"go.dedis.ch/kyber/v4/suites"
 )
 

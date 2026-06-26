@@ -16,11 +16,11 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/version"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
-	"github.com/computeflux/tee-provider/pkg/store"
-	"github.com/computeflux/tee-provider/pkg/teetypes"
+	"github.com/computeflux/tee-provider/pkg/types"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
@@ -41,10 +41,10 @@ type TeeChain struct {
 	p2p      *bftbrigde.BTFReactor
 	NodePriv *teecrypto.PrivKey
 
-	txCh      *store.PersistChan[*model.BlockPartialSign]
+	txCh      *types.PersistChan[*model.BlockPartialSign]
 	txReadyCh chan struct{} // 通知 ApplyToChain 可以提交新交易到区块
 
-	onGoingBlock        *store.Txn
+	onGoingBlock        *types.Txn
 	onGoingValidators   []abci.ValidatorUpdate
 	currProposerAddress []byte
 	lastCommitAt        time.Time // 上次 Commit 的时间
@@ -84,7 +84,7 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 	}
 
 	if !light {
-		txCh, err := store.NewPersistChan[*model.BlockPartialSign]("back_tx", 1000)
+		txCh, err := types.NewPersistChan[*model.BlockPartialSign]("back_tx", 1000)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64)
 
 func (app *TeeChain) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	// Iterate over Tx in current block
-	app.onGoingBlock = store.SECRET_DB.NewTransaction()
+	app.onGoingBlock = types.SECRET_DB.NewTransaction()
 	respTxs, err := app.FinalizeTx(req.Txs, app.onGoingBlock, req.Height, req.Time, req.ProposerAddress)
 	if err != nil {
 		app.onGoingBlock.Rollback()

@@ -9,9 +9,9 @@ import (
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/mempool"
-	teecrypto "github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/wetee-dao/ink.go"
 )
 

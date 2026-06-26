@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/contracts"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
@@ -38,7 +38,7 @@ func hashAPIKey(key string) []byte {
 }
 
 // LookupAPIKeyViaContract 通过合约查询 API Key 信息（exported for graph/auth_helpers.go）。
-func LookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
+func LookupAPIKeyViaContract(key string) *types.GatewayTokenInfo {
 	bridge := getBridge()
 	hash := hashAPIKey(key)
 	hexHash := hex.EncodeToString(hash)
@@ -59,7 +59,7 @@ func LookupAPIKeyViaContract(key string) *store.GatewayTokenInfo {
 		return nil
 	}
 
-	return &store.GatewayTokenInfo{
+	return &types.GatewayTokenInfo{
 		Owner:     fmt.Sprintf("%x", info.Owner.V),
 		Addr:      info.Owner,
 		Key:       key,
@@ -85,7 +85,7 @@ func providerDefaultURL(providerType uint16) string {
 }
 
 // buildEndpointsFromModel 根据合约 ModelInfo 构建 GatewayEndpoint 列表。
-func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
+func buildEndpointsFromModel(m *cgateway.ModelInfo) []*types.GatewayEndpoint {
 	url := m.URI
 	if url == "" {
 		url = providerDefaultURL(m.ProviderType)
@@ -93,7 +93,7 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 
 	// 本地模型使用 Yamux 反向隧道，不需要 APIKeys 也不依赖 URI
 	if m.ProviderType == cgateway.ProviderPersonal {
-		return []*store.GatewayEndpoint{{
+		return []*types.GatewayEndpoint{{
 			ID:         m.ProviderID,
 			ProviderID: m.ProviderID,
 			URL:        url,
@@ -107,12 +107,12 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*store.GatewayEndpoint {
 		return nil
 	}
 
-	eps := make([]*store.GatewayEndpoint, 0, len(m.APIKeys))
+	eps := make([]*types.GatewayEndpoint, 0, len(m.APIKeys))
 	for i, apiKey := range m.APIKeys {
 		if apiKey == "" {
 			continue
 		}
-		eps = append(eps, &store.GatewayEndpoint{
+		eps = append(eps, &types.GatewayEndpoint{
 			ID:         uint64(i) + 1,
 			ProviderID: m.ProviderID,
 			URL:        url,

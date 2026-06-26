@@ -4,10 +4,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model/bls12381"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/stretchr/testify/require"

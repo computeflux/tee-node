@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/config"
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )

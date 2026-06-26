@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/api/auth"
-	"github.com/computeflux/tee-provider/pkg/store"
+	store "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"

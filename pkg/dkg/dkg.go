@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	p2peer "github.com/computeflux/tee-provider/pkg/network"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"go.dedis.ch/kyber/v4"
 	pedersen "go.dedis.ch/kyber/v4/share/dkg/pedersen"
@@ -60,7 +60,7 @@ type DKG struct {
 	randomDkgMu     sync.Mutex
 
 	// mainChan is the channel to receive out message
-	mainChain *store.PersistChan[*model.DkgMessage]
+	mainChain *types.PersistChan[*model.DkgMessage]
 
 	// Consensus is running
 	lastConsensusTime    int64
@@ -122,7 +122,7 @@ func NewDKG(
 		return nil, fmt.Errorf("restore dkg: %w", err)
 	}
 
-	dkg.mainChain, err = store.NewPersistChan[*model.DkgMessage]("dkg", 1000)
+	dkg.mainChain, err = types.NewPersistChan[*model.DkgMessage]("dkg", 1000)
 	if err != nil {
 		return nil, fmt.Errorf("create dkg persist chan: %w", err)
 	}

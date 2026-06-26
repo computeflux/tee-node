@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	oed "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	"go.dedis.ch/kyber/v4/suites"
 )

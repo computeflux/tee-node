@@ -17,7 +17,7 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	dbstore "github.com/computeflux/tee-provider/pkg/store"
+	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 

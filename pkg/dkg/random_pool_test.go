@@ -3,16 +3,16 @@ package dkg
 import (
 	"testing"
 
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestDB(t *testing.T) {
 	t.Helper()
-	db, err := store.NewDBWithPath(t.TempDir())
+	db, err := types.NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 }

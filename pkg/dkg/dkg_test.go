@@ -9,11 +9,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	crypto "github.com/computeflux/tee-provider/pkg/crypto"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
 	"github.com/computeflux/tee-provider/pkg/network/local"
-	"github.com/computeflux/tee-provider/pkg/store"
+	"github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
 
@@ -63,7 +63,7 @@ func runEpoch(t *testing.T, dkgs []*DKG, validators []*chaintypes.Validator, epo
 func TestNetwork(t *testing.T) {
 	os.RemoveAll("./token_chain_data")
 
-	db, err := store.NewDB()
+	db, err := types.NewDB()
 	if err != nil {
 		require.NoErrorf(t, err, "failed store.InitDB")
 		os.Exit(1)

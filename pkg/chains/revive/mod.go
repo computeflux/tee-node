@@ -9,8 +9,8 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chains/revive/subnet"
 	"github.com/computeflux/tee-provider/pkg/chains/revive/token"
-	"github.com/computeflux/tee-provider/pkg/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/crypto"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
 	"github.com/wetee-dao/ink.go/util"
