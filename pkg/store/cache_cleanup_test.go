@@ -35,7 +35,7 @@ func TestFindGatewayTokenByKey_LazyDeletesExpired(t *testing.T) {
 	assert.True(t, err == nil || err.Error() == "db not initialized" || err == pebble.ErrNotFound)
 }
 
-func TestCleanupExpiredGatewayTokens(t *testing.T) {
+func TestCacheCleanupExpiredGatewayTokens(t *testing.T) {
 	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
@@ -49,7 +49,6 @@ func TestCleanupExpiredGatewayTokens(t *testing.T) {
 		ExpiresAt: uint64(time.Now().Add(-1 * time.Hour).Unix()),
 	}
 	require.NoError(t, SetGatewayTokenByKey(expiredToken))
-	require.NoError(t, ScheduleExpiration("GATEWAY", "token_by_key:"+expiredKey, int64(expiredToken.ExpiresAt)))
 
 	validToken := &GatewayTokenInfo{
 		ID: 2, Owner: "b", Key: validKey, IsActive: true,
@@ -57,9 +56,10 @@ func TestCleanupExpiredGatewayTokens(t *testing.T) {
 		ExpiresAt: uint64(time.Now().Add(24 * time.Hour).Unix()),
 	}
 	require.NoError(t, SetGatewayTokenByKey(validToken))
-	require.NoError(t, ScheduleExpiration("GATEWAY", "token_by_key:"+validKey, int64(validToken.ExpiresAt)))
 
-	require.NoError(t, CleanupExpiredGatewayTokens())
+	require.NoError(t, cacheCleanupExpiredByIndex("GATEWAY", func(subKey string) error {
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
+	}))
 
 	assert.Nil(t, FindGatewayTokenByKey(expiredKey))
 	assert.NotNil(t, FindGatewayTokenByKey(validKey))
@@ -86,7 +86,7 @@ func TestFindRefreshToken_LazyDeletesExpired(t *testing.T) {
 	assert.True(t, err == nil || err == pebble.ErrNotFound)
 }
 
-func TestCleanupExpiredRefreshTokens(t *testing.T) {
+func TestCacheCleanupExpiredRefreshTokens(t *testing.T) {
 	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
@@ -100,7 +100,6 @@ func TestCleanupExpiredRefreshTokens(t *testing.T) {
 		ExpiresAt: uint64(time.Now().Add(-1 * time.Hour).Unix()),
 	}
 	require.NoError(t, SetRefreshToken(expired, expiredInfo))
-	require.NoError(t, ScheduleExpiration("GATEWAY", "refresh_token:"+expired, int64(expiredInfo.ExpiresAt)))
 
 	validInfo := &RefreshTokenInfo{
 		Owner: "b", Address: "0x2", IsActive: true,
@@ -108,28 +107,28 @@ func TestCleanupExpiredRefreshTokens(t *testing.T) {
 		ExpiresAt: uint64(time.Now().Add(30 * 24 * time.Hour).Unix()),
 	}
 	require.NoError(t, SetRefreshToken(valid, validInfo))
-	require.NoError(t, ScheduleExpiration("GATEWAY", "refresh_token:"+valid, int64(validInfo.ExpiresAt)))
 
-	require.NoError(t, CleanupExpiredRefreshTokens())
+	require.NoError(t, cacheCleanupExpiredByIndex("GATEWAY", func(subKey string) error {
+		return SECRET_DB.DeleteKey("GATEWAY", subKey)
+	}))
 
 	assert.Nil(t, FindRefreshToken(expired))
 	assert.NotNil(t, FindRefreshToken(valid))
 }
 
-// TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure verifies that if deleteFn fails,
+// TestCacheCleanupExpiredByIndex_KeepsIndexOnDeleteFailure verifies that if deleteFn fails,
 // the expiration index is preserved so the next cleanup can retry.
-func TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure(t *testing.T) {
+func TestCacheCleanupExpiredByIndex_KeepsIndexOnDeleteFailure(t *testing.T) {
 	db, err := NewDBWithPath(t.TempDir())
 	require.NoError(t, err)
 	defer db.Close()
 	SECRET_DB = db
 
 	key := "sub:protected"
-	require.NoError(t, SECRET_DB.SetKey("GATEWAY", key, []byte("data")))
-	require.NoError(t, ScheduleExpiration("GATEWAY", key, time.Now().Add(-1*time.Hour).Unix()))
+	require.NoError(t, SECRET_DB.CacheKey("GATEWAY", key, []byte("data"), time.Now().Add(-1*time.Hour).Unix()))
 
 	// 第一次清理：deleteFn 失败，索引应保留
-	require.NoError(t, CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
+	require.NoError(t, cacheCleanupExpiredByIndex("GATEWAY", func(subKey string) error {
 		return fmt.Errorf("simulated delete failure")
 	}))
 
@@ -139,7 +138,7 @@ func TestCleanupExpiredByIndex_KeepsIndexOnDeleteFailure(t *testing.T) {
 	assert.Equal(t, "data", string(v))
 
 	// 索引也应仍存在
-	require.NoError(t, CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
+	require.NoError(t, cacheCleanupExpiredByIndex("GATEWAY", func(subKey string) error {
 		return SECRET_DB.DeleteKey("GATEWAY", subKey)
 	}))
 

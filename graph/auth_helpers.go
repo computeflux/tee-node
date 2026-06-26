@@ -66,9 +66,6 @@ func createRefreshToken(owner string, address string) (string, error) {
 	if err := store.SetRefreshToken(refreshToken, token); err != nil {
 		return "", fmt.Errorf("failed to store refresh token: %w", err)
 	}
-	if err := store.ScheduleExpiration("GATEWAY", "refresh_token:"+refreshToken, int64(token.ExpiresAt)); err != nil {
-		fmt.Printf("[createRefreshToken] schedule expiration failed: %v\n", err)
-	}
 	return refreshToken, nil
 }
 
@@ -102,9 +99,6 @@ func createUserAPIKey(owner string, addrHex string) (string, error) {
 	}
 	if err := store.SetGatewayTokenByKey(token); err != nil {
 		return "", fmt.Errorf("failed to store gateway token: %w", err)
-	}
-	if err := store.ScheduleExpiration("GATEWAY", "token_by_key:"+apiKey, int64(token.ExpiresAt)); err != nil {
-		fmt.Printf("[createUserAPIKey] schedule expiration failed: %v\n", err)
 	}
 	store.SetNextID("gateway_token", nextID+1)
 

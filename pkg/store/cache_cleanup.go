@@ -38,18 +38,13 @@ func StartCleanupTask(ctx context.Context, interval time.Duration) {
 }
 
 func runCleanup() {
-	cleanupFns := []func() error{
-		CleanupExpiredGatewayTokens,
-		CleanupExpiredRefreshTokens,
-		CleanupExpiredSignSessions,
-		CleanupExpiredChallenges,
-		CleanupExpiredRecoveryOTPs,
-		CleanupExpiredWalletNonces,
-	}
-
-	for _, fn := range cleanupFns {
-		if err := fn(); err != nil {
-			fmt.Printf("[cleanup] error: %v\n", err)
+	// 清理所有 namespace 中已过期的缓存记录
+	namespaces := []string{"GATEWAY", Web3AuthNamespace}
+	for _, ns := range namespaces {
+		if err := cacheCleanupExpiredByIndex(ns, func(subKey string) error {
+			return SECRET_DB.DeleteKey(ns, subKey)
+		}); err != nil {
+			fmt.Printf("[cleanup] namespace=%s error: %v\n", ns, err)
 		}
 	}
 }

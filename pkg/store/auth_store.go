@@ -72,10 +72,7 @@ func PutSignSession(s *SignSession) error {
 		return err
 	}
 	key := "sig:" + s.Token
-	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
-		return err
-	}
-	return ScheduleExpiration(Web3AuthNamespace, key, s.ExpiresAt)
+	return SECRET_DB.CacheKey(Web3AuthNamespace, key, b, s.ExpiresAt)
 }
 
 func GetSignSession(token string) (*SignSession, error) {
@@ -85,7 +82,7 @@ func GetSignSession(token string) (*SignSession, error) {
 	}
 	if s != nil && time.Now().Unix() > s.ExpiresAt {
 		_ = DeleteSignSession(token)
-		_ = CancelExpiration(Web3AuthNamespace, "sig:"+token, s.ExpiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, "sig:"+token, s.ExpiresAt)
 		return nil, nil
 	}
 	return s, nil
@@ -94,7 +91,7 @@ func GetSignSession(token string) (*SignSession, error) {
 func DeleteSignSession(token string) error {
 	key := "sig:" + token
 	if s, _ := DBGetJson[SignSession](SECRET_DB, Web3AuthNamespace, key); s != nil {
-		_ = CancelExpiration(Web3AuthNamespace, key, s.ExpiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, key, s.ExpiresAt)
 	}
 	return SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 }
@@ -125,10 +122,7 @@ func PutChallenge(email, challenge string, ttlSeconds int) error {
 		return err
 	}
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
-	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
-		return err
-	}
-	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
+	return SECRET_DB.CacheKey(Web3AuthNamespace, key, b, expiresAt)
 }
 
 func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
@@ -139,7 +133,7 @@ func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
 	}
 	if rec != nil && time.Now().Unix() > rec.ExpiresAt {
 		_ = DeleteChallenge(email, challenge)
-		_ = CancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 		return nil, nil
 	}
 	return rec, nil
@@ -163,7 +157,7 @@ func MarkChallengeUsed(email, challenge string) error {
 func DeleteChallenge(email, challenge string) error {
 	key := fmt.Sprintf("c:%s:%s", email, challenge)
 	if rec, _ := DBGetJson[ChallengeRecord](SECRET_DB, Web3AuthNamespace, key); rec != nil {
-		_ = CancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 	}
 	return SECRET_DB.DeleteKey(Web3AuthNamespace, key)
 }
@@ -301,10 +295,7 @@ func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
 	expiresAt := time.Now().Add(time.Duration(ttlSeconds) * time.Second).Unix()
 	data := fmt.Sprintf("%d:%s", expiresAt, otp)
 	key := "ro:" + userEmail
-	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, []byte(data)); err != nil {
-		return err
-	}
-	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
+	return SECRET_DB.CacheKey(Web3AuthNamespace, key, []byte(data), expiresAt)
 }
 
 func GetRecoveryOTP(userEmail string) (string, error) {
@@ -321,7 +312,7 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 	expiresAt, _ := strconv.ParseInt(parts[0], 10, 64)
 	if time.Now().Unix() > expiresAt {
 		_ = DeleteRecoveryOTP(userEmail)
-		_ = CancelExpiration(Web3AuthNamespace, key, expiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, key, expiresAt)
 		return "", fmt.Errorf("recovery otp expired")
 	}
 	return parts[1], nil
@@ -333,7 +324,7 @@ func DeleteRecoveryOTP(userEmail string) error {
 		parts := strings.SplitN(string(b), ":", 2)
 		if len(parts) == 2 {
 			if expiresAt, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
-				_ = CancelExpiration(Web3AuthNamespace, key, expiresAt)
+				_ = cacheCancelExpiration(Web3AuthNamespace, key, expiresAt)
 			}
 		}
 	}
@@ -366,10 +357,7 @@ func PutWalletNonce(address, nonce string, ttlSeconds int) error {
 		return err
 	}
 	key := "wn:" + address + ":" + nonce
-	if err := SECRET_DB.SetKey(Web3AuthNamespace, key, b); err != nil {
-		return err
-	}
-	return ScheduleExpiration(Web3AuthNamespace, key, expiresAt)
+	return SECRET_DB.CacheKey(Web3AuthNamespace, key, b, expiresAt)
 }
 
 func GetWalletNonce(address, nonce string) (*WalletNonceRecord, error) {
@@ -380,7 +368,7 @@ func GetWalletNonce(address, nonce string) (*WalletNonceRecord, error) {
 	}
 	if rec != nil && time.Now().Unix() > rec.ExpiresAt {
 		_ = SECRET_DB.DeleteKey(Web3AuthNamespace, key)
-		_ = CancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
+		_ = cacheCancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 		return nil, nil
 	}
 	return rec, nil
@@ -397,32 +385,4 @@ func MarkWalletNonceUsed(address, nonce string) error {
 	rec.Used = true
 	b, _ := json.Marshal(rec)
 	return SECRET_DB.SetKey(Web3AuthNamespace, "wn:"+address+":"+nonce, b)
-}
-
-// CleanupExpiredWalletNonces 基于过期索引删除所有已过期的钱包登录 nonce。
-func CleanupExpiredWalletNonces() error {
-	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
-	})
-}
-
-// CleanupExpiredSignSessions 基于过期索引删除过期的短期签名 session。
-func CleanupExpiredSignSessions() error {
-	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
-	})
-}
-
-// CleanupExpiredChallenges 基于过期索引删除过期的 challenge 记录。
-func CleanupExpiredChallenges() error {
-	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
-	})
-}
-
-// CleanupExpiredRecoveryOTPs 基于过期索引删除过期的恢复 OTP。
-func CleanupExpiredRecoveryOTPs() error {
-	return CleanupExpiredByIndex(Web3AuthNamespace, func(subKey string) error {
-		return SECRET_DB.DeleteKey(Web3AuthNamespace, subKey)
-	})
 }

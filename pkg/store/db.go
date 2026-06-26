@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
@@ -122,6 +123,53 @@ func (db *DB) DeleteKey(namespace, key string) error {
 
 func (db *DB) DeleteByteKey(key []byte) error {
 	return db.DB.Delete(key, pebble.Sync)
+}
+
+// --- 统一缓存入口（store 包内唯一对外的缓存写入/删除点） ---
+//
+// CacheByteKey 是写缓存的唯一入口。调用方传入完整 byte key（comboKey 格式：
+// "{namespace}_{subKey}"），store 内部自动注册过期索引。
+// expiresAt <= 0 表示永不过期。
+//
+// DeleteCacheByteKey 是删缓存的唯一入口。注意：由于 key 中不包含 expiresAt，
+// 本接口仅删除数据；过期索引由后台 cacheCleanupExpiredByIndex 在 deleteFn 失败
+// （即数据已不存在）时清理，无需调用方关心。
+func (db *DB) CacheByteKey(key []byte, value []byte, expiresAt int64) error {
+	namespace, subKey, err := splitComboKey(key)
+	if err != nil {
+		return err
+	}
+	if err := db.SetKey(namespace, subKey, value); err != nil {
+		return err
+	}
+	return cacheScheduleExpiration(namespace, subKey, expiresAt)
+}
+
+func (db *DB) CacheKey(namespace string, subKey string, value []byte, expiresAt int64) error {
+	if err := db.SetKey(namespace, subKey, value); err != nil {
+		return err
+	}
+	return cacheScheduleExpiration(namespace, subKey, expiresAt)
+}
+
+func (db *DB) DeleteCacheByteKey(key []byte) error {
+	namespace, subKey, err := splitComboKey(key)
+	if err != nil {
+		return err
+	}
+	return db.DeleteKey(namespace, subKey)
+}
+
+// splitComboKey 把 CacheByteKey 接收的完整 byte key 按 comboKey 约定拆成
+// namespace 与 subKey。comboKey 格式："{namespace}_{subKey}"，因此以
+// 第一个 '_' 作为分隔符。
+func splitComboKey(key []byte) (string, string, error) {
+	s := string(key)
+	i := strings.Index(s, "_")
+	if i < 0 {
+		return "", "", fmt.Errorf("cache key %q is not in comboKey format (namespace_subKey)", s)
+	}
+	return s[:i], s[i+1:], nil
 }
 
 // --- Generic helpers operating on an explicit *DB ---

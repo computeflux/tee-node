@@ -45,7 +45,10 @@ type GatewayDailyUsage struct {
 
 // SetGatewayTokenByKey 以 API Key 为索引写入 token 信息，供 O(1) 直接查询。
 func SetGatewayTokenByKey(t *GatewayTokenInfo) error {
-	return DBSetJson(SECRET_DB, "GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t)
+	if err := DBSetJson(SECRET_DB, "GATEWAY", fmt.Sprintf("token_by_key:%s", t.Key), t); err != nil {
+		return err
+	}
+	return cacheScheduleExpiration("GATEWAY", "token_by_key:"+t.Key, int64(t.ExpiresAt))
 }
 
 // GetGatewayTokenByKey 通过 API Key 直接查询 token（O(1)，不遍历）。
@@ -75,17 +78,9 @@ func DeleteGatewayTokenByKey(key string) error {
 		return err
 	}
 	if tk != nil {
-		_ = CancelExpiration("GATEWAY", "token_by_key:"+key, int64(tk.ExpiresAt))
+		_ = cacheCancelExpiration("GATEWAY", "token_by_key:"+key, int64(tk.ExpiresAt))
 	}
 	return nil
-}
-
-// CleanupExpiredGatewayTokens 基于过期索引删除过期 Gateway token。
-// 优先使用时间排序的过期索引，避免全表扫描。
-func CleanupExpiredGatewayTokens() error {
-	return CleanupExpiredByIndex("GATEWAY", func(subKey string) error {
-		return SECRET_DB.DeleteKey("GATEWAY", subKey)
-	})
 }
 
 // ── NextID ───────────────────────────────────────────────
