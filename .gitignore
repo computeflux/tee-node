@@ -43,6 +43,7 @@ k8s.yaml
 ext/experimental/dss
 
 hack/build/keys
+tee-chain/runtime/wasm/ego/ego
 
 # Local secrets / operator config (NEVER commit)
 .env

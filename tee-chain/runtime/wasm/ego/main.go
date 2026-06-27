@@ -8,9 +8,12 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -21,7 +24,7 @@ import (
 )
 
 func main() {
-	wasmPath := flag.String("wasm", defaultWasmPath(), "path to runtime.wasm (or runtime.wasm.gz)")
+	wasmPath := flag.String("wasm", "runtime.wasm.gz", "path to runtime.wasm (or runtime.wasm.gz)")
 	method := flag.String("method", "runtime_version", "query method to invoke (snake_case)")
 	flag.Parse()
 
@@ -43,9 +46,12 @@ func main() {
 		fmt.Println("sgx:    not in SGX enclave (plain Go)")
 	}
 
-	// ── 1. 读取 wasm ─────────────────────────────────────
+	// ── 1. 读取 wasm（自动识别 gzip）────────────────────
 	raw, err := os.ReadFile(*wasmPath)
 	check("read wasm", err)
+	raw, err = decompressIfGzip(raw)
+	check("decompress wasm", err)
+	fmt.Printf("wasm size: %d bytes (uncompressed)\n", len(raw))
 
 	// ── 2. 构造 Engine + 预填缓存（绕过 LoadModule 从 gov 存储读 wasm）──
 	e := wasm.NewEngine()
@@ -85,48 +91,25 @@ func main() {
 // triedPaths 记录 defaultWasmPath 尝试过的所有路径，用于错误信息。
 var triedPaths []string
 
-// defaultWasmPath 解析默认 wasm 路径，SGX/普通 Go 双模式适配。
-//
-// 优先级：
-//  1. 环境变量 RUNTIME_WASM
-//  2. SGX enclave 下使用 enclave.json files 嵌入的路径 "runtime.wasm"
-//  3. 从当前 cwd 出发，依次尝试以下候选：
-//     - ./runtime.wasm（ego/ 下或拷贝后）
-//     - tee-chain/runtime/wasm/runtime/runtime.wasm（从 tee-node/ 出发）
-//     - tee-chain/runtime/wasm/ego/runtime.wasm（从 tee-node/ 出发，ego/ 里拷贝过）
-//     - ../runtime/runtime.wasm（从 ego/ 出发）
-//     - ../runtime.wasm（从 ego/ 出发，ego/ 里拷贝过）
-//  4. 找不到时返回第一个候选 + 记录所有尝试路径
-func defaultWasmPath() string {
-	if env := os.Getenv("RUNTIME_WASM"); env != "" {
-		triedPaths = append(triedPaths, "RUNTIME_WASM="+env)
-		return env
-	}
-	if _, err := enclave.GetSelfReport(); err == nil {
-		triedPaths = append(triedPaths, "runtime.wasm (enclave in-memfs)")
-		return "runtime.wasm"
-	}
-	candidates := []string{
-		"runtime.wasm", // 当前目录（ego/ 下或拷贝后）
-		"tee-chain/runtime/wasm/runtime/runtime.wasm", // tee-node/ 出发，源码目录
-		"tee-chain/runtime/wasm/ego/runtime.wasm",     // tee-node/ 出发，ego/ 里拷过
-		"../runtime/runtime.wasm",                     // ego/ 出发，源码目录
-		"../runtime.wasm",                             // ego/ 出发，ego/ 里拷过
-	}
-	triedPaths = append(triedPaths, candidates...)
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return candidates[0] // fallthrough; main() 会检测到不存在并报错
-}
-
 func check(stage string, err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s: %v\n", stage, err)
 		os.Exit(1)
 	}
+}
+
+// decompressIfGzip 当数据以 gzip magic 开头（0x1f 0x8b）时解压，否则原样返回。
+// 与 engine.go:decompressWasm 逻辑一致，让 ego 测试和链上 upload 都复用同一逻辑。
+func decompressIfGzip(data []byte) ([]byte, error) {
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		r, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		return io.ReadAll(r)
+	}
+	return data, nil
 }
 
 // toSnake 把 runtime_version / RuntimeVersion / runtimeVersion 统一成 snake_case。

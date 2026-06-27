@@ -10,8 +10,8 @@
     "env": null,
     "files": [
         {
-            "source": "./runtime.wasm",
-            "target": "runtime.wasm"
+            "source": "./runtime.wasm.gz",
+            "target": "runtime.wasm.gz"
         }
     ]
 }
