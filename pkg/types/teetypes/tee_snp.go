@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/google/go-sev-guest/client"
 	"github.com/google/go-sev-guest/proto/sevsnp"
@@ -102,7 +101,7 @@ func SnpVerify(callData *model.TeeCall) (result *model.TeeVerifyResult, err erro
 
 	// 验证签名
 	sig := attestation.Report.ReportData
-	if !domain.Ed25519SignVerify(callData.Caller, buf.Bytes(), sig) {
+	if !model.Ed25519SignVerify(callData.Caller, buf.Bytes(), sig) {
 		return nil, errors.New("invalid report sign")
 	}
 

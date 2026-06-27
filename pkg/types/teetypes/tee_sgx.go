@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/edgelesssys/ego/attestation"
@@ -75,7 +74,7 @@ func SgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	}
 
 	sig := report.Data
-	if !domain.Ed25519SignVerify(reportData.Caller, buf.Bytes(), sig) {
+	if !model.Ed25519SignVerify(reportData.Caller, buf.Bytes(), sig) {
 		return nil, errors.New("invalid report sign")
 	}
 

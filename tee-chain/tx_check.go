@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -20,7 +19,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 		return CodeTypeEncodingError
 	}
 
-	_, err = domain.VerifyTxSigner(txbox)
+	_, err = model.VerifyTxSigner(txbox)
 	// 验证交易签名
 	if err != nil {
 		fmt.Println("TeeChain CheckTx VerifyTxSigner error", err)

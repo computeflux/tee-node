@@ -7,7 +7,6 @@ import (
 
 	"strings"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
@@ -55,7 +54,7 @@ func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract
 		},
 	}
 
-	err := domain.SideSysCallVerify(caller, callerType, call, signature)
+	err := model.SideSysCallVerify(caller, callerType, call, signature)
 	if err != nil {
 		return "", fmt.Errorf("SubmitContractCall: contract verify: %w", err)
 	}

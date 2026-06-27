@@ -5,13 +5,17 @@
 #   hack/update_runtime.sh [--no-build] [--gql URL] [--version-src PATH] \
 #                          [--wasm PATH] [--desc TEXT] [--no-wait]
 #
+# 默认上传 runtime.wasm.gz（链端 engine.go:decompressWasm 按 magic 自动解压），
+# 比 .wasm 体积约小一半，绕开 CometBFT 默认 max_tx_bytes=1MB 限制。
+# --wasm foo.wasm 时若存在 foo.wasm.gz 会自动改用 gz 版本。
+#
 # version 从 tee-chain/runtime/module/call.go 的 const NativeVersion 读，
 # 工具会自动 GQL 查链上当前 version 并校验一致性（防止传错/编错）。
 #
 # 工作流（先编译后上传）:
 #   1. 编译 ext/runtimeupgrade Go 工具（先编译，fail-fast）
 #   2. 编译 runtime.wasm（默认；--no-build 跳过）
-#   3. 校验参数 + wasm 文件（>1MB 体积预警）
+#   3. 校验参数 + wasm 文件（>900KB gz 体积预警；链上加载时自动解压）
 #   4. 上传（运行工具签名 + GQL contractCall mutation），等终态
 #
 # 配置来源（高→低优先级）:
@@ -144,14 +148,27 @@ echo "=========================================="
 echo " 3/4 校验参数与 WASM ..."
 echo "=========================================="
 
-# 默认 WASM 路径
+# 默认 WASM 路径：build.sh 已同时产出 runtime.wasm 和 runtime.wasm.gz (gzip -9)。
+# 链端 gov.RuntimeUpgrade 直接存原字节、engine.go:decompressWasm 按 magic 自动解压，
+# 所以传 .gz 上去 tx 体积直接减半，不影响链上加载。codehash 是对所传字节 blake2b，
+# 工具/链端一致，不会有 hash 错配。
 if [[ -z "$WASM_PATH" ]]; then
-    WASM_PATH="$WASM_DIR/runtime.wasm"
+    WASM_PATH="$WASM_DIR/runtime.wasm.gz"
 fi
 if [[ ! -f "$WASM_PATH" ]]; then
     echo "ERROR: wasm not found: $WASM_PATH (use --build to compile, or --wasm <path>)" >&2
     exit 1
 fi
+
+# 贴心：用户显式传了 foo.wasm，但旁边有 foo.wasm.gz → 自动改用 gz 版本（半体积）。
+# 想强制用 raw 的话，传一个没有 .gz 兄弟的路径，或传目录外的任意文件名即可。
+if [[ "$WASM_PATH" == *.wasm && ! -f "$WASM_PATH.gz" ]]; then
+    : # no-op: 没兄弟就走原文件
+elif [[ "$WASM_PATH" == *.wasm && -f "$WASM_PATH.gz" ]]; then
+    echo "auto: 发现 $WASM_PATH.gz，改用 gzip 版本（链端 engine.go:decompressWasm 自动解压）"
+    WASM_PATH="$WASM_PATH.gz"
+fi
+
 WASM_SIZE=$(stat -c%s "$WASM_PATH")
 echo "wasm: $WASM_PATH ($WASM_SIZE bytes)"
 

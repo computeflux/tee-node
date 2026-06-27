@@ -5,7 +5,6 @@ import (
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
@@ -27,7 +26,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 			return nil, err
 		}
 
-		call, err := domain.VerifyTxSigner(tx)
+		call, err := model.VerifyTxSigner(tx)
 		if err != nil {
 			return nil, errors.Wrap(err, "verify tx signer")
 		}

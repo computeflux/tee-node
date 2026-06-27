@@ -1,12 +1,9 @@
-package domain
+package model
 
 import (
 	"bytes"
 	"encoding/hex"
-
 	"fmt"
-
-	"github.com/computeflux/tee-provider/pkg/model"
 
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -18,7 +15,7 @@ import (
 
 // VerifyTxSigner 验证交易发起方：caller 对 model.Tx（不含 signature）的签名必须有效
 // 签名数据包含 caller + caller_type + nonce + call，nonce 不可被篡改。
-func VerifyTxSigner(tx *model.Tx) (*model.SysCall, error) {
+func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")
 	}
@@ -33,7 +30,7 @@ func VerifyTxSigner(tx *model.Tx) (*model.SysCall, error) {
 	}
 
 	// 处理系统请求
-	call := new(model.SysCall)
+	call := new(SysCall)
 	err := protoio.ReadMessage(bytes.NewBuffer(tx.Call), call)
 	if err != nil {
 		return nil, err
@@ -47,7 +44,7 @@ func VerifyTxSigner(tx *model.Tx) (*model.SysCall, error) {
 	return call, nil
 }
 
-func SideSysCallVerify(caller []byte, callerType uint32, call *model.SysCall, signature []byte) error {
+func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signature []byte) error {
 	switch callerType {
 	case 0: // chain node ed25519
 		sigBytes, err := call.BytesForSig()

@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
 	"github.com/computeflux/tee-provider/pkg/model"
 
 	"golang.org/x/crypto/blake2b"
@@ -122,7 +121,7 @@ func main() {
 		die("sign: %v", err)
 	}
 
-	err = domain.SideSysCallVerify(addr.Bytes(), callerType, call, sig)
+	err = model.SideSysCallVerify(addr.Bytes(), callerType, call, sig)
 	if err != nil {
 		die("SubmitContractCall: contract verify: " + err.Error())
 	}
