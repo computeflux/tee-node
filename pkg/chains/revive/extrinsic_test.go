@@ -8,7 +8,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 )
 
 // ── BatchCall ──────────────────────────────────────────────

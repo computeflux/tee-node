@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/auth"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ── 基础类型 —─────────────────────────────────────────────

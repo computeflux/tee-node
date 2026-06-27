@@ -9,7 +9,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 	"github.com/wetee-dao/ink.go"
 )
 

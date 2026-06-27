@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/types"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

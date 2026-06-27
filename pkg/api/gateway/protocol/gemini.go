@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/maximhq/bifrost/core/providers/gemini"
 	bifrostOpenAI "github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/schemas"

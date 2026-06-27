@@ -13,7 +13,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 const GatewayModelIndexName = "gateway_models"

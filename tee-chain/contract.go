@@ -7,8 +7,8 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ContractRuntime 构造一个新的合约运行时上下文，供外部包（gateway、graph 等）使用。

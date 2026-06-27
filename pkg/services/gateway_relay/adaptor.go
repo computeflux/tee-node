@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // ── Types ─────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

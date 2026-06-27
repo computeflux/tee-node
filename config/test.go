@@ -10,7 +10,7 @@ var TestChainConfig = chaintypes.ChainConfigType{
 	ChainType:     "substrate",
 	Cipher:        crypto.SuiteEd25519,
 	Urls:          []string{"wss://asset-hub-paseo-rpc.n.dwellir.com", "wss://sys.turboflakes.io/asset-hub-paseo"},
-	SubnetAddress: "0xf8e6c4dec077b148b55e31533efea751c91f25e4",
-	TokenAddress:  "0xc0849f08bd8f1028a499d6e689f3431c0730a582",
+	SubnetAddress: "0x0d6dd3a07e04879d59fd2ed3967946a29f960e7e",
+	TokenAddress:  "0xff9b30b99f1e5a24664b0eda2f24cd465cb60ea6",
 	NetworkLabel:  "Paseo (Asset Hub)",
 }

@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 

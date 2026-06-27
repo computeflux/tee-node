@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/maximhq/bifrost/core/schemas"
 )
 

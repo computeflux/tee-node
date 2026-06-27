@@ -7,8 +7,8 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -122,6 +122,47 @@ func buildEndpointsFromModel(m *cgateway.ModelInfo) []*types.GatewayEndpoint {
 		})
 	}
 	return eps
+}
+
+// buildEndpointsFromRoute 从路由中收集所有模型的 endpoint，用于路由模式的均匀分配。
+func buildEndpointsFromRoute(routeID uint64) []*types.GatewayEndpoint {
+	bridge := getBridge()
+	if bridge == nil {
+		return nil
+	}
+
+	route, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.ModelRoute, error) {
+		return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetRoute(routeID)
+	})
+	if err != nil || route == nil || !route.IsActive {
+		return nil
+	}
+
+	// 收集路由中所有模型的 endpoint
+	var allEndpoints []*types.GatewayEndpoint
+	models, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) ([]*cgateway.ModelInfo, error) {
+		gateway := cgateway.NewGateway(runtime)
+		result := make([]*cgateway.ModelInfo, 0, len(route.ModelIds))
+		for _, modelID := range route.ModelIds {
+			model, err := cgateway.GatewaySecret{Gateway: *gateway}.GetModel(modelID)
+			if err != nil || model == nil || !model.IsActive {
+				if err != nil {
+					GATEWAYLOG().Printf("[ROUTE] buildEndpointsFromRoute: fetch model %d failed: %v", modelID, err)
+				}
+				continue
+			}
+			result = append(result, model)
+		}
+		return result, nil
+	})
+	if err != nil {
+		return nil
+	}
+	for _, model := range models {
+		eps := buildEndpointsFromModel(model)
+		allEndpoints = append(allEndpoints, eps...)
+	}
+	return allEndpoints
 }
 
 // FindProviderByModelAPIKey 根据模型名和 API Key 查找对应的本地模型供应商 ID。

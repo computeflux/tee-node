@@ -9,8 +9,8 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 	"github.com/vedhavyas/go-subkey/v2"
 	chain "github.com/wetee-dao/ink.go"
 	"github.com/wetee-dao/ink.go/pallet/revive"
@@ -65,7 +65,7 @@ func (c *Contract) TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*cha
 
 	switch tcall.CallType {
 	case 0:
-		withdrawApply, err := contracts.QueryWithdrawApply(tcall.CallID)
+		withdrawApply, err := runtime.QueryWithdrawApply(tcall.CallID)
 		if err != nil {
 			return nil, err
 		}

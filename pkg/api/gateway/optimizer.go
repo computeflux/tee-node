@@ -9,8 +9,8 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
+	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ── Async usage writer ───────────────────────────────────

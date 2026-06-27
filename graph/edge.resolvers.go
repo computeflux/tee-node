@@ -14,9 +14,9 @@ import (
 	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // EdgeModels is the resolver for the EdgeModels field.
@@ -30,7 +30,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 	defer txn.Rollback()
 
 	// 使用当前用户地址作为 caller 创建 runtime，以便 GetProviderByOwner 能正确识别
-	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, token.Addr, chaintypes.UniAddr{}, module.NativeVersion)
+	runtime := runtime.NewRuntimeWithVersion(0, time.Now(), txn, token.Addr, chaintypes.UniAddr{}, module.NativeVersion)
 
 	ins := gateway.NewGateway(runtime)
 	query := gateway.GatewayQuery{Gateway: *ins}

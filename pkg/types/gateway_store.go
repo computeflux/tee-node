@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ── Gateway 持久化类型 ───────────────────────────────────

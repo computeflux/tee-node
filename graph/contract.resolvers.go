@@ -13,8 +13,8 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	ctypes "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime"
+	ctypes "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -23,7 +23,7 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 	txn := types.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
-	if contracts.IsContractIsInited(txn, "gov") {
+	if runtime.IsContractIsInited(txn, "gov") {
 		return false, gqlerror.Errorf("contract is inited")
 	}
 

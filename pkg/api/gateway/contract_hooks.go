@@ -3,7 +3,7 @@ package gateway
 import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // ── Testable function pointers ───────────────────────────

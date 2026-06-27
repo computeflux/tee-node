@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cometbft/cometbft/p2p"
-	"github.com/cometbft/cometbft/privval"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/graph"
 	"github.com/computeflux/tee-provider/pkg/chains"
@@ -46,26 +45,22 @@ func main() {
 
 	// TEE 节点启动
 
-	// init teechain node key
-	_, p2pKey, err := crypto.GetP2PKey()
+	// init teechain node key — loaded from TEE-sealed file (auto-generated on first run)
+	p2pKey, err := crypto.GetP2PKey()
 	if err != nil {
-		fmt.Println("failed to load node key:", err)
+		fmt.Println("failed to load p2p key:", err)
 		os.Exit(1)
 	}
 
-	// Init key for DKG
-	validatorKey := privval.LoadFilePV(
-		"./token_chain_data/config/priv_validator_key.json",
-		"./token_chain_data/data/priv_validator_state.json",
-	)
-	dkgKey := validatorKey.Key.PrivKey
-
-	// Init node key for Mainchain
-	nodePriv, err := crypto.PrivateKeyFromOed25519(dkgKey.Bytes())
+	// Init key for DKG — loaded from TEE-sealed file (auto-generated on first run)
+	nodePriv, err := crypto.GetValidatorKey()
 	if err != nil {
-		fmt.Println("Marshal PKG_PK error:", err)
+		fmt.Println("failed to get validator key:", err)
 		os.Exit(1)
 	}
+
+	// Print CometBFT validator address & pub_key
+	crypto.PrintValidatorForGenesis(nodePriv, "")
 
 	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 	util.LogWithYellow("ETH Key", hex.EncodeToString(nodePriv.ToSecp256k1Signer().Public()))

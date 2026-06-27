@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/types"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 type contextKey string
@@ -77,45 +79,56 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// Parse "provider/model" format
 		providerName, modelName := parseProviderModel(modelNameArg)
-		if modelNameArg != modelName {
-			bodyMap["model"] = modelName
-			if newBody, err := json.Marshal(bodyMap); err == nil {
-				bodyBytes = newBody
+
+		var model *cgateway.ModelInfoWithID
+		var endpoints []*types.GatewayEndpoint
+
+		if providerName == "auto" {
+			// 路由模式：auto/路由名 → 从路由内自动选择模型
+			endpoints, model = resolveAutoRoute(modelName)
+			if model == nil || len(endpoints) == 0 {
+				writeProtocolError(w, r, http.StatusServiceUnavailable,
+					"route not available: "+modelName, "server_error")
+				return
+			}
+		} else {
+			if modelNameArg != modelName {
+				bodyMap["model"] = modelName
+				if newBody, err := json.Marshal(bodyMap); err == nil {
+					bodyBytes = newBody
+				}
+			}
+
+			// 查询 Provider
+			provider := findProviderNameFn(providerName)
+			if provider == nil || !provider.Data.IsActive {
+				writeProtocolError(w, r, http.StatusServiceUnavailable,
+					"provider not available for model "+modelName, "server_error")
+				return
+			}
+
+			// 查询模型
+			model = findGatewayModelByNameFn(provider.ID, modelName)
+			if model == nil {
+				writeProtocolError(w, r, http.StatusNotFound, "model not found: "+modelName, "not_found")
+				return
+			}
+
+			// 构建 endpoints：若模型属于路由则聚合路由内所有模型
+			if model.Data.RouteID > 0 {
+				endpoints = buildEndpointsFromRoute(model.Data.RouteID)
+			} else {
+				endpoints = buildEndpointsFromModel(&model.Data)
+			}
+			if len(endpoints) == 0 {
+				writeProtocolError(w, r, http.StatusServiceUnavailable,
+					"no available endpoints for model "+modelName, "server_error")
+				return
 			}
 		}
 
-		// 用 ProviderID 查询 Provider，验证名称与活跃状态
-		provider := findProviderNameFn(providerName)
-		if provider == nil || !provider.Data.IsActive {
-			writeProtocolError(w, r, http.StatusServiceUnavailable,
-				"provider not available for model "+modelName, "server_error")
-			return
-		}
-		if provider.Data.Name != providerName {
-			writeProtocolError(w, r, http.StatusBadRequest,
-				"provider name \""+providerName+"\" mismatch for model "+modelName+"\"provider.name"+provider.Data.Name+"\"", "invalid_request")
-			return
-		}
-
-		// 1. 从合约查询模型（必须存在且活跃）
-		model := findGatewayModelByNameFn(provider.ID, modelName)
-		if model == nil {
-			writeProtocolError(w, r, http.StatusNotFound, "model not found: "+modelName, "not_found")
-			return
-		}
-
-		// 3. 从合约构建 endpoints（URI + APIKeys） ProviderType 为动态注册
-		endpoints := buildEndpointsFromModel(&model.Data)
-		if len(endpoints) == 0 {
-			writeProtocolError(w, r, http.StatusServiceUnavailable,
-				"no available endpoints for model "+modelName, "server_error")
-			return
-		}
-
-		// 4. 按用户 hash 选 endpoint（sticky）
+		// 检查用户积分
 		token := GetTokenFromContext(r)
-
-		// 5. 检查用户积分
 		if bridge := getBridgeFn(); bridge != nil {
 			credit, err := gatewayGetCreditFn(bridge, token.Addr)
 			if err != nil {
@@ -127,17 +140,18 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// 按用户 hash 选 endpoint（sticky）
 		userKey := token.Owner
 		if userKey == "" {
 			userKey = r.RemoteAddr
 		}
+
 		b := types.NewEndpointBalancerFromEndpoints(endpoints)
 		if b == nil {
 			writeProtocolError(w, r, http.StatusServiceUnavailable,
 				"no available endpoint for model "+modelName, "server_error")
 			return
 		}
-
 		endpoint := b.Pick(userKey + ":" + modelName)
 		if endpoint == nil {
 			writeProtocolError(w, r, http.StatusServiceUnavailable,
@@ -163,6 +177,39 @@ func parseProviderModel(input string) (provider, model string) {
 	return "openai", input
 }
 
+// resolveAutoRoute resolves "auto/routeName" → endpoints from all models in the route.
+func resolveAutoRoute(routeName string) ([]*types.GatewayEndpoint, *cgateway.ModelInfoWithID) {
+	bridge := getBridge()
+	if bridge == nil {
+		return nil, nil
+	}
+
+	rw, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.ModelRouteWithID, error) {
+		return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetRouteByName(routeName)
+	})
+	if err != nil || rw == nil || !rw.Data.IsActive {
+		return nil, nil
+	}
+
+	endpoints := buildEndpointsFromRoute(rw.ID)
+	if len(endpoints) == 0 {
+		return nil, nil
+	}
+
+	// 用路由内第一个模型作为 ctxModel（供 relay handler 使用）
+	var modelWithID *cgateway.ModelInfoWithID
+	if len(rw.Data.ModelIds) > 0 {
+		m, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.ModelInfo, error) {
+			return cgateway.GatewaySecret{Gateway: *cgateway.NewGateway(runtime)}.GetModel(rw.Data.ModelIds[0])
+		})
+		if err == nil && m != nil {
+			modelWithID = &cgateway.ModelInfoWithID{ID: rw.Data.ModelIds[0], Data: *m}
+		}
+	}
+
+	return endpoints, modelWithID
+}
+
 // GetBodyFromContext returns cached body bytes set by DistributeMiddleware.
 func GetBodyFromContext(r *http.Request) []byte {
 	b, _ := r.Context().Value(ctxBody).([]byte)
@@ -170,7 +217,6 @@ func GetBodyFromContext(r *http.Request) []byte {
 }
 
 // ── Context accessors ────────────────────────────────────
-
 func GetTokenFromContext(r *http.Request) *types.GatewayTokenInfo {
 	t, _ := r.Context().Value(ctxToken).(*types.GatewayTokenInfo)
 	return t

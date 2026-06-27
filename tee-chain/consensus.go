@@ -21,7 +21,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types"
 	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
 

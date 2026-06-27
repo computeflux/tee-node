@@ -566,7 +566,7 @@ go test ./tee-chain/contracts/wasm/...
 package main
 
 import (
-    _ "github.com/computeflux/tee-provider/tee-chain/contracts/batch"
+    _ "github.com/computeflux/tee-provider/tee-chain/runtime/batch"
 )
 
 //go:wasmexport version

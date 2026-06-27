@@ -8,9 +8,9 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/domain"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/gov"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gov"
+	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 const (

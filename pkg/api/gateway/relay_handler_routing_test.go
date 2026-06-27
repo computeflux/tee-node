@@ -10,7 +10,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 	"github.com/computeflux/tee-provider/pkg/types"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 func makeTestEndpoint(url string) *types.GatewayEndpoint {

@@ -1,6 +1,6 @@
 package model
 
-import "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+import "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 
 func (m *ContractCall) ToStore() store.ContractCall {
 	return &store.InContractCall{

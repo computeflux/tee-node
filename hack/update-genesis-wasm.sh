@@ -8,7 +8,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-RUNTIME_DIR="$PROJECT_DIR/tee-chain/contracts/wasm/runtime"
+RUNTIME_DIR="$PROJECT_DIR/tee-chain/runtime/wasm/runtime"
 
 # 节点目录列表
 if [ $# -eq 0 ]; then

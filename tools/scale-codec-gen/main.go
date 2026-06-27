@@ -371,7 +371,7 @@ func neededImports(structs []structDef) []string {
 	}
 	var imps []string
 	imps = append(imps, `"fmt"`)
-	imps = append(imps, `"github.com/computeflux/tee-provider/tee-chain/contracts/store"`)
+	imps = append(imps, `"github.com/computeflux/tee-provider/tee-chain/runtime/store"`)
 	if needBin {
 		imps = append(imps, `"encoding/binary"`)
 	}

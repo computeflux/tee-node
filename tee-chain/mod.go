@@ -12,12 +12,12 @@ import (
 	cmtlog "github.com/cometbft/cometbft/libs/log"
 	nm "github.com/cometbft/cometbft/node"
 	"github.com/cometbft/cometbft/p2p"
-	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/version"
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"
+	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
@@ -94,14 +94,14 @@ func InitTeeChain(
 	}
 	config.SetRoot("./token_chain_data")
 
-	// init teechain node key
-	nodeKey, err := p2p.LoadNodeKey(config.NodeKeyFile())
+	// init teechain node key — from encrypted DB, no file read
+	p2pPriv, err := crypto.GetP2PKey()
 	if err != nil {
-		return nil, nil, nil, errors.New("failed to load node key: " + err.Error())
+		return nil, nil, nil, fmt.Errorf("failed to get p2p key: %w", err)
 	}
+	P2PKey = p2pPriv.GetPublicForSuite(crypto.SuiteEd25519)
 
-	_, p2pKey, _ := crypto.GetP2PKey()
-	P2PKey = p2pKey.GetPublicForSuite(crypto.SuiteEd25519)
+	nodeKey := crypto.ToCometNodeKey(p2pPriv)
 
 	// add boot nodes
 	seeds := []string{}
@@ -118,8 +118,8 @@ func InitTeeChain(
 	// 将 boot 节点同时设置为 PersistentPeers，确保断开后自动重连
 	config.P2P.PersistentPeers = strings.Join(seeds, ",")
 
-	// load validator key
-	validatorKey := privval.LoadFilePV(
+	// load validator key — in memory from encrypted DB, no file read
+	validatorKey := crypto.ToCometFilePV(nodePriv,
 		config.PrivValidatorKeyFile(),
 		config.PrivValidatorStateFile(),
 	)
@@ -137,7 +137,7 @@ func InitTeeChain(
 		p2pReactor.SetID(P2PKey)
 	}
 
-	// dbProvider := store.EncryptedDBProvider()
+	dbProvider := types.EncryptedDBProvider()
 	var StartTeeChain = func() (*nm.Node, error) {
 		// init BFT node
 		TeeChainNode, err = nm.NewNode(
@@ -146,7 +146,7 @@ func InitTeeChain(
 			nodeKey,
 			proxy.NewLocalClientCreator(teeChain),
 			nm.DefaultGenesisDocProviderFunc(config),
-			cfg.DefaultDBProvider,
+			dbProvider,
 			nm.DefaultMetricsProvider(config.Instrumentation),
 			logger,
 			nm.CustomReactors(map[string]p2p.Reactor{

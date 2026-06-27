@@ -194,7 +194,7 @@ func main() {
 	fmt.Fprintf(&buf, "package %s\n\n", pkgName)
 	fmt.Fprintf(&buf, "import (\n")
 	fmt.Fprintf(&buf, "\t\"fmt\"\n\n")
-	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/tee-chain/contracts/store\"\n")
+	fmt.Fprintf(&buf, "\t\"github.com/computeflux/tee-provider/tee-chain/runtime/store\"\n")
 	fmt.Fprintf(&buf, ")\n\n")
 
 	writeExecCall(&buf, *mutation, mutMethods, prefix, *structName)

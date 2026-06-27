@@ -3,8 +3,8 @@ package gateway
 import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	cgateway "github.com/computeflux/tee-provider/tee-chain/contracts/module/gateway"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // runGatewayQuery 构造 GatewayQuery 并执行 fn，统一处理合约 runtime 的创建与回滚。

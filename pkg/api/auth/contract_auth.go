@@ -2,9 +2,9 @@ package auth
 
 import (
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	cauth "github.com/computeflux/tee-provider/tee-chain/contracts/module/auth"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	cauth "github.com/computeflux/tee-provider/tee-chain/runtime/module/auth"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ── Auth 合约桥接（从 tee-chain/contract.go 拆分出来）─────────

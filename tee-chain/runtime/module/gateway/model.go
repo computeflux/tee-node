@@ -1,0 +1,576 @@
+package gateway
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
+)
+
+// ── Model ────────────────────────────────────────────────
+
+// RegisterModel 注册模型
+func (g GatewayMutation) RegisterModel(
+	name string,
+	inputModalities uint8,
+	contextLength uint64,
+	inPrice, cachedPrice, outPrice uint64,
+	providerType uint16,
+	uri string,
+	apiKeys []string,
+) error {
+	owner := g.api.GetCaller()
+
+	// 必须已注册 Provider
+	provID, err := g.providerByOwner.Get(g.api.GetTxn(), owner)
+	if err != nil || provID == nil {
+		return err
+	}
+
+	// ProviderID + Name 唯一性检查
+	txn := g.api.GetTxn()
+	existing, err := g.models.Query(txn, store.QueryAND{
+		store.QueryCond{Field: "ProviderID", Val: *provID},
+		store.QueryCond{Field: "Name", Val: name},
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(existing) > 0 {
+		return errors.New("model name already exists for this provider")
+	}
+
+	// 过滤空 key
+	keys := make([]string, 0, len(apiKeys))
+	for _, k := range apiKeys {
+		if k != "" {
+			keys = append(keys, k)
+		}
+	}
+
+	id, err := g.models.Insert(txn, ModelInfo{
+		Name:            name,
+		Owner:           owner,
+		ProviderID:      *provID,
+		IsActive:        true,
+		CreatedAt:       uint64(g.api.GetBlockTime()),
+		InputModalities: inputModalities,
+		ContextLength:   contextLength,
+		InPrice:         inPrice,
+		CachedPrice:     cachedPrice,
+		OutPrice:        outPrice,
+		ProviderType:    providerType,
+		URI:             uri,
+		APIKeys:         keys,
+	})
+	if err != nil {
+		return err
+	}
+
+	// 将模型 ID 加入 Provider 的 ModelIds
+	return g.providers.UpdateFn(txn, *provID, func(p *ProviderInfo) {
+		p.ModelIds = append(p.ModelIds, id)
+	})
+}
+
+func (g GatewayMutation) UpdateModel(
+	ID uint64,
+	inputModalities uint8,
+	contextLength uint64,
+	inPrice, cachedPrice, outPrice uint64,
+	providerType uint16,
+	uri string,
+) error {
+	cur, err := g.models.Get(g.api.GetTxn(), ID)
+	if err != nil || cur == nil {
+		return err
+	}
+
+	if err := g.models.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfo) {
+		m.InputModalities = inputModalities
+		m.ContextLength = contextLength
+		m.InPrice = inPrice
+		m.CachedPrice = cachedPrice
+		m.OutPrice = outPrice
+		m.ProviderType = providerType
+		m.URI = uri
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g GatewayMutation) AddModelAPIKeyRef(modelID uint64, apiKey string) error {
+	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || cur == nil {
+		return err
+	}
+	if apiKey == "" {
+		return errors.New("api key cannot be empty")
+	}
+
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.APIKeys = append(m.APIKeys, apiKey)
+	})
+}
+
+func (g GatewayMutation) DeleteModelAPIKeyRef(modelID uint64, index int) error {
+	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || cur == nil {
+		return err
+	}
+	if index < 0 || index >= len(cur.APIKeys) {
+		return errors.New("index out of range")
+	}
+
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.APIKeys = append(m.APIKeys[:index], m.APIKeys[index+1:]...)
+	})
+}
+
+func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, index int, newApiKey string) error {
+	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || cur == nil {
+		return err
+	}
+	if index < 0 || index >= len(cur.APIKeys) {
+		return errors.New("index out of range")
+	}
+	if newApiKey == "" {
+		return errors.New("api key cannot be empty")
+	}
+
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.APIKeys[index] = newApiKey
+	})
+}
+
+func (g GatewayMutation) DeactivateModel(modelID uint64) error {
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.IsActive = false
+	})
+}
+
+func (g GatewayMutation) ActiveModel(modelID uint64) error {
+	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+		m.IsActive = true
+	})
+}
+
+// UpdateModelLimits 更新模型的并发限制和余额（仅模型 Owner 或系统可调用）。
+func (g GatewayMutation) UpdateModelLimits(modelID uint64, maxConcurrency uint32, balance uint64) error {
+	txn := g.api.GetTxn()
+	caller := g.api.GetCaller()
+
+	model, err := g.models.Get(txn, modelID)
+	if err != nil || model == nil {
+		return ErrModelNotFound
+	}
+	// 系统调用 (T==0) 或模型 Owner 可修改
+	if caller.T != 0 && !bytes.Equal(model.Owner.V, caller.V) {
+		return ErrNotOwner
+	}
+	return g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+		m.MaxConcurrency = maxConcurrency
+		m.Balance = balance
+	})
+}
+
+// DeductBalance 扣除模型余额（仅系统可调用）。
+// 余额不足返回 false；扣到 0 自动停用模型防止超额调用。
+func (g GatewayMutation) DeductBalance(modelID uint64, amount uint64) (remaining uint64, ok bool, err error) {
+	txn := g.api.GetTxn()
+
+	// 权限校验：仅系统账户可调用
+	caller := g.api.GetCaller()
+	if caller.T != 0 {
+		return 0, false, errors.New("DeductBalance: must be called by system")
+	}
+
+	// 在 UpdateFn 内完成余额检查+扣减，避免读-改-写竞态
+	var (
+		newBalance uint64
+		success    bool
+	)
+	err = g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+		if m.Balance == 0 {
+			success = false
+			newBalance = 0
+			return
+		}
+		if m.Balance < amount {
+			success = false
+			newBalance = m.Balance
+			return
+		}
+		newBalance = m.Balance - amount
+		m.Balance = newBalance
+		if newBalance == 0 {
+			m.IsActive = false // 余额耗尽，自动停用
+		}
+		success = true
+	})
+	if err != nil {
+		return 0, false, err
+	}
+	return newBalance, success, nil
+}
+
+func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
+	m, err := g.models.Get(g.api.GetTxn(), modelID)
+	if err != nil || m == nil {
+		return nil, err
+	}
+	m.APIKeys = maskAPIKeys(m.APIKeys)
+	return m, nil
+}
+
+func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
+	models := make([]ModelInfo, 0, len(IDs))
+	for _, id := range IDs {
+		m, err := g.models.Get(g.api.GetTxn(), id)
+		if err != nil || m == nil {
+			continue
+		}
+		m.APIKeys = maskAPIKeys(m.APIKeys)
+		models = append(models, *m)
+	}
+
+	out := make([]ModelInfoWithProvider, 0, len(models))
+	for i := range models {
+		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].ProviderID)
+		if prov == nil {
+			continue
+		}
+		out = append(out, ModelInfoWithProvider{
+			ID:       IDs[i],
+			Model:    models[i],
+			Provider: *prov,
+		})
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	_, vals, err := g.models.List(g.api.GetTxn(), offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	for i := range vals {
+		vals[i].APIKeys = maskAPIKeys(vals[i].APIKeys)
+	}
+	return vals, nil
+}
+
+func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32) ([]ModelInfoWithID, error) {
+	if uint64(len(ids)) <= offset {
+		return nil, nil
+	}
+	end := offset + uint64(limit)
+	if end > uint64(len(ids)) {
+		end = uint64(len(ids))
+	}
+	txn := g.api.GetTxn()
+	out := make([]ModelInfoWithID, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		m, err := g.models.Get(txn, id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, ModelInfoWithID{
+			ID:   id,
+			Data: *m,
+		})
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfoWithID, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
+	if err != nil {
+		return nil, err
+	}
+	models, err := g.listModelsByIDs(ids, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	for i := range models {
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
+	}
+	return models, nil
+}
+
+func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfoWithID, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
+	if err != nil {
+		return nil, err
+	}
+	models, err := g.listModelsByIDs(ids, 0, 10000)
+	if err != nil {
+		return nil, err
+	}
+	for i := range models {
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
+	}
+	return models, nil
+}
+
+func (g GatewayQuery) ListActiveModelsWithinProvider(
+	minContext, maxContext, minPrice, maxPrice uint64,
+	offset uint64, limit uint32,
+) ([]ModelInfoWithProvider, error) {
+	exprs := store.QueryAND{store.QueryCond{Field: "IsActive", Val: uint64(1)}}
+	if minContext != 0 || maxContext != 0 {
+		exprs = append(exprs, store.QueryCond{Field: "ContextLength", Val: store.Range{Min: minContext, Max: maxContext}})
+	}
+	if minPrice != 0 || maxPrice != 0 {
+		exprs = append(exprs, store.QueryCond{Field: "InPrice", Val: store.Range{Min: minPrice, Max: maxPrice}})
+	}
+
+	ids, err := g.models.Query(g.api.GetTxn(), exprs)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := g.listModelsByIDs(ids, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]ModelInfoWithProvider, 0, len(models))
+	for i := range models {
+		prov, _ := g.providers.Get(g.api.GetTxn(), models[i].Data.ProviderID)
+		if prov == nil {
+			continue
+		}
+		out = append(out, ModelInfoWithProvider{
+			ID:       ids[i],
+			Model:    models[i].Data,
+			Provider: *prov,
+		})
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) GetModelCount() (uint64, error) {
+	return g.models.Len(g.api.GetTxn())
+}
+
+func (g GatewayQuery) QueryModels(
+	modalities uint8,
+	minContext, maxContext,
+	maxPrice uint64,
+	offset uint64,
+	limit uint32,
+) ([]ModelInfoWithID, error) {
+	txn := g.api.GetTxn()
+
+	exprs := store.QueryAND{store.QueryCond{Field: "IsActive", Val: uint64(1)}}
+	if minContext != 0 || maxContext != 0 {
+		exprs = append(exprs, store.QueryCond{Field: "ContextLength", Val: store.Range{Min: minContext, Max: maxContext}})
+	}
+	if maxPrice != 0 {
+		exprs = append(exprs, store.QueryCond{Field: "InPrice", Val: store.Range{Min: 0, Max: maxPrice}})
+	}
+
+	ids, err := g.models.Query(txn, exprs)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := g.listModelsByIDs(ids, 0, uint32(len(ids)))
+	if err != nil {
+		return nil, err
+	}
+
+	if modalities != 0 {
+		filtered := make([]ModelInfoWithID, 0, len(models))
+		for _, m := range models {
+			if m.Data.InputModalities&modalities != 0 {
+				filtered = append(filtered, m)
+			}
+		}
+		models = filtered
+	}
+
+	if uint64(len(models)) <= offset {
+		return nil, nil
+	}
+	end := offset + uint64(limit)
+	if end > uint64(len(models)) {
+		end = uint64(len(models))
+	}
+	models = models[offset:end]
+	for i := range models {
+		models[i].Data.APIKeys = maskAPIKeys(models[i].Data.APIKeys)
+	}
+	return models, nil
+}
+
+func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ModelInfo, 0, len(keys))
+	for _, k := range keys {
+		m, err := g.models.Get(g.api.GetTxn(), k)
+		if err != nil || m == nil {
+			continue
+		}
+		m.APIKeys = maskAPIKeys(m.APIKeys)
+		out = append(out, *m)
+	}
+	return out, nil
+}
+
+func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), store.QueryAND{
+		store.QueryCond{Field: "ProviderID", Val: pid},
+		store.QueryCond{Field: "Name", Val: name},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(keys) == 0 {
+		return nil, errors.New("model not found")
+	}
+
+	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	if err != nil || m == nil {
+		return nil, errors.New("model not found")
+	}
+
+	m.APIKeys = maskAPIKeys(m.APIKeys)
+	return &ModelInfoWithID{
+		ID:   keys[0],
+		Data: *m,
+	}, nil
+}
+
+// ── GatewaySecret ──────────────────────────────────────────
+// 节点内部使用，返回未脱敏的完整数据
+
+func (g GatewaySecret) GetModel(modelID uint64) (*ModelInfo, error) {
+	return g.models.Get(g.api.GetTxn(), modelID)
+}
+
+func (g GatewaySecret) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
+	keys, err := g.models.Query(g.api.GetTxn(), store.QueryAND{
+		store.QueryCond{Field: "ProviderID", Val: pid},
+		store.QueryCond{Field: "Name", Val: name},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(keys) == 0 {
+		return nil, errors.New("model not found")
+	}
+
+	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	if err != nil || m == nil {
+		return nil, errors.New("model not found")
+	}
+
+	return &ModelInfoWithID{
+		ID:   keys[0],
+		Data: *m,
+	}, nil
+}
+
+func (g GatewaySecret) GetModels(IDs []uint64) ([]ModelInfo, error) {
+	out := make([]ModelInfo, 0, len(IDs))
+	for _, id := range IDs {
+		m, err := g.models.Get(g.api.GetTxn(), id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
+}
+
+func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
+	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
+	if err != nil {
+		return nil, err
+	}
+	end := offset + uint64(limit)
+	if uint64(len(ids)) <= offset {
+		return nil, nil
+	}
+	if end > uint64(len(ids)) {
+		end = uint64(len(ids))
+	}
+	txn := g.api.GetTxn()
+	out := make([]ModelInfo, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		m, err := g.models.Get(txn, id)
+		if err != nil || m == nil {
+			continue
+		}
+		out = append(out, *m)
+	}
+	return out, nil
+}
+
+// maskAPIKey 对 API Key 脱敏：
+//   - 三段及以上（如 sk-cp-xxx...）：保留前两段及第三段前少量字符（不超过总长 1/8，且最多 4 个）。
+//   - 两段（如 sk-xxx）：保留第一段及第二段前 3 个字符。
+//   - 无 '-'：保留前 min(3, n/8 向上至少 1) 个字符。
+func maskAPIKey(key string) string {
+	n := len(key)
+	if n <= 3 {
+		return strings.Repeat("*", n)
+	}
+
+	parts := strings.Split(key, "-")
+
+	// 三段及以上：暴露前缀 sk-cp- 及后续少量字符
+	if len(parts) >= 3 {
+		visibleSecret := n / 8
+		if visibleSecret > 4 {
+			visibleSecret = 4
+		}
+		if visibleSecret < 1 {
+			visibleSecret = 1
+		}
+		prefix := parts[0] + "-" + parts[1] + "-"
+		secret := parts[2]
+		if visibleSecret > len(secret) {
+			visibleSecret = len(secret)
+		}
+		visibleLen := len(prefix) + visibleSecret
+		return key[:visibleLen] + strings.Repeat("*", n-visibleLen)
+	}
+
+	// 两段：保持原有行为，暴露 '-' 后 3 个字符
+	if len(parts) == 2 {
+		visibleEnd := len(parts[0]) + 1 + 3
+		if visibleEnd > n {
+			visibleEnd = n
+		}
+		return key[:visibleEnd] + strings.Repeat("*", n-visibleEnd)
+	}
+
+	// 无 '-'
+	visible := 3
+	if visible > n {
+		visible = n
+	}
+	return key[:visible] + strings.Repeat("*", n-visible)
+}
+
+// maskAPIKeys 对所有 API Key 做脱敏处理
+func maskAPIKeys(keys []string) []string {
+	masked := make([]string, len(keys))
+	for i, k := range keys {
+		masked[i] = maskAPIKey(k)
+	}
+	return masked
+}

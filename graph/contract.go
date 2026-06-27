@@ -12,7 +12,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // DecodeCaller 解析调用方地址（32 字节 hex 或 SS58）

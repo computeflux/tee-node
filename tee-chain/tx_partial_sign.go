@@ -9,9 +9,9 @@ import (
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
-	"github.com/computeflux/tee-provider/tee-chain/contracts"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module"
-	"github.com/computeflux/tee-provider/tee-chain/contracts/module/batch"
+	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 	"github.com/pkg/errors"
 )
 

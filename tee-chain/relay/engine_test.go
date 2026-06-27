@@ -6,7 +6,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	store "github.com/computeflux/tee-provider/pkg/types"
-	cstore "github.com/computeflux/tee-provider/tee-chain/contracts/store"
+	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/stretchr/testify/require"
 )
 
