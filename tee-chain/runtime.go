@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gov"
@@ -127,17 +126,17 @@ func GetRuntimeVersionAtHeight(txn *dbstore.Txn, height int64) (uint32, error) {
 }
 
 // GetRuntimeVersionInfo 获取指定版本的元数据（通过合约查询接口）。
-func GetRuntimeVersionInfo(txn *dbstore.Txn, version uint32) (*domain.RuntimeVersionInfo, error) {
-	gq := getGovQuery(txn)
-	meta, err := gq.RuntimeMeta(version)
-	if err != nil || meta == nil {
-		return nil, err
-	}
-	return &domain.RuntimeVersionInfo{
-		Version:          meta.Version,
-		ActivationHeight: int64(meta.ActivationHeight),
-		CodeHash:         meta.CodeHash,
-		WasmBytes:        meta.WasmBytes,
-		Description:      meta.Description,
-	}, nil
-}
+// func GetRuntimeVersionInfo(txn *dbstore.Txn, version uint32) (*domain.RuntimeVersionInfo, error) {
+// 	gq := getGovQuery(txn)
+// 	meta, err := gq.RuntimeMeta(version)
+// 	if err != nil || meta == nil {
+// 		return nil, err
+// 	}
+// 	return &domain.RuntimeVersionInfo{
+// 		Version:          meta.Version,
+// 		ActivationHeight: int64(meta.ActivationHeight),
+// 		CodeHash:         meta.CodeHash,
+// 		WasmBytes:        meta.WasmBytes,
+// 		Description:      meta.Description,
+// 	}, nil
+// }

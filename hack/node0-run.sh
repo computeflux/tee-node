@@ -146,6 +146,24 @@ export CHAIN_ENV=test
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
 
+# ── 确保服务有 Restart 策略（进程退出后 systemd 自动拉起）──
+# 用 systemctl edit 追加 drop-in 配置，避免改 /etc/systemd/system/tee-node0.service 原文件。
+# Restart=on-failure: 异常退出时重启；clean exit（code=0）不重启。
+# RestartSec=5:        重启间隔 5 秒，避免崩后立刻拉起又崩造成刷日志。
+# StartLimitBurst / StartLimitIntervalSec: 60 秒内最多 10 次重启，超过后放弃。
+if [ ! -f /etc/systemd/system/tee-node0.service.d/restart.conf ]; then
+    echo "Configuring systemd restart policy for tee-node0.service ..."
+    sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+    sudo tee /etc/systemd/system/tee-node0.service.d/restart.conf >/dev/null <<'EOF'
+[Service]
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=60
+EOF
+    sudo systemctl daemon-reload
+fi
+
 # ── 检查并终止已有进程 ──
 if systemctl is-active --quiet tee-node0.service 2>/dev/null; then
     echo "Stopping existing tee-node0.service ..."
@@ -158,7 +176,7 @@ sudo systemctl start tee-node0.service
 
 sleep 2
 if systemctl is-active --quiet tee-node0.service; then
-    echo "Service started successfully."
+    echo "Service started successfully (auto-restart enabled)."
     echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
     journalctl -u tee-node0.service -f -o cat
 else

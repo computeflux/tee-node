@@ -44,10 +44,20 @@ ext/experimental/dss
 
 hack/build/keys
 
+# Local secrets / operator config (NEVER commit)
+.env
+.env.*
+*.env
+!*.env.example
+hack/.env
+hack/.env.*
+!hack/.env.example
+
 node0.log
 
 /ink-abi-ts-gen
 /scale-codec-gen
+/runtimeupgrade
 **.wasm
 **.wasm.gz
 

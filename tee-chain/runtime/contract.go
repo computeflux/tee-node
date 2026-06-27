@@ -61,7 +61,7 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 		return err
 	}
 
-	util.LogWithYellow("CONTRACT VESION", "Mutation with WASM")
+	util.LogWithYellow("CONTRACT", "Mutation with WASM version", version)
 	err := getWasmEngine().ExecuteMutation(version, call, runtime)
 	if selector == store.MethodToSelector("Init") && err == nil {
 		return SetContractInited(runtime.GetTxn(), string(call.GetName()))

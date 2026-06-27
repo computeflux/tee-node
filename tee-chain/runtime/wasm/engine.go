@@ -18,9 +18,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/computeflux/tee-provider/pkg/domain"
-	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gov"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/tetratelabs/wazero"
 	wazapi "github.com/tetratelabs/wazero/api"
@@ -45,9 +44,12 @@ type hostState struct {
 	api store.ContractApi
 }
 
-// NewEngine creates a new WASM execution engine with interpreter mode.
+// NewEngine creates a new WASM execution engine.
+//
+// 统一使用 interpreter runtime：纯 Go 解释器，跨平台稳定、EGo SGX 兼容（enclave 内不允许 exec pages）。
+// 不要换成 NewRuntimeConfigCompiler()，否则在 EGo SGX 下会因禁止 exec pages 直接 SIGSEGV。
 func NewEngine() *Engine {
-	rt := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigCompiler())
+	rt := wazero.NewRuntimeWithConfig(context.Background(), wazero.NewRuntimeConfigInterpreter())
 	return &Engine{rt: rt}
 }
 
@@ -64,21 +66,19 @@ func (e *Engine) ensureHost(ctx context.Context) {
 	})
 }
 
-// LoadModule loads a compiled WASM module for the given version from DB,
-// decompressing gzip data if needed. Results are cached by version.
-func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
+// LoadModule loads a compiled WASM module for the given version from the gov contract store.
+// Uses GovQuery.RuntimeMeta(version) to read the stored PendingRuntimeUpgrade.
+// Results are cached by version.
+func (e *Engine) LoadModule(version uint32, api store.ContractApi) (wazero.CompiledModule, error) {
 	if e.cachedMod != nil && e.cachedVer == version {
 		return e.cachedMod, nil
 	}
 
-	info, err := dbstore.DBGetJson[domain.RuntimeVersionInfo](dbstore.SECRET_DB, "", "RUNTIME_META_"+fmt.Sprint(version))
-	if err != nil {
-		util.LogError("wasm.LoadModule", fmt.Errorf("get runtime meta v%d: %w", version, err))
-		return nil, fmt.Errorf("get runtime meta: %w", err)
-	}
-	if info == nil {
-		util.LogError("wasm.LoadModule", fmt.Errorf("runtime version %d not found", version))
-		return nil, fmt.Errorf("runtime version %d not found", version)
+	gw := gov.NewGov(api)
+	q := gov.GovQuery{Gov: *gw}
+	info, err := q.RuntimeMeta(version)
+	if err != nil || info == nil {
+		return nil, fmt.Errorf("runtime version %d not found: %w", version, err)
 	}
 
 	wasmBytes, err := decompressWasm(info.WasmBytes)
@@ -93,8 +93,10 @@ func (e *Engine) LoadModule(version uint32) (wazero.CompiledModule, error) {
 		util.LogError("wasm.LoadModule", fmt.Errorf("compile v%d: %w", version, err))
 		return nil, fmt.Errorf("compile wasm module v%d: %w", version, err)
 	}
+
 	e.cachedVer = version
 	e.cachedMod = mod
+
 	return mod, nil
 }
 
@@ -150,7 +152,7 @@ func (e *Engine) ExecuteMutation(version uint32, call store.ContractCall, api st
 //  4. Call execute(isQuery, dataPtr, dataLen) → returns (resultPtr << 32 | resultLen)
 //  5. Read result bytes from WASM memory at the returned pointer
 func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api store.ContractApi, isQuery bool) ([]byte, error) {
-	mod, err := e.LoadModule(version)
+	mod, err := e.LoadModule(version, api)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +178,7 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 	e.ensureHost(ctx)
 	e.ensureWASI(ctx)
 
-	config := wazero.NewModuleConfig()
-	instance, err := e.rt.InstantiateModule(ctx, mod, config)
+	instance, err := e.rt.InstantiateModule(ctx, mod, wazero.NewModuleConfig().WithName("chain"))
 	if err != nil {
 		return nil, fmt.Errorf("wasm instantiate: %w", err)
 	}
