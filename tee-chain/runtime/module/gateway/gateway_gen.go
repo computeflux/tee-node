@@ -63,6 +63,30 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("apply_withdraw: nonce: %w", err)
 		}
 		return m.ApplyWithdraw(chainID, token, providerID, amount, nonce)
+	case [4]byte{0x03, 0xf0, 0xcd, 0xa2}:
+		if err := store.RequireArgLen(args, 4, "audit_model"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("audit_model: modelID: %w", err)
+		}
+		triggerBy, err := store.DecodeScaleArgBytes[uint8](args[1])
+		if err != nil {
+			return fmt.Errorf("audit_model: triggerBy: %w", err)
+		}
+		passed, err := store.DecodeScaleArgBytes[bool](args[2])
+		if err != nil {
+			return fmt.Errorf("audit_model: passed: %w", err)
+		}
+		detail, err := store.DecodeScaleArgBytes[string](args[3])
+		if err != nil {
+			return fmt.Errorf("audit_model: detail: %w", err)
+		}
+		_, err = m.AuditModel(modelID, triggerBy, passed, detail).UnWrap()
+		return err
+	case [4]byte{0xd3, 0x66, 0xe8, 0xfb}:
+		return m.CreateOfficialRoutes()
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
 		if err := store.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err
@@ -88,6 +112,36 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("create_provider: deposit: %w", err)
 		}
 		return m.CreateProvider(name, logoURL, description, region, deposit)
+	case [4]byte{0x55, 0x87, 0x0f, 0x33}:
+		if err := store.RequireArgLen(args, 6, "create_route"); err != nil {
+			return err
+		}
+		name, err := store.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return fmt.Errorf("create_route: name: %w", err)
+		}
+		routeType, err := store.DecodeScaleArgBytes[uint16](args[1])
+		if err != nil {
+			return fmt.Errorf("create_route: routeType: %w", err)
+		}
+		inPrice, err := store.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return fmt.Errorf("create_route: inPrice: %w", err)
+		}
+		cachedPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
+		if err != nil {
+			return fmt.Errorf("create_route: cachedPrice: %w", err)
+		}
+		outPrice, err := store.DecodeScaleArgBytes[uint64](args[4])
+		if err != nil {
+			return fmt.Errorf("create_route: outPrice: %w", err)
+		}
+		isOfficial, err := store.DecodeScaleArgBytes[bool](args[5])
+		if err != nil {
+			return fmt.Errorf("create_route: isOfficial: %w", err)
+		}
+		_, err = m.CreateRoute(name, routeType, inPrice, cachedPrice, outPrice, isOfficial).UnWrap()
+		return err
 	case [4]byte{0x5c, 0xf2, 0xae, 0x3a}:
 		if err := store.RequireArgLen(args, 1, "deactivate_model"); err != nil {
 			return err
@@ -110,8 +164,39 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("delete_model_a_p_i_key_ref: index: %w", err)
 		}
 		return m.DeleteModelAPIKeyRef(modelID, index)
+	case [4]byte{0x88, 0x0f, 0x81, 0x36}:
+		if err := store.RequireArgLen(args, 1, "delete_route"); err != nil {
+			return err
+		}
+		routeID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("delete_route: routeID: %w", err)
+		}
+		return m.DeleteRoute(routeID)
 	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
 		return m.Init()
+	case [4]byte{0xff, 0x1f, 0x8c, 0xff}:
+		if err := store.RequireArgLen(args, 2, "join_route"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("join_route: modelID: %w", err)
+		}
+		routeID, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return fmt.Errorf("join_route: routeID: %w", err)
+		}
+		return m.JoinRoute(modelID, routeID)
+	case [4]byte{0x64, 0x2d, 0x77, 0x3b}:
+		if err := store.RequireArgLen(args, 1, "leave_route"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("leave_route: modelID: %w", err)
+		}
+		return m.LeaveRoute(modelID)
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
 		if err := store.RequireArgLen(args, 3, "recharge"); err != nil {
 			return err
@@ -183,6 +268,53 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
 		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)
+	case [4]byte{0x46, 0x7f, 0x5d, 0xb4}:
+		if err := store.RequireArgLen(args, 2, "report_model"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("report_model: modelID: %w", err)
+		}
+		reason, err := store.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("report_model: reason: %w", err)
+		}
+		return m.ReportModel(modelID, reason)
+	case [4]byte{0x34, 0x11, 0x12, 0x8a}:
+		if err := store.RequireArgLen(args, 3, "report_provider_call"); err != nil {
+			return err
+		}
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("report_provider_call: providerID: %w", err)
+		}
+		success, err := store.DecodeScaleArgBytes[bool](args[1])
+		if err != nil {
+			return fmt.Errorf("report_provider_call: success: %w", err)
+		}
+		latencyMs, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return fmt.Errorf("report_provider_call: latencyMs: %w", err)
+		}
+		return m.ReportProviderCall(providerID, success, latencyMs)
+	case [4]byte{0x3e, 0x41, 0x5f, 0x03}:
+		if err := store.RequireArgLen(args, 3, "resolve_report"); err != nil {
+			return err
+		}
+		reportID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("resolve_report: reportID: %w", err)
+		}
+		valid, err := store.DecodeScaleArgBytes[bool](args[1])
+		if err != nil {
+			return fmt.Errorf("resolve_report: valid: %w", err)
+		}
+		detail, err := store.DecodeScaleArgBytes[string](args[2])
+		if err != nil {
+			return fmt.Errorf("resolve_report: detail: %w", err)
+		}
+		return m.ResolveReport(reportID, valid, detail)
 	case [4]byte{0x7e, 0xd8, 0x02, 0xda}:
 		if err := store.RequireArgLen(args, 1, "revoke_a_p_i_key"); err != nil {
 			return err
@@ -268,6 +400,23 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("update_model_a_p_i_key_ref: newApiKey: %w", err)
 		}
 		return m.UpdateModelAPIKeyRef(modelID, index, newApiKey)
+	case [4]byte{0xd3, 0x19, 0x46, 0x45}:
+		if err := store.RequireArgLen(args, 3, "update_model_limits"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("update_model_limits: modelID: %w", err)
+		}
+		maxConcurrency, err := store.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return fmt.Errorf("update_model_limits: maxConcurrency: %w", err)
+		}
+		balance, err := store.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return fmt.Errorf("update_model_limits: balance: %w", err)
+		}
+		return m.UpdateModelLimits(modelID, maxConcurrency, balance)
 	case [4]byte{0x10, 0x38, 0x5c, 0x60}:
 		if err := store.RequireArgLen(args, 9, "update_provider"); err != nil {
 			return err
@@ -309,6 +458,36 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("update_provider: uptimeSLA: %w", err)
 		}
 		return m.UpdateProvider(providerID, name, logoURL, description, modelIds, region, feeRate, priority, uptimeSLA)
+	case [4]byte{0x49, 0x09, 0x4f, 0xbd}:
+		if err := store.RequireArgLen(args, 6, "update_route"); err != nil {
+			return err
+		}
+		routeID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("update_route: routeID: %w", err)
+		}
+		name, err := store.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("update_route: name: %w", err)
+		}
+		inPrice, err := store.DecodeScaleArgBytes[uint64](args[2])
+		if err != nil {
+			return fmt.Errorf("update_route: inPrice: %w", err)
+		}
+		cachedPrice, err := store.DecodeScaleArgBytes[uint64](args[3])
+		if err != nil {
+			return fmt.Errorf("update_route: cachedPrice: %w", err)
+		}
+		outPrice, err := store.DecodeScaleArgBytes[uint64](args[4])
+		if err != nil {
+			return fmt.Errorf("update_route: outPrice: %w", err)
+		}
+		isActive, err := store.DecodeScaleArgBytes[bool](args[5])
+		if err != nil {
+			return fmt.Errorf("update_route: isActive: %w", err)
+		}
+		isActivep := &isActive
+		return m.UpdateRoute(routeID, name, inPrice, cachedPrice, outPrice, isActivep)
 	case [4]byte{0xc0, 0x5f, 0xd1, 0x80}:
 		if err := store.RequireArgLen(args, 1, "withdrawal_cancelled"); err != nil {
 			return err
@@ -376,6 +555,27 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0xa9, 0x96, 0xd7, 0x48}:
+		if err := store.RequireArgLen(args, 3, "get_model_audits"); err != nil {
+			return nil, err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_audits: modelID: %w", err)
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_audits: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_audits: limit: %w", err)
+		}
+		out, err := q.GetModelAudits(modelID, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0xb5, 0x1e, 0x55, 0x6b}:
 		if err := store.RequireArgLen(args, 2, "get_model_by_name"); err != nil {
 			return nil, err
@@ -395,6 +595,27 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 		return store.ScaleEncode(out)
 	case [4]byte{0x05, 0xed, 0xba, 0xf5}:
 		out, err := q.GetModelCount()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x54, 0x6c, 0x35, 0xdd}:
+		if err := store.RequireArgLen(args, 3, "get_model_reports"); err != nil {
+			return nil, err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_reports: modelID: %w", err)
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_reports: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_model_reports: limit: %w", err)
+		}
+		out, err := q.GetModelReports(modelID, offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -493,6 +714,32 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("get_recharge_history: limit: %w", err)
 		}
 		out, err := q.GetRechargeHistory(user, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x4c, 0x86, 0x9f, 0xc8}:
+		if err := store.RequireArgLen(args, 1, "get_route"); err != nil {
+			return nil, err
+		}
+		routeID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_route: routeID: %w", err)
+		}
+		out, err := q.GetRoute(routeID)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x8f, 0x22, 0xff, 0x1f}:
+		if err := store.RequireArgLen(args, 1, "get_route_by_name"); err != nil {
+			return nil, err
+		}
+		name, err := store.DecodeScaleArgBytes[string](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_route_by_name: name: %w", err)
+		}
+		out, err := q.GetRouteByName(name)
 		if err != nil {
 			return nil, err
 		}
@@ -606,6 +853,27 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0x9f, 0xd4, 0x88, 0x0b}:
+		if err := store.RequireArgLen(args, 3, "list_active_routes_by_type"); err != nil {
+			return nil, err
+		}
+		routeType, err := store.DecodeScaleArgBytes[uint16](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_routes_by_type: routeType: %w", err)
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_routes_by_type: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("list_active_routes_by_type: limit: %w", err)
+		}
+		out, err := q.ListActiveRoutesByType(routeType, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0xc1, 0x51, 0x1f, 0xbf}:
 		if err := store.RequireArgLen(args, 2, "list_models"); err != nil {
 			return nil, err
@@ -649,6 +917,23 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, fmt.Errorf("list_providers: limit: %w", err)
 		}
 		out, err := q.ListProviders(offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
+	case [4]byte{0x61, 0x22, 0x78, 0xf9}:
+		if err := store.RequireArgLen(args, 2, "list_routes"); err != nil {
+			return nil, err
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("list_routes: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("list_routes: limit: %w", err)
+		}
+		out, err := q.ListRoutes(offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -741,20 +1026,24 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 func NewGateway(api store.ContractApi) *Gateway {
 	return &Gateway{
 		api:                   api,
-		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_credits_"},
-		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_credit_useds_"},
-		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "v9_models_next_id", "v9_models_"),
-		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "v9_providers_next_id", "v9_providers_"),
-		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "v9_provider_by_owner_"},
-		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "v9_provider_credit_"},
-		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "v9_api_key_"),
-		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "v9_recharge_history_k1_to_id_", "v9_recharge_history_k1_length_", "v9_recharge_history_k2_next_", "v9_recharge_history_store_"),
-		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "v9_settlement_history_k1_to_id_", "v9_settlement_history_k1_length_", "v9_settlement_history_k2_next_", "v9_settlement_history_store_"),
-		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "v9_user_settlement_history_k1_to_id_", "v9_user_settlement_history_k1_length_", "v9_user_settlement_history_k2_next_", "v9_user_settlement_history_store_"),
-		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_recharge_nonces_"},
-		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "v9_settled_nonces_"},
-		withdrawNonces:        store.NewIndexedList[uint64, WithdrawApply]("gateway", "v12_withdraw_nonces_next_id", "v12_withdraw_nonces_"),
-		withdrawByUser:        store.NewStoreList2D[store.UniAddr, uint32, uint64]("gateway", "v12_withdraw_by_user_k1_to_id_", "v12_withdraw_by_user_k1_length_", "v12_withdraw_by_user_k2_next_", "v12_withdraw_by_user_store_"),
+		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
+		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credit_useds_"},
+		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "models_next_id", "models_"),
+		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_next_id", "providers_"),
+		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "provider_by_owner_"},
+		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},
+		routes:                store.NewIndexedList[uint64, ModelRoute]("gateway", "routes_next_id", "routes_"),
+		modelByRoute:          &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "model_by_route_"},
+		modelReports:          store.NewIndexedList[uint64, ModelReport]("gateway", "model_reports_next_id", "model_reports_"),
+		modelAudits:           store.NewIndexedList[uint64, ModelAudit]("gateway", "model_audits_next_id", "model_audits_"),
+		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
+		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "recharge_history_k1_to_id_", "recharge_history_k1_length_", "recharge_history_k2_next_", "recharge_history_store_"),
+		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "settlement_history_k1_to_id_", "settlement_history_k1_length_", "settlement_history_k2_next_", "settlement_history_store_"),
+		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "user_settlement_history_k1_to_id_", "user_settlement_history_k1_length_", "user_settlement_history_k2_next_", "user_settlement_history_store_"),
+		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "recharge_nonces_"},
+		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "settled_nonces_"},
+		withdrawNonces:        store.NewIndexedList[uint64, WithdrawApply]("gateway", "withdraw_nonces_next_id", "withdraw_nonces_"),
+		withdrawByUser:        store.NewStoreList2D[store.UniAddr, uint32, uint64]("gateway", "withdraw_by_user_k1_to_id_", "withdraw_by_user_k1_length_", "withdraw_by_user_k2_next_", "withdraw_by_user_store_"),
 	}
 }
 
@@ -762,8 +1051,10 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x42, 0xcc, 0x03, 0xe6}: "get_a_p_i_keys_by_owner",
 	[4]byte{0x04, 0x60, 0x1f, 0xca}: "get_credit",
 	[4]byte{0xd3, 0xff, 0x81, 0xe9}: "get_model",
+	[4]byte{0xa9, 0x96, 0xd7, 0x48}: "get_model_audits",
 	[4]byte{0xb5, 0x1e, 0x55, 0x6b}: "get_model_by_name",
 	[4]byte{0x05, 0xed, 0xba, 0xf5}: "get_model_count",
+	[4]byte{0x54, 0x6c, 0x35, 0xdd}: "get_model_reports",
 	[4]byte{0xa1, 0x11, 0x9c, 0x12}: "get_models",
 	[4]byte{0x59, 0xd9, 0x42, 0x4a}: "get_models_by_provider",
 	[4]byte{0xb3, 0x4c, 0x16, 0xd8}: "get_provider",
@@ -772,14 +1063,18 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x46, 0x7c, 0x95, 0xd9}: "get_provider_count",
 	[4]byte{0xad, 0x4c, 0x38, 0xcd}: "get_provider_credit",
 	[4]byte{0xc8, 0x9f, 0x2f, 0x8f}: "get_recharge_history",
+	[4]byte{0x4c, 0x86, 0x9f, 0xc8}: "get_route",
+	[4]byte{0x8f, 0x22, 0xff, 0x1f}: "get_route_by_name",
 	[4]byte{0x74, 0xd5, 0x99, 0xfb}: "get_settlement_history",
 	[4]byte{0x56, 0xb9, 0x06, 0xc0}: "get_user_settlement_history",
 	[4]byte{0xda, 0xa1, 0xc2, 0xd5}: "list_active_models",
 	[4]byte{0xc3, 0xef, 0x49, 0x0c}: "list_active_models_within_provider",
 	[4]byte{0xbd, 0x24, 0x20, 0x9b}: "list_active_providers",
+	[4]byte{0x9f, 0xd4, 0x88, 0x0b}: "list_active_routes_by_type",
 	[4]byte{0xc1, 0x51, 0x1f, 0xbf}: "list_models",
 	[4]byte{0xcd, 0x2e, 0xf8, 0x8d}: "list_provider_models",
 	[4]byte{0x36, 0xe0, 0x90, 0x37}: "list_providers",
+	[4]byte{0x61, 0x22, 0x78, 0xf9}: "list_routes",
 	[4]byte{0xc5, 0x33, 0xa8, 0x4f}: "lookup_a_p_i_key",
 	[4]byte{0x60, 0xd0, 0x0c, 0x96}: "query_models",
 	[4]byte{0x8a, 0x76, 0x73, 0x40}: "withdraw",

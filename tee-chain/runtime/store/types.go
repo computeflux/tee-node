@@ -158,3 +158,70 @@ func (o *Option[T]) Decode(data []byte) (int, error) {
 	// 对于 SCALE，数据是紧凑的，消费全部剩余字节
 	return len(data), nil
 }
+
+// Result 类似 Rust Result<T, E>，用于可恢复错误的 SCALE 编解码。
+type Result[T, Err any] struct {
+	isErr bool
+	V     T
+	E     Err
+}
+
+func NewOk[T, Err any](v T) Result[T, Err] {
+	return Result[T, Err]{isErr: false, V: v}
+}
+
+func NewErr[T, Err any](e Err) Result[T, Err] {
+	return Result[T, Err]{isErr: true, E: e}
+}
+
+func (r Result[T, Err]) IsOk() bool  { return !r.isErr }
+func (r Result[T, Err]) IsErr() bool { return r.isErr }
+
+func (r Result[T, Err]) UnWrap() (T, error) {
+	if r.isErr {
+		var zero T
+		return zero, fmt.Errorf("unwrap error: Result is Err: %v", r.E)
+	}
+	return r.V, nil
+}
+
+// Encode 实现 ScaleEncoder（SCALE: Ok(v)=0x00+v, Err(e)=0x01+e）。
+func (r *Result[T, Err]) Encode() ([]byte, error) {
+	if r.isErr {
+		data, err := ScaleEncode(r.E)
+		if err != nil {
+			return nil, err
+		}
+		return append([]byte{0x01}, data...), nil
+	}
+	data, err := ScaleEncode(r.V)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte{0x00}, data...), nil
+}
+
+// Decode 实现 ScaleDecoder。
+func (r *Result[T, Err]) Decode(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, fmt.Errorf("decode Result: empty")
+	}
+	switch data[0] {
+	case 0x00:
+		r.isErr = false
+		if err := ScaleDecode(&r.V, data[1:]); err != nil {
+			return 0, err
+		}
+		// 无法精确计算消费字节数，ScaleDecode 不返回字节数
+		// 对于 SCALE，数据是紧凑的，消费全部剩余字节
+		return len(data), nil
+	case 0x01:
+		r.isErr = true
+		if err := ScaleDecode(&r.E, data[1:]); err != nil {
+			return 0, err
+		}
+		return len(data), nil
+	default:
+		return 0, fmt.Errorf("decode Result: unrecognized variant byte 0x%02x", data[0])
+	}
+}

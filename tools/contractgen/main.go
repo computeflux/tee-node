@@ -271,13 +271,14 @@ func recvTypeName(expr ast.Expr) string {
 }
 
 type methodSig struct {
-	goName       string
-	caseName     string
-	selector     [4]byte // 4字节selector，用于客户端传入selector时匹配
-	params       []param
-	isInit       bool
-	isMutation   bool   // 是否为mutation方法，用于计算selector
-	queryResult0 string // query 第一个返回值类型字符串，用于生成 ABI returnType
+	goName         string
+	caseName       string
+	selector       [4]byte // 4字节selector，用于客户端传入selector时匹配
+	params         []param
+	isInit         bool
+	isMutation     bool   // 是否为mutation方法，用于计算selector
+	isResultReturn bool   // mutation 返回 Result[T, error]（否则返回 error）；仅在 isMutation=true 时有意义
+	queryResult0   string // query 第一个返回值类型字符串，用于生成 ABI returnType
 }
 
 type param struct {
@@ -515,10 +516,13 @@ func parseMethod(fd *ast.FuncDecl, fset *token.FileSet, isMutation bool) (*metho
 		if fd.Type.Results == nil || len(fd.Type.Results.List) != 1 {
 			return nil, fmt.Errorf("mutation must return a single error")
 		}
-		rt := typeString(fset, fd.Type.Results.List[0].Type)
-		if rt != "error" {
-			return nil, fmt.Errorf("mutation must return error, got %s", rt)
+		retExpr := fd.Type.Results.List[0].Type
+		rt := typeString(fset, retExpr)
+		isResultReturn := isResultErrorType(retExpr)
+		if rt != "error" && !isResultReturn {
+			return nil, fmt.Errorf("mutation must return error or Result[T, error], got %s", rt)
 		}
+		ms.isResultReturn = isResultReturn
 		if name == "Init" && len(ms.params) >= 4 {
 			last := ms.params[len(ms.params)-1]
 			if last.isPtr {
@@ -548,6 +552,44 @@ func typeString(fset *token.FileSet, expr ast.Expr) string {
 	var buf bytes.Buffer
 	_ = printer.Fprint(&buf, fset, expr)
 	return strings.TrimSpace(buf.String())
+}
+
+// isResultErrorType 检查 expr 是否为 Result[T, error]（允许带包限定符，如 store.Result[T, error]）。
+// 仅支持单返回值为该类型；用于 mutation 方法的返回类型检查。
+func isResultErrorType(expr ast.Expr) bool {
+	var typeName string
+	var indices []ast.Expr
+
+	switch e := expr.(type) {
+	case *ast.IndexExpr:
+		indices = []ast.Expr{e.Index}
+		switch x := e.X.(type) {
+		case *ast.Ident:
+			typeName = x.Name
+		case *ast.SelectorExpr:
+			typeName = x.Sel.Name
+		default:
+			return false
+		}
+	case *ast.IndexListExpr:
+		indices = e.Indices
+		switch x := e.X.(type) {
+		case *ast.Ident:
+			typeName = x.Name
+		case *ast.SelectorExpr:
+			typeName = x.Sel.Name
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+
+	if typeName != "Result" || len(indices) < 2 {
+		return false
+	}
+	ident, ok := indices[1].(*ast.Ident)
+	return ok && ident.Name == "error"
 }
 
 func snakeCase(s string) string {
@@ -626,7 +668,7 @@ func writeInitCase(buf *bytes.Buffer, m *methodSig) {
 func writeMutationCase(buf *bytes.Buffer, m *methodSig) {
 	fmt.Fprintf(buf, "\tcase [4]byte{0x%02x, 0x%02x, 0x%02x, 0x%02x}:\n", m.selector[0], m.selector[1], m.selector[2], m.selector[3])
 	if len(m.params) == 0 {
-		fmt.Fprintf(buf, "\t\treturn m.%s()\n", m.goName)
+		writeMutationCall(buf, m, nil, false)
 		return
 	}
 
@@ -659,6 +701,30 @@ func writeMutationCase(buf *bytes.Buffer, m *methodSig) {
 		}
 	}
 
+	writeMutationCall(buf, m, argNames, true)
+}
+
+// writeMutationCall 写入 mutation 方法调用语句。
+// isResultReturn=true 时走 UnWrap 路径，丢掉 Ok 值，仅返回 error（保留 ExecCall 签名）。
+// hasDeclaredErr=true 表示同作用域中已有 err 变量（参数被 Decode 循环声明），用 = 复用而非 :=。
+func writeMutationCall(buf *bytes.Buffer, m *methodSig, argNames []string, hasDeclaredErr bool) {
+	if m.isResultReturn {
+		assign := ":="
+		if hasDeclaredErr {
+			assign = "="
+		}
+		if argNames == nil {
+			fmt.Fprintf(buf, "\t\t_, err %s m.%s().UnWrap()\n", assign, m.goName)
+		} else {
+			fmt.Fprintf(buf, "\t\t_, err %s m.%s(%s).UnWrap()\n", assign, m.goName, strings.Join(argNames, ", "))
+		}
+		fmt.Fprintf(buf, "\t\treturn err\n")
+		return
+	}
+	if argNames == nil {
+		fmt.Fprintf(buf, "\t\treturn m.%s()\n", m.goName)
+		return
+	}
 	fmt.Fprintf(buf, "\t\treturn m.%s(%s)\n", m.goName, strings.Join(argNames, ", "))
 }
 

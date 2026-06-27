@@ -63,9 +63,9 @@ func createGenesis(wasmBytes []byte, sudoAddr cstore.UniAddr) error {
 		return fmt.Errorf("set sudo: %w", err)
 	}
 
-	// 2. 写入创世 WASM
+	// 2. 写入创世 WASM（首个版本号必须为 1，符合 current+1 检查）
 	if err := gm.RuntimeUpgrade(gov.PendingRuntimeUpgrade{
-		Version:          RuntimeDefaultVersion,
+		Version:          1,
 		ActivationHeight: 0,
 		CodeHash:         nil,
 		WasmBytes:        wasmBytes,

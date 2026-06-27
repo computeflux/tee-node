@@ -11,19 +11,22 @@ import (
 // ── Route ──────────────────────────────────────────────────
 
 // CreateRoute 创建模型路由（仅 gov/sudo 可调用，创世时用于官方路由）。
+// 返回 Result[uint64, error]：Ok(routeID) 为新创建的路由 ID。
+// contractgen 在 dispatch 边界会 UnWrap 成 error，外部调用方拿不到 routeID；
+// 需要 routeID 的内部调用方（如 CreateOfficialRoutes）可以直接拿 Ok 值。
 func (g GatewayMutation) CreateRoute(
 	name string,
 	routeType uint16,
 	inPrice, cachedPrice, outPrice uint64,
 	isOfficial bool,
-) (uint64, error) {
+) store.Result[uint64, error] {
 	txn := g.api.GetTxn()
 
 	// 路由名唯一性
 	if name != "" {
 		dup, _ := g.routes.Query(txn, store.QueryCond{Field: "Name", Val: name})
 		if len(dup) > 0 {
-			return 0, fmt.Errorf("route name %q already exists", name)
+			return store.NewErr[uint64, error](fmt.Errorf("route name %q already exists", name))
 		}
 	}
 
@@ -39,9 +42,9 @@ func (g GatewayMutation) CreateRoute(
 		CreatedAt:   uint64(g.api.GetBlockTime()),
 	})
 	if err != nil {
-		return 0, err
+		return store.NewErr[uint64, error](err)
 	}
-	return id, nil
+	return store.NewOk[uint64, error](id)
 }
 
 // UpdateRoute 更新路由配置（仅路由 owner 或 gov/sudo）。
@@ -165,24 +168,21 @@ func (g GatewayMutation) LeaveRoute(modelID uint64) error {
 // CreateOfficialRoutes 创世时创建官方基础路由（由 InitGenesis 调用）。
 // 每个路由初始只包含一个模型。
 func (g GatewayMutation) CreateOfficialRoutes() error {
-	txn := g.api.GetTxn()
-
 	// 个人路由（ProviderPersonal）
-	if _, err := g.CreateRoute("官方个人模型", RoutePersonal, 0, 0, 0, true); err != nil {
+	if _, err := g.CreateRoute("官方个人模型", RoutePersonal, 0, 0, 0, true).UnWrap(); err != nil {
 		return fmt.Errorf("create official personal route: %w", err)
 	}
 
 	// 节点路由（ProviderOpenAI）
-	if _, err := g.CreateRoute("官方节点模型", RouteNode, 0, 0, 0, true); err != nil {
+	if _, err := g.CreateRoute("官方节点模型", RouteNode, 0, 0, 0, true).UnWrap(); err != nil {
 		return fmt.Errorf("create official node route: %w", err)
 	}
 
 	// 隐私路由（ProviderClaude）
-	if _, err := g.CreateRoute("官方隐私模型", RoutePrivacy, 0, 0, 0, true); err != nil {
+	if _, err := g.CreateRoute("官方隐私模型", RoutePrivacy, 0, 0, 0, true).UnWrap(); err != nil {
 		return fmt.Errorf("create official privacy route: %w", err)
 	}
 
-	_ = txn
 	return nil
 }
 
@@ -245,21 +245,4 @@ func (g GatewayQuery) ListActiveRoutesByType(routeType uint16, offset uint64, li
 		out = append(out, ModelRouteWithID{ID: id, Data: *r})
 	}
 	return out, nil
-}
-
-// GetEffectivePrice 获取模型的有效价格：加入路由则用路由价格，否则用模型自身价格。
-func (g GatewayQuery) GetEffectivePrice(modelID uint64) (inPrice, cachedPrice, outPrice uint64, err error) {
-	model, err := g.models.Get(g.api.GetTxn(), modelID)
-	if err != nil || model == nil {
-		return 0, 0, 0, ErrModelNotFound
-	}
-	if model.RouteID > 0 {
-		route, err := g.routes.Get(g.api.GetTxn(), model.RouteID)
-		if err != nil || route == nil {
-			// 路由不存在则回退到模型自身价格
-			return model.InPrice, model.CachedPrice, model.OutPrice, nil
-		}
-		return route.InPrice, route.CachedPrice, route.OutPrice, nil
-	}
-	return model.InPrice, model.CachedPrice, model.OutPrice, nil
 }

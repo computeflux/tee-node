@@ -282,7 +282,7 @@ func (q AuthQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 func NewAuth(api store.ContractApi) *Auth {
 	return &Auth{
 		api:           api,
-		config:        &store.StoreValue[AuthConfig]{Namespace: "auth", Key: "v1_config"},
+		config:        &store.StoreValue[AuthConfig]{Namespace: "auth", Key: "config"},
 		users:         &store.StoreMapping[[]byte, UserInfo]{Namespace: "auth", KeyPrefix: "user_"},
 		shareRoots:    &store.StoreMapping[[]byte, []byte]{Namespace: "auth", KeyPrefix: "share_root_"},
 		recoveries:    &store.StoreMapping[[]byte, RecoveryConfig]{Namespace: "auth", KeyPrefix: "recoverie_"},

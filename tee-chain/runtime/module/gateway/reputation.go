@@ -10,9 +10,9 @@ import (
 
 // ReportModel 用户举报模型造假，触发系统检查。
 // reason 不得为空且长度受限（最大 500 字符）。
-func (g GatewayMutation) ReportModel(modelID uint64, reason string) (uint64, error) {
+func (g GatewayMutation) ReportModel(modelID uint64, reason string) error {
 	if len(reason) == 0 || len(reason) > 500 {
-		return 0, fmt.Errorf("reason must be 1-500 characters")
+		return fmt.Errorf("reason must be 1-500 characters")
 	}
 
 	caller := g.api.GetCaller()
@@ -21,10 +21,10 @@ func (g GatewayMutation) ReportModel(modelID uint64, reason string) (uint64, err
 	// 校验模型存在
 	model, err := g.models.Get(txn, modelID)
 	if err != nil || model == nil {
-		return 0, fmt.Errorf("model %d not found", modelID)
+		return fmt.Errorf("model %d not found", modelID)
 	}
 
-	id, err := g.modelReports.Insert(txn, ModelReport{
+	_, err = g.modelReports.Insert(txn, ModelReport{
 		ModelID:   modelID,
 		Reporter:  caller,
 		Reason:    reason,
@@ -32,9 +32,9 @@ func (g GatewayMutation) ReportModel(modelID uint64, reason string) (uint64, err
 		CreatedAt: uint64(g.api.GetBlockTime()),
 	})
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return id, nil
+	return nil
 }
 
 // ResolveReport 处理举报并联动更新模型信誉（仅系统可调用）。
@@ -64,7 +64,7 @@ func (g GatewayMutation) ResolveReport(reportID uint64, valid bool, detail strin
 
 	// 联动信誉：举报属实 = 模型未通过检查（valid=false → passed=false, model fails）
 	passed := valid
-	_, err = g.AuditModel(report.ModelID, AuditTriggerReport, passed, detail)
+	_, err = g.AuditModel(report.ModelID, AuditTriggerReport, passed, detail).UnWrap()
 	return err
 }
 
@@ -72,17 +72,20 @@ func (g GatewayMutation) ResolveReport(reportID uint64, valid bool, detail strin
 
 // AuditModel 系统对模型能力进行检查，更新模型信誉分（仅系统可调用）。
 // triggerBy: AuditTriggerReport(1) 举报触发 / AuditTriggerRandom(2) 随机抽检。
-func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool, detail string) (uint64, error) {
+// 返回 Result[uint64, error]：Ok(auditID) 为新创建的检查记录 ID。
+// contractgen 在 dispatch 边界会 UnWrap 成 error，外部调用方拿不到 auditID；
+// 需要 auditID 的内部调用方（如 ResolveReport）可以直接拿 Ok 值。
+func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool, detail string) store.Result[uint64, error] {
 	caller := g.api.GetCaller()
 	if caller.T != 0 {
-		return 0, fmt.Errorf("AuditModel: must be called by system")
+		return store.NewErr[uint64, error](fmt.Errorf("AuditModel: must be called by system"))
 	}
 
 	txn := g.api.GetTxn()
 
 	// 校验模型存在，避免产生孤儿审计记录
 	if m, err := g.models.Get(txn, modelID); err != nil || m == nil {
-		return 0, fmt.Errorf("AuditModel: model %d not found", modelID)
+		return store.NewErr[uint64, error](fmt.Errorf("AuditModel: model %d not found", modelID))
 	}
 
 	// 记录检查
@@ -94,7 +97,7 @@ func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool
 		CreatedAt: uint64(g.api.GetBlockTime()),
 	})
 	if err != nil {
-		return 0, err
+		return store.NewErr[uint64, error](err)
 	}
 
 	// 更新模型信誉分（EMA，最近 100 次权重主导）
@@ -117,10 +120,10 @@ func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool
 		}
 		m.ReputationScore = uint32((oldScore*(n-1) + result) / n)
 	}); err != nil {
-		return auditID, err
+		return store.NewErr[uint64, error](fmt.Errorf("AuditModel: update reputation: %w", err))
 	}
 
-	return auditID, nil
+	return store.NewOk[uint64, error](auditID)
 }
 
 // ── Query ─────────────────────────────────────────────────

@@ -181,7 +181,7 @@ func (g GatewayMutation) UpdateModelLimits(modelID uint64, maxConcurrency uint32
 
 // DeductBalance 扣除模型余额（仅系统可调用）。
 // 余额不足返回 false；扣到 0 自动停用模型防止超额调用。
-func (g GatewayMutation) DeductBalance(modelID uint64, amount uint64) (remaining uint64, ok bool, err error) {
+func (g GatewaySecret) DeductBalance(modelID uint64, amount uint64) (remaining uint64, ok bool, err error) {
 	txn := g.api.GetTxn()
 
 	// 权限校验：仅系统账户可调用

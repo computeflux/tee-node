@@ -79,10 +79,12 @@ func (s *SMTPEmailService) send(to, subject, body string) error {
 
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 
-	// 端口 465 使用 TLS 直连（SMTPS），端口 587 使用 STARTTLS
+	// 端口 465 使用 TLS 直连（SMTPS）
 	if s.port == 465 {
 		return s.sendViaTLS(addr, to, msg)
 	}
+
+	// 端口 587 使用 STARTTLS
 	return s.sendViaSTARTTLS(addr, to, msg)
 }
 
