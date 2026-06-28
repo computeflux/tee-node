@@ -1,8 +1,8 @@
 package revive
 
-//go:generate go-ink-gen -json ./abi/subnet.json
-//go:generate go-ink-gen -json ./abi/token.json
-//go:generate go-ink-gen -json ./abi/proxy.json
+// //go:generate go-ink-gen -json ./abi/subnet.json
+// //go:generate go-ink-gen -json ./abi/token.json
+// //go:generate go-ink-gen -json ./abi/proxy.json
 
 import (
 	"errors"

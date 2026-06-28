@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 )
 
 // JWTService JWT 签发与验证
@@ -14,7 +12,7 @@ type JWTService struct {
 	secret []byte
 }
 
-func NewJWTService(cfg *auth.AuthConfig) *JWTService {
+func NewJWTService(cfg *AuthConfig) *JWTService {
 	return &JWTService{secret: []byte(cfg.JWTSecret)}
 }
 
@@ -61,7 +59,7 @@ func (s *JWTService) IssueRecoveryToken(email string) (string, error) {
 }
 
 // ParseToken 解析并验证 JWT
-func (s *JWTService) ParseToken(tokenStr string) (*auth.JWTClaims, error) {
+func (s *JWTService) ParseToken(tokenStr string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -75,7 +73,7 @@ func (s *JWTService) ParseToken(tokenStr string) (*auth.JWTClaims, error) {
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token")
 	}
-	return &auth.JWTClaims{
+	return &JWTClaims{
 		Email:        claims.Email,
 		Address:      claims.Address,
 		AuthProvider: claims.AuthProvider,

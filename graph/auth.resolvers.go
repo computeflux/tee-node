@@ -12,29 +12,29 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/types"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
 // RequestOtp is the resolver for the requestOTP field.
-func (r *mutationResolver) RequestOtp(ctx context.Context, email string, clientID string) (*auth.AuthResponse, error) {
+func (r *mutationResolver) RequestOtp(ctx context.Context, email string, clientID string) (*AuthResponse, error) {
 	otp, err := r.OTPSvc.Generate(email, clientID)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 	if err := r.EmailSvc.SendOTP(email, otp); err != nil {
-		return &auth.AuthResponse{Success: false, Error: "failed to send email"}, nil
+		return &AuthResponse{Success: false, Error: "failed to send email"}, nil
 	}
-	return &auth.AuthResponse{Success: true}, nil
+	return &AuthResponse{Success: true}, nil
 }
 
 // VerifyOtp is the resolver for the verifyOTP field.
-func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error) {
+func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*AuthResponse, error) {
 	if err := r.OTPSvc.Verify(email, otp, clientID); err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 	provider := "email_passwordless"
 
@@ -58,26 +58,26 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 
 	apiKey, err := createUserAPIKey(email, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	refreshToken, err := createRefreshToken(email, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	return &auth.AuthResponse{
+	return &AuthResponse{
 		Success:      true,
 		Token:        apiKey,
 		RefreshToken: refreshToken,
 		Address:      address,
-		UserInfo:     &auth.UserInfo{Email: email, Name: email, TypeOfLogin: provider},
+		UserInfo:     &UserInfo{Email: email, Name: email, TypeOfLogin: provider},
 	}, nil
 }
 
 // SocialLogin is the resolver for the socialLogin field.
-func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*auth.AuthResponse, error) {
-	var oauthUser *auth.OAuthUserInfo
+func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*AuthResponse, error) {
+	var oauthUser *authsvc.OAuthUserInfo
 	var err error
 
 	redirect := ""
@@ -107,11 +107,11 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		}
 		oauthUser, err = r.OAuthSvc.ExchangeXCode(c, v, redirect)
 	default:
-		return &auth.AuthResponse{Success: false, Error: "unsupported provider: " + provider}, nil
+		return &AuthResponse{Success: false, Error: "unsupported provider: " + provider}, nil
 	}
 
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 优先使用链上/本地已记录的地址，保证同一邮箱跨节点地址一致
@@ -134,15 +134,15 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 
 	apiKey, err := createUserAPIKey(oauthUser.Email, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	refreshToken, err := createRefreshToken(oauthUser.Email, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	userInfo := &auth.UserInfo{
+	userInfo := &UserInfo{
 		Email:        oauthUser.Email,
 		Name:         oauthUser.Name,
 		ProfileImage: oauthUser.AvatarURL,
@@ -151,21 +151,21 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 		VerifierID:   oauthUser.ProviderID,
 	}
 
-	return &auth.AuthResponse{
+	return &AuthResponse{
 		Success: true, UserInfo: userInfo, Token: apiKey, RefreshToken: refreshToken, Address: address,
 	}, nil
 }
 
 // SetPassword is the resolver for the setPassword field.
 // 同时保存 passwordHash（用于解密私钥）和 salt + dkHash（用于 challenge-response 验证）
-func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error) {
+func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*WalletResult, error) {
 	email, err := resolveEmailFromToken(token)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: "unauthorized"}, nil
+		return &WalletResult{Status: "error", Error: "unauthorized"}, nil
 	}
 	// 加密私钥
 	if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 	// 存储密码信息到用户记录
 	user, _ := getAuthUserFromContract(r.TeeChain, email)
@@ -177,13 +177,13 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	user.Salt = salt
 	user.DKHash = dkHash
 	if err := types.PutAuthUser(user); err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 
 	// 异步上链：同步 AuthUser 到合约，支持跨节点登录（带重试和可观测性）
 	persistAuthUserToChain(r.TeeChain, user)
 
-	return &auth.WalletResult{Status: "ok"}, nil
+	return &WalletResult{Status: "ok"}, nil
 }
 
 // VerifyPassword is the resolver for the verifyPassword field.
@@ -319,10 +319,10 @@ func (r *mutationResolver) VerifyResponse(ctx context.Context, token string, cha
 
 // SignTransaction is the resolver for the signTransaction field.
 // token 可以是登录 JWT 或短期签名 token
-func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error) {
+func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx TxInput) (*WalletResult, error) {
 	email, err := r.Resolver.ResolveSignerEmail(token)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 
 	// 获取 passwordHash：如果是 signToken，从 session 中获取（一次性）
@@ -330,7 +330,7 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 	if len(token) > 4 && token[:4] == "sig_" {
 		session, err := types.GetSignSession(token)
 		if err != nil || session == nil {
-			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
+			return &WalletResult{Status: "error", Error: "invalid sign token"}, nil
 		}
 		passwordHash = session.PasswordHash
 		// 使用后删除 signToken（一次性）
@@ -352,17 +352,17 @@ func (r *mutationResolver) SignTransaction(ctx context.Context, token string, tx
 		PasswordHash: passwordHash,
 	})
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
-	return &auth.WalletResult{Status: "ok", Result: raw}, nil
+	return &WalletResult{Status: "ok", Result: raw}, nil
 }
 
 // SignMessage is the resolver for the signMessage field.
 // token 可以是登录 JWT 或短期签名 token
-func (r *mutationResolver) SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error) {
+func (r *mutationResolver) SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*WalletResult, error) {
 	email, err := r.Resolver.ResolveSignerEmail(token)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
 
 	var pwd string
@@ -370,7 +370,7 @@ func (r *mutationResolver) SignMessage(ctx context.Context, token string, messag
 		// signToken 模式：从 session 获取 passwordHash（一次性）
 		session, err := types.GetSignSession(token)
 		if err != nil || session == nil {
-			return &auth.WalletResult{Status: "error", Error: "invalid sign token"}, nil
+			return &WalletResult{Status: "error", Error: "invalid sign token"}, nil
 		}
 		pwd = session.PasswordHash
 		// 使用后删除 signToken
@@ -381,47 +381,47 @@ func (r *mutationResolver) SignMessage(ctx context.Context, token string, messag
 
 	sig, err := r.WalletSvc.SignMessage(email, message, pwd)
 	if err != nil {
-		return &auth.WalletResult{Status: "error", Error: err.Error()}, nil
+		return &WalletResult{Status: "error", Error: err.Error()}, nil
 	}
-	return &auth.WalletResult{Status: "ok", Result: sig}, nil
+	return &WalletResult{Status: "ok", Result: sig}, nil
 }
 
 // RequestRecovery is the resolver for the requestRecovery field.
-func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error) {
+func (r *mutationResolver) RequestRecovery(ctx context.Context, recoveryEmail string) (*RecoveryResult, error) {
 	rec, err := types.FindRecoveryByEmail(recoveryEmail)
 	if err != nil || rec == nil {
-		return &auth.RecoveryResult{Status: "error", Error: "no recovery config for this email"}, nil
+		return &RecoveryResult{Status: "error", Error: "no recovery config for this email"}, nil
 	}
 
 	// 使用加密安全的随机数生成 OTP
 	otp, err := authsvc.GenerateNumericOTP(6)
 	if err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: "failed to generate OTP"}, nil
+		return &RecoveryResult{Status: "error", Error: "failed to generate OTP"}, nil
 	}
 
 	// 存储并设置 10 分钟过期
 	if err := types.PutRecoveryOTP(rec.UserEmail, otp, 600); err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: "failed to store OTP"}, nil
+		return &RecoveryResult{Status: "error", Error: "failed to store OTP"}, nil
 	}
 
 	// 实际投递 OTP 到恢复邮箱
 	if err := r.EmailSvc.SendOTP(recoveryEmail, otp); err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: "failed to send recovery email"}, nil
+		return &RecoveryResult{Status: "error", Error: "failed to send recovery email"}, nil
 	}
 
-	return &auth.RecoveryResult{Status: "ok"}, nil
+	return &RecoveryResult{Status: "ok"}, nil
 }
 
 // VerifyRecovery is the resolver for the verifyRecovery field.
-func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error) {
+func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*RecoveryResult, error) {
 	rec, err := types.FindRecoveryByEmail(recoveryEmail)
 	if err != nil || rec == nil {
-		return &auth.RecoveryResult{Status: "error", Error: "not found"}, nil
+		return &RecoveryResult{Status: "error", Error: "not found"}, nil
 	}
 
 	stored, _ := types.GetRecoveryOTP(rec.UserEmail)
 	if stored != otp {
-		return &auth.RecoveryResult{Status: "error", Error: "invalid OTP"}, nil
+		return &RecoveryResult{Status: "error", Error: "invalid OTP"}, nil
 	}
 	types.DeleteRecoveryOTP(rec.UserEmail)
 
@@ -434,20 +434,20 @@ func (r *mutationResolver) VerifyRecovery(ctx context.Context, recoveryEmail str
 		ExpiresAt:    expiresAt,
 		PasswordHash: "", // 恢复流程不关联 passwordHash
 	}); err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: "token issue failed"}, nil
+		return &RecoveryResult{Status: "error", Error: "token issue failed"}, nil
 	}
-	return &auth.RecoveryResult{Status: "ok", RecoveryToken: recoveryToken}, nil
+	return &RecoveryResult{Status: "ok", RecoveryToken: recoveryToken}, nil
 }
 
 // CompleteRecovery is the resolver for the completeRecovery field.
-func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error) {
+func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*RecoveryResult, error) {
 	email, err := resolveEmailFromToken(recoveryToken)
 	if err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: "invalid token"}, nil
+		return &RecoveryResult{Status: "error", Error: "invalid token"}, nil
 	}
 
 	if err := r.WalletSvc.EncryptPrivateKey(email, passwordHash); err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
+		return &RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
 
 	// 优先使用已有地址，保证跨节点一致性
@@ -461,15 +461,15 @@ func (r *mutationResolver) CompleteRecovery(ctx context.Context, recoveryToken s
 
 	apiKey, err := createUserAPIKey(email, address)
 	if err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
+		return &RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
 
 	refreshToken, err := createRefreshToken(email, address)
 	if err != nil {
-		return &auth.RecoveryResult{Status: "error", Error: err.Error()}, nil
+		return &RecoveryResult{Status: "error", Error: err.Error()}, nil
 	}
 
-	return &auth.RecoveryResult{
+	return &RecoveryResult{
 		Status: "ok", Token: apiKey, RefreshToken: refreshToken, Address: address, Email: email,
 	}, nil
 }
@@ -489,25 +489,25 @@ func (r *mutationResolver) RequestWalletNonce(ctx context.Context, address strin
 // LoginWithWallet is the resolver for the loginWithWallet field.
 // 外部钱包（MetaMask 等）通过 EIP-191 personal_sign 签名验证身份，返回 API Token。
 // 签名内容为 message + nonce（nonce 通过 requestWalletNonce 获取）。
-func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error) {
+func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*AuthResponse, error) {
 	// 1. 验证 nonce 存在、未过期、未使用
 	rec, err := types.GetWalletNonce(address, nonce)
 	if err != nil || rec == nil {
-		return &auth.AuthResponse{Success: false, Error: "invalid or expired nonce"}, nil
+		return &AuthResponse{Success: false, Error: "invalid or expired nonce"}, nil
 	}
 
 	if rec.Used {
-		return &auth.AuthResponse{Success: false, Error: "nonce already used"}, nil
+		return &AuthResponse{Success: false, Error: "nonce already used"}, nil
 	}
 
 	if time.Now().Unix() > rec.ExpiresAt {
-		return &auth.AuthResponse{Success: false, Error: "nonce expired"}, nil
+		return &AuthResponse{Success: false, Error: "nonce expired"}, nil
 	}
 
 	// 2. 验证 EIP-191 签名（签名内容为 message + nonce）
 	signedMessage := message + nonce
 	if !verifyEIP191Signature(address, signature, signedMessage) {
-		return &auth.AuthResponse{Success: false, Error: "invalid signature"}, nil
+		return &AuthResponse{Success: false, Error: "invalid signature"}, nil
 	}
 
 	// 3. 标记 nonce 为已使用（防重放）
@@ -516,16 +516,16 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 	// 4. 生成 API Key
 	apiKey, err := createUserAPIKey(address, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 5. 生成 Refresh Token，用于后续刷新 API Key
 	refreshToken, err := createRefreshToken(address, address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
-	return &auth.AuthResponse{
+	return &AuthResponse{
 		Success:      true,
 		Token:        apiKey,
 		RefreshToken: refreshToken,
@@ -536,43 +536,43 @@ func (r *mutationResolver) LoginWithWallet(ctx context.Context, address string, 
 // RefreshToken is the resolver for the refreshToken field.
 // 使用 refreshToken 校验用户身份并颁发新的 API Key（UserAPIKey），
 // 同时执行 Refresh Token Rotation：旧 refresh token 立即失效并返回新的 refresh token。
-func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string) (*auth.AuthResponse, error) {
+func (r *mutationResolver) RefreshToken(ctx context.Context, refreshToken string) (*AuthResponse, error) {
 	tk := types.FindRefreshToken(refreshToken)
 	if tk == nil {
-		return &auth.AuthResponse{Success: false, Error: "invalid or expired refresh token"}, nil
+		return &AuthResponse{Success: false, Error: "invalid or expired refresh token"}, nil
 	}
 
 	apiKey, err := createUserAPIKey(tk.Owner, tk.Address)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 生成新的 refresh token；若失败则回滚已创建的 API Key，避免孤儿凭证。
 	newRefreshToken, err := createRefreshToken(tk.Owner, tk.Address)
 	if err != nil {
 		_ = types.DeleteGatewayTokenByKey(apiKey)
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 旧的 refresh token 立即失效并清理。
 	if err := types.DeleteRefreshToken(refreshToken); err != nil {
 		_ = types.DeleteGatewayTokenByKey(apiKey)
 		_ = types.DeleteRefreshToken(newRefreshToken)
-		return &auth.AuthResponse{Success: false, Error: "failed to rotate refresh token"}, nil
+		return &AuthResponse{Success: false, Error: "failed to rotate refresh token"}, nil
 	}
 
-	return &auth.AuthResponse{
+	return &AuthResponse{
 		Success:      true,
 		Token:        apiKey,
 		RefreshToken: newRefreshToken,
 		Address:      tk.Address,
-		UserInfo:     &auth.UserInfo{Email: tk.Owner},
+		UserInfo:     &UserInfo{Email: tk.Owner},
 	}, nil
 }
 
 // SetAuthConfig is the resolver for the setAuthConfig field.
 func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error) {
-	err := auth.AuthSetConfig(
+	err := teechain.AuthSetConfig(
 		r.TeeChain,
 		cfg.SMTPHost,
 		uint32(cfg.SMTPPort),
@@ -598,18 +598,18 @@ func (r *mutationResolver) SetAuthConfig(ctx context.Context, cfg model.AuthConf
 }
 
 // OauthURL is the resolver for the oauthURL field.
-func (r *queryResolver) OauthURL(ctx context.Context, provider string, redirectURI *string) (*auth.OAuthURL, error) {
+func (r *queryResolver) OauthURL(ctx context.Context, provider string, redirectURI *string) (*OAuthURL, error) {
 	redirect := ""
 	if redirectURI != nil {
 		redirect = *redirectURI
 	}
 	switch provider {
 	case "google":
-		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GoogleAuthURL("", redirect)}, nil
+		return &OAuthURL{AuthUrl: r.OAuthSvc.GoogleAuthURL("", redirect)}, nil
 	case "github":
-		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.GitHubAuthURL("", redirect)}, nil
+		return &OAuthURL{AuthUrl: r.OAuthSvc.GitHubAuthURL("", redirect)}, nil
 	case "twitter", "x":
-		return &auth.OAuthURL{AuthUrl: r.OAuthSvc.XAuthURL("", "", redirect)}, nil
+		return &OAuthURL{AuthUrl: r.OAuthSvc.XAuthURL("", "", redirect)}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -625,22 +625,22 @@ func (r *queryResolver) AuthHealth(ctx context.Context) (string, error) {
 func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error) {
 	email, err := resolveEmailFromToken(token)
 	if err != nil {
-		return &model.ChallengeResult{Status: "error", Error: strPtr("unauthorized")}, nil
+		return &model.ChallengeResult{Status: "error", Error: new("unauthorized")}, nil
 	}
 
 	// 检查是否被锁定
 	if types.IsLocked(email) {
-		return &model.ChallengeResult{Status: "locked", Error: strPtr("Too many failed attempts")}, nil
+		return &model.ChallengeResult{Status: "locked", Error: new("Too many failed attempts")}, nil
 	}
 
 	// 从合约读取用户 salt
 	user, err := getAuthUserFromContract(r.TeeChain, email)
 	if err != nil || user == nil {
-		return &model.ChallengeResult{Status: "error", Error: strPtr("user not found")}, nil
+		return &model.ChallengeResult{Status: "error", Error: new("user not found")}, nil
 	}
 
 	if user.Salt == "" || user.DKHash == "" {
-		return &model.ChallengeResult{Status: "error", Error: strPtr("password not set")}, nil
+		return &model.ChallengeResult{Status: "error", Error: new("password not set")}, nil
 	}
 
 	// 生成 16 字节随机 challenge 前，清除该用户所有旧未使用的 challenge
@@ -652,13 +652,13 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 	// 生成 16 字节随机 challenge
 	challengeBytes := make([]byte, 16)
 	if _, err := rand.Read(challengeBytes); err != nil {
-		return &model.ChallengeResult{Status: "error", Error: strPtr("failed to generate challenge")}, nil
+		return &model.ChallengeResult{Status: "error", Error: new("failed to generate challenge")}, nil
 	}
 	challenge := hex.EncodeToString(challengeBytes)
 
 	// 存储 challenge（5 分钟过期）— 简化实现，无原生 TTL
 	if err := types.PutChallenge(email, challenge, 300); err != nil {
-		return &model.ChallengeResult{Status: "error", Error: strPtr("failed to store challenge")}, nil
+		return &model.ChallengeResult{Status: "error", Error: new("failed to store challenge")}, nil
 	}
 
 	expiresAt := int(time.Now().Add(5 * time.Minute).Unix())
@@ -672,7 +672,7 @@ func (r *queryResolver) GetChallenge(ctx context.Context, token string) (*model.
 
 // AuthConfig is the resolver for the authConfig field.
 func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, error) {
-	cfg, err := auth.AuthGetPubConfig(r.TeeChain)
+	cfg, err := teechain.AuthGetPubConfig(r.TeeChain)
 	if err != nil {
 		return nil, err
 	}
@@ -703,10 +703,10 @@ func (r *queryResolver) AuthConfig(ctx context.Context) (*model.AuthConfig, erro
 }
 
 // CheckSession is the resolver for the checkSession field.
-func (r *queryResolver) CheckSession(ctx context.Context, token string) (*auth.AuthResponse, error) {
+func (r *queryResolver) CheckSession(ctx context.Context, token string) (*AuthResponse, error) {
 	email, err := resolveEmailFromToken(token)
 	if err != nil {
-		return &auth.AuthResponse{Success: false, Error: err.Error()}, nil
+		return &AuthResponse{Success: false, Error: err.Error()}, nil
 	}
 
 	// 尝试获取用户地址（链上或本地）
@@ -715,9 +715,9 @@ func (r *queryResolver) CheckSession(ctx context.Context, token string) (*auth.A
 		address = existing.Address
 	}
 
-	return &auth.AuthResponse{
+	return &AuthResponse{
 		Success:  true,
-		UserInfo: &auth.UserInfo{Email: email},
+		UserInfo: &UserInfo{Email: email},
 		Address:  address,
 	}, nil
 }

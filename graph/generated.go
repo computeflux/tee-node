@@ -14,7 +14,6 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/model"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -174,7 +173,7 @@ type ComplexityRoot struct {
 		SetAuthConfig        func(childComplexity int, cfg model.AuthConfigInput) int
 		SetPassword          func(childComplexity int, token string, passwordHash string, salt string, dkHash string) int
 		SignMessage          func(childComplexity int, token string, message string, from string, passwordHash *string) int
-		SignTransaction      func(childComplexity int, token string, tx auth.TxInput) int
+		SignTransaction      func(childComplexity int, token string, tx TxInput) int
 		SocialLogin          func(childComplexity int, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) int
 		StartEpoch           func(childComplexity int) int
 		SystemContractInit   func(childComplexity int, contract string) int
@@ -306,20 +305,20 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
-	RequestOtp(ctx context.Context, email string, clientID string) (*auth.AuthResponse, error)
-	VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*auth.AuthResponse, error)
-	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*auth.AuthResponse, error)
-	SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*auth.WalletResult, error)
+	RequestOtp(ctx context.Context, email string, clientID string) (*AuthResponse, error)
+	VerifyOtp(ctx context.Context, email string, otp string, clientID string) (*AuthResponse, error)
+	SocialLogin(ctx context.Context, provider string, idToken *string, code *string, codeVerifier *string, redirectURI *string) (*AuthResponse, error)
+	SetPassword(ctx context.Context, token string, passwordHash string, salt string, dkHash string) (*WalletResult, error)
 	VerifyPassword(ctx context.Context, token string, passwordHash string) (*model.SignSessionResult, error)
 	VerifyResponse(ctx context.Context, token string, challenge string, response string) (*model.SignSessionResult, error)
-	SignTransaction(ctx context.Context, token string, tx auth.TxInput) (*auth.WalletResult, error)
-	SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*auth.WalletResult, error)
-	RequestRecovery(ctx context.Context, recoveryEmail string) (*auth.RecoveryResult, error)
-	VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*auth.RecoveryResult, error)
-	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*auth.RecoveryResult, error)
+	SignTransaction(ctx context.Context, token string, tx TxInput) (*WalletResult, error)
+	SignMessage(ctx context.Context, token string, message string, from string, passwordHash *string) (*WalletResult, error)
+	RequestRecovery(ctx context.Context, recoveryEmail string) (*RecoveryResult, error)
+	VerifyRecovery(ctx context.Context, recoveryEmail string, otp string) (*RecoveryResult, error)
+	CompleteRecovery(ctx context.Context, recoveryToken string, passwordHash string) (*RecoveryResult, error)
 	RequestWalletNonce(ctx context.Context, address string) (string, error)
-	LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*auth.AuthResponse, error)
-	RefreshToken(ctx context.Context, refreshToken string) (*auth.AuthResponse, error)
+	LoginWithWallet(ctx context.Context, address string, signature string, message string, nonce string) (*AuthResponse, error)
+	RefreshToken(ctx context.Context, refreshToken string) (*AuthResponse, error)
 	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
@@ -334,11 +333,11 @@ type MutationResolver interface {
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
 }
 type QueryResolver interface {
-	OauthURL(ctx context.Context, provider string, redirectURI *string) (*auth.OAuthURL, error)
+	OauthURL(ctx context.Context, provider string, redirectURI *string) (*OAuthURL, error)
 	AuthHealth(ctx context.Context) (string, error)
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
 	AuthConfig(ctx context.Context) (*model.AuthConfig, error)
-	CheckSession(ctx context.Context, token string) (*auth.AuthResponse, error)
+	CheckSession(ctx context.Context, token string) (*AuthResponse, error)
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
@@ -1062,7 +1061,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SignTransaction(childComplexity, args["token"].(string), args["tx"].(auth.TxInput)), true
+		return e.complexity.Mutation.SignTransaction(childComplexity, args["token"].(string), args["tx"].(TxInput)), true
 
 	case "Mutation.socialLogin":
 		if e.complexity.Mutation.SocialLogin == nil {
@@ -3013,18 +3012,18 @@ func (ec *executionContext) field_Mutation_signTransaction_argsToken(
 func (ec *executionContext) field_Mutation_signTransaction_argsTx(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (auth.TxInput, error) {
+) (TxInput, error) {
 	if _, ok := rawArgs["tx"]; !ok {
-		var zeroVal auth.TxInput
+		var zeroVal TxInput
 		return zeroVal, nil
 	}
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("tx"))
 	if tmp, ok := rawArgs["tx"]; ok {
-		return ec.unmarshalNTxInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐTxInput(ctx, tmp)
+		return ec.unmarshalNTxInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐTxInput(ctx, tmp)
 	}
 
-	var zeroVal auth.TxInput
+	var zeroVal TxInput
 	return zeroVal, nil
 }
 
@@ -5423,7 +5422,7 @@ func (ec *executionContext) fieldContext_AuthConfig_twitterRedirectURL(_ context
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_success(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_success(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_success(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5467,7 +5466,7 @@ func (ec *executionContext) fieldContext_AuthResponse_success(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_userInfo(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_userInfo(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_userInfo(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5490,9 +5489,9 @@ func (ec *executionContext) _AuthResponse_userInfo(ctx context.Context, field gr
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*auth.UserInfo)
+	res := resTmp.(*UserInfo)
 	fc.Result = res
-	return ec.marshalOUserInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐUserInfo(ctx, field.Selections, res)
+	return ec.marshalOUserInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐUserInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_AuthResponse_userInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5528,7 +5527,7 @@ func (ec *executionContext) fieldContext_AuthResponse_userInfo(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_token(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_token(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_token(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5569,7 +5568,7 @@ func (ec *executionContext) fieldContext_AuthResponse_token(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_refreshToken(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_refreshToken(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_refreshToken(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5610,7 +5609,7 @@ func (ec *executionContext) fieldContext_AuthResponse_refreshToken(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_address(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_address(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_address(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -5651,7 +5650,7 @@ func (ec *executionContext) fieldContext_AuthResponse_address(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _AuthResponse_error(ctx context.Context, field graphql.CollectedField, obj *auth.AuthResponse) (ret graphql.Marshaler) {
+func (ec *executionContext) _AuthResponse_error(ctx context.Context, field graphql.CollectedField, obj *AuthResponse) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AuthResponse_error(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -7682,9 +7681,9 @@ func (ec *executionContext) _Mutation_requestOTP(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_requestOTP(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7751,9 +7750,9 @@ func (ec *executionContext) _Mutation_verifyOTP(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_verifyOTP(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7820,9 +7819,9 @@ func (ec *executionContext) _Mutation_socialLogin(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_socialLogin(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7889,9 +7888,9 @@ func (ec *executionContext) _Mutation_setPassword(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.WalletResult)
+	res := resTmp.(*WalletResult)
 	fc.Result = res
-	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐWalletResult(ctx, field.Selections, res)
+	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐWalletResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_setPassword(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8070,7 +8069,7 @@ func (ec *executionContext) _Mutation_signTransaction(ctx context.Context, field
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SignTransaction(rctx, fc.Args["token"].(string), fc.Args["tx"].(auth.TxInput))
+		return ec.resolvers.Mutation().SignTransaction(rctx, fc.Args["token"].(string), fc.Args["tx"].(TxInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8082,9 +8081,9 @@ func (ec *executionContext) _Mutation_signTransaction(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.WalletResult)
+	res := resTmp.(*WalletResult)
 	fc.Result = res
-	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐWalletResult(ctx, field.Selections, res)
+	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐWalletResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_signTransaction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8145,9 +8144,9 @@ func (ec *executionContext) _Mutation_signMessage(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.WalletResult)
+	res := resTmp.(*WalletResult)
 	fc.Result = res
-	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐWalletResult(ctx, field.Selections, res)
+	return ec.marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐWalletResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_signMessage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8208,9 +8207,9 @@ func (ec *executionContext) _Mutation_requestRecovery(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.RecoveryResult)
+	res := resTmp.(*RecoveryResult)
 	fc.Result = res
-	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx, field.Selections, res)
+	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_requestRecovery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8279,9 +8278,9 @@ func (ec *executionContext) _Mutation_verifyRecovery(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.RecoveryResult)
+	res := resTmp.(*RecoveryResult)
 	fc.Result = res
-	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx, field.Selections, res)
+	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_verifyRecovery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8350,9 +8349,9 @@ func (ec *executionContext) _Mutation_completeRecovery(ctx context.Context, fiel
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.RecoveryResult)
+	res := resTmp.(*RecoveryResult)
 	fc.Result = res
-	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx, field.Selections, res)
+	return ec.marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_completeRecovery(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8476,9 +8475,9 @@ func (ec *executionContext) _Mutation_loginWithWallet(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_loginWithWallet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -8545,9 +8544,9 @@ func (ec *executionContext) _Mutation_refreshToken(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_refreshToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -9339,7 +9338,7 @@ func (ec *executionContext) fieldContext_Mutation_init_disk_key(ctx context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _OAuthURL_authUrl(ctx context.Context, field graphql.CollectedField, obj *auth.OAuthURL) (ret graphql.Marshaler) {
+func (ec *executionContext) _OAuthURL_authUrl(ctx context.Context, field graphql.CollectedField, obj *OAuthURL) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_OAuthURL_authUrl(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -10383,9 +10382,9 @@ func (ec *executionContext) _Query_oauthURL(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.OAuthURL)
+	res := resTmp.(*OAuthURL)
 	fc.Result = res
-	return ec.marshalNOAuthURL2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐOAuthURL(ctx, field.Selections, res)
+	return ec.marshalNOAuthURL2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐOAuthURL(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_oauthURL(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -10634,9 +10633,9 @@ func (ec *executionContext) _Query_checkSession(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*auth.AuthResponse)
+	res := resTmp.(*AuthResponse)
 	fc.Result = res
-	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx, field.Selections, res)
+	return ec.marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_checkSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -11840,7 +11839,7 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_status(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_status(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_status(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -11884,7 +11883,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_status(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_recoveryToken(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_recoveryToken(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_recoveryToken(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -11925,7 +11924,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_recoveryToken(_ context.
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_token(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_token(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_token(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -11966,7 +11965,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_token(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_refreshToken(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_refreshToken(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_refreshToken(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12007,7 +12006,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_refreshToken(_ context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_address(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_address(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_address(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12048,7 +12047,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_address(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_email(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_email(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_email(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12089,7 +12088,7 @@ func (ec *executionContext) fieldContext_RecoveryResult_email(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _RecoveryResult_error(ctx context.Context, field graphql.CollectedField, obj *auth.RecoveryResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _RecoveryResult_error(ctx context.Context, field graphql.CollectedField, obj *RecoveryResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RecoveryResult_error(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12790,7 +12789,7 @@ func (ec *executionContext) fieldContext_TaskStatus_claimedAt(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_email(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_email(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_email(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12834,7 +12833,7 @@ func (ec *executionContext) fieldContext_UserInfo_email(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_name(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_name(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_name(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12875,7 +12874,7 @@ func (ec *executionContext) fieldContext_UserInfo_name(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_profileImage(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_profileImage(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_profileImage(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12916,7 +12915,7 @@ func (ec *executionContext) fieldContext_UserInfo_profileImage(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_verifier(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_verifier(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_verifier(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12957,7 +12956,7 @@ func (ec *executionContext) fieldContext_UserInfo_verifier(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_verifierId(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_verifierId(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_verifierId(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -12998,7 +12997,7 @@ func (ec *executionContext) fieldContext_UserInfo_verifierId(_ context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_typeOfLogin(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_typeOfLogin(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_typeOfLogin(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13039,7 +13038,7 @@ func (ec *executionContext) fieldContext_UserInfo_typeOfLogin(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_aggregateVerifier(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_aggregateVerifier(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_aggregateVerifier(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13080,7 +13079,7 @@ func (ec *executionContext) fieldContext_UserInfo_aggregateVerifier(_ context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_authConnection(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_authConnection(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_authConnection(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13121,7 +13120,7 @@ func (ec *executionContext) fieldContext_UserInfo_authConnection(_ context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _UserInfo_authConnectionId(ctx context.Context, field graphql.CollectedField, obj *auth.UserInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _UserInfo_authConnectionId(ctx context.Context, field graphql.CollectedField, obj *UserInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_UserInfo_authConnectionId(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13162,7 +13161,7 @@ func (ec *executionContext) fieldContext_UserInfo_authConnectionId(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _WalletResult_status(ctx context.Context, field graphql.CollectedField, obj *auth.WalletResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _WalletResult_status(ctx context.Context, field graphql.CollectedField, obj *WalletResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_WalletResult_status(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13206,7 +13205,7 @@ func (ec *executionContext) fieldContext_WalletResult_status(_ context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _WalletResult_result(ctx context.Context, field graphql.CollectedField, obj *auth.WalletResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _WalletResult_result(ctx context.Context, field graphql.CollectedField, obj *WalletResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_WalletResult_result(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -13247,7 +13246,7 @@ func (ec *executionContext) fieldContext_WalletResult_result(_ context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _WalletResult_error(ctx context.Context, field graphql.CollectedField, obj *auth.WalletResult) (ret graphql.Marshaler) {
+func (ec *executionContext) _WalletResult_error(ctx context.Context, field graphql.CollectedField, obj *WalletResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_WalletResult_error(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -15405,8 +15404,8 @@ func (ec *executionContext) unmarshalInputKvalue(ctx context.Context, obj any) (
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputTxInput(ctx context.Context, obj any) (auth.TxInput, error) {
-	var it auth.TxInput
+func (ec *executionContext) unmarshalInputTxInput(ctx context.Context, obj any) (TxInput, error) {
+	var it TxInput
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -15627,7 +15626,7 @@ func (ec *executionContext) _AuthConfig(ctx context.Context, sel ast.SelectionSe
 
 var authResponseImplementors = []string{"AuthResponse"}
 
-func (ec *executionContext) _AuthResponse(ctx context.Context, sel ast.SelectionSet, obj *auth.AuthResponse) graphql.Marshaler {
+func (ec *executionContext) _AuthResponse(ctx context.Context, sel ast.SelectionSet, obj *AuthResponse) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, authResponseImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -16464,7 +16463,7 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 var oAuthURLImplementors = []string{"OAuthURL"}
 
-func (ec *executionContext) _OAuthURL(ctx context.Context, sel ast.SelectionSet, obj *auth.OAuthURL) graphql.Marshaler {
+func (ec *executionContext) _OAuthURL(ctx context.Context, sel ast.SelectionSet, obj *OAuthURL) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, oAuthURLImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -17240,7 +17239,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 
 var recoveryResultImplementors = []string{"RecoveryResult"}
 
-func (ec *executionContext) _RecoveryResult(ctx context.Context, sel ast.SelectionSet, obj *auth.RecoveryResult) graphql.Marshaler {
+func (ec *executionContext) _RecoveryResult(ctx context.Context, sel ast.SelectionSet, obj *RecoveryResult) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, recoveryResultImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -17518,7 +17517,7 @@ func (ec *executionContext) _TaskStatus(ctx context.Context, sel ast.SelectionSe
 
 var userInfoImplementors = []string{"UserInfo"}
 
-func (ec *executionContext) _UserInfo(ctx context.Context, sel ast.SelectionSet, obj *auth.UserInfo) graphql.Marshaler {
+func (ec *executionContext) _UserInfo(ctx context.Context, sel ast.SelectionSet, obj *UserInfo) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, userInfoImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -17573,7 +17572,7 @@ func (ec *executionContext) _UserInfo(ctx context.Context, sel ast.SelectionSet,
 
 var walletResultImplementors = []string{"WalletResult"}
 
-func (ec *executionContext) _WalletResult(ctx context.Context, sel ast.SelectionSet, obj *auth.WalletResult) graphql.Marshaler {
+func (ec *executionContext) _WalletResult(ctx context.Context, sel ast.SelectionSet, obj *WalletResult) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, walletResultImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -17954,11 +17953,11 @@ func (ec *executionContext) unmarshalNAuthConfigInput2githubᚗcomᚋcomputeflux
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNAuthResponse2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx context.Context, sel ast.SelectionSet, v auth.AuthResponse) graphql.Marshaler {
+func (ec *executionContext) marshalNAuthResponse2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx context.Context, sel ast.SelectionSet, v AuthResponse) graphql.Marshaler {
 	return ec._AuthResponse(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐAuthResponse(ctx context.Context, sel ast.SelectionSet, v *auth.AuthResponse) graphql.Marshaler {
+func (ec *executionContext) marshalNAuthResponse2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐAuthResponse(ctx context.Context, sel ast.SelectionSet, v *AuthResponse) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -18394,11 +18393,11 @@ func (ec *executionContext) marshalNModelRunningStatus2ᚖgithubᚗcomᚋcompute
 	return ec._ModelRunningStatus(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNOAuthURL2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v auth.OAuthURL) graphql.Marshaler {
+func (ec *executionContext) marshalNOAuthURL2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v OAuthURL) graphql.Marshaler {
 	return ec._OAuthURL(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNOAuthURL2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v *auth.OAuthURL) graphql.Marshaler {
+func (ec *executionContext) marshalNOAuthURL2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐOAuthURL(ctx context.Context, sel ast.SelectionSet, v *OAuthURL) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -18486,11 +18485,11 @@ func (ec *executionContext) marshalNProviderInfo2ᚖgithubᚗcomᚋcomputeflux�
 	return ec._ProviderInfo(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNRecoveryResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v auth.RecoveryResult) graphql.Marshaler {
+func (ec *executionContext) marshalNRecoveryResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v RecoveryResult) graphql.Marshaler {
 	return ec._RecoveryResult(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v *auth.RecoveryResult) graphql.Marshaler {
+func (ec *executionContext) marshalNRecoveryResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v *RecoveryResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -18638,16 +18637,16 @@ func (ec *executionContext) marshalNTaskStatus2ᚖgithubᚗcomᚋcomputefluxᚋt
 	return ec._TaskStatus(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNTxInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐTxInput(ctx context.Context, v any) (auth.TxInput, error) {
+func (ec *executionContext) unmarshalNTxInput2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐTxInput(ctx context.Context, v any) (TxInput, error) {
 	res, err := ec.unmarshalInputTxInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNWalletResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐWalletResult(ctx context.Context, sel ast.SelectionSet, v auth.WalletResult) graphql.Marshaler {
+func (ec *executionContext) marshalNWalletResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐWalletResult(ctx context.Context, sel ast.SelectionSet, v WalletResult) graphql.Marshaler {
 	return ec._WalletResult(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐWalletResult(ctx context.Context, sel ast.SelectionSet, v *auth.WalletResult) graphql.Marshaler {
+func (ec *executionContext) marshalNWalletResult2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐWalletResult(ctx context.Context, sel ast.SelectionSet, v *WalletResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -18995,7 +18994,7 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) marshalOUserInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋapiᚋauthᚐUserInfo(ctx context.Context, sel ast.SelectionSet, v *auth.UserInfo) graphql.Marshaler {
+func (ec *executionContext) marshalOUserInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐUserInfo(ctx context.Context, sel ast.SelectionSet, v *UserInfo) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

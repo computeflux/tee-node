@@ -15,7 +15,7 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	authpkg "github.com/computeflux/tee-provider/pkg/api/auth"
+	"github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
@@ -29,8 +29,8 @@ func NewWalletService(tc *teechain.TeeChain) *WalletService {
 	return &WalletService{tc: tc}
 }
 
-func (s *WalletService) cfg() *authpkg.AuthConfig {
-	return authpkg.LoadConfig(s.tc)
+func (s *WalletService) cfg() *auth.AuthConfig {
+	return auth.LoadConfig(s.tc)
 }
 
 // DeriveSeed email → 确定性种子 (HMAC-SHA256)
@@ -121,7 +121,7 @@ func (s *WalletService) HasEncryptedKey(email string) bool {
 func (s *WalletService) getEncryptedKey(email string) (*types.EncryptedKey, error) {
 	// 1. 链上合约为数据源（跨节点同步）
 	if s.tc != nil {
-		rec, err := authpkg.AuthGetPrivateKey(s.tc, "private_key:"+email)
+		rec, err := teechain.AuthGetPrivateKey(s.tc, "private_key:"+email)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var key types.EncryptedKey
 			if json.Unmarshal(rec.Ciphertext, &key) == nil {
@@ -157,7 +157,7 @@ func (s *WalletService) persistEncryptedKeyToChain(email string, record *types.E
 			if i > 0 {
 				time.Sleep(time.Duration(i) * 500 * time.Millisecond)
 			}
-			if err := authpkg.AuthStorePrivateKey(s.tc, key, plain); err == nil {
+			if err := teechain.AuthStorePrivateKey(s.tc, key, plain); err == nil {
 				return
 			}
 		}

@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
+	"github.com/computeflux/tee-provider/pkg/services/auth"
 	store "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"

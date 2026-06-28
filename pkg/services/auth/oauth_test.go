@@ -8,14 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	apiAuth "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func newTestOAuthService(client *http.Client) *OAuthService {
-	apiAuth.ResetConfigCache()
-	apiAuth.SetCachedConfigForTest(&apiAuth.AuthConfig{
+	ResetConfigCache()
+	SetCachedConfigForTest(&AuthConfig{
 		GoogleClientID:      "google-client-id",
 		GoogleClientSecret:  "google-secret",
 		GoogleRedirectURL:   "http://localhost/callback",

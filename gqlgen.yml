@@ -91,19 +91,19 @@ models:
             - github.com/99designs/gqlgen/graphql.Int32
     AuthResponse:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.AuthResponse
+            - github.com/computeflux/tee-provider/graph.AuthResponse
     UserInfo:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.UserInfo
+            - github.com/computeflux/tee-provider/graph.UserInfo
     WalletResult:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.WalletResult
+            - github.com/computeflux/tee-provider/graph.WalletResult
     RecoveryResult:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.RecoveryResult
+            - github.com/computeflux/tee-provider/graph.RecoveryResult
     OAuthURL:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.OAuthURL
+            - github.com/computeflux/tee-provider/graph.OAuthURL
     TxInput:
         model:
-            - github.com/computeflux/tee-provider/pkg/api/auth.TxInput
+            - github.com/computeflux/tee-provider/graph.TxInput

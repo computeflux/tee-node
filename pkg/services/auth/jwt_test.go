@@ -5,14 +5,13 @@ import (
 	"testing"
 	"time"
 
-	apiAuth "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func newTestJWTService() *JWTService {
-	return NewJWTService(&apiAuth.AuthConfig{JWTSecret: "test-secret-32bytes-long-ok!!!"})
+	return NewJWTService(&AuthConfig{JWTSecret: "test-secret-32bytes-long-ok!!!"})
 }
 
 func TestJWTService_IssueToken_RoundTrip(t *testing.T) {
@@ -75,7 +74,7 @@ func TestJWTService_ParseToken_Tampered(t *testing.T) {
 
 func TestJWTService_ParseToken_WrongSecret(t *testing.T) {
 	svc1 := newTestJWTService()
-	svc2 := NewJWTService(&apiAuth.AuthConfig{JWTSecret: "different-secret-32bytes-long!!"})
+	svc2 := NewJWTService(&AuthConfig{JWTSecret: "different-secret-32bytes-long!!"})
 
 	tokenStr, err := svc1.IssueToken("alice@example.com", "0x1234", "google")
 	require.NoError(t, err)

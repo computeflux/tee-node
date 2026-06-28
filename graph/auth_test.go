@@ -9,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
-	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
+	"github.com/computeflux/tee-provider/pkg/services/auth"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -35,8 +34,8 @@ func setupAuthTest(t *testing.T, seedSecret string) (*Resolver, func()) {
 	resolver := &Resolver{
 		TeeChain:  nil, // nil 时 getAuthUserFromContract 回退到本地存储
 		WalletSvc: walletSvc,
-		OTPSvc:    authsvc.NewOTPService(otpCtx, 5),
-		EmailSvc:  authsvc.NewMockEmailService("test"),
+		OTPSvc:    auth.NewOTPService(otpCtx, 5),
+		EmailSvc:  auth.NewMockEmailService("test"),
 	}
 
 	cleanup := func() {
@@ -128,7 +127,7 @@ func TestVerifyOtp_CrossNodeConsistency(t *testing.T) {
 	resolverB := &Resolver{
 		TeeChain:  nil,
 		WalletSvc: wallet.NewWalletService(&teechain.TeeChain{}),
-		OTPSvc:    authsvc.NewOTPService(otpCtxB, 5),
+		OTPSvc:    auth.NewOTPService(otpCtxB, 5),
 	}
 
 	// 在节点 B 登录：由于本地存储已有记录，应使用已有地址，

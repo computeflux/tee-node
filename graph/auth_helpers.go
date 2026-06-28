@@ -12,7 +12,6 @@ import (
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	authpkg "github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
@@ -144,9 +143,6 @@ func resolveEmailFromToken(token string) (string, error) {
 	return "", fmt.Errorf("unauthorized")
 }
 
-// strPtr 返回字符串指针
-func strPtr(s string) *string { return &s }
-
 // computeHMAC 计算 HMAC-SHA256，key 和 msg 都是 hex 字符串
 func computeHMAC(keyHex, msgHex string) string {
 	key, _ := hex.DecodeString(keyHex)
@@ -187,7 +183,7 @@ func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUs
 	// 1. 链上合约为数据源（ref 内部按 HashEmailKey 哈希，与 persistAuthUserToChain 写入侧一致）
 	if tc != nil {
 		ref := "auth_user:" + types.HashEmailKey(email)
-		rec, err := authpkg.AuthGetAuthUser(tc, ref)
+		rec, err := teechain.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var chainUser types.AuthUser
 			if json.Unmarshal(rec.Ciphertext, &chainUser) == nil {
@@ -202,4 +198,69 @@ func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUs
 		return localUser, nil
 	}
 	return nil, fmt.Errorf("auth user not found")
+}
+
+// ── GraphQL 返回类型 ──────────────────────────────────────────
+
+// AuthResponse 认证操作返回
+type AuthResponse struct {
+	Success      bool      `json:"success"`
+	UserInfo     *UserInfo `json:"userInfo,omitempty"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refreshToken,omitempty"`
+	Address      string    `json:"address,omitempty"`
+	Error        string    `json:"error,omitempty"`
+}
+
+// UserInfo 用户信息
+type UserInfo struct {
+	Email                   string `json:"email"`
+	Name                    string `json:"name,omitempty"`
+	ProfileImage            string `json:"profileImage,omitempty"`
+	Verifier                string `json:"verifier,omitempty"`
+	VerifierID              string `json:"verifierId,omitempty"`
+	TypeOfLogin             string `json:"typeOfLogin,omitempty"`
+	AggregateVerifier       string `json:"aggregateVerifier,omitempty"`
+	AuthConnection          string `json:"authConnection,omitempty"`
+	AuthConnectionID        string `json:"authConnectionId,omitempty"`
+	GroupedAuthConnectionID string `json:"groupedAuthConnectionId,omitempty"`
+	IDToken                 string `json:"idToken,omitempty"`
+}
+
+// OAuthURL OAuth 授权 URL
+type OAuthURL struct {
+	AuthUrl string `json:"authUrl"`
+}
+
+// WalletResult 钱包操作结果
+type WalletResult struct {
+	Status string `json:"status"`
+	Result string `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// RecoveryResult 恢复操作结果
+type RecoveryResult struct {
+	Status        string `json:"status"`
+	RecoveryToken string `json:"recoveryToken,omitempty"`
+	Token         string `json:"token,omitempty"`
+	RefreshToken  string `json:"refreshToken,omitempty"`
+	Address       string `json:"address,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
+// ── GraphQL 输入类型 ──────────────────────────────────────────
+
+// TxInput 交易签名输入
+type TxInput struct {
+	From         string `json:"from"`
+	To           string `json:"to"`
+	Value        string `json:"value,omitempty"`
+	Data         string `json:"data,omitempty"`
+	Gas          string `json:"gas,omitempty"`
+	GasPrice     string `json:"gasPrice,omitempty"`
+	Nonce        string `json:"nonce,omitempty"`
+	ChainID      string `json:"chainId,omitempty"`
+	PasswordHash string `json:"passwordHash,omitempty"`
 }

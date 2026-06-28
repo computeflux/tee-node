@@ -7,7 +7,6 @@ import (
 	"net/smtp"
 	"strings"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -44,7 +43,7 @@ type SMTPEmailService struct {
 	fromName string
 }
 
-func NewSMTPEmailService(cfg *auth.AuthConfig) *SMTPEmailService {
+func NewSMTPEmailService(cfg *AuthConfig) *SMTPEmailService {
 	return &SMTPEmailService{
 		host:     cfg.SMTPHost,
 		port:     cfg.SMTPPort,
@@ -144,7 +143,7 @@ func (s *SMTPEmailService) sendViaSTARTTLS(addr, to, msg string) error {
 // ── Factory ───────────────────────────────────────────────
 
 func NewEmailService(tc *teechain.TeeChain) EmailService {
-	cfg := auth.LoadConfig(tc)
+	cfg := LoadConfig(tc)
 	if cfg.MockEmail {
 		return NewMockEmailService(cfg.SMTPFromName)
 	}

@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
@@ -29,8 +28,8 @@ func (s *OAuthService) httpClient() *http.Client {
 	return http.DefaultClient
 }
 
-func (s *OAuthService) cfg() *auth.AuthConfig {
-	return auth.LoadConfig(s.tc)
+func (s *OAuthService) cfg() *AuthConfig {
+	return LoadConfig(s.tc)
 }
 
 // ── Auth URLs ─────────────────────────────────────────────
@@ -122,7 +121,7 @@ func (s *OAuthService) pickRedirectURI(redirectUri string) string {
 
 // ── Google ────────────────────────────────────────────────
 
-func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*OAuthUserInfo, error) {
 	verifyURL := fmt.Sprintf("https://oauth2.googleapis.com/tokeninfo?id_token=%s",
 		url.QueryEscape(idToken))
 
@@ -154,13 +153,13 @@ func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*auth.OAuthUserInfo,
 	if tokenInfo.Email == "" {
 		return nil, fmt.Errorf("google did not return email")
 	}
-	return &auth.OAuthUserInfo{
+	return &OAuthUserInfo{
 		Email: tokenInfo.Email, Name: tokenInfo.Name,
 		AvatarURL: tokenInfo.Picture, ProviderID: tokenInfo.Sub,
 	}, nil
 }
 
-func (s *OAuthService) ExchangeGoogleCode(code, redirectUri string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) ExchangeGoogleCode(code, redirectUri string) (*OAuthUserInfo, error) {
 	redirect := s.pickRedirectURI(redirectUri)
 
 	data := url.Values{}
@@ -211,14 +210,14 @@ func (s *OAuthService) ExchangeGoogleCode(code, redirectUri string) (*auth.OAuth
 	if ui.Email == "" {
 		return nil, fmt.Errorf("google did not return email")
 	}
-	return &auth.OAuthUserInfo{
+	return &OAuthUserInfo{
 		Email: ui.Email, Name: ui.Name, AvatarURL: ui.Picture, ProviderID: ui.Sub,
 	}, nil
 }
 
 // ── GitHub ────────────────────────────────────────────────
 
-func (s *OAuthService) ExchangeGitHubCode(code string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) ExchangeGitHubCode(code string) (*OAuthUserInfo, error) {
 	data := url.Values{}
 	data.Set("code", code)
 	data.Set("client_id", s.cfg().GitHubClientID)
@@ -278,7 +277,7 @@ func (s *OAuthService) ExchangeGitHubCode(code string) (*auth.OAuthUserInfo, err
 	if name == "" {
 		name = gh.Login
 	}
-	return &auth.OAuthUserInfo{
+	return &OAuthUserInfo{
 		Email: gh.Email, Name: name, AvatarURL: gh.AvatarURL,
 		ProviderID: fmt.Sprintf("github_%d", gh.ID),
 	}, nil
@@ -311,7 +310,7 @@ func (s *OAuthService) getGitHubEmails(accessToken string) []string {
 
 // ── X/Twitter ─────────────────────────────────────────────
 
-func (s *OAuthService) ExchangeXCode(code, codeVerifier, redirectUri string) (*auth.OAuthUserInfo, error) {
+func (s *OAuthService) ExchangeXCode(code, codeVerifier, redirectUri string) (*OAuthUserInfo, error) {
 	redirect := redirectUri
 	if redirect == "" {
 		redirect = s.cfg().TwitterRedirectURL
@@ -372,7 +371,7 @@ func (s *OAuthService) ExchangeXCode(code, codeVerifier, redirectUri string) (*a
 	if name == "" {
 		name = xu.Data.Username
 	}
-	return &auth.OAuthUserInfo{
+	return &OAuthUserInfo{
 		Email: email, Name: name, AvatarURL: xu.Data.ProfileImageURL,
 		ProviderID: "x_" + xu.Data.ID,
 	}, nil

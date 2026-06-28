@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
-	"github.com/computeflux/tee-provider/pkg/api/auth"
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
 	"github.com/computeflux/tee-provider/pkg/types"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -83,7 +82,7 @@ func initToken(r *http.Request) *types.GatewayTokenInfo {
 	return gateway.FindTokenByKey(raw)
 }
 
-var authStoreAuthUserFn = auth.AuthStoreAuthUser
+var authStoreAuthUserFn = teechain.AuthStoreAuthUser
 
 func persistAuthUserToChain(chain *teechain.TeeChain, user *types.AuthUser) {
 	if chain == nil || user == nil {

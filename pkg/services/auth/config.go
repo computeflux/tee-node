@@ -6,7 +6,9 @@ import (
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 )
 
-// AuthConfig Web3Auth 业务配置
+// AuthConfig Web3Auth 业务配置（service 层）。
+// 与合约层 cauth.AuthConfig 同名不同物：这是给 OTP/email/oauth/JWT 等服务用的业务配置，
+// 由 LoadConfig 从链上合约读出后再转换字段得到。
 type AuthConfig struct {
 	JWTSecret    string
 	SeedSecret   string
@@ -51,7 +53,7 @@ func LoadConfig(tc *teechain.TeeChain) *AuthConfig {
 
 	// 1. 从链上合约读取
 	if tc != nil {
-		cfg, err := AuthGetConfig(tc)
+		cfg, err := teechain.AuthGetConfig(tc)
 		if err == nil && cfg != nil {
 			c := &AuthConfig{
 				JWTSecret:  cfg.JWTSecret,
