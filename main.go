@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Print CometBFT validator address & pub_key
-	crypto.PrintValidatorForGenesis(nodePriv, "")
+	crypto.PrintValidatorForGenesis(nodePriv)
 
 	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 	util.LogWithYellow("ETH Key", hex.EncodeToString(nodePriv.ToSecp256k1Signer().Public()))
@@ -99,6 +99,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Init dkg
 	dkgIns, err := dkg.NewDKG(nodePriv, dkgReactor, dkg.Logger{
 		NodeTag: "DKG",
 	})
@@ -112,11 +113,7 @@ func main() {
 	// Set DKG to teeChain
 	teeChain.SetDKG(dkgIns)
 
-	// if err := teechain.LoadRuntimeForDebug(); err != nil {
-	// 	fmt.Println("LoadRuntimeForDebug:", err)
-	// 	os.Exit(1)
-	// }
-
+	// Get code versions
 	codeVersions, err := chains.MainChain.GetCodeVersions()
 	if err != nil {
 		fmt.Println("Get code versions error:", err)

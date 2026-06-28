@@ -13,6 +13,7 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/wasm"
 	"github.com/pkg/errors"
 )
 
@@ -154,6 +155,10 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 	// 同步链上运行时版本状态（合约已通过 RuntimeUpgrade 完成版本管理）
 	if v, _ := GetCurrentRuntimeVersion(txn); v != app.state.RuntimeVersion {
 		app.state.RuntimeVersion = v
+		// 刷新 wasm 包级字节缓存：避免后续每次合约调用都重新查 gov + 解压
+		if err := wasm.RefreshCurrentVersion(v, getGovQuery(txn)); err != nil {
+			util.LogError("FinalizeTx refresh wasm cache", err)
+		}
 	}
 
 	return res, nil

@@ -22,6 +22,7 @@ import (
 	teecrypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/wasm"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
 
@@ -79,6 +80,14 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 		syncInProgress: make(map[string]bool),
 	}
 
+	// 预热 wasm 包级字节缓存：重启后第一次 wasm 合约调用不再走 gov 查字节
+	// genesis 启动时 state.RuntimeVersion=0 跳过此步，由首次 FinalizeTx 写入
+	if types.SECRET_DB != nil {
+		if err := preloadWasmCache(state.RuntimeVersion); err != nil {
+			util.LogError("NewTeeChain preload wasm cache", err)
+		}
+	}
+
 	if err := CheckRuntimeV0(); err != nil {
 		return nil, err
 	}
@@ -98,6 +107,14 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 	}
 
 	return c, nil
+}
+
+// preloadWasmCache 启动时为指定 version 预填 wasm 包级字节缓存。
+// 失败不致命，LoadModule 仍可走 gov fallback。
+func preloadWasmCache(version uint32) error {
+	txn := types.SECRET_DB.NewTransaction()
+	defer txn.Rollback()
+	return wasm.RefreshCurrentVersion(version, getGovQuery(txn))
 }
 
 func (app *TeeChain) Info(_ context.Context, info *abci.RequestInfo) (*abci.ResponseInfo, error) {

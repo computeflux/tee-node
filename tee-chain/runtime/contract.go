@@ -39,7 +39,7 @@ func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (
 		return module.Query(call, runtime)
 	}
 
-	util.LogWithRed("CONTRACT VESION", "Query with WASM")
+	util.LogWithRed("CONTRACT VESION", "Query with with WASM version", version)
 	return getWasmEngine().ExecuteQuery(version, call, runtime)
 }
 

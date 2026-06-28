@@ -66,25 +66,35 @@ func (e *Engine) ensureHost(ctx context.Context) {
 	})
 }
 
-// LoadModule loads a compiled WASM module for the given version from the gov contract store.
-// Uses GovQuery.RuntimeMeta(version) to read the stored PendingRuntimeUpgrade.
-// Results are cached by version.
+// LoadModule loads a compiled WASM module for the given version.
+//
+// 优先读包级字节缓存（FinalizeTx 检测到版本切换时刷新，NewTeeChain 启动预热）；
+// 未命中或查询的不是 current 版本时，fallback 到 gov 合约 store（覆盖启动后
+// 第一次合约调用前 / 查询历史版本等场景）。
+//
+// 编译后的 wazero.CompiledModule 由 Engine 内部按 version 缓存，二级 cache。
 func (e *Engine) LoadModule(version uint32, api store.ContractApi) (wazero.CompiledModule, error) {
 	if e.cachedMod != nil && e.cachedVer == version {
 		return e.cachedMod, nil
 	}
 
-	gw := gov.NewGov(api)
-	q := gov.GovQuery{Gov: *gw}
-	info, err := q.RuntimeMeta(version)
-	if err != nil || info == nil {
-		return nil, fmt.Errorf("runtime version %d not found: %w", version, err)
-	}
-
-	wasmBytes, err := decompressWasm(info.WasmBytes)
-	if err != nil {
-		util.LogError("wasm.LoadModule", fmt.Errorf("decompress v%d: %w", version, err))
-		return nil, fmt.Errorf("decompress wasm v%d: %w", version, err)
+	var wasmBytes []byte
+	if cachedVer, cachedBytes, ok := GetCurrentVersion(); ok && cachedVer == version {
+		// 命中包级字节缓存：跳过 gov 查询 + gzip 解压
+		wasmBytes = cachedBytes
+	} else {
+		// Fallback：直接走 gov 查
+		gw := gov.NewGov(api)
+		q := gov.GovQuery{Gov: *gw}
+		info, err := q.RuntimeMeta(version)
+		if err != nil || info == nil {
+			return nil, fmt.Errorf("runtime version %d not found: %w", version, err)
+		}
+		wasmBytes, err = decompressWasm(info.WasmBytes)
+		if err != nil {
+			util.LogError("wasm.LoadModule", fmt.Errorf("decompress v%d: %w", version, err))
+			return nil, fmt.Errorf("decompress wasm v%d: %w", version, err)
+		}
 	}
 
 	ctx := context.Background()

@@ -29,18 +29,15 @@ func ToCometFilePV(priv *PrivKey, keyPath, statePath string) *privval.FilePV {
 // Output format matches the genesis.json validator entry:
 //
 //	{"address": "<HEX40>", "pub_key": {"type": "tendermint/PubKeyEd25519", "value": "<BASE64>"}, "power": "10", "name": ""}
-func PrintValidatorForGenesis(priv *PrivKey, name string) {
+func PrintValidatorForGenesis(priv *PrivKey) {
 	cometPriv := cmeted.PrivKey(priv.PrivateKey)
 	pubKey := cometPriv.PubKey().Bytes() // 32 bytes
 	h := sha256.Sum256(pubKey)
 	address := strings.ToUpper(hex.EncodeToString(h[:20]))
 	pubB64 := base64.StdEncoding.EncodeToString(pubKey)
 
-	util.LogWithGreen("===================== CometBFT Validator ===================", "")
+	util.LogWithGreen("======================== Validator ========================", "")
 	util.LogWithGreen("Address", address)
 	util.LogWithGreen("PubKey ", pubB64)
-	if name != "" {
-		util.LogWithGreen("  Name", name)
-	}
-	util.LogWithGreen("============================================================", "")
+	util.LogWithGreen("===========================================================", "")
 }
