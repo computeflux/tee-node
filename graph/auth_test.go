@@ -71,7 +71,8 @@ func TestVerifyOtp_NewUser_DerivesAddress(t *testing.T) {
 	// 验证本地存储已写入
 	user, err := getAuthUserFromContract(nil, email)
 	require.NoError(t, err)
-	assert.Equal(t, email, user.Email)
+	// Email 字段在 Ciphertext 中存放 hash
+	assert.Equal(t, types.HashEmailKey(email), user.Email)
 	assert.Equal(t, resp.Address, user.Address)
 }
 
@@ -155,7 +156,8 @@ func TestSocialLogin_AddressConsistency(t *testing.T) {
 	// 由于 OAuthSvc 未配置真实客户端，SocialLogin 的完整 resolver 测试较难模拟。
 	// 这里改为直接验证核心逻辑：getAuthUserFromContract 读取已有地址，
 	// 以及 DeriveAddress 会生成不同值。
-	_ = types.PutAuthUser(&types.AuthUser{Email: email, Address: "0xOAuthAddress123"})
+	// Email 字段现在存 hash
+	_ = types.PutAuthUser(&types.AuthUser{Email: types.HashEmailKey(email), Address: "0xOAuthAddress123"})
 
 	user, err := getAuthUserFromContract(nil, email)
 	require.NoError(t, err)
@@ -333,9 +335,9 @@ func TestGetAuthUserFromContract_LocalFallback(t *testing.T) {
 	email := "local@example.com"
 	expectedAddr := "0x1234567890abcdef1234567890abcdef12345678"
 
-	// 直接写入本地存储
+	// 直接写入本地存储（Email 字段存放 hash）
 	err := types.PutAuthUser(&types.AuthUser{
-		Email:   email,
+		Email:   types.HashEmailKey(email),
 		Address: expectedAddr,
 	})
 	require.NoError(t, err)
@@ -344,7 +346,8 @@ func TestGetAuthUserFromContract_LocalFallback(t *testing.T) {
 	user, err := getAuthUserFromContract(nil, email)
 	require.NoError(t, err)
 	assert.Equal(t, expectedAddr, user.Address)
-	assert.Equal(t, email, user.Email)
+	// Email 字段在 Ciphertext 中存放 hash
+	assert.Equal(t, types.HashEmailKey(email), user.Email)
 }
 
 // ── Wallet Login Nonce Tests ──────────────────────────────

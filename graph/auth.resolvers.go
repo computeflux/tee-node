@@ -46,7 +46,8 @@ func (r *mutationResolver) VerifyOtp(ctx context.Context, email string, otp stri
 	} else {
 		address = r.WalletSvc.DeriveAddress(email)
 		if existing == nil {
-			existing = &types.AuthUser{Email: email}
+			// Email 字段存放 hash，避免明文邮箱进入 Ciphertext
+			existing = &types.AuthUser{Email: types.HashEmailKey(email)}
 		}
 		existing.Address = address
 		types.PutAuthUser(existing)
@@ -121,7 +122,8 @@ func (r *mutationResolver) SocialLogin(ctx context.Context, provider string, idT
 	} else {
 		address = r.WalletSvc.DeriveAddress(oauthUser.Email)
 		if existing == nil {
-			existing = &types.AuthUser{Email: oauthUser.Email}
+			// Email 字段存放 hash，避免明文邮箱进入 Ciphertext
+			existing = &types.AuthUser{Email: types.HashEmailKey(oauthUser.Email)}
 		}
 		existing.Address = address
 		types.PutAuthUser(existing)
@@ -168,7 +170,8 @@ func (r *mutationResolver) SetPassword(ctx context.Context, token string, passwo
 	// 存储密码信息到用户记录
 	user, _ := getAuthUserFromContract(r.TeeChain, email)
 	if user == nil {
-		user = &types.AuthUser{Email: email}
+		// Email 字段存放 hash，避免明文邮箱进入 Ciphertext
+		user = &types.AuthUser{Email: types.HashEmailKey(email)}
 	}
 	user.PasswordHash = passwordHash
 	user.Salt = salt

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,10 +10,27 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
+	"golang.org/x/crypto/blake2b"
 )
 
 // Web3AuthNamespace 是 Web3Auth 相关数据在 KV 存储中的命名空间。
 const Web3AuthNamespace = "WEB3AUTH"
+
+// emailHashKeySize email 哈希 key 的字节数（H160），匹配 auth.UserInfo.EmailHash 字段。
+const emailHashKeySize = 20
+
+// HashEmailKey 对 email 做 blake2b-256 并截断到 H160，返回 hex string。
+//
+// 用作 PebbleDB key、链上合约 ref 的脱敏哈希。截断到 20 字节在保持紧凑
+// 的同时提供 ~2^80 的碰撞复杂度。email 按 RFC 5321 大小写不敏感，
+// 故先 ToLower+TrimSpace 规范化。
+//
+// 对外接口不变：所有 Put/Get/Delete 仍然接受明文 email，hash 在此函数内完成。
+func HashEmailKey(email string) string {
+	h, _ := blake2b.New256(nil)
+	h.Write([]byte(strings.ToLower(strings.TrimSpace(email))))
+	return hex.EncodeToString(h.Sum(nil)[:emailHashKeySize])
+}
 
 // ── Auth 持久化类型 ───────────────────────────────────────
 
@@ -56,6 +74,7 @@ func PutAuthUser(u *AuthUser) error {
 
 	// Cache locally with 1-hour TTL — enough for async chain upload to complete.
 	// After TTL expires, chain becomes the sole source of truth.
+	// 注：u.Email 字段已是 hash（调用方负责填 hash），不再二次哈希
 	expiresAt := time.Now().Add(1 * time.Hour).Unix()
 	return SECRET_DB.CacheKey(Web3AuthNamespace, "u:"+u.Email, b, expiresAt)
 }
@@ -125,12 +144,12 @@ func PutChallenge(email, challenge string, ttlSeconds int) error {
 	if err != nil {
 		return err
 	}
-	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	key := fmt.Sprintf("c:%s:%s", HashEmailKey(email), challenge)
 	return SECRET_DB.CacheKey(Web3AuthNamespace, key, b, expiresAt)
 }
 
 func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
-	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	key := fmt.Sprintf("c:%s:%s", HashEmailKey(email), challenge)
 	rec, err := DBGetJson[ChallengeRecord](SECRET_DB, Web3AuthNamespace, key)
 	if err != nil {
 		return nil, err
@@ -144,7 +163,7 @@ func GetChallenge(email, challenge string) (*ChallengeRecord, error) {
 }
 
 func MarkChallengeUsed(email, challenge string) error {
-	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	key := fmt.Sprintf("c:%s:%s", HashEmailKey(email), challenge)
 	rec, err := GetChallenge(email, challenge)
 	if err != nil {
 		return err
@@ -159,7 +178,7 @@ func MarkChallengeUsed(email, challenge string) error {
 }
 
 func DeleteChallenge(email, challenge string) error {
-	key := fmt.Sprintf("c:%s:%s", email, challenge)
+	key := fmt.Sprintf("c:%s:%s", HashEmailKey(email), challenge)
 	if rec, _ := DBGetJson[ChallengeRecord](SECRET_DB, Web3AuthNamespace, key); rec != nil {
 		_ = cacheCancelExpiration(Web3AuthNamespace, key, rec.ExpiresAt)
 	}
@@ -168,7 +187,7 @@ func DeleteChallenge(email, challenge string) error {
 
 // ClearAllChallenges 清除用户所有未使用的 challenge（避免多 challenge 残留导致验证错位）
 func ClearAllChallenges(email string) error {
-	prefix := []byte(comboKey(Web3AuthNamespace, fmt.Sprintf("c:%s:", email)))
+	prefix := []byte(comboKey(Web3AuthNamespace, fmt.Sprintf("c:%s:", HashEmailKey(email))))
 	iter, err := SECRET_DB.NewIter(&pebble.IterOptions{
 		LowerBound: prefix,
 	})
@@ -199,7 +218,7 @@ func ClearAllChallenges(email string) error {
 // ── Rate Limit ────────────────────────────────────────────
 
 func IncrFailedChallenge(email string) (int, error) {
-	key := fmt.Sprintf("fl:%s", email)
+	key := fmt.Sprintf("fl:%s", HashEmailKey(email))
 	b, err := SECRET_DB.GetKey(Web3AuthNamespace, key)
 	var count int
 	if err == nil && len(b) > 0 {
@@ -216,7 +235,7 @@ func IncrFailedChallenge(email string) (int, error) {
 }
 
 func ResetFailedChallenge(email string) error {
-	return SECRET_DB.DeleteKey(Web3AuthNamespace, fmt.Sprintf("fl:%s", email))
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, fmt.Sprintf("fl:%s", HashEmailKey(email)))
 }
 
 func IsLocked(email string) bool {
@@ -243,21 +262,21 @@ func PutEncryptedKey(k *EncryptedKey) error {
 	// Cache locally with 1-hour TTL — enough for async chain upload to complete.
 	// After TTL expires, chain becomes the sole source of truth.
 	expiresAt := time.Now().Add(1 * time.Hour).Unix()
-	return SECRET_DB.CacheKey(Web3AuthNamespace, "k:"+k.Email, b, expiresAt)
+	return SECRET_DB.CacheKey(Web3AuthNamespace, "k:"+HashEmailKey(k.Email), b, expiresAt)
 }
 
 func GetEncryptedKey(email string) (*EncryptedKey, error) {
-	return DBGetJson[EncryptedKey](SECRET_DB, Web3AuthNamespace, "k:"+email)
+	return DBGetJson[EncryptedKey](SECRET_DB, Web3AuthNamespace, "k:"+HashEmailKey(email))
 }
 
 // ── OTP ───────────────────────────────────────────────────
 
 func PutOTP(email, otp string) error {
-	return SECRET_DB.SetKey(Web3AuthNamespace, "o:"+email, []byte(otp))
+	return SECRET_DB.SetKey(Web3AuthNamespace, "o:"+HashEmailKey(email), []byte(otp))
 }
 
 func GetOTP(email string) (string, error) {
-	b, err := SECRET_DB.GetKey(Web3AuthNamespace, "o:"+email)
+	b, err := SECRET_DB.GetKey(Web3AuthNamespace, "o:"+HashEmailKey(email))
 	if err != nil {
 		return "", err
 	}
@@ -265,7 +284,7 @@ func GetOTP(email string) (string, error) {
 }
 
 func DeleteOTP(email string) error {
-	return SECRET_DB.DeleteKey(Web3AuthNamespace, "o:"+email)
+	return SECRET_DB.DeleteKey(Web3AuthNamespace, "o:"+HashEmailKey(email))
 }
 
 // ── Recovery ──────────────────────────────────────────────
@@ -275,7 +294,7 @@ func PutRecoveryConfig(c *RecoveryConfig) error {
 	if err != nil {
 		return err
 	}
-	return SECRET_DB.SetKey(Web3AuthNamespace, "r:"+c.UserEmail, b)
+	return SECRET_DB.SetKey(Web3AuthNamespace, "r:"+HashEmailKey(c.UserEmail), b)
 }
 
 func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
@@ -302,12 +321,12 @@ func FindRecoveryByEmail(recoveryEmail string) (*RecoveryConfig, error) {
 func PutRecoveryOTP(userEmail, otp string, ttlSeconds int) error {
 	expiresAt := time.Now().Add(time.Duration(ttlSeconds) * time.Second).Unix()
 	data := fmt.Sprintf("%d:%s", expiresAt, otp)
-	key := "ro:" + userEmail
+	key := "ro:" + HashEmailKey(userEmail)
 	return SECRET_DB.CacheKey(Web3AuthNamespace, key, []byte(data), expiresAt)
 }
 
 func GetRecoveryOTP(userEmail string) (string, error) {
-	key := "ro:" + userEmail
+	key := "ro:" + HashEmailKey(userEmail)
 	b, err := SECRET_DB.GetKey(Web3AuthNamespace, key)
 	if err != nil {
 		return "", err
@@ -327,7 +346,7 @@ func GetRecoveryOTP(userEmail string) (string, error) {
 }
 
 func DeleteRecoveryOTP(userEmail string) error {
-	key := "ro:" + userEmail
+	key := "ro:" + HashEmailKey(userEmail)
 	if b, _ := SECRET_DB.GetKey(Web3AuthNamespace, key); len(b) > 0 {
 		parts := strings.SplitN(string(b), ":", 2)
 		if len(parts) == 2 {

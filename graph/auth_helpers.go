@@ -184,9 +184,9 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 // getAuthUserFromContract 读取 AuthUser。
 // 链上合约为数据源，本地缓存仅在异步上链窗口期内回退。
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUser, error) {
-	// 1. 链上合约为数据源
+	// 1. 链上合约为数据源（ref 内部按 HashEmailKey 哈希，与 persistAuthUserToChain 写入侧一致）
 	if tc != nil {
-		ref := "auth_user:" + email
+		ref := "auth_user:" + types.HashEmailKey(email)
 		rec, err := authpkg.AuthGetAuthUser(tc, ref)
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var chainUser types.AuthUser
@@ -196,8 +196,8 @@ func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUs
 		}
 	}
 
-	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口）
-	localUser, _ := types.DBGetJson[types.AuthUser](types.SECRET_DB, types.Web3AuthNamespace, "u:"+email)
+	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口；key 按 HashEmailKey 哈希）
+	localUser, _ := types.DBGetJson[types.AuthUser](types.SECRET_DB, types.Web3AuthNamespace, "u:"+types.HashEmailKey(email))
 	if localUser != nil {
 		return localUser, nil
 	}
