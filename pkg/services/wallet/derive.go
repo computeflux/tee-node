@@ -93,9 +93,11 @@ func (s *WalletService) encryptWithServerKey(email string, keyBytes []byte) erro
 	return nil
 }
 
-// DecryptWithServerKey 用服务端密钥解密私钥
+// DecryptWithServerKey 用服务端密钥解密私钥（先查链上合约，再回退本地缓存）。
 func (s *WalletService) DecryptWithServerKey(email string) ([]byte, error) {
-	record, err := types.GetEncryptedKey(email)
+	// 走带 chain fallback 的 getEncryptedKey：跨节点时本地 PebbleDB 1h TTL
+	// 过期也能从链上合约取回。
+	record, err := s.getEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no stored key for %s", email)
 	}

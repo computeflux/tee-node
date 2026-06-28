@@ -44,6 +44,7 @@ ext/experimental/dss
 
 hack/build/keys
 tee-chain/runtime/wasm/ego/ego
+ext/email_test.go
 
 # Local secrets / operator config (NEVER commit)
 .env

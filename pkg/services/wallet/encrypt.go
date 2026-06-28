@@ -51,9 +51,11 @@ func (s *WalletService) EncryptPrivateKey(email, passwordHash string) error {
 	return nil
 }
 
-// DecryptPrivateKey 用用户密码解密私钥
+// DecryptPrivateKey 用用户密码解密私钥（先查链上合约，再回退本地缓存）。
 func (s *WalletService) DecryptPrivateKey(email, passwordHash string) (*ecdsa.PrivateKey, error) {
-	record, err := types.GetEncryptedKey(email)
+	// 走带 chain fallback 的 getEncryptedKey：跨节点时本地 PebbleDB 1h TTL
+	// 过期也能从链上合约取回。避免出现本地找不到、链上有却解不开的情况。
+	record, err := s.getEncryptedKey(email)
 	if err != nil || record == nil {
 		return nil, fmt.Errorf("no encrypted key found — set a transaction password first")
 	}
