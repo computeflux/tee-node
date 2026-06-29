@@ -288,6 +288,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	cfg.BreakerConfig.MinSampleSize = 5
 	cfg.BreakerConfig.FailureRate = 0.5
 	cfg.BreakerConfig.OpenDuration = 100 * time.Millisecond
+	cfg.BreakerConfig.HalfOpenProbes = 1 // 1 个探测成功即关闭熔断器
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
 	sch.AttachMetrics()
@@ -319,8 +320,8 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	// 再次请求，应该被熔断器拦截
 	log.Reset()
 	_, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
-	if log.Count("DEBUG", "breaker blocked") != 1 {
-		t.Errorf("expected 1 breaker blocked log, got %d", log.Count("DEBUG", "breaker blocked"))
+	if log.Count("DEBUG", "breaker blocked") < 1 {
+		t.Errorf("expected at least 1 breaker blocked log, got %d", log.Count("DEBUG", "breaker blocked"))
 	}
 	if err == nil {
 		t.Fatalf("expected error when breaker is open, got nil")
@@ -452,13 +453,12 @@ func TestIntegration_AuthDeadKey(t *testing.T) {
 			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
 
 	cfg := DefaultConfig()
-	cfg.MaxRetries = 5
+	cfg.MaxRetries = 20 // 三个随机端点,需足够多的尝试次数保证全部踩到
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
 	sch.AttachMetrics()

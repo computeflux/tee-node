@@ -15,11 +15,12 @@ import (
 //	  - latency_factor:1 + EMA_latency / 1s       延迟惩罚
 //
 // 冷启动期(样本数 < threshold)只用 weight,避免冷启动抖动。
-// 熔断时直接返回 0(被 selector 跳过)。
+//
+// 注意:不再因为 CircuitOpen=true 直接返回 0。如果在 selector 阶段过滤
+// 熔断端点,Breaker.Allow 永远拿不到该端点,也就无法完成
+// Open → HalfOpen 的状态转换(死锁)。熔断状态完全由 Breaker 自己
+// 在 Allow 中判断,并允许 HalfOpen 探测请求通过。
 func computeScore(weight float64, m *EndpointMetrics, coldStartThreshold int) float64 {
-	if m.CircuitOpen.Load() {
-		return 0
-	}
 	total := m.TotalRequests.Load()
 	if total < int64(coldStartThreshold) {
 		return weight

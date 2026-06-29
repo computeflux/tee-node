@@ -386,8 +386,9 @@ func TestComputeScore(t *testing.T) {
 		t.Errorf("expected ~0.5, got %v", score)
 	}
 	m.CircuitOpen.Store(true)
-	if score := computeScore(2.0, m, 20); score != 0 {
-		t.Errorf("circuit open should return 0, got %v", score)
+	// 熔断标记不再过滤 score,熔断由 Breaker.Allow 在调用阶段拦截。
+	if score := computeScore(2.0, m, 20); score < 0.49 || score > 0.51 {
+		t.Errorf("circuit open should not change score (breaker gates it instead), got %v", score)
 	}
 }
 
