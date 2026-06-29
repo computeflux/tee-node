@@ -48,6 +48,12 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	// 启动 Gateway 优化组件：异步用量 writer + 缓存刷新 + 限流器清理 + 用量结算
 	gateway.InitOptimizations()
 
+	// 启动 LLM 路由调度器（端点选择 / 并发 / 熔断 / 跨协议转换 / 计费），
+	// 供 HandleRelay 经全局单例使用。必须在 SetContractBridge 之后。
+	if err := gateway.InitScheduler(ctx, s); err != nil {
+		return fmt.Errorf("init scheduler: %w", err)
+	}
+
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},

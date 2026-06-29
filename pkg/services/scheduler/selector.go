@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 // computeScore 计算端点的综合评分(越大越优先)。
@@ -62,16 +63,22 @@ func newCandidateSlice() []Candidate {
 }
 
 // Select 从 route.Endpoints 中挑一个可用端点。
+// skip 中的 KeyID(已 dead 或本轮已用)会被排除;所有候选都被排除时返回 nil,
+// 让调用方据此触发「第二次机会」清空逻辑,而不是空转重试同一批 key。
 // 返回 nil 表示无可用端点。
-func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThreshold int) *Endpoint {
+func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThreshold int, skip map[string]bool) *Endpoint {
 	cands := s.pool.Get().([]Candidate)
 	cands = cands[:0]
 	defer func() { s.pool.Put(cands) }()
 
-	var skippedDisabled, skippedModel, skippedConcurrency, skippedScore int
+	var skippedDisabled, skippedExcluded, skippedModel, skippedConcurrency, skippedScore int
 	for _, ep := range route.Endpoints {
 		if !ep.Enabled {
 			skippedDisabled++
+			continue
+		}
+		if skip[ep.KeyID] {
+			skippedExcluded++
 			continue
 		}
 		if !modelAllowed(ep.Models, route.Model) {
@@ -91,7 +98,7 @@ func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThres
 	}
 	if len(cands) == 0 {
 		// 在 debug 级别记录详细原因，生产环境通常不开启
-		_ = skippedDisabled + skippedModel + skippedConcurrency + skippedScore
+		_ = skippedDisabled + skippedExcluded + skippedModel + skippedConcurrency + skippedScore
 		return nil
 	}
 	return weightedPick(cands, s.randFloat64())
@@ -151,5 +158,5 @@ func updateEMA(metrics *EndpointMetrics, latencyMicros int64, alpha float64) {
 
 // int64Fast 返回一个轻量时间源(纳秒),用做 RNG 种子。
 func int64Fast() int64 {
-	return timeNowUnixNano()
+	return time.Now().UnixNano()
 }

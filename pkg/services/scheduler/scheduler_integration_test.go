@@ -419,9 +419,14 @@ func TestIntegration_RateLimit429(t *testing.T) {
 	sch := New(cfg, reg, NoopObservability())
 	sch.AttachMetrics()
 
+	// 三个端点首次调用都返回 429。冷启动评分相等,selector 均匀随机,所以无论先选哪个
+	// 都会触发限流退避;随后 selector 会排除已限流的 key,直到全部排除时返回 nil,触发
+	// 「清空 usedKeys 第二次机会」—— 此时各 key 的 429 已出队,重试即成功。
+	// 这样无需依赖随机顺序就能稳定覆盖「退避 + 跨 key 回退后成功」。
 	client := newMockClient()
 	client.QueueErrors("key-a", &UpstreamError{Status: 429, Message: "rate limit"})
 	client.QueueErrors("key-b", &UpstreamError{Status: 429, Message: "rate limit"})
+	client.QueueErrors("key-c", &UpstreamError{Status: 429, Message: "rate limit"})
 	sch.RegisterProvider("openai", client)
 
 	res, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ── OpenAIAdaptor ──────────────────────────────────────────
@@ -12,19 +11,16 @@ import (
 func TestOpenAIAdaptor_GetRequestURL(t *testing.T) {
 	a := &OpenAIAdaptor{}
 
-	url, err := a.GetRequestURL(&Meta{BaseURL: "https://api.openai.com", RequestURLPath: "/v1/chat/completions"})
-	require.NoError(t, err)
-	assert.Equal(t, "https://api.openai.com/v1/chat/completions", url)
+	assert.Equal(t, "https://api.openai.com/v1/chat/completions",
+		a.requestURL("https://api.openai.com", "/v1/chat/completions"))
 
 	// Deduplicate overlapping path segment
-	url, err = a.GetRequestURL(&Meta{BaseURL: "https://api.minimaxi.com/v1", RequestURLPath: "/v1/chat/completions"})
-	require.NoError(t, err)
-	assert.Equal(t, "https://api.minimaxi.com/v1/chat/completions", url)
+	assert.Equal(t, "https://api.minimaxi.com/v1/chat/completions",
+		a.requestURL("https://api.minimaxi.com/v1", "/v1/chat/completions"))
 
 	// Empty path
-	url, err = a.GetRequestURL(&Meta{BaseURL: "https://api.openai.com", RequestURLPath: ""})
-	require.NoError(t, err)
-	assert.Equal(t, "https://api.openai.com", url)
+	assert.Equal(t, "https://api.openai.com",
+		a.requestURL("https://api.openai.com", ""))
 }
 
 func TestOpenAIAdaptor_GetProviderName(t *testing.T) {
@@ -36,9 +32,8 @@ func TestOpenAIAdaptor_GetProviderName(t *testing.T) {
 
 func TestAnthropicAdaptor_GetRequestURL(t *testing.T) {
 	a := &AnthropicAdaptor{}
-	url, err := a.GetRequestURL(&Meta{BaseURL: "https://api.anthropic.com"})
-	require.NoError(t, err)
-	assert.Equal(t, "https://api.anthropic.com/v1/messages", url)
+	assert.Equal(t, "https://api.anthropic.com/v1/messages",
+		a.requestURL("https://api.anthropic.com", ""))
 }
 
 // ── GeminiAdaptor ──────────────────────────────────────────

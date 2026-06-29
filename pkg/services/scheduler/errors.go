@@ -116,6 +116,7 @@ func Classify(err error) ErrorClass {
 		case ue.Status >= 400 && ue.Status < 500:
 			return ClassClient
 		}
+
 		// 一些供应商把 429 写到 message 里
 		if isRateLimitText(ue.Message) || isRateLimitText(ue.Code) {
 			return ClassRateLimit

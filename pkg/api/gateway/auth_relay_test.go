@@ -3,15 +3,13 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
-	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
+	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -27,30 +25,22 @@ func setupMockFns(t *testing.T) func() {
 	// Save all mockable function pointers and restore on cleanup
 	old := map[string]interface{}{
 		"findTokenCachedFn":        findTokenCachedFn,
-		"findProviderNameFn":       findProviderNameFn,
-		"findGatewayModelByNameFn": findGatewayModelByNameFn,
 		"getBridgeFn":              getBridgeFn,
 		"gatewayGetCreditFn":       gatewayGetCreditFn,
 		"getCachedGatewayModelsFn": getCachedGatewayModelsFn,
-		"relayToUpstreamFn":        relayToUpstreamFn,
-		"streamRelayFn":            streamRelayFn,
 		"recordUsageAsyncFn":       recordUsageAsyncFn,
 	}
 
 	// Reset global state
-	endpointLimiters = make(map[uint64]*EndpointRateLimiter)
 	providerMetrics = make(map[uint64]*providerMetric)
 
 	return func() {
 		findTokenCachedFn = old["findTokenCachedFn"].(func(string) *types.GatewayTokenInfo)
-		findProviderNameFn = old["findProviderNameFn"].(func(string) *cgateway.ProviderInfoWithID)
-		findGatewayModelByNameFn = old["findGatewayModelByNameFn"].(func(uint64, string) *cgateway.ModelInfoWithID)
 		getBridgeFn = old["getBridgeFn"].(func() *teechain.TeeChain)
 		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
 		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
-		relayToUpstreamFn = old["relayToUpstreamFn"].(func(http.ResponseWriter, *http.Request, *types.GatewayEndpoint, string, []byte, bool, uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error))
-		streamRelayFn = old["streamRelayFn"].(func(http.ResponseWriter, *http.Request, *types.GatewayEndpoint, string, []byte, uint16, bool, protocol.Protocol, protocol.Protocol, []byte) (*relay.Usage, bool))
 		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
+		scheduler.ResetGlobal()
 	}
 }
 
@@ -64,33 +54,6 @@ func makeTestToken(active bool) *types.GatewayTokenInfo {
 	}
 }
 
-func makeTestProvider(name string, active bool) *cgateway.ProviderInfoWithID {
-	return &cgateway.ProviderInfoWithID{
-		ID: 1,
-		Data: cgateway.ProviderInfo{
-			Owner:    cstore.UniAddr{T: 0, V: []byte{0x01}},
-			Name:     name,
-			IsActive: active,
-		},
-	}
-}
-
-func makeTestModel(name string, active bool, apiKeys []string) *cgateway.ModelInfoWithID {
-	return &cgateway.ModelInfoWithID{
-		ID: 1,
-		Data: cgateway.ModelInfo{
-			Name:         name,
-			Owner:        cstore.UniAddr{T: 0, V: []byte{0x02}},
-			ProviderID:   1,
-			ProviderType: 1,
-			URI:          "https://api.openai.com",
-			APIKeys:      apiKeys,
-			IsActive:     active,
-			CreatedAt:    uint64(time.Now().Unix()),
-		},
-	}
-}
-
 func requestWithToken(token *types.GatewayTokenInfo, body string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
 	if token != nil {
@@ -100,15 +63,94 @@ func requestWithToken(token *types.GatewayTokenInfo, body string) *http.Request 
 	return req
 }
 
-func requestWithContext(token *types.GatewayTokenInfo, modelData *cgateway.ModelInfoWithID, endpoint *types.GatewayEndpoint, body string) *http.Request {
-	req := requestWithToken(token, body)
-	if modelData != nil {
-		req = req.WithContext(context.WithValue(req.Context(), ctxModel, modelData))
+// ── fake scheduler plumbing ────────────────────────────────
+
+// fakeAdaptor 实现 scheduler.ProviderClient，回放预置的上游响应，
+// 并记录收到的 body / 是否流式，供断言。
+type fakeAdaptor struct {
+	respBody   string
+	respStatus int
+	gotBody    []byte
+	gotPath    string
+	gotStream  bool
+}
+
+func (f *fakeAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byte) ([]byte, error) {
+	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
+	if err != nil {
+		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
-	if endpoint != nil {
-		req = req.WithContext(context.WithValue(req.Context(), ctxEndpoint, endpoint))
+	f.gotBody = sendBody
+	f.gotPath = upstreamPath
+	f.gotStream = false
+	if f.respStatus >= 400 {
+		return nil, &scheduler.UpstreamError{Status: f.respStatus, Message: f.respBody}
 	}
-	return req
+	return []byte(f.respBody), nil
+}
+
+func (f *fakeAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body []byte) (scheduler.Stream, error) {
+	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
+	if err != nil {
+		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
+	}
+	f.gotBody = sendBody
+	f.gotPath = upstreamPath
+	f.gotStream = true
+	if f.respStatus >= 400 {
+		return nil, &scheduler.UpstreamError{Status: f.respStatus, Message: f.respBody}
+	}
+	return &fakeStream{data: []byte(f.respBody)}, nil
+}
+
+// fakeStream 把预置响应体作为单个 chunk 返回，然后结束。
+type fakeStream struct {
+	data []byte
+	sent bool
+}
+
+func (s *fakeStream) Next(ctx context.Context) (*scheduler.StreamChunk, error) {
+	if !s.sent {
+		s.sent = true
+		return &scheduler.StreamChunk{Data: s.data, Index: 0}, nil
+	}
+	return &scheduler.StreamChunk{Index: 1, IsFinal: true}, nil
+}
+
+func (s *fakeStream) Close() error { return nil }
+
+// installScheduler 构造一个挂着 fake provider client 的全局 scheduler，并注册一条
+// 指向该 provider 的路由。返回后会在测试结束时 ResetGlobal。
+func installScheduler(t *testing.T, providerName, modelKey, upstreamModel string, providerType uint16, fake scheduler.ProviderClient) {
+	t.Helper()
+	gw, err := scheduler.NewGatewayScheduler()
+	require.NoError(t, err)
+
+	gw.RegisterProviders(map[string]scheduler.ProviderClient{providerName: fake})
+	scheduler.SetRequestTransform(schedulerRequestTransform)
+	gw.ReloadRegistry([]*scheduler.ModelRoute{
+		{
+			Model: scheduler.ModelKey(modelKey),
+			Endpoints: []*scheduler.Endpoint{
+				{
+					Provider:           scheduler.ProviderID(providerName),
+					Protocol:           scheduler.ProviderID(providerName),
+					KeyID:              "k1",
+					KeyValue:           "sk-test",
+					BaseURL:            "https://upstream.test",
+					Weight:             1,
+					Enabled:            true,
+					Models:             []scheduler.ModelKey{scheduler.ModelKey(modelKey), "*"},
+					ModelID:            1,
+					ContractProviderID: 1,
+					ModelName:          upstreamModel,
+					ProviderType:       providerType,
+				},
+			},
+		},
+	})
+	gw.Start(context.Background())
+	scheduler.SetGlobal(gw)
 }
 
 // ── TokenAuthMiddleware ────────────────────────────────────
@@ -205,6 +247,7 @@ func TestTokenAuthMiddleware_InactiveToken(t *testing.T) {
 }
 
 // ── DistributeMiddleware ───────────────────────────────────
+// 端点/模型解析已下沉到 scheduler；中间件只负责:读 body、解析 model 名、查积分。
 
 func TestDistributeMiddleware_MissingModel(t *testing.T) {
 	cleanup := setupMockFns(t)
@@ -223,25 +266,17 @@ func TestDistributeMiddleware_MissingModel(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "model is null")
 }
 
-func TestDistributeMiddleware_ValidRoute(t *testing.T) {
+func TestDistributeMiddleware_PassesThrough(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	provider := makeTestProvider("openai", true)
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
 	getBridgeFn = func() *teechain.TeeChain { return nil } // skip credit check
-	gatewayGetCreditFn = func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) { return 100, nil }
 
-	var ctxModel *cgateway.ModelInfoWithID
-	var ctxEndpoint *types.GatewayEndpoint
-	var ctxBody []byte
+	var gotModel string
+	var gotBody []byte
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctxModel = GetModelFromContext(r)
-		ctxEndpoint = GetEndpointFromContext(r)
-		ctxBody = GetBodyFromContext(r)
+		gotModel = GetModelNameFromContext(r)
+		gotBody = GetBodyFromContext(r)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -251,127 +286,41 @@ func TestDistributeMiddleware_ValidRoute(t *testing.T) {
 	mw.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	require.NotNil(t, ctxModel)
-	assert.Equal(t, "gpt-4", ctxModel.Data.Name)
-	require.NotNil(t, ctxEndpoint)
-	assert.Equal(t, "https://api.openai.com", ctxEndpoint.URL)
-	assert.Equal(t, "sk-test", ctxEndpoint.APIKey)
-	require.NotNil(t, ctxBody)
-	assert.Contains(t, string(ctxBody), `"model":"gpt-4"`)
+	assert.Equal(t, "openai/gpt-4", gotModel)
+	require.NotNil(t, gotBody)
+	// body 里的 model 前缀被剥掉,发往上游的是裸模型名。
+	assert.Contains(t, string(gotBody), `"model":"gpt-4"`)
+	assert.NotContains(t, string(gotBody), `openai/gpt-4`)
 }
 
-func TestDistributeMiddleware_ProviderNotFound(t *testing.T) {
+func TestDistributeMiddleware_QueryStringModel(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return nil }
+	getBridgeFn = func() *teechain.TeeChain { return nil }
 
+	var gotModel string
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotModel = GetModelNameFromContext(r)
 		w.WriteHeader(http.StatusOK)
 	})
 
 	mw := DistributeMiddleware(next)
 	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{"model":"openai/gpt-4"}`)
+	req := requestWithToken(makeTestToken(true), `{}`)
+	q := req.URL.Query()
+	q.Set("model", "openai/gpt-4")
+	req.URL.RawQuery = q.Encode()
 	mw.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "provider not available")
-}
-
-func TestDistributeMiddleware_ProviderInactive(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	provider := makeTestProvider("openai", false) // inactive
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := DistributeMiddleware(next)
-	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{"model":"openai/gpt-4"}`)
-	mw.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "provider not available")
-}
-
-func TestDistributeMiddleware_ProviderNameMismatch(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	provider := makeTestProvider("wrong-name", true)
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := DistributeMiddleware(next)
-	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{"model":"openai/gpt-4"}`)
-	mw.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "provider name")
-}
-
-func TestDistributeMiddleware_ModelNotFound(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	provider := makeTestProvider("openai", true)
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return nil }
-
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := DistributeMiddleware(next)
-	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{"model":"openai/gpt-4"}`)
-	mw.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusNotFound, w.Code)
-	assert.Contains(t, w.Body.String(), "model not found")
-}
-
-func TestDistributeMiddleware_NoEndpoints(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	provider := makeTestProvider("openai", true)
-	modelData := makeTestModel("gpt-4", true, []string{}) // no API keys
-
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
-
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := DistributeMiddleware(next)
-	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{"model":"openai/gpt-4"}`)
-	mw.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "no available endpoints")
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "openai/gpt-4", gotModel)
 }
 
 func TestDistributeMiddleware_InsufficientCredit(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	provider := makeTestProvider("openai", true)
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
 	getBridgeFn = func() *teechain.TeeChain { return &teechain.TeeChain{} } // non-nil bridge triggers credit check
 	gatewayGetCreditFn = func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) { return 0, nil }
 
@@ -386,36 +335,6 @@ func TestDistributeMiddleware_InsufficientCredit(t *testing.T) {
 
 	assert.Equal(t, http.StatusPaymentRequired, w.Code)
 	assert.Contains(t, w.Body.String(), "insufficient credit")
-}
-
-func TestDistributeMiddleware_QueryStringModel(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	provider := makeTestProvider("openai", true)
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	findProviderNameFn = func(name string) *cgateway.ProviderInfoWithID { return provider }
-	findGatewayModelByNameFn = func(pid uint64, name string) *cgateway.ModelInfoWithID { return modelData }
-	getBridgeFn = func() *teechain.TeeChain { return nil }
-
-	var ctxModel *cgateway.ModelInfoWithID
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctxModel = GetModelFromContext(r)
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := DistributeMiddleware(next)
-	w := httptest.NewRecorder()
-	req := requestWithToken(makeTestToken(true), `{}`)
-	q := req.URL.Query()
-	q.Set("model", "openai/gpt-4")
-	req.URL.RawQuery = q.Encode()
-	mw.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	require.NotNil(t, ctxModel)
-	assert.Equal(t, "gpt-4", ctxModel.Data.Name)
 }
 
 // ── HandleListModels ───────────────────────────────────────
@@ -465,122 +384,85 @@ func TestHandleListModels_Empty(t *testing.T) {
 
 // ── HandleRelay ────────────────────────────────────────────
 
-func TestHandleRelay_MissingEndpoint(t *testing.T) {
+func TestHandleRelay_SchedulerNotReady(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
+	scheduler.ResetGlobal() // ensure no global
+
 	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), makeTestModel("gpt-4", true, []string{"sk-test"}), nil, `{}`)
+	req := requestWithToken(makeTestToken(true), `{"model":"gpt-4"}`)
+	req = req.WithContext(context.WithValue(req.Context(), ctxBody, []byte(`{"model":"gpt-4"}`)))
+	req = req.WithContext(context.WithValue(req.Context(), ctxModelName, "openai/gpt-4"))
 	HandleRelay(w, req)
 
 	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "no route")
+	assert.Contains(t, w.Body.String(), "scheduler not ready")
 }
 
-func TestHandleRelay_MissingModel(t *testing.T) {
+func TestHandleRelay_ModelNotConfigured(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &types.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
-	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), nil, endpoint, `{}`)
-	HandleRelay(w, req)
-
-	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
-	assert.Contains(t, w.Body.String(), "no route")
-}
-
-func TestHandleRelay_RateLimited(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	endpoint := &types.GatewayEndpoint{ID: 99, URL: "https://api.openai.com", APIKey: "sk-test"}
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	// Pre-exhaust the limiter: Allow 50 times (openai default maxConc=50) without Done
-	lim := getEndpointLimiter(endpoint.ID, 0)
-	for i := 0; i < 50; i++ {
-		lim.Allow()
-	}
-
-	// Mock relay so we don't hit real upstream if rate limit doesn't trigger
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-		t.Fatal("relayToUpstream should not be called when rate limited")
-		return nil, nil, nil
-	}
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, &fakeAdaptor{respBody: `{}`})
 
 	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), modelData, endpoint, `{}`)
+	body := `{"model":"openai/unknown-model"}`
+	req := requestWithToken(makeTestToken(true), body)
+	req = req.WithContext(context.WithValue(req.Context(), ctxBody, []byte(body)))
+	req = req.WithContext(context.WithValue(req.Context(), ctxModelName, "openai/unknown-model"))
 	HandleRelay(w, req)
 
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
-	assert.Contains(t, w.Body.String(), "rate limited")
-
-	// Cleanup inflight
-	for i := 0; i < 50; i++ {
-		lim.Done()
-	}
-}
-
-func TestHandleRelay_UpstreamBizError(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	endpoint := &types.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-		return nil, &relay.ErrorWithStatusCode{StatusCode: http.StatusBadRequest, Error: relay.ErrorDetail{Message: "bad request", Type: "invalid_request"}}, nil
-	}
-
-	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), modelData, endpoint, `{}`)
-	HandleRelay(w, req)
-
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "bad request")
-}
-
-func TestHandleRelay_UpstreamTransportError(t *testing.T) {
-	cleanup := setupMockFns(t)
-	defer cleanup()
-
-	endpoint := &types.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-		return nil, nil, fmt.Errorf("connection refused")
-	}
-
-	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), modelData, endpoint, `{}`)
-	HandleRelay(w, req)
-
-	assert.Equal(t, http.StatusBadGateway, w.Code)
-	assert.Contains(t, w.Body.String(), "connection refused")
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestHandleRelay_Success(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	endpoint := &types.GatewayEndpoint{ID: 1, URL: "https://api.openai.com", APIKey: "sk-test"}
-	modelData := makeTestModel("gpt-4", true, []string{"sk-test"})
-
 	var recorded bool
 	recordUsageAsyncFn = func(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cached uint64) {
 		recorded = true
+		assert.Equal(t, uint64(10), in)
+		assert.Equal(t, uint64(5), out)
 	}
 
-	relayToUpstreamFn = func(w http.ResponseWriter, r *http.Request, ep *types.GatewayEndpoint, modelName string, body []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-		return &relay.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, nil, nil
+	fake := &fakeAdaptor{
+		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`,
 	}
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, fake)
 
 	w := httptest.NewRecorder()
-	req := requestWithContext(makeTestToken(true), modelData, endpoint, `{}`)
+	body := `{"model":"openai/gpt-4","messages":[{"role":"user","content":"hello"}]}`
+	req := requestWithToken(makeTestToken(true), body)
+	req.URL.Path = "/v1/chat/completions"
+	req = req.WithContext(context.WithValue(req.Context(), ctxBody, []byte(body)))
+	req = req.WithContext(context.WithValue(req.Context(), ctxModelName, "openai/gpt-4"))
 	HandleRelay(w, req)
 
-	// Success: no explicit status code written by HandleRelay on success path
-	// (relayToUpstream writes response directly to w)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"chatcmpl-1"`)
 	assert.True(t, recorded, "usage should be recorded")
+	// 同协议透传:发往上游的 model 名应保持原样(由 reqBody 决定)
+	assert.Equal(t, "/v1/chat/completions", fake.gotPath)
 }
+
+func TestHandleRelay_UpstreamError(t *testing.T) {
+	cleanup := setupMockFns(t)
+	defer cleanup()
+
+	fake := &fakeAdaptor{respStatus: http.StatusBadRequest, respBody: `{"error":{"message":"bad request"}}`}
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, fake)
+
+	w := httptest.NewRecorder()
+	body := `{"model":"openai/gpt-4"}`
+	req := requestWithToken(makeTestToken(true), body)
+	req = req.WithContext(context.WithValue(req.Context(), ctxBody, []byte(body)))
+	req = req.WithContext(context.WithValue(req.Context(), ctxModelName, "openai/gpt-4"))
+	HandleRelay(w, req)
+
+	// 上游 4xx 被 scheduler 归类为 client error,映射回对应状态码。
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+var _ = time.Now

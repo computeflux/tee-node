@@ -34,7 +34,7 @@ func (k EndpointKey) String() string { return string(k.Provider) + "/" + k.KeyID
 // Endpoint = 一个 (供应商, API key) 对。
 // 同一供应商可以有多个 Endpoint(多个 key),分别参与负载均衡。
 type Endpoint struct {
-	Provider ProviderID `json:"provider"`  // provider 节点名（如 "node-7f3a"）
+	Provider ProviderID `json:"provider"` // provider 节点名（如 "node-7f3a"）
 	Protocol ProviderID `json:"protocol"` // 协议类型（如 "openai"/"anthropic"/"gemini"）
 	KeyID    string     `json:"key_id"`
 	KeyValue string     `json:"key_value"`
@@ -52,6 +52,16 @@ type Endpoint struct {
 
 	// ExtraHeaders 是每次请求都要带的 header(如 OpenAI 的 Organization)。
 	ExtraHeaders map[string]string `json:"extra_headers,omitempty"`
+
+	// ── 计费 / 上游调用身份（由 reloader 从合约盖章）──
+	// 这些字段让 HandleRelay 在 scheduler 选完端点后,无需回查合约即可:
+	//   - provider client 发上游请求(模型名 / provider id / provider type)
+	//   - 上报 provider 指标(EmitProviderMetric)
+	//   - 记录用量计费(recordUsageAsync 需要 ModelID + ContractProviderID)
+	ModelID            uint64 `json:"model_id,omitempty"`             // 合约 model id(计费 key)
+	ContractProviderID uint64 `json:"contract_provider_id,omitempty"` // 合约 provider id
+	ModelName          string `json:"model_name,omitempty"`           // 上游真实 model name
+	ProviderType       uint16 `json:"provider_type,omitempty"`        // 合约 ProviderType(选 client / 转换用)
 
 	// metrics 是端点的实时指标(由 Scheduler 初始化时注入)。
 	// 不导出 JSON,因为它是运行时状态。

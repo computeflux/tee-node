@@ -3,13 +3,11 @@ package scheduler
 import (
 	"context"
 	"fmt"
-
-	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 )
 
 // GatewayScheduler 把 Scheduler 封装成 TEE 节点的一个服务。
 // 提供:
-//   - ProviderClient 注册(用现有 relay.Adaptor)
+//   - ProviderClient 注册(由 gateway_relay 直接实现)
 //   - 路由表热更新
 //   - Schedule / ScheduleStream 给 HandleRelay 调用
 type GatewayScheduler struct {
@@ -45,32 +43,32 @@ func (g *GatewayScheduler) SetLog(l Logger) {
 	g.scheduler.cfg.Log = l
 }
 
-// RegisterProvider 把一个 relay.Adaptor 注册成 scheduler 的 provider。
+// RegisterProvider 把一个 ProviderClient 注册成 scheduler 的 provider。
 // 调用示例:
 //
-//	gw.RegisterProvider("openai", relay.GetAdaptorForProviderTypeCode(cgateway.ProviderOpenAI))
-func (g *GatewayScheduler) RegisterProvider(name string, a relay.Adaptor) {
+//	gw.RegisterProvider("openai", relay.GetProviderClient(cgateway.ProviderOpenAI))
+func (g *GatewayScheduler) RegisterProvider(name string, c ProviderClient) {
 	g.log.Info("registering provider", "name", name)
-	g.scheduler.RegisterProvider(ProviderID(name), NewAdaptorClient(a))
+	g.scheduler.RegisterProvider(ProviderID(name), c)
 }
 
 // RegisterProviders 批量注册 provider。
-func (g *GatewayScheduler) RegisterProviders(providers map[string]relay.Adaptor) {
+func (g *GatewayScheduler) RegisterProviders(providers map[string]ProviderClient) {
 	g.log.Info("batch registering providers", "count", len(providers))
 	batch := make(map[ProviderID]ProviderClient, len(providers))
-	for name, a := range providers {
-		batch[ProviderID(name)] = NewAdaptorClient(a)
+	for name, c := range providers {
+		batch[ProviderID(name)] = c
 	}
 	g.scheduler.RegisterClients(batch)
 }
 
 // ReplaceClients 全量替换 provider clients。
 // 当合约新增了 provider 协议类型（或删除了旧类型）时调用。
-func (g *GatewayScheduler) ReplaceClients(providers map[string]relay.Adaptor) {
+func (g *GatewayScheduler) ReplaceClients(providers map[string]ProviderClient) {
 	g.log.Info("replacing all provider clients", "count", len(providers))
 	batch := make(map[ProviderID]ProviderClient, len(providers))
-	for name, a := range providers {
-		batch[ProviderID(name)] = NewAdaptorClient(a)
+	for name, c := range providers {
+		batch[ProviderID(name)] = c
 	}
 	g.scheduler.ReplaceClients(batch)
 }

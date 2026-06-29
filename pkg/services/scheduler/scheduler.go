@@ -13,32 +13,32 @@ import (
 
 // Config 是调度器的核心配置。
 type Config struct {
-	MaxRetries          int
-	BackoffInitial      time.Duration
-	BackoffMax          time.Duration
-	BackoffJitterMin    float64 // 默认 0.8
-	BackoffJitterMax    float64 // 默认 1.2
-	ColdStartSamples    int     // 端点冷启动样本阈值,默认 20
-	EMADecay            float64 // 延迟 EMA 衰减,默认 0.3
-	BreakerConfig       BreakerConfig
-	BreakerTickInterval time.Duration // 默认 5s
-	Log                 Logger        // 可选日志接口，nil 时静默
-	SoftConcurrencyRatio float64      // 软限制倍率，默认 1.0（硬限制）
+	MaxRetries           int
+	BackoffInitial       time.Duration
+	BackoffMax           time.Duration
+	BackoffJitterMin     float64 // 默认 0.8
+	BackoffJitterMax     float64 // 默认 1.2
+	ColdStartSamples     int     // 端点冷启动样本阈值,默认 20
+	EMADecay             float64 // 延迟 EMA 衰减,默认 0.3
+	BreakerConfig        BreakerConfig
+	BreakerTickInterval  time.Duration // 默认 5s
+	Log                  Logger        // 可选日志接口，nil 时静默
+	SoftConcurrencyRatio float64       // 软限制倍率，默认 1.0（硬限制）
 }
 
 // DefaultConfig 返回合理默认配置。
 func DefaultConfig() Config {
 	return Config{
-		MaxRetries:          3,
-		BackoffInitial:      200 * time.Millisecond,
-		BackoffMax:          5 * time.Second,
-		BackoffJitterMin:    0.8,
-		BackoffJitterMax:    1.2,
-		ColdStartSamples:    20,
-		EMADecay:            0.3,
-		BreakerConfig:       DefaultBreakerConfig(),
-		BreakerTickInterval: 5 * time.Second,
-		Log:                 noopLogger{},
+		MaxRetries:           3,
+		BackoffInitial:       200 * time.Millisecond,
+		BackoffMax:           5 * time.Second,
+		BackoffJitterMin:     0.8,
+		BackoffJitterMax:     1.2,
+		ColdStartSamples:     20,
+		EMADecay:             0.3,
+		BreakerConfig:        DefaultBreakerConfig(),
+		BreakerTickInterval:  5 * time.Second,
+		Log:                  noopLogger{},
 		SoftConcurrencyRatio: 1.0,
 	}
 }
@@ -110,6 +110,7 @@ func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
 	if cfg.BackoffJitterMax == 0 {
 		cfg.BackoffJitterMax = 1.2
 	}
+
 	if obs == nil {
 		obs = NoopObservability()
 	}
@@ -117,6 +118,7 @@ func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
 	if logger == nil {
 		logger = noopLogger{}
 	}
+
 	return &Scheduler{
 		cfg:      cfg,
 		registry: registry,
@@ -267,6 +269,7 @@ func (s *Scheduler) tryOneModel(
 ) (*Result, error) {
 	var deadKeys, usedKeys map[string]bool
 	lastWasRateLimit := false
+	var lastUpstreamErr error // 最近一次端点调用的真实错误,用于耗尽时回传给调用方
 
 	s.log.Debug("tryOneModel begin",
 		"model", model,
@@ -307,14 +310,16 @@ func (s *Scheduler) tryOneModel(
 		}
 
 		if ep == nil {
-			ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples)
+			// 排除已 dead(401)和本轮已被限流(429)的 key,这样所有候选都被排除时
+			// Select 返回 nil,触发下面的「第二次机会」清空逻辑,而不是空转重试已用 key。
+			ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
 		}
 		if ep == nil {
 			// 池子空了:若是 429 周期耗尽,清掉 usedKeys 给滑过窗口的 key 第二次机会
 			if lastWasRateLimit && len(usedKeys) > 0 {
 				s.log.Debug("clearing usedKeys for rate-limit retry", "model", model)
 				usedKeys = nil
-				ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples)
+				ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
 			}
 			if ep == nil {
 				s.log.Warn("no available endpoint", "model", model, "attempt", attempt)
@@ -411,6 +416,7 @@ func (s *Scheduler) tryOneModel(
 		// 失败路径
 		ep.metrics.LastErrorAtUnix.Store(time.Now().Unix())
 		class := Classify(err)
+		lastUpstreamErr = err
 		s.recordFailureClass(ep.metrics, class)
 		updateEMA(ep.metrics, latency.Microseconds(), s.cfg.EMADecay)
 
@@ -495,8 +501,38 @@ func (s *Scheduler) tryOneModel(
 		s.log.Error("all endpoints dead", "model", model, "dead_count", len(deadKeys))
 		return nil, ErrAllEndpointsDead
 	}
-	s.log.Error("retries exhausted", "model", model, "attempts", s.cfg.MaxRetries+1, "dead_count", len(deadKeys))
+	s.log.Error("retries exhausted", "model", model, "attempts", s.cfg.MaxRetries+1, "dead_count", len(deadKeys), "last_error", lastUpstreamErr)
+	// 把最近一次的真实上游错误回传,避免 502 只剩 "retries exhausted" 无从排查。
+	if lastUpstreamErr != nil {
+		// 若上游错误带 HTTP status,透传它(含 status + message),让 mapScheduleError 给出正确状态码。
+		var ue *UpstreamError
+		if errors.As(lastUpstreamErr, &ue) {
+			return nil, &SchedError{
+				Class:   Classify(lastUpstreamErr),
+				Status:  ue.Status,
+				Message: fmt.Sprintf("retries exhausted for model %s: %s", model, ue.Message),
+				Cause:   lastUpstreamErr,
+			}
+		}
+		return nil, fmt.Errorf("retries exhausted for model %s: %w", model, lastUpstreamErr)
+	}
 	return nil, fmt.Errorf("retries exhausted for model %s", model)
+}
+
+// skipSet 合并 dead/used 两个 key 集合给 selector.Select 排除。
+// 都为空时返回 nil(Select 视为不排除)。
+func skipSet(deadKeys, usedKeys map[string]bool) map[string]bool {
+	if len(deadKeys) == 0 && len(usedKeys) == 0 {
+		return nil
+	}
+	skip := make(map[string]bool, len(deadKeys)+len(usedKeys))
+	for k := range deadKeys {
+		skip[k] = true
+	}
+	for k := range usedKeys {
+		skip[k] = true
+	}
+	return skip
 }
 
 // makeMeta 构造 CallMeta。

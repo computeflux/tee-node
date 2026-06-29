@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
+	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -58,159 +60,194 @@ func RegisterGatewayRoutes(r chi.Router) {
 }
 
 func HandleRelay(w http.ResponseWriter, r *http.Request) {
-	endpoint := GetEndpointFromContext(r)
-	modelData := GetModelFromContext(r)
-	if endpoint == nil || modelData == nil {
-		writeProtocolError(w, r, http.StatusServiceUnavailable, "no route", "server_error")
+	gw := scheduler.GetGlobal()
+	if gw == nil {
+		writeProtocolError(w, r, http.StatusServiceUnavailable, "scheduler not ready", "server_error")
 		return
 	}
-	providerTypeStr := providerTypeToLimiterKey(modelData.Data.ProviderType)
-	rpmLimit, maxConc := GetProviderLimits(providerTypeStr)
-	lim := getEndpointLimiter(endpoint.ID, rpmLimit)
-	lim.SetLimits(rpmLimit, maxConc)
-	if !lim.Allow() {
-		rpm, inf := lim.Stats()
-		writeProtocolError(w, r, http.StatusTooManyRequests,
-			fmt.Sprintf("rate limited: %d/%d RPM, %d/%d inflight", rpm, rpmLimit, inf, maxConc), "rate_limit")
-		return
-	}
-	defer lim.Done()
 
+	// 逻辑模型/路由名:去掉 "auto/" 或 "provider/" 前缀,只留 scheduler 的路由键。
+	_, modelKey := parseProviderModel(GetModelNameFromContext(r))
 	bodyBytes := GetBodyFromContext(r)
+	token := GetTokenFromContext(r)
+
 	var reqBody struct {
-		Model  string `json:"model"`
-		Stream bool   `json:"stream"`
+		Stream bool `json:"stream"`
 	}
 	json.Unmarshal(bodyBytes, &reqBody)
 
-	inboundProto := protocol.FromContext(r)
-	providerProto := protocol.ProviderNativeProtocol(modelData.Data.ProviderType)
-
+	inbound := protocol.FromContext(r)
 	requestPath := r.URL.Path
-	if inboundProto == protocol.ProtocolAnthropic {
+	if inbound == protocol.ProtocolAnthropic {
 		requestPath = protocol.CanonicalAnthropicPath(requestPath)
 	}
-	upstreamPath, pathErr := protocol.ResolveUpstreamPath(inboundProto, providerProto, requestPath)
-	if pathErr != nil {
-		writeProtocolError(w, r, http.StatusNotImplemented, pathErr.Error(), "not_implemented")
-		return
-	}
-	relayR := r.Clone(r.Context())
-	relayR.URL.Path = upstreamPath
 
-	// 同协议 = 直接转发
-	if inboundProto == providerProto {
-		usage, bizErr, err := relayToUpstreamFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, reqBody.Stream, modelData.Data.ProviderType)
-		if bizErr != nil {
-			EmitProviderMetric(modelData.Data.ProviderID, false)
-			writeProtocolError(w, r, bizErr.StatusCode, bizErr.Error.Message, "upstream_error")
-			return
-		}
+	// session 亲和:同一用户+模型优先复用上次端点(命中上游 KV cache)。
+	sessionID := ""
+	if token != nil {
+		sessionID = token.Owner + ":" + modelKey
+	}
+
+	// 把入口协议 + 请求路径塞进 ctx,scheduler 选完端点后由 provider client 据此转换请求体。
+	ctx := scheduler.WithRequest(r.Context(), string(inbound), requestPath)
+
+	if reqBody.Stream {
+		res, err := gw.ScheduleStream(ctx, modelKey, bodyBytes, sessionID)
 		if err != nil {
-			EmitProviderMetric(modelData.Data.ProviderID, false)
-			writeProtocolError(w, r, http.StatusBadGateway, err.Error(), "server_error")
+			st, msg, typ := mapScheduleError(err)
+			writeProtocolError(w, r, st, msg, typ)
 			return
 		}
-		EmitProviderMetric(modelData.Data.ProviderID, true)
-		token := GetTokenFromContext(r)
-		if usage != nil {
-			recordUsageAsyncFn(token.Addr, token.ID, modelData,
-				uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
-		}
-		return
-	}
+		ep := res.Meta.Endpoint
+		prov := protocol.ProviderNativeProtocol(ep.ProviderType)
 
-	// 跨协议转换
-	usage, success := streamRelayFn(w, relayR, endpoint, modelData.Data.Name, bodyBytes, modelData.Data.ProviderType, reqBody.Stream, inboundProto, providerProto, bodyBytes)
-	EmitProviderMetric(modelData.Data.ProviderID, success)
-	token := GetTokenFromContext(r)
-	if usage != nil && token != nil {
-		recordUsageAsyncFn(token.Addr, token.ID, modelData,
-			uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
-	}
-}
-
-var relayToUpstreamFn = relayToUpstream
-var streamRelayFn = streamRelay
-
-func relayToUpstream(w http.ResponseWriter, r *http.Request, endpoint *types.GatewayEndpoint, modelName string, bodyBytes []byte, isStream bool, providerType uint16) (*relay.Usage, *relay.ErrorWithStatusCode, error) {
-	ctx := relay.NewRelayContext(w, r)
-	meta := relay.GetMetaByContext(ctx)
-	meta.BaseURL = endpoint.URL
-	meta.APIKey = endpoint.APIKey
-	meta.IsStream = isStream
-	meta.OriginModelName = modelName
-	meta.ProviderId = endpoint.ProviderID
-	meta.ProviderType = providerType
-
-	adaptor := relay.GetAdaptorForProviderTypeCode(providerType)
-	adaptor.Init(meta)
-	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, nil, fmt.Errorf("upstream: %w", err)
-	}
-
-	usage, bizErr := adaptor.DoResponse(ctx, resp, meta)
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
-	}
-	if bizErr != nil {
-		return nil, bizErr, nil
-	}
-	return usage, nil, nil
-}
-
-func streamRelay(w http.ResponseWriter, r *http.Request, endpoint *types.GatewayEndpoint, modelName string, bodyBytes []byte, providerType uint16, isStream bool, inbound, provider protocol.Protocol, origBody []byte) (*relay.Usage, bool) {
-	if !isStream {
-		converted, conv := convertRequest(bodyBytes, inbound, provider, modelName, providerType)
-		if conv != nil {
-			writeProtocolError(w, r, http.StatusBadRequest, conv.Error(), "invalid_request")
-			return nil, false
-		}
-		bodyBytes = converted
-	}
-
-	ctx := relay.NewRelayContext(w, r)
-	meta := relay.GetMetaByContext(ctx)
-	meta.BaseURL = endpoint.URL
-	meta.APIKey = endpoint.APIKey
-	meta.IsStream = isStream
-	meta.OriginModelName = modelName
-	meta.ProviderId = endpoint.ProviderID
-	meta.ProviderType = providerType
-
-	adaptor := relay.GetAdaptorForProviderTypeCode(providerType)
-	adaptor.Init(meta)
-	resp, err := adaptor.DoRequest(ctx, meta, bytes.NewReader(bodyBytes))
-	if err != nil {
-		writeProtocolError(w, r, http.StatusBadGateway, err.Error(), "server_error")
-		return nil, false
-	}
-	defer resp.Body.Close()
-
-	if isStream {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
-		usage, err := streamConvert(resp.Body, w, inbound, provider)
-		if err != nil {
-			writeProtocolError(w, r, http.StatusInternalServerError, err.Error(), "server_error")
-			return nil, false
+
+		usage, serr := writeRelayStream(ctx, w, res.Stream, inbound, prov)
+		EmitProviderMetric(ep.ContractProviderID, serr == nil)
+		if serr != nil {
+			// header 多半已发出,无法再写 error body,仅记录。
+			fmt.Printf("[relay] stream error model=%s provider=%d: %v\n", modelKey, ep.ContractProviderID, serr)
+			return
 		}
-		return usage, true
+		recordRelayUsage(token, ep, usage)
+		return
 	}
 
-	body, _ := io.ReadAll(resp.Body)
-	converted, usage, conv := convertResponse(body, inbound, provider, origBody, providerType)
-	if conv != nil {
-		writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
-		return nil, false
+	res, err := gw.Schedule(ctx, modelKey, bodyBytes, sessionID)
+	if err != nil {
+		st, msg, typ := mapScheduleError(err)
+		writeProtocolError(w, r, st, msg, typ)
+		return
 	}
+	ep := res.Meta.Endpoint
+	prov := protocol.ProviderNativeProtocol(ep.ProviderType)
+
+	var (
+		outBody []byte
+		usage   *relay.Usage
+	)
+	if inbound == prov {
+		outBody = res.Body
+		usage = parseNativeUsage(res.Body, prov)
+	} else {
+		var conv error
+		outBody, usage, conv = convertResponse(res.Body, inbound, prov, bodyBytes, ep.ProviderType)
+		if conv != nil {
+			EmitProviderMetric(ep.ContractProviderID, false)
+			writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write(converted); err != nil {
-		fmt.Printf("[relay] write response body: %v", err)
+	if _, err := w.Write(outBody); err != nil {
+		fmt.Printf("[relay] write response body: %v\n", err)
 	}
-	return usage, true
+	EmitProviderMetric(ep.ContractProviderID, true)
+	recordRelayUsage(token, ep, usage)
+}
+
+// writeRelayStream 把 scheduler 返回的 provider-native 流写成 inbound 协议的 SSE。
+//   - 同协议:逐行透传 + 尽力 sniff usage
+//   - 跨协议:把 chunk 重组成 reader 喂给 streamConvert 转换
+func writeRelayStream(ctx context.Context, w http.ResponseWriter, s scheduler.Stream, inbound, prov protocol.Protocol) (*relay.Usage, error) {
+	flusher, _ := w.(http.Flusher)
+
+	if inbound != prov {
+		return streamConvert(newChunkReader(ctx, s), flushWriter{w: w, fl: flusher}, inbound, prov)
+	}
+
+	var usage *relay.Usage
+	for {
+		chunk, err := s.Next(ctx)
+		if err != nil {
+			return usage, err
+		}
+		if chunk != nil && len(chunk.Data) > 0 {
+			if _, err := w.Write(chunk.Data); err != nil {
+				return usage, err
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+			if u := sniffStreamLine(chunk.Data, prov); u != nil {
+				usage = u
+			}
+		}
+		if chunk != nil && chunk.IsFinal {
+			return usage, nil
+		}
+	}
+}
+
+// sniffStreamLine 从一条 raw SSE 行(可能形如 "data: {...}\n")里提取 usage。
+func sniffStreamLine(line []byte, prov protocol.Protocol) *relay.Usage {
+	s := trimSSELine(line)
+	if s == nil {
+		return nil
+	}
+	return sniffStreamUsage(s, prov)
+}
+
+// trimSSELine 去掉行尾空白和可选的 "data:" 前缀,返回 payload(非 data 行返回 nil)。
+func trimSSELine(line []byte) []byte {
+	// 去尾部 \r\n 和空白
+	end := len(line)
+	for end > 0 && (line[end-1] == '\n' || line[end-1] == '\r' || line[end-1] == ' ') {
+		end--
+	}
+	s := line[:end]
+	if len(s) >= 5 && string(s[:5]) == "data:" {
+		s = s[5:]
+		for len(s) > 0 && s[0] == ' ' {
+			s = s[1:]
+		}
+		return s
+	}
+	return nil
+}
+
+// recordRelayUsage 异步记录用量计费。Endpoint 已携带计费身份(ModelID/ContractProviderID)。
+func recordRelayUsage(token *types.GatewayTokenInfo, ep *scheduler.Endpoint, usage *relay.Usage) {
+	if usage == nil || token == nil || ep == nil {
+		return
+	}
+	model := &cgateway.ModelInfoWithID{
+		ID:   ep.ModelID,
+		Data: cgateway.ModelInfo{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
+	}
+	recordUsageAsyncFn(token.Addr, token.ID, model,
+		uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
+}
+
+// mapScheduleError 把 scheduler 错误映射为 HTTP 状态码 + 协议错误类型。
+func mapScheduleError(err error) (status int, msg, errType string) {
+	// 先处理带具体 HTTP status 的上游错误。
+	// 注意:SchedError.Is 仅按 Class 匹配,ErrModelNotFound 也是 ClassClient,
+	// 若先走 sentinel 分支会把所有 4xx 上游错误误判成 404,因此 Status!=0 优先。
+	var se *scheduler.SchedError
+	if errors.As(err, &se) && se.Status != 0 {
+		typ := "upstream_error"
+		switch {
+		case se.Status == http.StatusTooManyRequests:
+			typ = "rate_limit"
+		case se.Status >= 400 && se.Status < 500:
+			typ = "invalid_request"
+		}
+		return se.Status, se.Message, typ
+	}
+	switch {
+	case errors.Is(err, scheduler.ErrModelNotFound):
+		return http.StatusNotFound, "model not found", "not_found"
+	case errors.Is(err, scheduler.ErrNoHealthyEndpoint), errors.Is(err, scheduler.ErrAllEndpointsDead):
+		return http.StatusServiceUnavailable, "no available endpoint", "server_error"
+	case errors.Is(err, scheduler.ErrCanceled):
+		return http.StatusBadRequest, "request cancelled", "invalid_request"
+	}
+	return http.StatusBadGateway, err.Error(), "server_error"
 }
 
 func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, modelName string, providerType uint16) ([]byte, error) {
@@ -293,19 +330,6 @@ func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol
 		return bifrostUsageToRelay(usage), nil
 	default:
 		return nil, fmt.Errorf("unsupported stream protocol pair: inbound=%v provider=%v", inbound, provider)
-	}
-}
-
-func providerTypeToLimiterKey(providerType uint16) string {
-	switch providerType {
-	case cgateway.ProviderClaude:
-		return "anthropic"
-	case cgateway.ProviderGemini:
-		return "gemini"
-	case cgateway.ProviderPersonal:
-		return "local"
-	default:
-		return "openai"
 	}
 }
 
