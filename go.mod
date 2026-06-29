@@ -23,6 +23,9 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.27
 	github.com/wetee-dao/ink.go v0.1.39
 	go.dedis.ch/kyber/v4 v4.0.2
+	go.opentelemetry.io/otel v1.44.0
+	go.opentelemetry.io/otel/metric v1.44.0
+	go.opentelemetry.io/otel/trace v1.44.0
 	golang.org/x/crypto v0.53.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
@@ -58,6 +61,8 @@ require (
 	github.com/dunglas/httpsfv v1.1.0 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
@@ -133,6 +138,7 @@ require (
 	github.com/valyala/fasthttp v1.71.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/fx v1.24.0 // indirect
 	go.uber.org/mock v0.5.2 // indirect
