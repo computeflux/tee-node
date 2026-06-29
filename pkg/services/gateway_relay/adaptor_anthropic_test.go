@@ -24,6 +24,11 @@ func TestAnthropicAdaptor_GetRequestURL_Dedup(t *testing.T) {
 }
 
 func TestAnthropicAdaptor_Do_ForwardsBodyAndHeaders(t *testing.T) {
+	scheduler.SetRequestTransform(func(inbound, providerProto, reqPath string, providerType uint16, body []byte) ([]byte, string, error) {
+		return body, reqPath, nil
+	})
+	defer scheduler.SetRequestTransform(nil)
+
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/messages" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -49,8 +54,9 @@ func TestAnthropicAdaptor_Do_ForwardsBodyAndHeaders(t *testing.T) {
 	body := []byte(`{"model":"claude-3","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`)
 	a := &AnthropicAdaptor{}
 	ep := &scheduler.Endpoint{BaseURL: upstream.URL, KeyValue: "sk-test"}
+	ctx := scheduler.WithRequest(context.Background(), "anthropic", "/v1/messages")
 
-	resp, err := a.Do(context.Background(), ep, body)
+	resp, err := a.Do(ctx, ep, body)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

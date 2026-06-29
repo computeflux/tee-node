@@ -38,7 +38,6 @@
 | **`reloader.go`** | 链上合约同步：`Reloader` 定期从 `teechain` 合约读取 `ModelRoute`/`ModelInfo`/`ProviderInfo`，构建 `scheduler.ModelRoute`，调用 `ReloadRegistry` 批量刷新。 |
 | **`route_cache.go`** | 辅助缓存：`routeIDToName`（`sync.Map`），用于 `DistributeMiddleware` 把 route ID 映射到 scheduler 键。 |
 | **`global.go`** | 全局单例：`SetGlobal`/`GetGlobal`/`ResetGlobal`，供 `DistributeMiddleware`/`HandleRelay` 在不注入依赖时获取 scheduler 实例。 |
-| **`time.go`** | 时间源抽象：`timeNowUnixNano` 变量，方便测试时替换。 |
 | **`scheduler_test.go`** | 测试覆盖：happy path、429 重试、401 dead key、fallback model、stream、并发信号量、熔断器、registry 热替换、评分算法、错误分类、大规模压测。 |
 
 ---
@@ -481,6 +480,4 @@ types.go ───┬──► scheduler.go ──► service.go
                      ├──► route_cache.go
                      └──► global.go
 
-(辅助)
-time.go ──► selector.go (int64Fast)
 ```

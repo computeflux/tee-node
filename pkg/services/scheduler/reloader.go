@@ -249,7 +249,10 @@ func providerDefaultURL(providerType uint16) string {
 	case cgateway.ProviderGemini:
 		return "https://generativelanguage.googleapis.com"
 	case cgateway.ProviderPersonal:
-		return "local://yamux" // 本地模型走反向隧道,不需要真实 URL
+		// ProviderPersonal 不使用 BaseURL;LocalAdaptor.forward 直接读
+		// ep.ContractProviderID/ep.ModelName 走 localtunnel.ForwardRequest。
+		// 此处仅占位,不应被任何 HTTP 客户端解析。
+		return ""
 	default:
 		return ""
 	}
@@ -273,15 +276,21 @@ func modelToEndpoints(modelID uint64, model *cgateway.ModelInfo, provider *cgate
 		baseURL = providerDefaultURL(model.ProviderType)
 	}
 
-	// 本地模型(个人算力)走 Yamux 反向隧道,不需要 APIKey,单端点即可。
+	// 本地模型(个人算力)走反向隧道,不需要 APIKey,单端点即可。
 	if model.ProviderType == cgateway.ProviderPersonal {
 		return []*Endpoint{{
 			Provider:           ProviderID(providerName),
 			Protocol:           ProviderID(protocol),
-			KeyID:              fmt.Sprintf("%s-local", model.ModelID),
+			KeyID:              fmt.Sprintf("local-model-%d", modelID),
 			KeyValue:           "",
 			BaseURL:            baseURL,
 			Weight:             1.0,
+			// 仅按模型 active 启用。真正的余额硬门槛是「用户积分」,在调度选端点后
+			// 由 DistributeMiddleware 调 GatewayGetCredit 校验(credit<=0 → 402)。
+			// 不要再叠加 model.Balance>0:该字段是模型侧预付额度,系统从不扣减
+			// (DeductBalance 全代码无调用),且 RegisterModel 默认置 0,叠加后
+			// 会让所有新模型永远 disabled。余额耗尽场景由 DeductBalance 置
+			// IsActive=false 兜底,IsActive 单独判断已足够。
 			Enabled:            model.IsActive,
 			Models:             []ModelKey{ModelKey(model.Name), ModelKey(model.ModelID)},
 			Concurrency:        int(model.MaxConcurrency),
@@ -303,8 +312,12 @@ func modelToEndpoints(modelID uint64, model *cgateway.ModelInfo, provider *cgate
 			KeyValue:    key,
 			BaseURL:     baseURL,
 			Weight:      1.0, // 合约暂无权重，均分
-			// 仅按模型 active 启用;不用 model.Balance 作硬门槛
-			// (余额/积分在 DistributeMiddleware 按用户校验,不在端点层拦截)。
+			// 仅按模型 active 启用。真正的余额硬门槛是「用户积分」,在调度选端点后
+			// 由 DistributeMiddleware 调 GatewayGetCredit 校验(credit<=0 → 402)。
+			// 不要再叠加 model.Balance>0:该字段是模型侧预付额度,系统从不扣减
+			// (DeductBalance 全代码无调用),且 RegisterModel 默认置 0,叠加后
+			// 会让所有新模型永远 disabled。余额耗尽场景由 DeductBalance 置
+			// IsActive=false 兜底,IsActive 单独判断已足够。
 			Enabled:     model.IsActive,
 			Models:      []ModelKey{ModelKey(model.Name), ModelKey(model.ModelID)},
 			Concurrency: int(model.MaxConcurrency),

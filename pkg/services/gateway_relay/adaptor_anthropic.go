@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -30,7 +31,11 @@ func (a *AnthropicAdaptor) requestURL(baseURL, path string) string {
 func (a *AnthropicAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byte) ([]byte, error) {
 	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
 	if err != nil {
-		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
+		var ue *scheduler.UpstreamError
+		if errors.As(err, &ue) {
+			return nil, ue
+		}
+		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
 	return httpDo(ctx, url, sendBody, func(req *http.Request) {
@@ -42,7 +47,11 @@ func (a *AnthropicAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body 
 func (a *AnthropicAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body []byte) (scheduler.Stream, error) {
 	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
 	if err != nil {
-		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
+		var ue *scheduler.UpstreamError
+		if errors.As(err, &ue) {
+			return nil, ue
+		}
+		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
 	return httpStream(ctx, url, sendBody, func(req *http.Request) {

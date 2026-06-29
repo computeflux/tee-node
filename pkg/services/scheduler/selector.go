@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -42,6 +43,7 @@ type Selector struct {
 	pool sync.Pool
 	rng  *rand.Rand
 	mu   sync.Mutex
+	log  Logger
 }
 
 // Candidate 是评分算法的中间产物。
@@ -55,7 +57,20 @@ func NewSelector() *Selector {
 	return &Selector{
 		pool: sync.Pool{New: func() interface{} { return make([]Candidate, 0, 16) }},
 		rng:  rand.New(rand.NewSource(int64Fast())),
+		log:  noopLogger{},
 	}
+}
+
+// SetLog 给 Selector 绑定日志实现，便于排查无可用端点的原因。
+// 注意：SetLog 与 Select 并发调用是数据竞争,必须在所有 Select 调用
+// 开始之前完成,或在持有 s.mu 的情况下调用。
+func (s *Selector) SetLog(l Logger) {
+	if l == nil {
+		l = noopLogger{}
+	}
+	s.mu.Lock()
+	s.log = l
+	s.mu.Unlock()
 }
 
 func newCandidateSlice() []Candidate {
@@ -65,8 +80,9 @@ func newCandidateSlice() []Candidate {
 // Select 从 route.Endpoints 中挑一个可用端点。
 // skip 中的 KeyID(已 dead 或本轮已用)会被排除;所有候选都被排除时返回 nil,
 // 让调用方据此触发「第二次机会」清空逻辑,而不是空转重试同一批 key。
-// 返回 nil 表示无可用端点。
-func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThreshold int, skip map[string]bool) *Endpoint {
+// 返回 (nil, reason) 表示无可用端点,reason 是供上层透传给调用方的简明原因。
+// 选中端点时返回 (ep, "")。
+func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThreshold int, skip map[string]bool) (*Endpoint, string) {
 	cands := s.pool.Get().([]Candidate)
 	cands = cands[:0]
 	defer func() { s.pool.Put(cands) }()
@@ -97,11 +113,31 @@ func (s *Selector) Select(ctx context.Context, route *ModelRoute, coldStartThres
 		cands = append(cands, Candidate{Endpoint: ep, Score: score})
 	}
 	if len(cands) == 0 {
-		// 在 debug 级别记录详细原因，生产环境通常不开启
-		_ = skippedDisabled + skippedExcluded + skippedModel + skippedConcurrency + skippedScore
-		return nil
+		// 无可用端点是导致 "retries exhausted / no available endpoint" 的根因，
+		// 必须在 Warn 级别带上分项原因(disabled/excluded/model/concurrency/score),
+		// 否则上层只看到 "no available endpoint" 无从排查(例如余额耗尽导致
+		// 所有端点 Enabled=false → skipped_disabled,见 reloader.modelToEndpoints)。
+		s.log.Warn("selector: no candidate endpoint",
+			"model", route.Model,
+			"endpoints", len(route.Endpoints),
+			"skipped_disabled", skippedDisabled,
+			"skipped_excluded", skippedExcluded,
+			"skipped_model", skippedModel,
+			"skipped_concurrency", skippedConcurrency,
+			"skipped_score", skippedScore,
+		)
+		return nil, noEndpointReason(len(route.Endpoints), skippedDisabled, skippedExcluded, skippedModel, skippedConcurrency, skippedScore)
 	}
-	return weightedPick(cands, s.randFloat64())
+	return weightedPick(cands, s.randFloat64()), ""
+}
+
+// noEndpointReason 把过滤分项拼成一句简明原因,既写进 Warn 日志,也透传给
+// 调用方的错误消息(retries exhausted ... : <reason>),便于一眼定位根因。
+func noEndpointReason(total, disabled, excluded, model, concurrency, score int) string {
+	return fmt.Sprintf(
+		"all %d endpoint(s) filtered out (disabled=%d[likely insufficient balance/inactive], excluded=%d[dead/rate-limited], model_mismatch=%d, concurrency_full=%d, zero_score=%d)",
+		total, disabled, excluded, model, concurrency, score,
+	)
 }
 
 func (s *Selector) randFloat64() float64 {

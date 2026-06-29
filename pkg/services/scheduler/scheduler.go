@@ -119,7 +119,7 @@ func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
 		logger = noopLogger{}
 	}
 
-	return &Scheduler{
+	s := &Scheduler{
 		cfg:      cfg,
 		registry: registry,
 		sems:     NewSemaphoreSet(cfg.SoftConcurrencyRatio),
@@ -130,6 +130,8 @@ func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
 		affinity: NewSessionAffinity(0), // 默认 TTL 5 分钟
 		clients:  make(map[ProviderID]ProviderClient),
 	}
+	s.selector.SetLog(logger)
+	return s
 }
 
 // RegisterProvider 注册一个 provider client。
@@ -270,6 +272,7 @@ func (s *Scheduler) tryOneModel(
 	var deadKeys, usedKeys map[string]bool
 	lastWasRateLimit := false
 	var lastUpstreamErr error // 最近一次端点调用的真实错误,用于耗尽时回传给调用方
+	lastClass := ClassUnknown // 最近一次失败时的错误分类
 
 	s.log.Debug("tryOneModel begin",
 		"model", model,
@@ -280,6 +283,7 @@ func (s *Scheduler) tryOneModel(
 
 	for attempt := 0; attempt <= s.cfg.MaxRetries; attempt++ {
 		var ep *Endpoint
+		var noEpReason string // Select 返回 nil 时的简明原因,用于日志和耗尽错误透传
 
 		// Session affinity: 同一 session 优先复用上次端点
 		if inv.SessionID != "" && attempt == 0 {
@@ -305,6 +309,11 @@ func (s *Scheduler) tryOneModel(
 				if ep == nil {
 					s.affinity.Delete(inv.SessionID)
 					s.log.Debug("session affinity stale, cleared", "session", inv.SessionID)
+				} else if deadKeys[ep.KeyID] || usedKeys[ep.KeyID] {
+					// 缓存的端点本轮已被排除(401/429),直接清缓存走 Select,避免一次注定失败的请求
+					s.affinity.Delete(inv.SessionID)
+					s.log.Debug("session affinity key dead/used, cleared", "session", inv.SessionID, "key_id", ep.KeyID)
+					ep = nil
 				}
 			}
 		}
@@ -312,17 +321,19 @@ func (s *Scheduler) tryOneModel(
 		if ep == nil {
 			// 排除已 dead(401)和本轮已被限流(429)的 key,这样所有候选都被排除时
 			// Select 返回 nil,触发下面的「第二次机会」清空逻辑,而不是空转重试已用 key。
-			ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
+			ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
 		}
 		if ep == nil {
 			// 池子空了:若是 429 周期耗尽,清掉 usedKeys 给滑过窗口的 key 第二次机会
 			if lastWasRateLimit && len(usedKeys) > 0 {
 				s.log.Debug("clearing usedKeys for rate-limit retry", "model", model)
 				usedKeys = nil
-				ep = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
+				ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
 			}
 			if ep == nil {
-				s.log.Warn("no available endpoint", "model", model, "attempt", attempt)
+				s.log.Warn("no available endpoint", "model", model, "attempt", attempt, "reason", noEpReason)
+				// 让最终耗尽错误带上原因，避免上层只看到 "retries exhausted" 无从排查。
+				lastUpstreamErr = fmt.Errorf("no available endpoint for model %s at attempt %d: %s", model, attempt, noEpReason)
 				break
 			}
 		}
@@ -363,6 +374,17 @@ func (s *Scheduler) tryOneModel(
 			s.log.Error("no client for protocol", "model", model, "protocol", ep.Protocol, "provider", ep.Provider)
 			return nil, fmt.Errorf("no client for protocol %s", ep.Protocol)
 		}
+
+		s.log.Debug("calling provider client",
+			"model", model,
+			"provider", ep.Provider,
+			"key_id", ep.KeyID,
+			"protocol", ep.Protocol,
+			"provider_type", ep.ProviderType,
+			"model_name", ep.ModelName,
+			"stream", stream,
+			"attempt", attempt,
+		)
 
 		var (
 			body []byte
@@ -416,6 +438,7 @@ func (s *Scheduler) tryOneModel(
 		// 失败路径
 		ep.metrics.LastErrorAtUnix.Store(time.Now().Unix())
 		class := Classify(err)
+		lastClass = class
 		lastUpstreamErr = err
 		s.recordFailureClass(ep.metrics, class)
 		updateEMA(ep.metrics, latency.Microseconds(), s.cfg.EMADecay)
@@ -424,11 +447,16 @@ func (s *Scheduler) tryOneModel(
 		span.SetAttributes(attribute.String(AttrSchedErrorClass, class.String()))
 		span.End()
 
+		var status int
+		if ue, ok := err.(*UpstreamError); ok {
+			status = ue.Status
+		}
 		s.log.Warn("endpoint call failed",
 			"model", model,
 			"provider", ep.Provider,
 			"key_id", ep.KeyID,
 			"error_class", class,
+			"status", status,
 			"error", err,
 			"latency", latency,
 			"attempt", attempt,
@@ -508,7 +536,7 @@ func (s *Scheduler) tryOneModel(
 		var ue *UpstreamError
 		if errors.As(lastUpstreamErr, &ue) {
 			return nil, &SchedError{
-				Class:   Classify(lastUpstreamErr),
+				Class:   lastClass, // 复用循环里上一次失败时已经算好的 class,避免重复分类
 				Status:  ue.Status,
 				Message: fmt.Sprintf("retries exhausted for model %s: %s", model, ue.Message),
 				Cause:   lastUpstreamErr,

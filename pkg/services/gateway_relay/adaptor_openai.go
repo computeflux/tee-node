@@ -3,6 +3,7 @@ package relay
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -34,22 +35,40 @@ func (a *OpenAIAdaptor) requestURL(baseURL, path string) string {
 func (a *OpenAIAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byte) ([]byte, error) {
 	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
 	if err != nil {
-		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
+		var ue *scheduler.UpstreamError
+		if errors.As(err, &ue) {
+			return nil, ue
+		}
+		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
 	return httpDo(ctx, url, sendBody, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+ep.KeyValue)
+		for k, v := range ep.ExtraHeaders {
+			req.Header.Set(k, v)
+		}
 	})
 }
 
 func (a *OpenAIAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body []byte) (scheduler.Stream, error) {
 	sendBody, upstreamPath, err := scheduler.ResolveRequest(ctx, ep, body)
 	if err != nil {
-		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
+		var ue *scheduler.UpstreamError
+		if errors.As(err, &ue) {
+			return nil, ue
+		}
+		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
-	return httpStream(ctx, url, injectStreamUsage(sendBody), func(req *http.Request) {
+	out := sendBody
+	if ep.Protocol == scheduler.ProviderID("openai") {
+		out = injectStreamUsage(sendBody)
+	}
+	return httpStream(ctx, url, out, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+ep.KeyValue)
+		for k, v := range ep.ExtraHeaders {
+			req.Header.Set(k, v)
+		}
 	})
 }
 
@@ -57,7 +76,7 @@ func (a *OpenAIAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body
 // 以便上游在流末尾返回 usage。已存在 stream_options 时不覆盖。
 func injectStreamUsage(body []byte) []byte {
 	var reqMap map[string]any
-	if json.Unmarshal(body, &reqMap) != nil {
+	if json.Unmarshal(body, &reqMap) != nil || reqMap == nil {
 		return body
 	}
 	if _, ok := reqMap["stream_options"]; ok {

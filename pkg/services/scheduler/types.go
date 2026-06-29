@@ -37,7 +37,8 @@ type Endpoint struct {
 	Provider ProviderID `json:"provider"` // provider 节点名（如 "node-7f3a"）
 	Protocol ProviderID `json:"protocol"` // 协议类型（如 "openai"/"anthropic"/"gemini"）
 	KeyID    string     `json:"key_id"`
-	KeyValue string     `json:"key_value"`
+	// KeyValue 是上游 API Key 明文，绝不应被默认 JSON 序列化带出。
+	KeyValue string     `json:"-"`
 	BaseURL  string     `json:"base_url,omitempty"`
 	Weight   float64    `json:"weight"`
 	Enabled  bool       `json:"enabled"`

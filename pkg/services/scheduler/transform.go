@@ -1,6 +1,10 @@
 package scheduler
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"sync"
+)
 
 // 协议转换在 scheduler 内部、选完端点之后发生——因为目标协议取决于被选中端点的
 // Protocol（同一逻辑模型的不同端点可能是 openai/anthropic/gemini 不同协议）。
@@ -23,10 +27,23 @@ type RequestTransformFunc func(
 	body []byte,
 ) (outBody []byte, upstreamPath string, err error)
 
-var requestTransform RequestTransformFunc
+var (
+	requestTransform     RequestTransformFunc
+	requestTransformMu   sync.RWMutex
+)
 
 // SetRequestTransform 注入请求转换实现（gateway 层在启动时调用一次）。
-func SetRequestTransform(f RequestTransformFunc) { requestTransform = f }
+func SetRequestTransform(f RequestTransformFunc) {
+	requestTransformMu.Lock()
+	requestTransform = f
+	requestTransformMu.Unlock()
+}
+
+func loadRequestTransform() RequestTransformFunc {
+	requestTransformMu.RLock()
+	defer requestTransformMu.RUnlock()
+	return requestTransform
+}
 
 // reqInfo 是每请求的转换上下文（入口协议 + 原始请求路径）。
 type reqInfo struct {
@@ -38,21 +55,37 @@ type reqInfoKey struct{}
 
 // WithRequest 把入口协议 + 请求路径写入 ctx，供 provider client 调用 ResolveRequest 时读取。
 func WithRequest(ctx context.Context, inbound, path string) context.Context {
+	if inbound == "" {
+		panic("scheduler.WithRequest: inbound protocol must not be empty")
+	}
 	return context.WithValue(ctx, reqInfoKey{}, reqInfo{Inbound: inbound, Path: path})
 }
 
-func reqInfoFrom(ctx context.Context) reqInfo {
-	ri, _ := ctx.Value(reqInfoKey{}).(reqInfo)
-	return ri
+func reqInfoFrom(ctx context.Context) (reqInfo, bool) {
+	v := ctx.Value(reqInfoKey{})
+	if v == nil {
+		return reqInfo{}, false
+	}
+	ri, ok := v.(reqInfo)
+	return ri, ok
 }
 
 // ResolveRequest 根据 ctx 中的入口信息和端点协议，决定发往上游的 body 与路径。
-// 未注入 transform 或缺少入口信息时，原样透传 body，路径取 ctx 中的请求路径。
 // 由 provider client 实现(gateway_relay)在真正发请求前调用。
 func ResolveRequest(ctx context.Context, ep *Endpoint, body []byte) (outBody []byte, upstreamPath string, err error) {
-	ri := reqInfoFrom(ctx)
-	if requestTransform == nil || ri.Inbound == "" {
-		return body, ri.Path, nil
+	if ep == nil {
+		return nil, "", fmt.Errorf("scheduler: nil endpoint passed to ResolveRequest")
 	}
-	return requestTransform(ri.Inbound, string(ep.Protocol), ri.Path, ep.ProviderType, body)
+	if loadRequestTransform() == nil {
+		return nil, "", fmt.Errorf("scheduler: request transform not injected (gateway not initialized?)")
+	}
+	ri, ok := reqInfoFrom(ctx)
+	if !ok || ri.Inbound == "" {
+		return nil, "", fmt.Errorf("scheduler: inbound protocol missing in ctx")
+	}
+	outBody, upstreamPath, err = loadRequestTransform()(ri.Inbound, string(ep.Protocol), ri.Path, ep.ProviderType, body)
+	if err != nil {
+		return nil, "", fmt.Errorf("scheduler: transform inbound=%s providerProto=%s path=%s: %w", ri.Inbound, ep.Protocol, ri.Path, err)
+	}
+	return outBody, upstreamPath, nil
 }
