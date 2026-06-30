@@ -105,10 +105,14 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	util.LogWithBlue("API", "  /health     -> health check")
 
 	server := &http.Server{
-		Addr:         ":" + fmt.Sprint(port),
-		Handler:      router,
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 300 * time.Second, // 本地模型推理可能需要较长时间
+		Addr:        ":" + fmt.Sprint(port),
+		Handler:     router,
+		ReadTimeout: 60 * time.Second,
+		// 本地模型推理 + 长 prompt/long output 的非流式响应可能超过 5min；
+		// 调到 10min 给 doHTTPClient.Timeout(300s) 留有安全裕量，避免两边几乎同时到期。
+		// 流式响应不走这个：HandleRelay 在写首字节前用 http.ResponseController
+		// 把 per-request 写超时清零，流跑多久由 ctx 控制。
+		WriteTimeout: 600 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 

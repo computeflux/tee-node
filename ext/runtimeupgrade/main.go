@@ -95,11 +95,10 @@ func main() {
 	fmt.Printf("payload:  %d bytes\n", len(payload))
 	payloadHex := "0x" + hex.EncodeToString(payload)
 
-	nonce, err := gqlContractNonce(gql, caller, int(callerType))
+	nonce, err := gqlContractNonce(gql, pubkey, int(callerType))
 	if err != nil {
 		die("contractNonce: %v", err)
 	}
-	nonce++
 	fmt.Printf("nonce:    %d\n", nonce)
 
 	c := &model.ContractCall{

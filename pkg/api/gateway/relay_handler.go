@@ -105,13 +105,33 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 
+		// 流式响应可能跑数分钟（长思考 + 长 output）。http.Server.WriteTimeout 在所有 endpoint 上
+		// 全局生效，到期会强制关连接并取消 r.Context()，表现就是 "stream aborted by client"。
+		// 在写首个字节前用 ResponseController 把 per-request 写超时清零，
+		// 让 http.Server.WriteTimeout 对本连接失效；生命周期完全交给 ctx 控制。
+		// 注：ResponseController.SetWriteDeadline 必须在 WriteHeader 隐式触发之前调用；
+		// 在它之前设 Header/WriteHeader 都仍受默认 deadline 保护。
+		if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {
+			// 非致命:不支持就退回到服务级 WriteTimeout(本身已被我调到 600s)。
+			fmt.Printf("[relay] stream: clear write deadline unsupported: %v\n", err)
+		}
+
 		usage, serr := writeRelayStream(ctx, w, res.Stream, inbound, prov)
-		EmitProviderMetric(ep.ContractProviderID, serr == nil)
 		if serr != nil {
-			// header 多半已发出,无法再写 error body,仅记录。
-			fmt.Printf("[relay] stream error model=%s provider=%d: %v\n", modelKey, ep.ContractProviderID, serr)
+			// 客户端主动断连（context.Canceled）≠ provider 故障：上游已经发回了部分/全部响应字节，
+			// 计费按已发出 usage 走；指标也不计入失败窗口，避免污染熔断统计。
+			// 其他错误（含 context.DeadlineExceeded、transport 失败等）仍按失败处理。
+			if errors.Is(serr, context.Canceled) {
+				fmt.Printf("[relay] stream aborted by client model=%s provider=%d\n", modelKey, ep.ContractProviderID)
+			} else {
+				EmitProviderMetric(ep.ContractProviderID, false)
+				// header 多半已发出,无法再写 error body,仅记录。
+				fmt.Printf("[relay] stream error model=%s provider=%d: %v\n", modelKey, ep.ContractProviderID, serr)
+			}
+			recordRelayUsage(token, ep, usage)
 			return
 		}
+		EmitProviderMetric(ep.ContractProviderID, true)
 		recordRelayUsage(token, ep, usage)
 		return
 	}

@@ -37,17 +37,26 @@ func GetProviderClient(providerType uint16) scheduler.ProviderClient {
 	}
 }
 
-// 包级专用 client，集中配置超时(避免依赖 http.DefaultClient 的零超时默认值)。
-var defaultHTTPClient = &http.Client{
-	Timeout: 120 * time.Second,
-	Transport: &http.Transport{
+// 包级专用 clients，按「是否流式」分叉超时策略(避免依赖 http.DefaultClient 的零超时默认值)。
+//
+//   - doHTTPClient（非流式 httpDo 用）：整体 Timeout 放宽到 5min，禁用 ResponseHeaderTimeout，
+//     容纳长 prompt/长 output 的整体响应生成时间。LLM 在生成完整响应前通常不发任何 header，
+//     启用 ResponseHeaderTimeout 会被 "timeout awaiting response headers" 误杀。
+//
+//   - streamHTTPClient（流式 httpStream 用）：不设 client-level Timeout（流可能跑很久，
+//     生命周期由调用方 ctx 决定）；保留 90s ResponseHeaderTimeout 作为 TTFT 兜底，
+//     防止上游永远不发第一个字节。
+//
+// 两份 Transport 共享同一组网络层超时(Dial/TLS/Idle/KeepAlive)；HTTP/2 仍全局禁用。
+func newTransport(headerTimeout time.Duration) *http.Transport {
+	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 120 * time.Second,
 		}).DialContext,
 		TLSHandshakeTimeout:   10 * time.Second,
-		ResponseHeaderTimeout: 90 * time.Second,
+		ResponseHeaderTimeout: headerTimeout,
 		ExpectContinueTimeout: 1 * time.Second,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConns:          100,
@@ -55,7 +64,17 @@ var defaultHTTPClient = &http.Client{
 		// TLSNextProto 为空 map 可彻底阻止 ALPN 协商到 h2；ForceAttemptHTTP2 防显式回退。
 		ForceAttemptHTTP2: false,
 		TLSNextProto:      map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
-	},
+	}
+}
+
+var doHTTPClient = &http.Client{
+	Timeout:   300 * time.Second,
+	Transport: newTransport(0), // 0 = disable, 由整体 Timeout 兜底
+}
+
+var streamHTTPClient = &http.Client{
+	// 不设 Timeout：流式响应可能持续数分钟，由 ctx 控制生命周期。
+	Transport: newTransport(90 * time.Second),
 }
 
 // 错误响应 body 截断上限，避免 OOM 与日志爆炸。
@@ -75,7 +94,7 @@ func httpDo(ctx context.Context, url string, body []byte, setHeaders func(*http.
 		setHeaders(req)
 	}
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := doHTTPClient.Do(req)
 	if err != nil {
 		log.Printf("[relay] httpDo transport error url=%s err=%v", url, err)
 		return nil, err
@@ -94,7 +113,7 @@ func httpStream(ctx context.Context, url string, body []byte, setHeaders func(*h
 		setHeaders(req)
 	}
 
-	resp, err := defaultHTTPClient.Do(req)
+	resp, err := streamHTTPClient.Do(req)
 	if err != nil {
 		log.Printf("[relay] httpStream transport error url=%s err=%v", url, err)
 		return nil, err

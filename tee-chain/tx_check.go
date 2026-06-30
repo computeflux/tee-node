@@ -35,8 +35,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
 			if txNonce != expectedNonce {
-				util.LogWithYellow("CHECK TX", "invalid nonce: expected %d, got %d (caller %s, type %d)\n",
-					expectedNonce, txNonce, hex.EncodeToString(txbox.GetCaller()), txbox.GetCallerType())
+				util.LogWithYellow("CHECK TX", "invalid nonce: expected ", expectedNonce, "got ", txNonce, " (caller ", hex.EncodeToString(txbox.GetCaller()), ", type ", txbox.GetCallerType(), ")")
 				return CodeInvalidNode
 			}
 
