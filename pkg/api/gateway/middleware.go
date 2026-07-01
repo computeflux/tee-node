@@ -236,7 +236,7 @@ func ShouldDisableProvider(errMsg string, statusCode int) bool {
 func writeError(w http.ResponseWriter, code int, msg, typ string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]string{"message": msg, "type": typ},
 	})
 }

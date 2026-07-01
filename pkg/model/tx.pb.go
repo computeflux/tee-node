@@ -5,10 +5,11 @@ package model
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	io "io"
 	math "math"
 	math_bits "math/bits"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -236,8 +237,8 @@ func (m *SysCall) GetRelaySync() *RelaySync {
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*SysCall) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+func (*SysCall) XXX_OneofWrappers() []any {
+	return []any{
 		(*SysCall_Empty)(nil),
 		(*SysCall_EpochEnd)(nil),
 		(*SysCall_EpochStart)(nil),
@@ -988,8 +989,8 @@ func (m *To) GetNode() []byte {
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*To) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+func (*To) XXX_OneofWrappers() []any {
+	return []any{
 		(*To_Broadcast)(nil),
 		(*To_Nodes)(nil),
 		(*To_Node)(nil),
@@ -1215,8 +1216,8 @@ func (m *TeeCall) GetInitDisk() *InitDisk {
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*TeeCall) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+func (*TeeCall) XXX_OneofWrappers() []any {
+	return []any{
 		(*TeeCall_PodStart)(nil),
 		(*TeeCall_PodMint)(nil),
 		(*TeeCall_BridgeCall)(nil),
@@ -1760,8 +1761,8 @@ func (m *SecretBox) GetResp() *DecryptResp {
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*SecretBox) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+func (*SecretBox) XXX_OneofWrappers() []any {
+	return []any{
 		(*SecretBox_Req)(nil),
 		(*SecretBox_SharesResp)(nil),
 		(*SecretBox_Resp)(nil),
@@ -2377,8 +2378,8 @@ func (m *PeerMsg) GetSecretBox() *SecretBox {
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*PeerMsg) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+func (*PeerMsg) XXX_OneofWrappers() []any {
+	return []any{
 		(*PeerMsg_DkgMessage)(nil),
 		(*PeerMsg_BlockPartialSign)(nil),
 		(*PeerMsg_SecretBox)(nil),

@@ -107,6 +107,22 @@ func TestGatewayModelIndex_Pagination(t *testing.T) {
 	assert.Len(t, res, 2)
 }
 
+func TestGatewayModelIndex_Get(t *testing.T) {
+	idx := NewGatewayModelIndex()
+	models := []cgateway.ModelInfoWithProvider{
+		sampleModel(1, "model-a", 1, 1000, 100),
+		sampleModel(2, "model-b", 1, 2000, 200),
+	}
+	require.NoError(t, idx.BuildFromModels(models))
+
+	m, ok := idx.Get(1)
+	require.True(t, ok)
+	assert.Equal(t, "model-a", m.Model.Name)
+
+	_, ok = idx.Get(999)
+	assert.False(t, ok)
+}
+
 func TestGatewayModelIndex_ModalityFilter(t *testing.T) {
 	idx := NewGatewayModelIndex()
 	models := []cgateway.ModelInfoWithProvider{

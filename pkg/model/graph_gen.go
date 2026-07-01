@@ -130,8 +130,9 @@ type ModelInfo struct {
 
 type ModelInfoWithProvider struct {
 	ID       int           `json:"id"`
-	Model    *ModelInfo    `json:"model"`
-	Provider *ProviderInfo `json:"provider"`
+	Model    *ModelInfo    `json:"model,omitempty"`
+	Provider *ProviderInfo `json:"provider,omitempty"`
+	Route    *RouteInfo    `json:"route,omitempty"`
 }
 
 type ModelRunningStatus struct {
@@ -181,6 +182,19 @@ type ReferralInfo struct {
 	Referrer  *string  `json:"referrer,omitempty"`
 	Earnings  string   `json:"earnings"`
 	Referrals []string `json:"referrals"`
+}
+
+type RouteInfo struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	RouteType   int    `json:"routeType"`
+	InPrice     int    `json:"inPrice"`
+	OutPrice    int    `json:"outPrice"`
+	CachedPrice int    `json:"cachedPrice"`
+	ModelIds    []int  `json:"modelIds"`
+	IsActive    bool   `json:"isActive"`
+	IsOfficial  bool   `json:"isOfficial"`
+	CreatedAt   int    `json:"createdAt"`
 }
 
 // 加密环境变量

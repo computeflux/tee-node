@@ -14,7 +14,7 @@ import (
 
 // Logger 定义索引器刷新失败时的日志回调。
 // 默认使用 fmt.Printf，可在外部替换为项目统一的 logger。
-var Logger = func(format string, args ...interface{}) {
+var Logger = func(format string, args ...any) {
 	fmt.Printf("[INDEXER] "+format+"\n", args...)
 }
 

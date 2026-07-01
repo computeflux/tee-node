@@ -146,7 +146,7 @@ func bindToken(address common.Address, caller bind.ContractCaller, transactor bi
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Token *TokenRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+func (_Token *TokenRaw) Call(opts *bind.CallOpts, result *[]any, method string, params ...any) error {
 	return _Token.Contract.TokenCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -157,7 +157,7 @@ func (_Token *TokenRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, e
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Token *TokenRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+func (_Token *TokenRaw) Transact(opts *bind.TransactOpts, method string, params ...any) (*types.Transaction, error) {
 	return _Token.Contract.TokenTransactor.contract.Transact(opts, method, params...)
 }
 
@@ -165,7 +165,7 @@ func (_Token *TokenRaw) Transact(opts *bind.TransactOpts, method string, params 
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Token *TokenCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+func (_Token *TokenCallerRaw) Call(opts *bind.CallOpts, result *[]any, method string, params ...any) error {
 	return _Token.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -176,7 +176,7 @@ func (_Token *TokenTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Tran
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Token *TokenTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+func (_Token *TokenTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...any) (*types.Transaction, error) {
 	return _Token.Contract.contract.Transact(opts, method, params...)
 }
 
@@ -184,7 +184,7 @@ func (_Token *TokenTransactorRaw) Transact(opts *bind.TransactOpts, method strin
 //
 // Solidity: function balances(address ) view returns(uint256)
 func (_Token *TokenCaller) Balances(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "balances", arg0)
 
 	if err != nil {
@@ -215,7 +215,7 @@ func (_Token *TokenCallerSession) Balances(arg0 common.Address) (*big.Int, error
 //
 // Solidity: function getBalance(address user) view returns(uint256)
 func (_Token *TokenCaller) GetBalance(opts *bind.CallOpts, user common.Address) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "getBalance", user)
 
 	if err != nil {
@@ -246,7 +246,7 @@ func (_Token *TokenCallerSession) GetBalance(user common.Address) (*big.Int, err
 //
 // Solidity: function owner() view returns(address)
 func (_Token *TokenCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "owner")
 
 	if err != nil {
@@ -277,7 +277,7 @@ func (_Token *TokenCallerSession) Owner() (common.Address, error) {
 //
 // Solidity: function proxiableUUID() view returns(bytes32)
 func (_Token *TokenCaller) ProxiableUUID(opts *bind.CallOpts) ([32]byte, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "proxiableUUID")
 
 	if err != nil {
@@ -308,7 +308,7 @@ func (_Token *TokenCallerSession) ProxiableUUID() ([32]byte, error) {
 //
 // Solidity: function rate() view returns(uint256)
 func (_Token *TokenCaller) Rate(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "rate")
 
 	if err != nil {
@@ -339,7 +339,7 @@ func (_Token *TokenCallerSession) Rate() (*big.Int, error) {
 //
 // Solidity: function subnet() view returns(address)
 func (_Token *TokenCaller) Subnet(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "subnet")
 
 	if err != nil {
@@ -370,7 +370,7 @@ func (_Token *TokenCallerSession) Subnet() (common.Address, error) {
 //
 // Solidity: function toPoints(uint256 ethAmount) view returns(uint256)
 func (_Token *TokenCaller) ToPoints(opts *bind.CallOpts, ethAmount *big.Int) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Token.contract.Call(opts, &out, "toPoints", ethAmount)
 
 	if err != nil {
@@ -841,7 +841,7 @@ type TokenBeaconUpgraded struct {
 // Solidity: event BeaconUpgraded(address indexed beacon)
 func (_Token *TokenFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beacon []common.Address) (*TokenBeaconUpgradedIterator, error) {
 
-	var beaconRule []interface{}
+	var beaconRule []any
 	for _, beaconItem := range beacon {
 		beaconRule = append(beaconRule, beaconItem)
 	}
@@ -858,7 +858,7 @@ func (_Token *TokenFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beacon 
 // Solidity: event BeaconUpgraded(address indexed beacon)
 func (_Token *TokenFilterer) WatchBeaconUpgraded(opts *bind.WatchOpts, sink chan<- *TokenBeaconUpgraded, beacon []common.Address) (event.Subscription, error) {
 
-	var beaconRule []interface{}
+	var beaconRule []any
 	for _, beaconItem := range beacon {
 		beaconRule = append(beaconRule, beaconItem)
 	}
@@ -1120,11 +1120,11 @@ type TokenOwnershipTransferred struct {
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Token *TokenFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*TokenOwnershipTransferredIterator, error) {
 
-	var previousOwnerRule []interface{}
+	var previousOwnerRule []any
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
 	}
-	var newOwnerRule []interface{}
+	var newOwnerRule []any
 	for _, newOwnerItem := range newOwner {
 		newOwnerRule = append(newOwnerRule, newOwnerItem)
 	}
@@ -1141,11 +1141,11 @@ func (_Token *TokenFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, p
 // Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Token *TokenFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *TokenOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
-	var previousOwnerRule []interface{}
+	var previousOwnerRule []any
 	for _, previousOwnerItem := range previousOwner {
 		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
 	}
-	var newOwnerRule []interface{}
+	var newOwnerRule []any
 	for _, newOwnerItem := range newOwner {
 		newOwnerRule = append(newOwnerRule, newOwnerItem)
 	}
@@ -1410,7 +1410,7 @@ type TokenRecharged struct {
 // Solidity: event Recharged(address indexed user, uint256 ethAmount, uint256 pointsAmount, uint256 timestamp)
 func (_Token *TokenFilterer) FilterRecharged(opts *bind.FilterOpts, user []common.Address) (*TokenRechargedIterator, error) {
 
-	var userRule []interface{}
+	var userRule []any
 	for _, userItem := range user {
 		userRule = append(userRule, userItem)
 	}
@@ -1427,7 +1427,7 @@ func (_Token *TokenFilterer) FilterRecharged(opts *bind.FilterOpts, user []commo
 // Solidity: event Recharged(address indexed user, uint256 ethAmount, uint256 pointsAmount, uint256 timestamp)
 func (_Token *TokenFilterer) WatchRecharged(opts *bind.WatchOpts, sink chan<- *TokenRecharged, user []common.Address) (event.Subscription, error) {
 
-	var userRule []interface{}
+	var userRule []any
 	for _, userItem := range user {
 		userRule = append(userRule, userItem)
 	}
@@ -1555,11 +1555,11 @@ type TokenSubnetSet struct {
 // Solidity: event SubnetSet(address indexed oldSubnet, address indexed newSubnet)
 func (_Token *TokenFilterer) FilterSubnetSet(opts *bind.FilterOpts, oldSubnet []common.Address, newSubnet []common.Address) (*TokenSubnetSetIterator, error) {
 
-	var oldSubnetRule []interface{}
+	var oldSubnetRule []any
 	for _, oldSubnetItem := range oldSubnet {
 		oldSubnetRule = append(oldSubnetRule, oldSubnetItem)
 	}
-	var newSubnetRule []interface{}
+	var newSubnetRule []any
 	for _, newSubnetItem := range newSubnet {
 		newSubnetRule = append(newSubnetRule, newSubnetItem)
 	}
@@ -1576,11 +1576,11 @@ func (_Token *TokenFilterer) FilterSubnetSet(opts *bind.FilterOpts, oldSubnet []
 // Solidity: event SubnetSet(address indexed oldSubnet, address indexed newSubnet)
 func (_Token *TokenFilterer) WatchSubnetSet(opts *bind.WatchOpts, sink chan<- *TokenSubnetSet, oldSubnet []common.Address, newSubnet []common.Address) (event.Subscription, error) {
 
-	var oldSubnetRule []interface{}
+	var oldSubnetRule []any
 	for _, oldSubnetItem := range oldSubnet {
 		oldSubnetRule = append(oldSubnetRule, oldSubnetItem)
 	}
-	var newSubnetRule []interface{}
+	var newSubnetRule []any
 	for _, newSubnetItem := range newSubnet {
 		newSubnetRule = append(newSubnetRule, newSubnetItem)
 	}
@@ -1707,7 +1707,7 @@ type TokenUpgraded struct {
 // Solidity: event Upgraded(address indexed implementation)
 func (_Token *TokenFilterer) FilterUpgraded(opts *bind.FilterOpts, implementation []common.Address) (*TokenUpgradedIterator, error) {
 
-	var implementationRule []interface{}
+	var implementationRule []any
 	for _, implementationItem := range implementation {
 		implementationRule = append(implementationRule, implementationItem)
 	}
@@ -1724,7 +1724,7 @@ func (_Token *TokenFilterer) FilterUpgraded(opts *bind.FilterOpts, implementatio
 // Solidity: event Upgraded(address indexed implementation)
 func (_Token *TokenFilterer) WatchUpgraded(opts *bind.WatchOpts, sink chan<- *TokenUpgraded, implementation []common.Address) (event.Subscription, error) {
 
-	var implementationRule []interface{}
+	var implementationRule []any
 	for _, implementationItem := range implementation {
 		implementationRule = append(implementationRule, implementationItem)
 	}
@@ -1854,7 +1854,7 @@ type TokenWithdrawn struct {
 // Solidity: event Withdrawn(address indexed user, uint256 ethAmount, uint256 pointsAmount, uint256 timestamp)
 func (_Token *TokenFilterer) FilterWithdrawn(opts *bind.FilterOpts, user []common.Address) (*TokenWithdrawnIterator, error) {
 
-	var userRule []interface{}
+	var userRule []any
 	for _, userItem := range user {
 		userRule = append(userRule, userItem)
 	}
@@ -1871,7 +1871,7 @@ func (_Token *TokenFilterer) FilterWithdrawn(opts *bind.FilterOpts, user []commo
 // Solidity: event Withdrawn(address indexed user, uint256 ethAmount, uint256 pointsAmount, uint256 timestamp)
 func (_Token *TokenFilterer) WatchWithdrawn(opts *bind.WatchOpts, sink chan<- *TokenWithdrawn, user []common.Address) (event.Subscription, error) {
 
-	var userRule []interface{}
+	var userRule []any
 	for _, userItem := range user {
 		userRule = append(userRule, userItem)
 	}

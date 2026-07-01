@@ -52,11 +52,11 @@ type Config struct {
 
 // API mirrors sonic's public API interface.
 type API interface {
-	MarshalToString(v interface{}) (string, error)
-	Marshal(v interface{}) ([]byte, error)
-	MarshalIndent(v interface{}, prefix, indent string) ([]byte, error)
-	UnmarshalFromString(str string, v interface{}) error
-	Unmarshal(data []byte, v interface{}) error
+	MarshalToString(v any) (string, error)
+	Marshal(v any) ([]byte, error)
+	MarshalIndent(v any, prefix, indent string) ([]byte, error)
+	UnmarshalFromString(str string, v any) error
+	Unmarshal(data []byte, v any) error
 	NewEncoder(writer io.Writer) Encoder
 	NewDecoder(reader io.Reader) Decoder
 	Valid(data []byte) bool
@@ -64,14 +64,14 @@ type API interface {
 
 // Encoder mirrors sonic's public Encoder interface.
 type Encoder interface {
-	Encode(val interface{}) error
+	Encode(val any) error
 	SetEscapeHTML(on bool)
 	SetIndent(prefix, indent string)
 }
 
 // Decoder mirrors sonic's public Decoder interface.
 type Decoder interface {
-	Decode(val interface{}) error
+	Decode(val any) error
 	Buffered() io.Reader
 	DisallowUnknownFields()
 	More() bool

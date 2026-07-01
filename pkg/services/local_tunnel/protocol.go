@@ -164,7 +164,7 @@ func ReadTypedFrame(r io.Reader) (FrameType, []byte, error) {
 // ── JSON helpers ─────────────────────────────────────────
 
 // WriteJSONFrame 将对象序列化为 JSON 后写入 typed frame
-func WriteJSONFrame(w io.Writer, ft FrameType, v interface{}) error {
+func WriteJSONFrame(w io.Writer, ft FrameType, v any) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err

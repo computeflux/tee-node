@@ -212,7 +212,7 @@ func bindSubnet(address common.Address, caller bind.ContractCaller, transactor b
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Subnet *SubnetRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+func (_Subnet *SubnetRaw) Call(opts *bind.CallOpts, result *[]any, method string, params ...any) error {
 	return _Subnet.Contract.SubnetCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -223,7 +223,7 @@ func (_Subnet *SubnetRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction,
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Subnet *SubnetRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+func (_Subnet *SubnetRaw) Transact(opts *bind.TransactOpts, method string, params ...any) (*types.Transaction, error) {
 	return _Subnet.Contract.SubnetTransactor.contract.Transact(opts, method, params...)
 }
 
@@ -231,7 +231,7 @@ func (_Subnet *SubnetRaw) Transact(opts *bind.TransactOpts, method string, param
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Subnet *SubnetCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+func (_Subnet *SubnetCallerRaw) Call(opts *bind.CallOpts, result *[]any, method string, params ...any) error {
 	return _Subnet.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -242,7 +242,7 @@ func (_Subnet *SubnetTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Tr
 }
 
 // Transact invokes the (paid) contract method with params as input values.
-func (_Subnet *SubnetTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+func (_Subnet *SubnetTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...any) (*types.Transaction, error) {
 	return _Subnet.Contract.contract.Transact(opts, method, params...)
 }
 
@@ -250,7 +250,7 @@ func (_Subnet *SubnetTransactorRaw) Transact(opts *bind.TransactOpts, method str
 //
 // Solidity: function asset(uint32 id) view returns((string,uint8,uint256), uint256)
 func (_Subnet *SubnetCaller) Asset(opts *bind.CallOpts, id uint32) (AssetInfo, *big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "asset", id)
 
 	if err != nil {
@@ -286,7 +286,7 @@ func (_Subnet *SubnetCaller) AssetInfos(opts *bind.CallOpts, arg0 uint32) (struc
 	AssetType   uint8
 	TotalSupply *big.Int
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "assetInfos", arg0)
 
 	outstruct := new(struct {
@@ -332,7 +332,7 @@ func (_Subnet *SubnetCallerSession) AssetInfos(arg0 uint32) (struct {
 //
 // Solidity: function assetPrices(uint32 ) view returns(uint256)
 func (_Subnet *SubnetCaller) AssetPrices(opts *bind.CallOpts, arg0 uint32) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "assetPrices", arg0)
 
 	if err != nil {
@@ -363,7 +363,7 @@ func (_Subnet *SubnetCallerSession) AssetPrices(arg0 uint32) (*big.Int, error) {
 //
 // Solidity: function blsContract() view returns(address)
 func (_Subnet *SubnetCaller) BlsContract(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "blsContract")
 
 	if err != nil {
@@ -394,7 +394,7 @@ func (_Subnet *SubnetCallerSession) BlsContract() (common.Address, error) {
 //
 // Solidity: function bootNodes(uint32 ) view returns(uint64)
 func (_Subnet *SubnetCaller) BootNodes(opts *bind.CallOpts, arg0 uint32) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "bootNodes", arg0)
 
 	if err != nil {
@@ -425,7 +425,7 @@ func (_Subnet *SubnetCallerSession) BootNodes(arg0 uint32) (uint64, error) {
 //
 // Solidity: function bootNodesLen() view returns(uint32)
 func (_Subnet *SubnetCaller) BootNodesLen(opts *bind.CallOpts) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "bootNodesLen")
 
 	if err != nil {
@@ -456,7 +456,7 @@ func (_Subnet *SubnetCallerSession) BootNodesLen() (uint32, error) {
 //
 // Solidity: function epoch() view returns(uint32)
 func (_Subnet *SubnetCaller) Epoch(opts *bind.CallOpts) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "epoch")
 
 	if err != nil {
@@ -487,7 +487,7 @@ func (_Subnet *SubnetCallerSession) Epoch() (uint32, error) {
 //
 // Solidity: function epochInfo() view returns((uint32,uint32,uint256,uint32,address))
 func (_Subnet *SubnetCaller) EpochInfo(opts *bind.CallOpts) (EpochInfo, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "epochInfo")
 
 	if err != nil {
@@ -518,7 +518,7 @@ func (_Subnet *SubnetCallerSession) EpochInfo() (EpochInfo, error) {
 //
 // Solidity: function epochSlot() view returns(uint32)
 func (_Subnet *SubnetCaller) EpochSlot(opts *bind.CallOpts) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "epochSlot")
 
 	if err != nil {
@@ -549,7 +549,7 @@ func (_Subnet *SubnetCallerSession) EpochSlot() (uint32, error) {
 //
 // Solidity: function getBlsContract() view returns(address)
 func (_Subnet *SubnetCaller) GetBlsContract(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getBlsContract")
 
 	if err != nil {
@@ -580,7 +580,7 @@ func (_Subnet *SubnetCallerSession) GetBlsContract() (common.Address, error) {
 //
 // Solidity: function getBootNodes() view returns((uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[])
 func (_Subnet *SubnetCaller) GetBootNodes(opts *bind.CallOpts) ([]SecretNode, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getBootNodes")
 
 	if err != nil {
@@ -611,7 +611,7 @@ func (_Subnet *SubnetCallerSession) GetBootNodes() ([]SecretNode, error) {
 //
 // Solidity: function getLevelMinMortgage(uint8 level) view returns(uint256)
 func (_Subnet *SubnetCaller) GetLevelMinMortgage(opts *bind.CallOpts, level uint8) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getLevelMinMortgage", level)
 
 	if err != nil {
@@ -642,7 +642,7 @@ func (_Subnet *SubnetCallerSession) GetLevelMinMortgage(level uint8) (*big.Int, 
 //
 // Solidity: function getLevelPrice(uint8 level) view returns((uint256,uint256,uint256,uint256))
 func (_Subnet *SubnetCaller) GetLevelPrice(opts *bind.CallOpts, level uint8) (RunPrice, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getLevelPrice", level)
 
 	if err != nil {
@@ -673,7 +673,7 @@ func (_Subnet *SubnetCallerSession) GetLevelPrice(level uint8) (RunPrice, error)
 //
 // Solidity: function getMinMortgage() view returns(uint256)
 func (_Subnet *SubnetCaller) GetMinMortgage(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getMinMortgage")
 
 	if err != nil {
@@ -704,7 +704,7 @@ func (_Subnet *SubnetCallerSession) GetMinMortgage() (*big.Int, error) {
 //
 // Solidity: function getPendingSecrets() view returns(uint64[], uint32[])
 func (_Subnet *SubnetCaller) GetPendingSecrets(opts *bind.CallOpts) ([]uint64, []uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getPendingSecrets")
 
 	if err != nil {
@@ -739,7 +739,7 @@ func (_Subnet *SubnetCaller) GetRegions(opts *bind.CallOpts) (struct {
 	Ids   []uint32
 	Names [][]byte
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getRegions")
 
 	outstruct := new(struct {
@@ -784,7 +784,7 @@ func (_Subnet *SubnetCaller) GetSecrets(opts *bind.CallOpts, start *big.Int, siz
 	Ids   []uint64
 	Nodes []SecretNode
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getSecrets", start, size)
 
 	outstruct := new(struct {
@@ -826,7 +826,7 @@ func (_Subnet *SubnetCallerSession) GetSecrets(start *big.Int, size *big.Int) (s
 //
 // Solidity: function getValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCaller) GetValidators(opts *bind.CallOpts) ([]uint64, []SecretNode, []uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getValidators")
 
 	if err != nil {
@@ -859,7 +859,7 @@ func (_Subnet *SubnetCallerSession) GetValidators() ([]uint64, []SecretNode, []u
 //
 // Solidity: function getWorker(uint64 id) view returns((uint64,bytes,address,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32))
 func (_Subnet *SubnetCaller) GetWorker(opts *bind.CallOpts, id uint64) (K8sCluster, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getWorker", id)
 
 	if err != nil {
@@ -890,7 +890,7 @@ func (_Subnet *SubnetCallerSession) GetWorker(id uint64) (K8sCluster, error) {
 //
 // Solidity: function getWorkers(uint64 start, uint64 size) view returns((uint64,bytes,address,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32)[], uint64[])
 func (_Subnet *SubnetCaller) GetWorkers(opts *bind.CallOpts, start uint64, size uint64) ([]K8sCluster, []uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "getWorkers", start, size)
 
 	if err != nil {
@@ -922,7 +922,7 @@ func (_Subnet *SubnetCallerSession) GetWorkers(start uint64, size uint64) ([]K8s
 //
 // Solidity: function govContract() view returns(address)
 func (_Subnet *SubnetCaller) GovContract(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "govContract")
 
 	if err != nil {
@@ -953,7 +953,7 @@ func (_Subnet *SubnetCallerSession) GovContract() (common.Address, error) {
 //
 // Solidity: function lastEpochBlock() view returns(uint256)
 func (_Subnet *SubnetCaller) LastEpochBlock(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "lastEpochBlock")
 
 	if err != nil {
@@ -984,7 +984,7 @@ func (_Subnet *SubnetCallerSession) LastEpochBlock() (*big.Int, error) {
 //
 // Solidity: function levelMinMortgages(uint8 ) view returns(uint256)
 func (_Subnet *SubnetCaller) LevelMinMortgages(opts *bind.CallOpts, arg0 uint8) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "levelMinMortgages", arg0)
 
 	if err != nil {
@@ -1020,7 +1020,7 @@ func (_Subnet *SubnetCaller) LevelPrices(opts *bind.CallOpts, arg0 uint8) (struc
 	StorageAmount *big.Int
 	Network       *big.Int
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "levelPrices", arg0)
 
 	outstruct := new(struct {
@@ -1070,7 +1070,7 @@ func (_Subnet *SubnetCallerSession) LevelPrices(arg0 uint8) (struct {
 //
 // Solidity: function minMortgageAmount() view returns(uint256)
 func (_Subnet *SubnetCaller) MinMortgageAmount(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "minMortgageAmount")
 
 	if err != nil {
@@ -1101,7 +1101,7 @@ func (_Subnet *SubnetCallerSession) MinMortgageAmount() (*big.Int, error) {
 //
 // Solidity: function mintOfWorker(bytes32 ) view returns(uint64)
 func (_Subnet *SubnetCaller) MintOfWorker(opts *bind.CallOpts, arg0 [32]byte) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "mintOfWorker", arg0)
 
 	if err != nil {
@@ -1132,7 +1132,7 @@ func (_Subnet *SubnetCallerSession) MintOfWorker(arg0 [32]byte) (uint64, error) 
 //
 // Solidity: function mintWorker(bytes32 id) view returns(uint64, (uint64,bytes,address,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32))
 func (_Subnet *SubnetCaller) MintWorker(opts *bind.CallOpts, id [32]byte) (uint64, K8sCluster, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "mintWorker", id)
 
 	if err != nil {
@@ -1164,7 +1164,7 @@ func (_Subnet *SubnetCallerSession) MintWorker(id [32]byte) (uint64, K8sCluster,
 //
 // Solidity: function nextAssetId() view returns(uint32)
 func (_Subnet *SubnetCaller) NextAssetId(opts *bind.CallOpts) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "nextAssetId")
 
 	if err != nil {
@@ -1195,7 +1195,7 @@ func (_Subnet *SubnetCallerSession) NextAssetId() (uint32, error) {
 //
 // Solidity: function nextEpochValidators() view returns(uint64[], (uint64,bytes,address,bytes32,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32,bytes)[], uint32[])
 func (_Subnet *SubnetCaller) NextEpochValidators(opts *bind.CallOpts) ([]uint64, []SecretNode, []uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "nextEpochValidators")
 
 	if err != nil {
@@ -1228,7 +1228,7 @@ func (_Subnet *SubnetCallerSession) NextEpochValidators() ([]uint64, []SecretNod
 //
 // Solidity: function nextRegionId() view returns(uint32)
 func (_Subnet *SubnetCaller) NextRegionId(opts *bind.CallOpts) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "nextRegionId")
 
 	if err != nil {
@@ -1259,7 +1259,7 @@ func (_Subnet *SubnetCallerSession) NextRegionId() (uint32, error) {
 //
 // Solidity: function nextSecretId() view returns(uint64)
 func (_Subnet *SubnetCaller) NextSecretId(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "nextSecretId")
 
 	if err != nil {
@@ -1290,7 +1290,7 @@ func (_Subnet *SubnetCallerSession) NextSecretId() (uint64, error) {
 //
 // Solidity: function nextWorkerId() view returns(uint64)
 func (_Subnet *SubnetCaller) NextWorkerId(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "nextWorkerId")
 
 	if err != nil {
@@ -1321,7 +1321,7 @@ func (_Subnet *SubnetCallerSession) NextWorkerId() (uint64, error) {
 //
 // Solidity: function ownerOfWorker(address ) view returns(uint64)
 func (_Subnet *SubnetCaller) OwnerOfWorker(opts *bind.CallOpts, arg0 common.Address) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "ownerOfWorker", arg0)
 
 	if err != nil {
@@ -1352,7 +1352,7 @@ func (_Subnet *SubnetCallerSession) OwnerOfWorker(arg0 common.Address) (uint64, 
 //
 // Solidity: function pendingValidatorIds(uint256 ) view returns(uint64)
 func (_Subnet *SubnetCaller) PendingValidatorIds(opts *bind.CallOpts, arg0 *big.Int) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "pendingValidatorIds", arg0)
 
 	if err != nil {
@@ -1383,7 +1383,7 @@ func (_Subnet *SubnetCallerSession) PendingValidatorIds(arg0 *big.Int) (uint64, 
 //
 // Solidity: function pendingValidators(uint64 ) view returns(uint32)
 func (_Subnet *SubnetCaller) PendingValidators(opts *bind.CallOpts, arg0 uint64) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "pendingValidators", arg0)
 
 	if err != nil {
@@ -1414,7 +1414,7 @@ func (_Subnet *SubnetCallerSession) PendingValidators(arg0 uint64) (uint32, erro
 //
 // Solidity: function proxiableUUID() view returns(bytes32)
 func (_Subnet *SubnetCaller) ProxiableUUID(opts *bind.CallOpts) ([32]byte, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "proxiableUUID")
 
 	if err != nil {
@@ -1445,7 +1445,7 @@ func (_Subnet *SubnetCallerSession) ProxiableUUID() ([32]byte, error) {
 //
 // Solidity: function region(uint32 id) view returns(bytes)
 func (_Subnet *SubnetCaller) Region(opts *bind.CallOpts, id uint32) ([]byte, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "region", id)
 
 	if err != nil {
@@ -1476,7 +1476,7 @@ func (_Subnet *SubnetCallerSession) Region(id uint32) ([]byte, error) {
 //
 // Solidity: function regionWorkers(uint32 , uint256 ) view returns(uint64)
 func (_Subnet *SubnetCaller) RegionWorkers(opts *bind.CallOpts, arg0 uint32, arg1 *big.Int) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "regionWorkers", arg0, arg1)
 
 	if err != nil {
@@ -1507,7 +1507,7 @@ func (_Subnet *SubnetCallerSession) RegionWorkers(arg0 uint32, arg1 *big.Int) (u
 //
 // Solidity: function regions(uint32 ) view returns(bytes)
 func (_Subnet *SubnetCaller) Regions(opts *bind.CallOpts, arg0 uint32) ([]byte, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "regions", arg0)
 
 	if err != nil {
@@ -1538,7 +1538,7 @@ func (_Subnet *SubnetCallerSession) Regions(arg0 uint32) ([]byte, error) {
 //
 // Solidity: function runningValidatorIds(uint256 ) view returns(uint64)
 func (_Subnet *SubnetCaller) RunningValidatorIds(opts *bind.CallOpts, arg0 *big.Int) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "runningValidatorIds", arg0)
 
 	if err != nil {
@@ -1569,7 +1569,7 @@ func (_Subnet *SubnetCallerSession) RunningValidatorIds(arg0 *big.Int) (uint64, 
 //
 // Solidity: function runningValidators(uint64 ) view returns(uint32)
 func (_Subnet *SubnetCaller) RunningValidators(opts *bind.CallOpts, arg0 uint64) (uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "runningValidators", arg0)
 
 	if err != nil {
@@ -1600,7 +1600,7 @@ func (_Subnet *SubnetCallerSession) RunningValidators(arg0 uint64) (uint32, erro
 //
 // Solidity: function secretMortgages(uint64 ) view returns(uint256)
 func (_Subnet *SubnetCaller) SecretMortgages(opts *bind.CallOpts, arg0 uint64) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "secretMortgages", arg0)
 
 	if err != nil {
@@ -1631,7 +1631,7 @@ func (_Subnet *SubnetCallerSession) SecretMortgages(arg0 uint64) (*big.Int, erro
 //
 // Solidity: function secretOfUser(address ) view returns(uint64)
 func (_Subnet *SubnetCaller) SecretOfUser(opts *bind.CallOpts, arg0 common.Address) (uint64, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "secretOfUser", arg0)
 
 	if err != nil {
@@ -1677,7 +1677,7 @@ func (_Subnet *SubnetCaller) Secrets(opts *bind.CallOpts, arg0 uint64) (struct {
 	P2pId         [32]byte
 	Bls           []byte
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "secrets", arg0)
 
 	outstruct := new(struct {
@@ -1767,7 +1767,7 @@ func (_Subnet *SubnetCallerSession) Secrets(arg0 uint64) (struct {
 //
 // Solidity: function teeChainKey() view returns(address)
 func (_Subnet *SubnetCaller) TeeChainKey(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "teeChainKey")
 
 	if err != nil {
@@ -1798,7 +1798,7 @@ func (_Subnet *SubnetCallerSession) TeeChainKey() (common.Address, error) {
 //
 // Solidity: function teeChainMultiKey() view returns(address)
 func (_Subnet *SubnetCaller) TeeChainMultiKey(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "teeChainMultiKey")
 
 	if err != nil {
@@ -1829,7 +1829,7 @@ func (_Subnet *SubnetCallerSession) TeeChainMultiKey() (common.Address, error) {
 //
 // Solidity: function tokenContract() view returns(address)
 func (_Subnet *SubnetCaller) TokenContract(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "tokenContract")
 
 	if err != nil {
@@ -1860,7 +1860,7 @@ func (_Subnet *SubnetCallerSession) TokenContract() (common.Address, error) {
 //
 // Solidity: function userWorker(address user) view returns(uint64, (uint64,bytes,address,uint8,uint32,uint256,uint256,uint256,(uint8,uint8,uint8,uint8),uint32,uint8,bytes32))
 func (_Subnet *SubnetCaller) UserWorker(opts *bind.CallOpts, user common.Address) (uint64, K8sCluster, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "userWorker", user)
 
 	if err != nil {
@@ -1892,7 +1892,7 @@ func (_Subnet *SubnetCallerSession) UserWorker(user common.Address) (uint64, K8s
 //
 // Solidity: function workerStatus(uint64 ) view returns(uint8)
 func (_Subnet *SubnetCaller) WorkerStatus(opts *bind.CallOpts, arg0 uint64) (uint8, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "workerStatus", arg0)
 
 	if err != nil {
@@ -1923,7 +1923,7 @@ func (_Subnet *SubnetCallerSession) WorkerStatus(arg0 uint64) (uint8, error) {
 //
 // Solidity: function workerTotalMortgage(uint64 workerId) view returns(uint256)
 func (_Subnet *SubnetCaller) WorkerTotalMortgage(opts *bind.CallOpts, workerId uint64) (*big.Int, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "workerTotalMortgage", workerId)
 
 	if err != nil {
@@ -1954,7 +1954,7 @@ func (_Subnet *SubnetCallerSession) WorkerTotalMortgage(workerId uint64) (*big.I
 //
 // Solidity: function workerTotalResources(uint64 workerId) view returns(uint32, uint32, uint32, uint32, uint32, uint32)
 func (_Subnet *SubnetCaller) WorkerTotalResources(opts *bind.CallOpts, workerId uint64) (uint32, uint32, uint32, uint32, uint32, uint32, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "workerTotalResources", workerId)
 
 	if err != nil {
@@ -2003,7 +2003,7 @@ func (_Subnet *SubnetCaller) Workers(opts *bind.CallOpts, arg0 uint64) (struct {
 	Status        uint8
 	P2pId         [32]byte
 }, error) {
-	var out []interface{}
+	var out []any
 	err := _Subnet.contract.Call(opts, &out, "workers", arg0)
 
 	outstruct := new(struct {
@@ -2903,7 +2903,7 @@ type SubnetBeaconUpgraded struct {
 // Solidity: event BeaconUpgraded(address indexed beacon)
 func (_Subnet *SubnetFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beacon []common.Address) (*SubnetBeaconUpgradedIterator, error) {
 
-	var beaconRule []interface{}
+	var beaconRule []any
 	for _, beaconItem := range beacon {
 		beaconRule = append(beaconRule, beaconItem)
 	}
@@ -2920,7 +2920,7 @@ func (_Subnet *SubnetFilterer) FilterBeaconUpgraded(opts *bind.FilterOpts, beaco
 // Solidity: event BeaconUpgraded(address indexed beacon)
 func (_Subnet *SubnetFilterer) WatchBeaconUpgraded(opts *bind.WatchOpts, sink chan<- *SubnetBeaconUpgraded, beacon []common.Address) (event.Subscription, error) {
 
-	var beaconRule []interface{}
+	var beaconRule []any
 	for _, beaconItem := range beacon {
 		beaconRule = append(beaconRule, beaconItem)
 	}
@@ -3181,7 +3181,7 @@ type SubnetUpgraded struct {
 // Solidity: event Upgraded(address indexed implementation)
 func (_Subnet *SubnetFilterer) FilterUpgraded(opts *bind.FilterOpts, implementation []common.Address) (*SubnetUpgradedIterator, error) {
 
-	var implementationRule []interface{}
+	var implementationRule []any
 	for _, implementationItem := range implementation {
 		implementationRule = append(implementationRule, implementationItem)
 	}
@@ -3198,7 +3198,7 @@ func (_Subnet *SubnetFilterer) FilterUpgraded(opts *bind.FilterOpts, implementat
 // Solidity: event Upgraded(address indexed implementation)
 func (_Subnet *SubnetFilterer) WatchUpgraded(opts *bind.WatchOpts, sink chan<- *SubnetUpgraded, implementation []common.Address) (event.Subscription, error) {
 
-	var implementationRule []interface{}
+	var implementationRule []any
 	for _, implementationItem := range implementation {
 		implementationRule = append(implementationRule, implementationItem)
 	}

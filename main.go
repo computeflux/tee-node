@@ -164,6 +164,9 @@ func main() {
 	if err := idx.Register(indexer.NewGatewayModelIndex()); err != nil {
 		log.Fatalf("failed to register gateway model index: %v", err)
 	}
+	if err := idx.Register(indexer.NewGatewayRouterIndex()); err != nil {
+		log.Fatalf("failed to register gateway router index: %v", err)
+	}
 	if err := idx.Start(1 * time.Minute); err != nil {
 		log.Fatalf("failed to start indexer: %v", err)
 	}

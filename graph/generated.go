@@ -149,6 +149,7 @@ type ComplexityRoot struct {
 		ID       func(childComplexity int) int
 		Model    func(childComplexity int) int
 		Provider func(childComplexity int) int
+		Route    func(childComplexity int) int
 	}
 
 	ModelRunningStatus struct {
@@ -260,6 +261,19 @@ type ComplexityRoot struct {
 		Earnings  func(childComplexity int) int
 		Referrals func(childComplexity int) int
 		Referrer  func(childComplexity int) int
+	}
+
+	RouteInfo struct {
+		CachedPrice func(childComplexity int) int
+		CreatedAt   func(childComplexity int) int
+		ID          func(childComplexity int) int
+		InPrice     func(childComplexity int) int
+		IsActive    func(childComplexity int) int
+		IsOfficial  func(childComplexity int) int
+		ModelIds    func(childComplexity int) int
+		Name        func(childComplexity int) int
+		OutPrice    func(childComplexity int) int
+		RouteType   func(childComplexity int) int
 	}
 
 	SecretEnv struct {
@@ -844,6 +858,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ModelInfoWithProvider.Provider(childComplexity), true
+
+	case "ModelInfoWithProvider.route":
+		if e.complexity.ModelInfoWithProvider.Route == nil {
+			break
+		}
+
+		return e.complexity.ModelInfoWithProvider.Route(childComplexity), true
 
 	case "ModelRunningStatus.isRunning":
 		if e.complexity.ModelRunningStatus.IsRunning == nil {
@@ -1632,6 +1653,76 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ReferralInfo.Referrer(childComplexity), true
+
+	case "RouteInfo.cachedPrice":
+		if e.complexity.RouteInfo.CachedPrice == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.CachedPrice(childComplexity), true
+
+	case "RouteInfo.createdAt":
+		if e.complexity.RouteInfo.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.CreatedAt(childComplexity), true
+
+	case "RouteInfo.id":
+		if e.complexity.RouteInfo.ID == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.ID(childComplexity), true
+
+	case "RouteInfo.inPrice":
+		if e.complexity.RouteInfo.InPrice == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.InPrice(childComplexity), true
+
+	case "RouteInfo.isActive":
+		if e.complexity.RouteInfo.IsActive == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.IsActive(childComplexity), true
+
+	case "RouteInfo.isOfficial":
+		if e.complexity.RouteInfo.IsOfficial == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.IsOfficial(childComplexity), true
+
+	case "RouteInfo.modelIds":
+		if e.complexity.RouteInfo.ModelIds == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.ModelIds(childComplexity), true
+
+	case "RouteInfo.name":
+		if e.complexity.RouteInfo.Name == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.Name(childComplexity), true
+
+	case "RouteInfo.outPrice":
+		if e.complexity.RouteInfo.OutPrice == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.OutPrice(childComplexity), true
+
+	case "RouteInfo.routeType":
+		if e.complexity.RouteInfo.RouteType == nil {
+			break
+		}
+
+		return e.complexity.RouteInfo.RouteType(childComplexity), true
 
 	case "SecretEnv.envs":
 		if e.complexity.SecretEnv.Envs == nil {
@@ -7442,14 +7533,11 @@ func (ec *executionContext) _ModelInfoWithProvider_model(ctx context.Context, fi
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.ModelInfo)
 	fc.Result = res
-	return ec.marshalNModelInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfo(ctx, field.Selections, res)
+	return ec.marshalOModelInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ModelInfoWithProvider_model(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7512,14 +7600,11 @@ func (ec *executionContext) _ModelInfoWithProvider_provider(ctx context.Context,
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.ProviderInfo)
 	fc.Result = res
-	return ec.marshalNProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx, field.Selections, res)
+	return ec.marshalOProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ModelInfoWithProvider_provider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7562,6 +7647,69 @@ func (ec *executionContext) fieldContext_ModelInfoWithProvider_provider(_ contex
 				return ec.fieldContext_ProviderInfo_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ProviderInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelInfoWithProvider_route(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfoWithProvider) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfoWithProvider_route(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Route, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.RouteInfo)
+	fc.Result = res
+	return ec.marshalORouteInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐRouteInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfoWithProvider_route(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfoWithProvider",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_RouteInfo_id(ctx, field)
+			case "name":
+				return ec.fieldContext_RouteInfo_name(ctx, field)
+			case "routeType":
+				return ec.fieldContext_RouteInfo_routeType(ctx, field)
+			case "inPrice":
+				return ec.fieldContext_RouteInfo_inPrice(ctx, field)
+			case "outPrice":
+				return ec.fieldContext_RouteInfo_outPrice(ctx, field)
+			case "cachedPrice":
+				return ec.fieldContext_RouteInfo_cachedPrice(ctx, field)
+			case "modelIds":
+				return ec.fieldContext_RouteInfo_modelIds(ctx, field)
+			case "isActive":
+				return ec.fieldContext_RouteInfo_isActive(ctx, field)
+			case "isOfficial":
+				return ec.fieldContext_RouteInfo_isOfficial(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_RouteInfo_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RouteInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -11530,6 +11678,8 @@ func (ec *executionContext) fieldContext_Query_models(ctx context.Context, field
 				return ec.fieldContext_ModelInfoWithProvider_model(ctx, field)
 			case "provider":
 				return ec.fieldContext_ModelInfoWithProvider_provider(ctx, field)
+			case "route":
+				return ec.fieldContext_ModelInfoWithProvider_route(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ModelInfoWithProvider", field.Name)
 		},
@@ -12294,6 +12444,446 @@ func (ec *executionContext) fieldContext_ReferralInfo_referrals(_ context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_id(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_name(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_routeType(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_routeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RouteType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_routeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_inPrice(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_inPrice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.InPrice, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_inPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_outPrice(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_outPrice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OutPrice, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_outPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_cachedPrice(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_cachedPrice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CachedPrice, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_cachedPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_modelIds(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_modelIds(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModelIds, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]int)
+	fc.Result = res
+	return ec.marshalNInt2ᚕintᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_modelIds(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_isActive(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_isActive(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsActive, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_isActive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_isOfficial(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_isOfficial(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsOfficial, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_isOfficial(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RouteInfo_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.RouteInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RouteInfo_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RouteInfo_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RouteInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -16162,14 +16752,10 @@ func (ec *executionContext) _ModelInfoWithProvider(ctx context.Context, sel ast.
 			}
 		case "model":
 			out.Values[i] = ec._ModelInfoWithProvider_model(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "provider":
 			out.Values[i] = ec._ModelInfoWithProvider_provider(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
+		case "route":
+			out.Values[i] = ec._ModelInfoWithProvider_route(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -17336,6 +17922,90 @@ func (ec *executionContext) _ReferralInfo(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var routeInfoImplementors = []string{"RouteInfo"}
+
+func (ec *executionContext) _RouteInfo(ctx context.Context, sel ast.SelectionSet, obj *model.RouteInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, routeInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RouteInfo")
+		case "id":
+			out.Values[i] = ec._RouteInfo_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._RouteInfo_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "routeType":
+			out.Values[i] = ec._RouteInfo_routeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "inPrice":
+			out.Values[i] = ec._RouteInfo_inPrice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "outPrice":
+			out.Values[i] = ec._RouteInfo_outPrice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cachedPrice":
+			out.Values[i] = ec._RouteInfo_cachedPrice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "modelIds":
+			out.Values[i] = ec._RouteInfo_modelIds(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isActive":
+			out.Values[i] = ec._RouteInfo_isActive(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isOfficial":
+			out.Values[i] = ec._RouteInfo_isOfficial(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._RouteInfo_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var secretEnvImplementors = []string{"SecretEnv"}
 
 func (ec *executionContext) _SecretEnv(ctx context.Context, sel ast.SelectionSet, obj *model.SecretEnv) graphql.Marshaler {
@@ -18475,16 +19145,6 @@ func (ec *executionContext) marshalNPointsHistoryItem2ᚖgithubᚗcomᚋcomputef
 	return ec._PointsHistoryItem(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx context.Context, sel ast.SelectionSet, v *model.ProviderInfo) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._ProviderInfo(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalNRecoveryResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋgraphᚐRecoveryResult(ctx context.Context, sel ast.SelectionSet, v RecoveryResult) graphql.Marshaler {
 	return ec._RecoveryResult(ctx, sel, &v)
 }
@@ -18962,6 +19622,27 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	_ = ctx
 	res := graphql.MarshalInt(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOModelInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐModelInfo(ctx context.Context, sel ast.SelectionSet, v *model.ModelInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ModelInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOProviderInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐProviderInfo(ctx context.Context, sel ast.SelectionSet, v *model.ProviderInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ProviderInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORouteInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐRouteInfo(ctx context.Context, sel ast.SelectionSet, v *model.RouteInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RouteInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v any) (string, error) {

@@ -78,7 +78,7 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 		docID := strconv.FormatUint(m.ID, 10)
 		newModels[docID] = m
 
-		doc := map[string]interface{}{
+		doc := map[string]any{
 			"name":              m.Model.Name,
 			"modelId":           m.Model.ModelID,
 			"providerType":      m.Model.ProviderType,
@@ -103,6 +103,15 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 	g.index = newIndex
 	g.models = newModels
 	return nil
+}
+
+// Get 按 ID 查询单个模型。
+func (g *GatewayModelIndex) Get(id uint64) (cgateway.ModelInfoWithProvider, bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	m, ok := g.models[strconv.FormatUint(id, 10)]
+	return m, ok
 }
 
 // Search 在索引中查询模型。

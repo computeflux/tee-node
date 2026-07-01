@@ -80,63 +80,77 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 }
 
 // Models is the resolver for the Models field.
+// 返回模型与路由的混合列表；route 与独立模型同名时，route 优先覆盖。
+// 模型端应用全部筛选条件（context、价格、模态）；路由端仅按名称关键字与价格过滤，
+// context / 模态对路由无意义故不施加。
 func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error) {
 	var kw string
 	if keyword != nil {
 		kw = *keyword
 	}
 
-	var off uint64
-	var lim uint32 = 1000
-	if offset != nil {
-		off = uint64(*offset)
-	}
-	if limit != nil {
-		lim = uint32(*limit)
-	}
-
-	idx, err := r.Indexer.Get(indexer.GatewayModelIndexName)
+	// 1. 模型：走 GatewayModelIndex，应用全部筛选条件。
+	modelIdxRaw, err := r.Indexer.Get(indexer.GatewayModelIndexName)
 	if err != nil {
 		return nil, err
 	}
-	gatewayIdx, ok := idx.(*indexer.GatewayModelIndex)
+	modelIdx, ok := modelIdxRaw.(*indexer.GatewayModelIndex)
 	if !ok {
 		return nil, fmt.Errorf("invalid gateway model index type")
 	}
-
-	req := indexer.GatewayModelSearchRequest{
+	modelReq := indexer.GatewayModelSearchRequest{
 		Keyword: kw,
-		Offset:  off,
-		Limit:   lim,
+		Offset:  0,
+		Limit:   100000,
 	}
 	if minContext != nil {
 		v := uint64(*minContext)
-		req.MinContext = &v
+		modelReq.MinContext = &v
 	}
 	if maxContext != nil {
 		v := uint64(*maxContext)
-		req.MaxContext = &v
+		modelReq.MaxContext = &v
 	}
 	if minPrice != nil {
 		v := uint64(*minPrice)
-		req.MinPrice = &v
+		modelReq.MinPrice = &v
 	}
 	if maxPrice != nil {
 		v := uint64(*maxPrice)
-		req.MaxPrice = &v
+		modelReq.MaxPrice = &v
 	}
 	if modalities != nil {
-		req.Modalities = uint8(*modalities)
+		modelReq.Modalities = uint8(*modalities)
+	}
+	models, err := modelIdx.Search(ctx, modelReq)
+	if err != nil {
+		return nil, err
 	}
 
-	models, err := gatewayIdx.Search(ctx, req)
+	// 2. 路由：走 GatewayRouterIndex，仅应用名称关键字过滤。
+	routerIdxRaw, err := r.Indexer.Get(indexer.GatewayRouterIndexName)
+	if err != nil {
+		return nil, err
+	}
+
+	routerIdx, ok := routerIdxRaw.(*indexer.GatewayRouterIndex)
+	if !ok {
+		return nil, fmt.Errorf("invalid gateway router index type")
+	}
+
+	routes, err := routerIdx.Search(ctx, indexer.GatewayRouterSearchRequest{
+		Keyword: kw,
+		Offset:  0,
+		Limit:   100000,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	pool := localtunnel.GetGlobalPool()
 
-	result := make([]*model.ModelInfoWithProvider, 0, len(models))
+	// 3. models 和 routes 都直接进列表。
+	result := make([]*model.ModelInfoWithProvider, 0, len(models)+len(routes))
 	for _, item := range models {
 		m := item.Model
 		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
@@ -182,6 +196,44 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 				UptimeSLA:     int(p.UptimeSLA),
 				IsActive:      p.IsActive,
 				CreatedAt:     int(p.CreatedAt),
+			},
+		})
+	}
+
+	for _, route := range routes {
+		d := route.Data
+		// 跳过空路由模板（未关联任何模型）：这些是供模型加入的容器，
+		// 本身不可调用，在 models 列表里只会显示为空条目，干扰前端。
+		// if len(d.ModelIds) == 0 {
+		// 	continue
+		// }
+
+		// 路由在索引层不支持价格范围，这里按 inPrice 在内存中补一道价格过滤。
+		if minPrice != nil && d.InPrice < uint64(*minPrice) {
+			continue
+		}
+		if maxPrice != nil && d.InPrice > uint64(*maxPrice) {
+			continue
+		}
+
+		modelIds := make([]int, 0, len(d.ModelIds))
+		for _, modelID := range d.ModelIds {
+			modelIds = append(modelIds, int(modelID))
+		}
+
+		result = append(result, &model.ModelInfoWithProvider{
+			ID: int(route.ID),
+			Route: &model.RouteInfo{
+				ID:          int(route.ID),
+				Name:        d.Name,
+				RouteType:   int(d.RouteType),
+				InPrice:     int(d.InPrice),
+				OutPrice:    int(d.OutPrice),
+				CachedPrice: int(d.CachedPrice),
+				ModelIds:    modelIds,
+				IsActive:    d.IsActive,
+				IsOfficial:  d.IsOfficial,
+				CreatedAt:   int(d.CreatedAt),
 			},
 		})
 	}

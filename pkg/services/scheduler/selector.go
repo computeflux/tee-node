@@ -55,7 +55,7 @@ type Candidate struct {
 // NewSelector 创建 Selector。
 func NewSelector() *Selector {
 	return &Selector{
-		pool: sync.Pool{New: func() interface{} { return make([]Candidate, 0, 16) }},
+		pool: sync.Pool{New: func() any { return make([]Candidate, 0, 16) }},
 		rng:  rand.New(rand.NewSource(int64Fast())),
 		log:  noopLogger{},
 	}

@@ -31,7 +31,7 @@ func GatewayTokenFromContext(ctx context.Context) *types.GatewayTokenInfo {
 }
 
 // AuthCheck checks the API key is valid via context.
-func AuthCheck(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error) {
+func AuthCheck(ctx context.Context, obj any, next graphql.Resolver) (res any, err error) {
 	token := GatewayTokenFromContext(ctx)
 	if token == nil {
 		err = gqlerror.Errorf("Please log in first.")

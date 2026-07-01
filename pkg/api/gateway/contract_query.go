@@ -31,3 +31,10 @@ func GatewayGetCredit(chain *teechain.TeeChain, user chaintypes.UniAddr) (int64,
 		return q.GetCredit(user)
 	})
 }
+
+// GatewayListAllRoutes 查询链上全部路由列表。
+func GatewayListAllRoutes(chain *teechain.TeeChain, offset uint64, limit uint32) ([]cgateway.ModelRouteWithID, error) {
+	return runGatewayQuery(chain, func(q cgateway.GatewayQuery) ([]cgateway.ModelRouteWithID, error) {
+		return q.ListRoutes(offset, limit)
+	})
+}

@@ -31,10 +31,24 @@ type ProviderInfo {
   createdAt: Int!
 }
 
+type RouteInfo {
+  id: Int!
+  name: String!
+  routeType: Int!
+  inPrice: Int!
+  outPrice: Int!
+  cachedPrice: Int!
+  modelIds: [Int!]!
+  isActive: Boolean!
+  isOfficial: Boolean!
+  createdAt: Int!
+}
+
 type ModelInfoWithProvider {
   id: Int!
-  model: ModelInfo!
-  provider: ProviderInfo!
+  model: ModelInfo
+  provider: ProviderInfo
+  route: RouteInfo
 }
 
 type ModelRunningStatus {
@@ -42,7 +56,7 @@ type ModelRunningStatus {
   isRunning: Boolean!
 }
 
-# ── Query ───────────────────────────────────────────────
+# ── Query ─────────────────────────────────────────────
 extend type Query {
   edge_models: [ModelInfo!]! @AuthCheck
   """获取活跃模型列表，支持按模型名关键字模糊搜索，以及上下文长度和价格区间筛选。

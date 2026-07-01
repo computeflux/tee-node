@@ -8,7 +8,7 @@ import (
 // Callers in bifrost only use Exists(), Raw() and String().
 type Node struct {
 	exists bool
-	value  interface{}
+	value  any
 }
 
 // Exists reports whether the requested path was found.
@@ -40,24 +40,24 @@ func (n Node) String() (string, error) {
 
 // Get searches and locates the given path from src json.
 // Each path arg must be an integer (array index) or a string (object key).
-func Get(src []byte, path ...interface{}) (Node, error) {
+func Get(src []byte, path ...any) (Node, error) {
 	return GetFromString(string(src), path...)
 }
 
 // GetCopyFromString is the same as GetFromString (copy is irrelevant for the std-json shim).
-func GetCopyFromString(src string, path ...interface{}) (Node, error) {
+func GetCopyFromString(src string, path ...any) (Node, error) {
 	return GetFromString(src, path...)
 }
 
 // GetWithOptions searches and locates the given path from src json; options are ignored.
-func GetWithOptions(src []byte, opts interface{}, path ...interface{}) (Node, error) {
+func GetWithOptions(src []byte, opts any, path ...any) (Node, error) {
 	return GetFromString(string(src), path...)
 }
 
 // GetFromString searches and locates the given path from src json.
 // Each path arg must be an integer (array index) or a string (object key).
-func GetFromString(src string, path ...interface{}) (Node, error) {
-	var root interface{}
+func GetFromString(src string, path ...any) (Node, error) {
+	var root any
 	if err := json.Unmarshal([]byte(src), &root); err != nil {
 		return Node{}, err
 	}
@@ -65,13 +65,13 @@ func GetFromString(src string, path ...interface{}) (Node, error) {
 	return Node{exists: ok, value: v}, nil
 }
 
-func walkPath(v interface{}, path []interface{}) (interface{}, bool) {
+func walkPath(v any, path []any) (any, bool) {
 	if len(path) == 0 {
 		return v, true
 	}
 	switch cur := path[0].(type) {
 	case string:
-		m, ok := v.(map[string]interface{})
+		m, ok := v.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -81,13 +81,13 @@ func walkPath(v interface{}, path []interface{}) (interface{}, bool) {
 		}
 		return walkPath(child, path[1:])
 	case int:
-		arr, ok := v.([]interface{})
+		arr, ok := v.([]any)
 		if !ok || cur < 0 || cur >= len(arr) {
 			return nil, false
 		}
 		return walkPath(arr[cur], path[1:])
 	case int64:
-		arr, ok := v.([]interface{})
+		arr, ok := v.([]any)
 		if !ok || cur < 0 || int(cur) >= len(arr) {
 			return nil, false
 		}
@@ -100,9 +100,8 @@ func walkPath(v interface{}, path []interface{}) (interface{}, bool) {
 
 // Pretouch and PretouchMany are no-ops in the std-json fallback.
 // They are not part of the API interface and are not called by bifrost.
-func Pretouch(vt interface{}, opts ...interface{}) error { return nil }
-func PretouchMany(vts []interface{}, opts ...interface{}) error { return nil }
+func Pretouch(vt any, opts ...any) error        { return nil }
+func PretouchMany(vts []any, opts ...any) error { return nil }
 
 // NoCopyRawMessage is a placeholder type exported by sonic; not used by bifrost.
 type NoCopyRawMessage []byte
-

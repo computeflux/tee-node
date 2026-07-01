@@ -16,7 +16,7 @@ func (cfg Config) Froze() API {
 	return &frozenConfig{Config: cfg}
 }
 
-func (cfg *frozenConfig) marshalOptions(val interface{}, prefix, indent string) ([]byte, error) {
+func (cfg *frozenConfig) marshalOptions(val any, prefix, indent string) ([]byte, error) {
 	w := bytes.NewBuffer(nil)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(cfg.EscapeHTML)
@@ -33,7 +33,7 @@ func (cfg *frozenConfig) marshalOptions(val interface{}, prefix, indent string) 
 }
 
 // Marshal implements API.Marshal.
-func (cfg *frozenConfig) Marshal(val interface{}) ([]byte, error) {
+func (cfg *frozenConfig) Marshal(val any) ([]byte, error) {
 	if !cfg.EscapeHTML {
 		return cfg.marshalOptions(val, "", "")
 	}
@@ -41,13 +41,13 @@ func (cfg *frozenConfig) Marshal(val interface{}) ([]byte, error) {
 }
 
 // MarshalToString implements API.MarshalToString.
-func (cfg *frozenConfig) MarshalToString(val interface{}) (string, error) {
+func (cfg *frozenConfig) MarshalToString(val any) (string, error) {
 	out, err := cfg.Marshal(val)
 	return string(out), err
 }
 
 // MarshalIndent implements API.MarshalIndent.
-func (cfg *frozenConfig) MarshalIndent(val interface{}, prefix, indent string) ([]byte, error) {
+func (cfg *frozenConfig) MarshalIndent(val any, prefix, indent string) ([]byte, error) {
 	if !cfg.EscapeHTML {
 		return cfg.marshalOptions(val, prefix, indent)
 	}
@@ -55,7 +55,7 @@ func (cfg *frozenConfig) MarshalIndent(val interface{}, prefix, indent string) (
 }
 
 // UnmarshalFromString implements API.UnmarshalFromString.
-func (cfg *frozenConfig) UnmarshalFromString(str string, v interface{}) error {
+func (cfg *frozenConfig) UnmarshalFromString(str string, v any) error {
 	r := bytes.NewBufferString(str)
 	dec := json.NewDecoder(r)
 	if cfg.UseNumber {
@@ -76,7 +76,7 @@ func (cfg *frozenConfig) UnmarshalFromString(str string, v interface{}) error {
 }
 
 // Unmarshal implements API.Unmarshal.
-func (cfg *frozenConfig) Unmarshal(data []byte, v interface{}) error {
+func (cfg *frozenConfig) Unmarshal(data []byte, v any) error {
 	return cfg.UnmarshalFromString(string(data), v)
 }
 

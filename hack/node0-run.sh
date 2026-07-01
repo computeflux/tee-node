@@ -164,6 +164,21 @@ EOF
     sudo systemctl daemon-reload
 fi
 
+# ── 进程崩溃被 systemd 拉起时，不要再重新编译，直接复用脚本已构建的二进制 ──
+# 原 /etc/systemd/system/tee-node0.service 在 ExecStartPre 里每次启动都跑
+# `ego-go build` + `ego sign`，进程崩了被 systemd 拉起时还要先编译，拖慢恢复。
+# 用 drop-in 把 ExecStartPre 重置，仅保留系统级目录/符号链接准备。
+if [ ! -f /etc/systemd/system/tee-node0.service.d/no-rebuild.conf ]; then
+    echo "Configuring systemd to skip rebuild on auto-restart ..."
+    sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+    sudo tee /etc/systemd/system/tee-node0.service.d/no-rebuild.conf >/dev/null <<'EOF'
+[Service]
+ExecStartPre=
+ExecStartPre=+/bin/bash -c 'mkdir -p /srv/token_node0/token_chain_data && rm -f /token_chain_data && ln -s /srv/token_node0/token_chain_data /token_chain_data'
+EOF
+    sudo systemctl daemon-reload
+fi
+
 # ── 检查并终止已有进程 ──
 if systemctl is-active --quiet tee-node0.service 2>/dev/null; then
     echo "Stopping existing tee-node0.service ..."

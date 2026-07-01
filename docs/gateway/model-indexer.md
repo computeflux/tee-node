@@ -270,7 +270,7 @@ idx.Start(1 * time.Minute) // 默认 1 分钟
 ### 日志
 
 ```go
-indexer.Logger = func(format string, args ...interface{}) {
+indexer.Logger = func(format string, args ...any) {
     log.Printf("[Indexer] "+format, args...)
 }
 ```

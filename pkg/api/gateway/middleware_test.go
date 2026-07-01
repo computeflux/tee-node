@@ -403,9 +403,9 @@ func TestWriteError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-	var body map[string]interface{}
+	var body map[string]any
 	json.Unmarshal(w.Body.Bytes(), &body)
-	err := body["error"].(map[string]interface{})
+	err := body["error"].(map[string]any)
 	assert.Equal(t, "bad input", err["message"])
 	assert.Equal(t, "invalid_request", err["type"])
 }

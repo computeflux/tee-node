@@ -23,7 +23,7 @@ import (
 
 func setupMockFns(t *testing.T) func() {
 	// Save all mockable function pointers and restore on cleanup
-	old := map[string]interface{}{
+	old := map[string]any{
 		"findTokenCachedFn":        findTokenCachedFn,
 		"getBridgeFn":              getBridgeFn,
 		"gatewayGetCreditFn":       gatewayGetCreditFn,
@@ -356,12 +356,12 @@ func TestHandleListModels_WithModels(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var body map[string]interface{}
+	var body map[string]any
 	json.Unmarshal(w.Body.Bytes(), &body)
-	data := body["data"].([]interface{})
+	data := body["data"].([]any)
 	assert.Len(t, data, 2)
-	assert.Equal(t, "gpt-4", data[0].(map[string]interface{})["id"])
-	assert.Equal(t, "claude-3", data[1].(map[string]interface{})["id"])
+	assert.Equal(t, "gpt-4", data[0].(map[string]any)["id"])
+	assert.Equal(t, "claude-3", data[1].(map[string]any)["id"])
 }
 
 func TestHandleListModels_Empty(t *testing.T) {
@@ -376,9 +376,9 @@ func TestHandleListModels_Empty(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var body map[string]interface{}
+	var body map[string]any
 	json.Unmarshal(w.Body.Bytes(), &body)
-	data := body["data"].([]interface{})
+	data := body["data"].([]any)
 	assert.Len(t, data, 0)
 }
 

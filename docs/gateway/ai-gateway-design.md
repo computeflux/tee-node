@@ -577,7 +577,7 @@ Authorization: Bearer tee_<64 hex chars>
 
 ### 变更 4：Body model 字段替换
 - **功能**：支持 `"provider/model"` 格式请求，自动替换 body 中的 `"model"` 为纯模型名
-- **实现**：`json.Unmarshal` → `map[string]interface{}` → 替换 → `json.Marshal`
+- **实现**：`json.Unmarshal` → `map[string]any` → 替换 → `json.Marshal`
 
 ### 变更 5：独立日志文件
 - **新增**：`logger.go`，`GatewayLog()` 返回写入 `./logs/gateway.log` 的 logger

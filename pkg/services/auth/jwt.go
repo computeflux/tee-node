@@ -60,7 +60,7 @@ func (s *JWTService) IssueRecoveryToken(email string) (string, error) {
 
 // ParseToken 解析并验证 JWT
 func (s *JWTService) ParseToken(tokenStr string) (*JWTClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &customClaims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}

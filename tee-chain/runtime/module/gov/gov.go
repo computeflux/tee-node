@@ -222,10 +222,12 @@ func (d GovMutation) CallAsSudo(calls []store.InContractCall) error {
 		if len(call.Name) == 0 {
 			return fmt.Errorf("sudo call %d: empty contract name", i)
 		}
+
 		if len(call.Method) == 0 {
 			return fmt.Errorf("sudo call %d: empty method selector", i)
 		}
-		_, err := d.api.Call(d.api.GetCaller(), &call)
+
+		_, err := d.api.Call(d.api.GetSystemAccount(), &call)
 		if err != nil {
 			return fmt.Errorf("sudo call %d (%s): %w", i, string(call.Name), err)
 		}
