@@ -20,7 +20,7 @@ type noopLogger struct{}
 func (n noopLogger) Debug(string, ...any) {}
 func (n noopLogger) Info(string, ...any)  {}
 func (n noopLogger) Warn(string, ...any)  {}
-func (n noopLogger) Error(string, ...any)  {}
+func (n noopLogger) Error(string, ...any) {}
 
 // stdLogger 把标准库 log.Logger 包装成 Logger。
 type stdLogger struct {

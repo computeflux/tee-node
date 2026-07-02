@@ -122,13 +122,29 @@ func (g *GatewayScheduler) ReloadRegistry(routes []*ModelRoute) {
 // Schedule 非流式入口。
 func (g *GatewayScheduler) Schedule(ctx context.Context, model string, body []byte, sessionID string) (*Result, error) {
 	g.log.Debug("schedule request", "model", model, "body_len", len(body), "stream", false, "session", sessionID)
-	return g.scheduler.Schedule(ctx, Invoke{Model: ModelKey(model), SessionID: sessionID, Body: body, Stream: false})
+	return g.scheduler.Schedule(
+		ctx,
+		Invoke{
+			Model:     ModelKey(model),
+			SessionID: sessionID,
+			Body:      body,
+			Stream:    false,
+		},
+	)
 }
 
 // ScheduleStream 流式入口。
 func (g *GatewayScheduler) ScheduleStream(ctx context.Context, model string, body []byte, sessionID string) (*Result, error) {
 	g.log.Debug("schedule request", "model", model, "body_len", len(body), "stream", true, "session", sessionID)
-	return g.scheduler.ScheduleStream(ctx, Invoke{Model: ModelKey(model), SessionID: sessionID, Body: body, Stream: true})
+	return g.scheduler.ScheduleStream(
+		ctx,
+		Invoke{
+			Model:     ModelKey(model),
+			SessionID: sessionID,
+			Body:      body,
+			Stream:    true,
+		},
+	)
 }
 
 // Registry 暴露 Registry 用于 reloader 写、metrics 读。

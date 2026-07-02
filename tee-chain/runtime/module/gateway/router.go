@@ -112,10 +112,10 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 		return fmt.Errorf("model %d not found", modelID)
 	}
 
-	// 校验路由类型与模型 ProviderType 一致
-	if model.ProviderType != route.RouteType {
-		return fmt.Errorf("model providerType %d does not match route type %d", model.ProviderType, route.RouteType)
-	}
+	// // 校验路由类型与模型 ProviderType 一致
+	// if model.ProviderType != route.RouteType {
+	// 	return fmt.Errorf("model providerType %d does not match route type %d", model.ProviderType, route.RouteType)
+	// }
 
 	// 更新模型的 RouteID，价格由路由统一
 	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {

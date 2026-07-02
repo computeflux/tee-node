@@ -196,7 +196,11 @@ func (app *TeeChain) CheckTx(_ context.Context, req *abci.RequestCheckTx) (*abci
 	fmt.Println()
 	util.LogWithGreen("START BLOCK", "--------------------------------------------------------------")
 	ok := app.checkTx(req.Tx)
-	LogWithTime("🚀 CheckTx", ok)
+	if ok == 0 {
+		LogWithTime("🚀 CheckTx", "ok")
+	} else {
+		LogWithTime("🚀 CheckTx", "fail")
+	}
 
 	return &abci.ResponseCheckTx{Code: ok}, nil
 }
