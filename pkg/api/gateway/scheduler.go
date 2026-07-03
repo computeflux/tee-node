@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"context"
-	"time"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
@@ -17,16 +16,15 @@ import (
 // 职责：
 //   - 注册固定的协议 adaptor（openai/anthropic/gemini/personal）
 //   - 注入请求协议转换 hook（选完端点后按端点协议转换请求体 + 解析上游路径）
-//   - 注入链上桥 getter 给 reloader
 //   - 设为全局单例供 HandleRelay 使用
-//   - 启动熔断评估 + 路由表热更新
-func InitScheduler(ctx context.Context, chain *teechain.TeeChain) error {
-	gw, err := scheduler.NewGatewayScheduler()
+//   - 启动熔断评估
+func InitScheduler(ctx context.Context, chain *teechain.TeeChain, resolver scheduler.ModelResolver) (*scheduler.GatewayScheduler, error) {
+	gw, err := scheduler.NewGatewayScheduler(resolver)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// 协议 adaptor 命名必须与 reloader.providerTypeName 输出一致。
+	// 协议 adaptor 命名必须与 scheduler.providerTypeName 输出一致。
 	gw.RegisterProviders(map[string]scheduler.ProviderClient{
 		"openai":    relay.GetProviderClient(cgateway.ProviderOpenAI),
 		"anthropic": relay.GetProviderClient(cgateway.ProviderClaude),
@@ -35,12 +33,10 @@ func InitScheduler(ctx context.Context, chain *teechain.TeeChain) error {
 	})
 
 	scheduler.SetRequestTransform(schedulerRequestTransform)
-	scheduler.SetBridgeGetter(func() *teechain.TeeChain { return chain })
 	scheduler.SetGlobal(gw)
 
 	gw.Start(ctx)
-	go scheduler.NewReloader(gw, 30*time.Second).Run(ctx)
-	return nil
+	return gw, nil
 }
 
 // schedulerRequestTransform 把入口协议请求体转换为目标 provider 协议请求体，并解析上游路径。

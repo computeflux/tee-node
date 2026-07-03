@@ -6,7 +6,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -29,7 +28,6 @@ const (
 	AttrSchedInFlight    = "sched.in_flight"
 
 	// Span 命名
-	SpanKeySelection = "sched.key.selection"
 	SpanEndpointCall = "sched.endpoint.call"
 )
 
@@ -40,12 +38,11 @@ type Observability struct {
 	meter  metric.Meter
 
 	// Counters
-	requestTotal   metric.Int64Counter
-	successTotal   metric.Int64Counter
-	errorTotal     metric.Int64Counter
-	retryTotal     metric.Int64Counter
-	fallbackTotal  metric.Int64Counter
-	circuitOpenCnt metric.Int64Counter
+	requestTotal  metric.Int64Counter
+	successTotal  metric.Int64Counter
+	errorTotal    metric.Int64Counter
+	retryTotal    metric.Int64Counter
+	fallbackTotal metric.Int64Counter
 
 	// Histograms
 	latencyMs metric.Float64Histogram
@@ -87,10 +84,6 @@ func NewObservability(serviceName string) (*Observability, error) {
 	if err != nil {
 		return nil, err
 	}
-	obs.circuitOpenCnt, err = obs.meter.Int64Counter("sched.circuit.opens.total")
-	if err != nil {
-		return nil, err
-	}
 	obs.latencyMs, err = obs.meter.Float64Histogram("sched.request.duration",
 		metric.WithUnit("ms"),
 		metric.WithDescription("End-to-end request duration"))
@@ -114,13 +107,6 @@ func NoopObservability() *Observability {
 
 // --- Span helpers ---
 
-// StartKeySelection 开始一个"key selection"span(可选,通常不需要)。
-func (o *Observability) StartKeySelection(ctx context.Context, model ModelKey) (context.Context, trace.Span) {
-	ctx, span := o.tracer.Start(ctx, SpanKeySelection, trace.WithSpanKind(trace.SpanKindInternal))
-	span.SetAttributes(attribute.String(AttrGenAIRequestModel, string(model)))
-	return ctx, span
-}
-
 // StartEndpointCall 开始一个"endpoint call"span。
 func (o *Observability) StartEndpointCall(ctx context.Context, ep *Endpoint, model ModelKey, attempt int) (context.Context, trace.Span) {
 	ctx, span := o.tracer.Start(ctx, SpanEndpointCall, trace.WithSpanKind(trace.SpanKindClient))
@@ -131,16 +117,6 @@ func (o *Observability) StartEndpointCall(ctx context.Context, ep *Endpoint, mod
 		attribute.Int(AttrSchedAttempt, attempt),
 	)
 	return ctx, span
-}
-
-// EndSpanError 在 span 上记录错误。
-func (o *Observability) EndSpanError(span trace.Span, err error, class ErrorClass) {
-	if err == nil {
-		return
-	}
-	span.RecordError(err)
-	span.SetStatus(codes.Error, err.Error())
-	span.SetAttributes(attribute.String(AttrSchedErrorClass, class.String()))
 }
 
 // --- Metric helpers ---
@@ -183,13 +159,5 @@ func (o *Observability) RecordTTFT(provider ProviderID, model ModelKey, dur time
 	o.ttftMs.Record(context.Background(), float64(dur.Milliseconds()), metric.WithAttributes(
 		attribute.String(AttrGenAIProvider, string(provider)),
 		attribute.String(AttrGenAIRequestModel, string(model)),
-	))
-}
-
-// RecordCircuitOpen 记录一次熔断触发。
-func (o *Observability) RecordCircuitOpen(provider ProviderID, keyID string) {
-	o.circuitOpenCnt.Add(context.Background(), 1, metric.WithAttributes(
-		attribute.String(AttrGenAIProvider, string(provider)),
-		attribute.String(AttrSchedEndpointKey, keyID),
 	))
 }

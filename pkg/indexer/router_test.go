@@ -26,41 +26,12 @@ func sampleRoute(id uint64, name string, routeType uint16, isActive, isOfficial 
 	}
 }
 
-func TestGatewayRouterIndex_ListAll(t *testing.T) {
-	idx := NewGatewayRouterIndex()
-	routes := []cgateway.ModelRouteWithID{
-		sampleRoute(1, "official-personal", cgateway.RoutePersonal, true, true),
-		sampleRoute(2, "official-node", cgateway.RouteNode, true, true),
-		sampleRoute(3, "custom-privacy", cgateway.RoutePrivacy, true, false),
-	}
-	require.NoError(t, idx.BuildFromRoutes(routes))
-
-	all, err := idx.ListAll()
-	require.NoError(t, err)
-	assert.Len(t, all, 3)
-}
-
-func TestGatewayRouterIndex_Get(t *testing.T) {
-	idx := NewGatewayRouterIndex()
-	routes := []cgateway.ModelRouteWithID{
-		sampleRoute(1, "official-personal", cgateway.RoutePersonal, true, true),
-	}
-	require.NoError(t, idx.BuildFromRoutes(routes))
-
-	r, ok := idx.Get(1)
-	require.True(t, ok)
-	assert.Equal(t, "official-personal", r.Data.Name)
-
-	_, ok = idx.Get(999)
-	assert.False(t, ok)
-}
-
 func TestGatewayRouterIndex_Search_Keyword(t *testing.T) {
 	idx := NewGatewayRouterIndex()
 	routes := []cgateway.ModelRouteWithID{
-		sampleRoute(1, "official-personal", cgateway.RoutePersonal, true, true),
-		sampleRoute(2, "official-node", cgateway.RouteNode, true, true),
-		sampleRoute(3, "custom-privacy", cgateway.RoutePrivacy, true, false),
+		sampleRoute(1, "official-personal", cgateway.EdgeRoute, true, true),
+		sampleRoute(2, "official-node", cgateway.MiningPoolRoute, true, true),
+		sampleRoute(3, "custom-privacy", cgateway.TEERoute, true, false),
 	}
 	require.NoError(t, idx.BuildFromRoutes(routes))
 
@@ -82,13 +53,13 @@ func TestGatewayRouterIndex_Search_Keyword(t *testing.T) {
 func TestGatewayRouterIndex_Search_RouteType(t *testing.T) {
 	idx := NewGatewayRouterIndex()
 	routes := []cgateway.ModelRouteWithID{
-		sampleRoute(1, "official-personal", cgateway.RoutePersonal, true, true),
-		sampleRoute(2, "official-node", cgateway.RouteNode, true, true),
-		sampleRoute(3, "custom-privacy", cgateway.RoutePrivacy, true, false),
+		sampleRoute(1, "official-personal", cgateway.EdgeRoute, true, true),
+		sampleRoute(2, "official-node", cgateway.MiningPoolRoute, true, true),
+		sampleRoute(3, "custom-privacy", cgateway.TEERoute, true, false),
 	}
 	require.NoError(t, idx.BuildFromRoutes(routes))
 
-	nodeType := cgateway.RouteNode
+	nodeType := cgateway.MiningPoolRoute
 	res, err := idx.Search(context.Background(), GatewayRouterSearchRequest{
 		RouteType: &nodeType,
 		Limit:     10,
@@ -101,9 +72,9 @@ func TestGatewayRouterIndex_Search_RouteType(t *testing.T) {
 func TestGatewayRouterIndex_Search_IsOfficial(t *testing.T) {
 	idx := NewGatewayRouterIndex()
 	routes := []cgateway.ModelRouteWithID{
-		sampleRoute(1, "official-personal", cgateway.RoutePersonal, true, true),
-		sampleRoute(2, "official-node", cgateway.RouteNode, true, true),
-		sampleRoute(3, "custom-privacy", cgateway.RoutePrivacy, true, false),
+		sampleRoute(1, "official-personal", cgateway.EdgeRoute, true, true),
+		sampleRoute(2, "official-node", cgateway.MiningPoolRoute, true, true),
+		sampleRoute(3, "custom-privacy", cgateway.TEERoute, true, false),
 	}
 	require.NoError(t, idx.BuildFromRoutes(routes))
 
@@ -118,9 +89,6 @@ func TestGatewayRouterIndex_Search_IsOfficial(t *testing.T) {
 
 func TestGatewayRouterIndex_Search_NotReady(t *testing.T) {
 	idx := NewGatewayRouterIndex()
-	_, err := idx.ListAll()
-	require.Error(t, err)
-
-	_, err = idx.Search(context.Background(), GatewayRouterSearchRequest{Limit: 10})
+	_, err := idx.Search(context.Background(), GatewayRouterSearchRequest{Limit: 10})
 	require.Error(t, err)
 }

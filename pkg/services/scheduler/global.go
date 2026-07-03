@@ -1,9 +1,6 @@
 package scheduler
 
-import (
-	"context"
-	"sync"
-)
+import "sync"
 
 // 全局单例,给 DistributeMiddleware/HandleRelay 拿。
 var (
@@ -32,6 +29,3 @@ func ResetGlobal() {
 	defer globalOnce.Unlock()
 	global = nil
 }
-
-// Compile-time guard: 包必须能独立编译
-var _ = context.Background

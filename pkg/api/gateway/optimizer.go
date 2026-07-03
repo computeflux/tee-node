@@ -26,11 +26,10 @@ type usageRecord struct {
 }
 
 var (
-	usageCh      = make(chan usageRecord, 65536)
-	usageFlushCh = make(chan struct{}, 1)
-	usageWg      sync.WaitGroup
-	usageOnce    sync.Once
-	usageMu      sync.Mutex // 保护 usage:* 读写，避免 flush 与 settle 竞态
+	usageCh   = make(chan usageRecord, 65536)
+	usageWg   sync.WaitGroup
+	usageOnce sync.Once
+	usageMu   sync.Mutex // 保护 usage:* 读写，避免 flush 与 settle 竞态
 )
 
 func initUsageWriter() {
@@ -82,8 +81,6 @@ func initUsageWriter() {
 						}
 					}
 				case <-ticker.C:
-					flush()
-				case <-usageFlushCh:
 					flush()
 				}
 			}
@@ -145,19 +142,9 @@ func initRateLimiterCleanup() {
 	})
 }
 
-// ── Body buffer pool ─────────────────────────────────────
-
-var bufferPool = sync.Pool{
-	New: func() any {
-		return make([]byte, 0, 64*1024)
-	},
-}
-
-// ── Usage settlement to sidechain ────────────────────────
 var (
 	settleOnce   sync.Once
 	settleTicker *time.Ticker
-	settleDone   = make(chan struct{})
 	settleMu     sync.Mutex
 )
 
@@ -178,8 +165,6 @@ func initUsageSettler() {
 					if err := settlePendingUsage(); err != nil {
 						GATEWAYLOG().Printf("[SETTLE] failed: %v", err)
 					}
-				case <-settleDone:
-					return
 				}
 			}
 		}()

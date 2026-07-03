@@ -3,9 +3,19 @@ package gateway
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
+
+// isReservedProviderName 检查 provider 名是否与 route 类型前缀冲突。
+func isReservedProviderName(name string) bool {
+	switch strings.ToLower(name) {
+	case "edge", "miningpool", "tee":
+		return true
+	}
+	return false
+}
 
 // ── Provider / Provider ───────────────────────────────────
 
@@ -16,17 +26,23 @@ func (g GatewayMutation) CreateProvider(
 	owner := g.api.GetCaller()
 	txn := g.api.GetTxn()
 
+	if name == "" {
+		return errors.New("provider name is required")
+	}
+
+	if isReservedProviderName(name) {
+		return errors.New("provider name conflicts with route prefix")
+	}
+
 	// 一人只能注册一个 provider
 	if existing, _ := g.providerByOwner.Get(txn, owner); existing != nil {
 		return fmt.Errorf("provider already exists for this account (id=%d)", *existing)
 	}
 
 	// provider name 唯一性检查
-	if name != "" {
-		dup, _ := g.providers.Query(txn, store.QueryCond{Field: "Name", Val: name})
-		if len(dup) > 0 {
-			return errors.New("provider name already exists")
-		}
+	dup, _ := g.providers.Query(txn, store.QueryCond{Field: "Name", Val: name})
+	if len(dup) > 0 {
+		return errors.New("provider name already exists")
 	}
 
 	// priority 由 deposit 自动计算
@@ -71,6 +87,9 @@ func (g GatewayMutation) UpdateProvider(
 
 	// 若修改 name，需检查唯一性
 	if name != "" {
+		if isReservedProviderName(name) {
+			return errors.New("provider name conflicts with route prefix")
+		}
 		cur, _ := g.providers.Get(txn, providerID)
 		if cur != nil && cur.Name != name {
 			dup, _ := g.providers.Query(txn, store.QueryCond{Field: "Name", Val: name})

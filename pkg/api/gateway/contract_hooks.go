@@ -9,8 +9,6 @@ import (
 // ── Testable function pointers ───────────────────────────
 
 var (
-	findProviderNameFn       func(string) *cgateway.ProviderInfoWithID                   = findProviderName
-	findGatewayModelByNameFn func(uint64, string) *cgateway.ModelInfoWithID              = findGatewayModelByName
 	getCachedGatewayModelsFn func() []cgateway.ModelInfo                                 = getCachedGatewayModels
 	getBridgeFn              func() *teechain.TeeChain                                   = getBridge
 	gatewayGetCreditFn       func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error) = GatewayGetCredit

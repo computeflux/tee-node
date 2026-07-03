@@ -68,7 +68,7 @@ func TestIntegration_HappyPath(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-1", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-1", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -76,8 +76,7 @@ func TestIntegration_HappyPath(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
-	sch.RegisterProvider("openai", newMockClient())
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": newMockClient()})
 
 	res, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
 	if err != nil {
@@ -100,8 +99,8 @@ func TestIntegration_HappyPath(t *testing.T) {
 	if log.Count("INFO", "schedule success") != 1 {
 		t.Errorf("expected 1 'schedule success' info log, got %d", log.Count("INFO", "schedule success"))
 	}
-	if log.Count("INFO", "provider registered") != 1 {
-		t.Errorf("expected 1 provider registration log, got %d", log.Count("INFO", "provider registered"))
+	if log.Count("INFO", "providers registered in batch") != 1 {
+		t.Errorf("expected 1 provider registration log, got %d", log.Count("INFO", "providers registered in batch"))
 	}
 }
 
@@ -112,9 +111,9 @@ func TestIntegration_SessionAffinity(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -122,8 +121,7 @@ func TestIntegration_SessionAffinity(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
-	sch.RegisterProvider("openai", newMockClient())
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": newMockClient()})
 
 	sessionID := "sess-abc"
 
@@ -180,7 +178,7 @@ func TestIntegration_ConcurrencyHardLimit(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 2, // 硬限制 2
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -189,12 +187,11 @@ func TestIntegration_ConcurrencyHardLimit(t *testing.T) {
 	cfg.Log = log
 	cfg.SoftConcurrencyRatio = 1.0 // 硬限制
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	// 阻塞 client，让请求挂住
 	hold := make(chan struct{})
 	client := &blockingClient{hold: hold, hook: func() {}}
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
@@ -230,7 +227,7 @@ func TestIntegration_SoftLimit(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 2, // 硬限制 2，软限制 3
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -239,12 +236,11 @@ func TestIntegration_SoftLimit(t *testing.T) {
 	cfg.Log = log
 	cfg.SoftConcurrencyRatio = 1.5 // 软限制 = 3
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	hold := make(chan struct{})
 	var activeCount atomic.Int32
 	client := &blockingClient{hold: hold, hook: func() { activeCount.Add(1) }}
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
@@ -279,7 +275,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -291,7 +287,6 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	cfg.BreakerConfig.HalfOpenProbes = 1 // 1 个探测成功即关闭熔断器
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	client := newMockClient()
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
@@ -301,7 +296,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	// 发送请求直到熔断器打开（需要手动触发 Tick，因为后台 goroutine 未启动）
 	for i := 0; i < 7; i++ {
@@ -309,7 +304,11 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	}
 	// 手动触发熔断器 Tick
 	br := sch.breakers.GetOrCreate(EndpointKey{Provider: "openai", KeyID: "key-a"})
-	ep := reg.LookupEndpoint(EndpointKey{Provider: "openai", KeyID: "key-a"})
+	route := reg.LookupModel("gpt-4o")
+	if route == nil || len(route.Endpoints) == 0 {
+		t.Fatal("expected route gpt-4o with endpoints")
+	}
+	ep := route.Endpoints[0]
 	br.Tick(ep.metrics, log)
 
 	// 检查熔断器打开日志
@@ -334,7 +333,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 
 	// 恢复 key-a
 	client = newMockClient()
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	// 再次请求，应该触发半开探测并恢复
 	_, err = sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
@@ -355,14 +354,14 @@ func TestIntegration_RetryAndFallback(t *testing.T) {
 		{
 			Model: "gpt-4o", MaxConcurrency: 10,
 			Endpoints: []*Endpoint{
-				{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 			FallbackModels: []ModelKey{"claude-3-5"},
 		},
 		{
 			Model: "claude-3-5", MaxConcurrency: 10,
 			Endpoints: []*Endpoint{
-				{Provider: "anthropic", KeyID: "key-x", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "anthropic", Protocol: "anthropic", KeyID: "key-x", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 		},
 	}
@@ -371,15 +370,14 @@ func TestIntegration_RetryAndFallback(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	client := newMockClient()
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
 	client.QueueErrors("key-a", &UpstreamError{Status: 503})
-	sch.RegisterProvider("openai", client)
-	sch.RegisterProvider("anthropic", newMockClient())
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
+	sch.RegisterClients(map[ProviderID]ProviderClient{"anthropic": newMockClient()})
 
 	res, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
 	if err != nil {
@@ -407,9 +405,9 @@ func TestIntegration_RateLimit429(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -417,7 +415,6 @@ func TestIntegration_RateLimit429(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	// 三个端点首次调用都返回 429。冷启动评分相等,selector 均匀随机,所以无论先选哪个
 	// 都会触发限流退避;随后 selector 会排除已限流的 key,直到全部排除时返回 nil,触发
@@ -427,7 +424,7 @@ func TestIntegration_RateLimit429(t *testing.T) {
 	client.QueueErrors("key-a", &UpstreamError{Status: 429, Message: "rate limit"})
 	client.QueueErrors("key-b", &UpstreamError{Status: 429, Message: "rate limit"})
 	client.QueueErrors("key-c", &UpstreamError{Status: 429, Message: "rate limit"})
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	res, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
 	if err != nil {
@@ -455,9 +452,9 @@ func TestIntegration_AuthDeadKey(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -466,13 +463,12 @@ func TestIntegration_AuthDeadKey(t *testing.T) {
 	cfg.MaxRetries = 20 // 三个随机端点,需足够多的尝试次数保证全部踩到
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
 
 	client := newMockClient()
 	client.QueueErrors("key-a", &UpstreamError{Status: 401})
 	client.QueueErrors("key-b", &UpstreamError{Status: 401})
 	client.QueueErrors("key-c", &UpstreamError{Status: 401})
-	sch.RegisterProvider("openai", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": client})
 
 	_, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
 	if !errors.Is(err, ErrAllEndpointsDead) {
@@ -497,7 +493,7 @@ func TestIntegration_LogLevels(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -505,8 +501,7 @@ func TestIntegration_LogLevels(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Log = log
 	sch := New(cfg, reg, NoopObservability())
-	sch.AttachMetrics()
-	sch.RegisterProvider("openai", newMockClient())
+	sch.RegisterClients(map[ProviderID]ProviderClient{"openai": newMockClient()})
 
 	_, err := sch.Schedule(context.Background(), Invoke{Model: "gpt-4o", Body: []byte(`{}`)})
 	if err != nil {

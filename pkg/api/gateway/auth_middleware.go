@@ -103,13 +103,21 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 // ── "provider/model" parser ───────────────────────────────
 // "openai/gpt-4" → ("openai", "gpt-4")
-// "gpt-4"        → ("openai", "gpt-4")  (default provider)
+// "gpt-4"        → ("", "gpt-4")  // 裸模型名，需由调用方拒绝
 func parseProviderModel(input string) (provider, model string) {
 	parts := strings.SplitN(input, "/", 2)
 	if len(parts) == 2 {
 		return parts[0], parts[1]
 	}
-	return "openai", input
+	return "", input
+}
+
+// isRouteName 判断请求名是否是 route 前缀（Edge/MiningPool/TEE，大小写不敏感）。
+func isRouteName(input string) bool {
+	lower := strings.ToLower(input)
+	return strings.HasPrefix(lower, "edge/") ||
+		strings.HasPrefix(lower, "miningpool/") ||
+		strings.HasPrefix(lower, "tee/")
 }
 
 // GetBodyFromContext returns cached body bytes set by DistributeMiddleware.

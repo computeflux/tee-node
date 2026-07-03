@@ -1,32 +1,84 @@
 package scheduler
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
-// routeIDToName 维护 on-chain route ID → route name 的缓存。
-// 由 Reloader 在每次重载时刷新。
-// DistributeMiddleware 用它把 "model.RouteID > 0" 的 model 映射到正确的
-// scheduler 键(路由名)。
-var routeIDToName sync.Map // uint64 → string
-
-// SetRouteNameMapping 在重载时写入一条映射。
-func SetRouteNameMapping(routeID uint64, name string) {
-	routeIDToName.Store(routeID, name)
+// cacheKey 是 ModelRouteCache 的键，区分 model + provider。
+type cacheKey struct {
+	model    ModelKey
+	provider ProviderID
 }
 
-// LookupRouteNameByID 查 routeID 对应的名字。找不到时返回 "",false。
-func LookupRouteNameByID(routeID uint64) (string, bool) {
-	v, ok := routeIDToName.Load(routeID)
-	if !ok {
-		return "", false
+// cachedRoute 缓存一个解析后的 ModelRoute 及其过期时间。
+type cachedRoute struct {
+	route  *ModelRoute
+	expiry time.Time
+}
+
+// ModelRouteCache 缓存 resolver 解析出的 ModelRoute，减少每个请求都重建端点列表的开销。
+// 它是 scheduler 的运行时组件，indexer 仍只负责索引数据。
+type ModelRouteCache struct {
+	mu      sync.RWMutex
+	entries map[cacheKey]*cachedRoute
+	ttl     time.Duration
+	log     Logger
+}
+
+// NewModelRouteCache 创建缓存。ttl <= 0 时不缓存。
+func NewModelRouteCache(ttl time.Duration, log Logger) *ModelRouteCache {
+	if log == nil {
+		log = noopLogger{}
 	}
-	s, _ := v.(string)
-	return s, s != ""
+	return &ModelRouteCache{
+		entries: make(map[cacheKey]*cachedRoute),
+		ttl:     ttl,
+		log:     log,
+	}
 }
 
-// ResetRouteMappings 清空所有映射(测试用)。
-func ResetRouteMappings() {
-	routeIDToName.Range(func(k, _ any) bool {
-		routeIDToName.Delete(k)
-		return true
-	})
+// Get 从缓存取 route。过期或不存在返回 nil。
+func (c *ModelRouteCache) Get(model ModelKey, provider ProviderID) *ModelRoute {
+	if c == nil || c.ttl <= 0 {
+		return nil
+	}
+	c.mu.RLock()
+	entry, ok := c.entries[cacheKey{model: model, provider: provider}]
+	c.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	if time.Now().After(entry.expiry) {
+		c.log.Debug("route cache expired", "model", model, "provider", provider)
+		return nil
+	}
+	c.log.Debug("route cache hit", "model", model, "provider", provider, "endpoints", len(entry.route.Endpoints))
+	return entry.route
 }
+
+// Set 把解析后的 route 写入缓存。
+func (c *ModelRouteCache) Set(model ModelKey, provider ProviderID, route *ModelRoute) {
+	if c == nil || c.ttl <= 0 || route == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[cacheKey{model: model, provider: provider}] = &cachedRoute{
+		route:  route,
+		expiry: time.Now().Add(c.ttl),
+	}
+	c.log.Debug("route cache set", "model", model, "provider", provider, "endpoints", len(route.Endpoints))
+}
+
+// Clear 清空缓存，用于链上数据刷新后强制重建。
+func (c *ModelRouteCache) Clear() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = make(map[cacheKey]*cachedRoute)
+	c.log.Info("route cache cleared")
+}
+

@@ -71,27 +71,3 @@ func (a *SessionAffinity) Delete(sessionID string) {
 	delete(a.cache, sessionID)
 }
 
-// Cleanup 清理所有过期条目。
-func (a *SessionAffinity) Cleanup() {
-	if a == nil {
-		return
-	}
-	now := time.Now()
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	for k, v := range a.cache {
-		if now.After(v.expiry) {
-			delete(a.cache, k)
-		}
-	}
-}
-
-// Len 返回当前缓存条目数。
-func (a *SessionAffinity) Len() int {
-	if a == nil {
-		return 0
-	}
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return len(a.cache)
-}

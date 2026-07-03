@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"slices"
@@ -20,6 +21,10 @@ func (g GatewayMutation) CreateRoute(
 	inPrice, cachedPrice, outPrice uint64,
 	isOfficial bool,
 ) store.Result[uint64, error] {
+	if !g.api.CallbySystem() {
+		return store.NewErr[uint64, error](errors.New("only system can call this method"))
+	}
+
 	txn := g.api.GetTxn()
 
 	// 路由名唯一性
@@ -54,6 +59,10 @@ func (g GatewayMutation) UpdateRoute(
 	inPrice, cachedPrice, outPrice uint64,
 	isActive *bool,
 ) error {
+	if !g.api.CallbySystem() {
+		return errors.New("only system can call this method")
+	}
+
 	_, err := g.routes.Get(g.api.GetTxn(), routeID)
 	if err != nil {
 		return err
@@ -80,6 +89,10 @@ func (g GatewayMutation) UpdateRoute(
 
 // DeleteRoute 删除路由（官方路由不可删除）。
 func (g GatewayMutation) DeleteRoute(routeID uint64) error {
+	if !g.api.CallbySystem() {
+		return errors.New("only system can call this method")
+	}
+
 	route, err := g.routes.Get(g.api.GetTxn(), routeID)
 	if err != nil || route == nil {
 		return err
@@ -106,10 +119,14 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 		return fmt.Errorf("route %d is inactive", routeID)
 	}
 
-	// 校验模型存在
+	// 校验模型存在且发起者是模型拥有者
 	model, err := g.models.Get(txn, modelID)
 	if err != nil || model == nil {
 		return fmt.Errorf("model %d not found", modelID)
+	}
+	caller := g.api.GetCaller()
+	if caller.T != model.Owner.T || !bytes.Equal(caller.V, model.Owner.V) {
+		return errors.New("only model owner can join route")
 	}
 
 	// // 校验路由类型与模型 ProviderType 一致
@@ -142,6 +159,11 @@ func (g GatewayMutation) LeaveRoute(modelID uint64) error {
 		return fmt.Errorf("model %d not found", modelID)
 	}
 
+	caller := g.api.GetCaller()
+	if caller.T != model.Owner.T || !bytes.Equal(caller.V, model.Owner.V) {
+		return errors.New("only model owner can leave route")
+	}
+
 	routeID := model.RouteID
 	if routeID == 0 {
 		return errors.New("model is not in any route")
@@ -163,27 +185,6 @@ func (g GatewayMutation) LeaveRoute(modelID uint64) error {
 			}
 		}
 	})
-}
-
-// CreateOfficialRoutes 创世时创建官方基础路由（由 InitGenesis 调用）。
-// 每个路由初始只包含一个模型。
-func (g GatewayMutation) CreateOfficialRoutes() error {
-	// 个人路由（ProviderPersonal）
-	if _, err := g.CreateRoute("官方个人模型", RoutePersonal, 0, 0, 0, true).UnWrap(); err != nil {
-		return fmt.Errorf("create official personal route: %w", err)
-	}
-
-	// 节点路由（ProviderOpenAI）
-	if _, err := g.CreateRoute("官方节点模型", RouteNode, 0, 0, 0, true).UnWrap(); err != nil {
-		return fmt.Errorf("create official node route: %w", err)
-	}
-
-	// 隐私路由（ProviderClaude）
-	if _, err := g.CreateRoute("官方隐私模型", RoutePrivacy, 0, 0, 0, true).UnWrap(); err != nil {
-		return fmt.Errorf("create official privacy route: %w", err)
-	}
-
-	return nil
 }
 
 // ── Query ──────────────────────────────────────────────────
@@ -245,4 +246,14 @@ func (g GatewayQuery) ListActiveRoutesByType(routeType uint16, offset uint64, li
 		out = append(out, ModelRouteWithID{ID: id, Data: *r})
 	}
 	return out, nil
+}
+
+func getRouterTypeOfModel(providerType uint16) uint16 {
+	if providerType < 9999 {
+		return MiningPoolRoute
+	}
+	if providerType == 9999 {
+		return EdgeRoute
+	}
+	return TEERoute
 }

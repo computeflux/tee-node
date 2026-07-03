@@ -25,6 +25,7 @@ type Config struct {
 	BreakerTickInterval  time.Duration // 默认 5s
 	Log                  Logger        // 可选日志接口，nil 时静默
 	SoftConcurrencyRatio float64       // 软限制倍率，默认 1.0（硬限制）
+	ModelRouteCacheTTL   time.Duration // 解析后 ModelRoute 缓存 TTL，默认 5s；0 禁用
 }
 
 // DefaultConfig 返回合理默认配置。
@@ -41,15 +42,17 @@ func DefaultConfig() Config {
 		BreakerTickInterval:  5 * time.Second,
 		Log:                  NewStdLogger(log.Default()),
 		SoftConcurrencyRatio: 1.0,
+		ModelRouteCacheTTL:   5 * time.Second,
 	}
 }
 
 // Invoke 描述一次调用的入参。
 type Invoke struct {
 	Model     ModelKey
-	SessionID string // 可选，同一 session 的请求优先复用上次端点以命中缓存
-	Body      []byte // 已序列化好的 HTTP body(JSON)
-	Stream    bool   // 是否流式
+	Provider  ProviderID // 显式指定的 provider（如 "openai/BailLocal"）；空表示按 route/模型自动解析
+	SessionID string     // 可选，同一 session 的请求优先复用上次端点以命中缓存
+	Body      []byte     // 已序列化好的 HTTP body(JSON)
+	Stream    bool       // 是否流式
 }
 
 // Result 描述一次调用的出参。
@@ -81,21 +84,25 @@ type ProviderClient interface {
 
 // Scheduler 是主入口。
 type Scheduler struct {
-	cfg      Config
-	registry *Registry
-	sems     *SemaphoreSet
-	breakers *BreakerSet
-	selector *Selector
-	obs      *Observability
-	log      Logger
-	affinity *SessionAffinity // session 亲和性：同一 session 复用上次端点
+	cfg        Config
+	resolver   ModelResolver
+	routeCache *ModelRouteCache
+	sems       *SemaphoreSet
+	breakers   *BreakerSet
+	selector   *Selector
+	obs        *Observability
+	log        Logger
+	affinity   *SessionAffinity // session 亲和性：同一 session 复用上次端点
+
+	metricsMu sync.RWMutex
+	metrics   map[EndpointKey]*EndpointMetrics
 
 	clientsMu sync.RWMutex
 	clients   map[ProviderID]ProviderClient
 }
 
 // New 创建 Scheduler(不启动后台 goroutine)。
-func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
+func New(cfg Config, resolver ModelResolver, obs *Observability) *Scheduler {
 	if cfg.ColdStartSamples == 0 {
 		cfg.ColdStartSamples = 20
 	}
@@ -121,26 +128,20 @@ func New(cfg Config, registry *Registry, obs *Observability) *Scheduler {
 	}
 
 	s := &Scheduler{
-		cfg:      cfg,
-		registry: registry,
-		sems:     NewSemaphoreSet(cfg.SoftConcurrencyRatio),
-		breakers: NewBreakerSet(cfg.BreakerConfig, logger),
-		selector: NewSelector(),
-		obs:      obs,
-		log:      logger,
-		affinity: NewSessionAffinity(0), // 默认 TTL 5 分钟
-		clients:  make(map[ProviderID]ProviderClient),
+		cfg:        cfg,
+		resolver:   resolver,
+		routeCache: NewModelRouteCache(cfg.ModelRouteCacheTTL, logger),
+		sems:       NewSemaphoreSet(cfg.SoftConcurrencyRatio),
+		breakers:   NewBreakerSet(cfg.BreakerConfig, logger),
+		selector:   NewSelector(),
+		obs:        obs,
+		log:        logger,
+		affinity:   NewSessionAffinity(0), // 默认 TTL 5 分钟
+		metrics:    make(map[EndpointKey]*EndpointMetrics),
+		clients:    make(map[ProviderID]ProviderClient),
 	}
 	s.selector.SetLog(logger)
 	return s
-}
-
-// RegisterProvider 注册一个 provider client。
-func (s *Scheduler) RegisterProvider(p ProviderID, c ProviderClient) {
-	s.clientsMu.Lock()
-	s.clients[p] = c
-	s.clientsMu.Unlock()
-	s.log.Info("provider registered", "protocol", p)
 }
 
 // RegisterClients 批量注册/更新 provider clients（不清除旧项，用于启动时）。
@@ -153,37 +154,46 @@ func (s *Scheduler) RegisterClients(providers map[ProviderID]ProviderClient) {
 	s.log.Info("providers registered in batch", "count", len(providers))
 }
 
-// ReplaceClients 全量替换 provider clients 映射。
-// 用于合约刷新 provider 协议类型后，清理已不存在的协议。
-func (s *Scheduler) ReplaceClients(clients map[ProviderID]ProviderClient) {
-	s.clientsMu.Lock()
-	defer s.clientsMu.Unlock()
-	oldCount := len(s.clients)
-	s.clients = clients
-	s.log.Info("clients replaced", "old_count", oldCount, "new_count", len(clients))
-}
-
 // Start 启动后台熔断评估。
 func (s *Scheduler) Start(ctx context.Context) {
 	s.log.Info("scheduler started", "breaker_tick_interval", s.cfg.BreakerTickInterval)
-	go s.breakers.RunTicker(ctx, s.registry, s.cfg.BreakerTickInterval)
+	go s.breakers.RunTicker(ctx, s, s.cfg.BreakerTickInterval)
 }
 
-// AttachMetrics 在 Registry.Replace 之后调用,给每个 Endpoint 注入 metrics。
-func (s *Scheduler) AttachMetrics() {
-	snap := s.registry.snap.Load()
-	if snap == nil {
+// GetOrCreate 实现 EndpointMetricsSource，供 breaker ticker 使用。
+func (s *Scheduler) GetOrCreate(k EndpointKey) *EndpointMetrics {
+	return s.getMetrics(k)
+}
+
+func (s *Scheduler) getMetrics(k EndpointKey) *EndpointMetrics {
+	s.metricsMu.RLock()
+	m, ok := s.metrics[k]
+	s.metricsMu.RUnlock()
+	if ok {
+		return m
+	}
+
+	s.metricsMu.Lock()
+	defer s.metricsMu.Unlock()
+	if m, ok := s.metrics[k]; ok {
+		return m
+	}
+	m = &EndpointMetrics{}
+	s.metrics[k] = m
+	return m
+}
+
+func (s *Scheduler) attachMetricsToRoute(route *ModelRoute) {
+	if route == nil {
 		return
 	}
-	var injected int
-	for _, ep := range snap.byEndpoint {
-		if ep.metrics == nil {
-			ep.metrics = &EndpointMetrics{}
-			injected++
+	for _, ep := range route.Endpoints {
+		if ep == nil {
+			continue
 		}
-	}
-	if injected > 0 {
-		s.log.Info("metrics injected", "count", injected, "total_endpoints", len(snap.byEndpoint))
+		if ep.metrics == nil {
+			ep.metrics = s.getMetrics(EndpointKey{Provider: ep.Provider, KeyID: ep.KeyID})
+		}
 	}
 }
 
@@ -197,19 +207,47 @@ func (s *Scheduler) ScheduleStream(ctx context.Context, inv Invoke) (*Result, er
 	return s.schedule(ctx, inv, true)
 }
 
-func (s *Scheduler) schedule(ctx context.Context, inv Invoke, stream bool) (*Result, error) {
-	main := s.registry.LookupModel(inv.Model)
-	if main == nil {
-		s.log.Warn("model not found", "model", inv.Model)
-		return nil, fmt.Errorf("%w: %s", ErrModelNotFound, inv.Model)
+func (s *Scheduler) resolveRoute(ctx context.Context, model ModelKey, provider ProviderID) (*ModelRoute, error) {
+	if s.routeCache != nil {
+		if r := s.routeCache.Get(model, provider); r != nil {
+			s.attachMetricsToRoute(r)
+			return r, nil
+		}
 	}
+	r, err := s.resolver.Resolve(ctx, model, provider)
+	if err != nil {
+		return nil, err
+	}
+	s.attachMetricsToRoute(r)
+	if s.routeCache != nil {
+		s.routeCache.Set(model, provider, r)
+	}
+	return r, nil
+}
+
+func (s *Scheduler) schedule(ctx context.Context, inv Invoke, stream bool) (*Result, error) {
+	main, err := s.resolveRoute(ctx, inv.Model, inv.Provider)
+	if err != nil {
+		if errors.Is(err, ErrModelNotFound) {
+			s.log.Warn("model not found", "model", inv.Model, "error", err)
+			return nil, fmt.Errorf("%w: %s", ErrModelNotFound, inv.Model)
+		}
+		s.log.Warn("resolve model failed", "model", inv.Model, "error", err)
+		return nil, err
+	}
+	s.attachMetricsToRoute(main)
 
 	s.log.Debug("schedule begin",
 		"model", inv.Model,
+		"provider", inv.Provider,
 		"stream", stream,
 		"endpoint_count", len(main.Endpoints),
 		"max_concurrency", main.MaxConcurrency,
 	)
+	if len(main.Endpoints) == 0 {
+		s.log.Warn("resolved model has no endpoints", "model", inv.Model, "provider", inv.Provider)
+		return nil, fmt.Errorf("%w: %s", ErrNoHealthyEndpoint, inv.Model)
+	}
 
 	// per-model 并发信号量
 	sem := s.sems.GetOrCreate(inv.Model, main.MaxConcurrency)
@@ -228,9 +266,9 @@ func (s *Scheduler) schedule(ctx context.Context, inv Invoke, stream bool) (*Res
 			s.log.Info("fallback triggered", "from_model", inv.Model, "to_model", m, "fallback_index", fbIdx)
 			s.obs.RecordFallback(inv.Model, fbIdx)
 		}
-		r := s.registry.LookupModel(m)
-		if r == nil {
-			s.log.Warn("fallback model not found", "model", m)
+		r, err := s.resolveRoute(ctx, m, inv.Provider)
+		if err != nil {
+			s.log.Warn("fallback model not found", "model", m, "error", err)
 			continue
 		}
 		res, err := s.tryOneModel(ctx, m, r, inv, stream, fbIdx > 0)
@@ -366,10 +404,6 @@ func (s *Scheduler) tryOneModel(
 
 		client := s.getClient(ep.Protocol)
 		if client == nil {
-			// 兼容旧配置：Protocol 为空时回退到 Provider
-			client = s.getClient(ep.Provider)
-		}
-		if client == nil {
 			ep.metrics.InFlight.Add(-1)
 			span.End()
 			s.log.Error("no client for protocol", "model", model, "protocol", ep.Protocol, "provider", ep.Provider)
@@ -387,20 +421,28 @@ func (s *Scheduler) tryOneModel(
 			"attempt", attempt,
 		)
 
+		// route 请求需要把 body 里的 model 字段改写成上游真实模型名。
+		body := inv.Body
+		if ep.ModelName != "" && string(model) != ep.ModelName {
+			if rewritten, err := rewriteBodyModel(inv.Body, ep.ModelName); err == nil {
+				body = rewritten
+			}
+		}
+
 		var (
-			body []byte
-			strm Stream
-			err  error
+			outBody []byte
+			strm    Stream
+			err     error
 		)
 		streamSucceeded := false
 		if stream {
-			strm, err = client.Stream(ctx, ep, inv.Body)
+			strm, err = client.Stream(ctx, ep, body)
 			if err == nil && strm != nil {
 				streamSucceeded = true
 				strm = newInstrumentedStream(strm, ep, model, s.obs)
 			}
 		} else {
-			body, err = client.Do(ctx, ep, inv.Body)
+			outBody, err = client.Do(ctx, ep, body)
 		}
 
 		latency := time.Since(start)
@@ -433,7 +475,7 @@ func (s *Scheduler) tryOneModel(
 				s.affinity.Set(inv.SessionID, EndpointKey{Provider: ep.Provider, KeyID: ep.KeyID})
 				s.log.Debug("session affinity recorded", "session", inv.SessionID, "provider", ep.Provider, "key_id", ep.KeyID)
 			}
-			return &Result{Body: body, Meta: s.makeMeta(ep, attempt)}, nil
+			return &Result{Body: outBody, Meta: s.makeMeta(ep, attempt)}, nil
 		}
 
 		// 失败路径

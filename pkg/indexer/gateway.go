@@ -80,7 +80,6 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 
 		doc := map[string]any{
 			"name":              m.Model.Name,
-			"modelId":           m.Model.ModelID,
 			"providerType":      m.Model.ProviderType,
 			"contextLength":     m.Model.ContextLength,
 			"inPrice":           m.Model.InPrice,
@@ -102,16 +101,9 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 	}
 	g.index = newIndex
 	g.models = newModels
+
+	Logger("GatewayModelIndex built models=%d", len(models))
 	return nil
-}
-
-// Get 按 ID 查询单个模型。
-func (g *GatewayModelIndex) Get(id uint64) (cgateway.ModelInfoWithProvider, bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	m, ok := g.models[strconv.FormatUint(id, 10)]
-	return m, ok
 }
 
 // Search 在索引中查询模型。
@@ -125,7 +117,7 @@ func (g *GatewayModelIndex) Search(ctx context.Context, req GatewayModelSearchRe
 		return nil, fmt.Errorf("gateway model index not ready")
 	}
 
-	queries := make([]query.Query, 0, 4)
+	queries := make([]query.Query, 0, 10000)
 
 	if req.Keyword != "" {
 		mq := bleve.NewMatchQuery(req.Keyword)
@@ -135,7 +127,7 @@ func (g *GatewayModelIndex) Search(ctx context.Context, req GatewayModelSearchRe
 	}
 
 	if req.Modalities != 0 {
-		tagQueries := make([]query.Query, 0, 5)
+		tagQueries := make([]query.Query, 0, 10000)
 		for _, tag := range inputModalityTags(req.Modalities) {
 			mq := bleve.NewMatchQuery(tag)
 			mq.SetField("inputModalityTags")

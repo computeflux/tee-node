@@ -347,34 +347,6 @@ func TestEmitProviderMetric_LowSuccessRateResets(t *testing.T) {
 	assert.Nil(t, m.recent)
 }
 
-func TestShouldDisableProvider(t *testing.T) {
-	tests := []struct {
-		msg        string
-		statusCode int
-		want       bool
-	}{
-		{"", http.StatusUnauthorized, true},
-		{"insufficient_quota", http.StatusOK, true},
-		{"invalid_api_key", http.StatusOK, true},
-		{"account_deactivated", http.StatusOK, true},
-		{"credit exhausted", http.StatusOK, true},
-		{"balance too low", http.StatusOK, true},
-		{"已欠费", http.StatusOK, true},
-		{"permission denied", http.StatusOK, true},
-		{"some random error", http.StatusOK, false},
-		{"", http.StatusOK, false},
-		{"", http.StatusBadGateway, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%s_%d", tt.msg, tt.statusCode), func(t *testing.T) {
-			got := ShouldDisableProvider(tt.msg, tt.statusCode)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-// ── parseProviderModel ─────────────────────────────────────
 
 func TestParseProviderModel_WithProvider(t *testing.T) {
 	p, m := parseProviderModel("openai/gpt-4")
@@ -382,9 +354,9 @@ func TestParseProviderModel_WithProvider(t *testing.T) {
 	assert.Equal(t, "gpt-4", m)
 }
 
-func TestParseProviderModel_DefaultProvider(t *testing.T) {
+func TestParseProviderModel_BareModel(t *testing.T) {
 	p, m := parseProviderModel("gpt-4")
-	assert.Equal(t, "openai", p)
+	assert.Equal(t, "", p)
 	assert.Equal(t, "gpt-4", m)
 }
 
@@ -445,44 +417,6 @@ func TestMin(t *testing.T) {
 
 // ── DistributeMiddleware ───────────────────────────────────
 
-func TestMaxBodySizeMiddleware_BlocksOversizedBody(t *testing.T) {
-	var readErr error
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, readErr = io.ReadAll(r.Body)
-		if readErr != nil {
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := MaxBodySizeMiddleware(1024)(next) // 1 KiB limit
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(strings.Repeat("x", 2048)))
-
-	mw.ServeHTTP(w, req)
-	assert.Error(t, readErr, "超出限制的 body 应导致读取错误")
-	assert.Contains(t, readErr.Error(), "too large")
-	// 注意：httptest.ResponseRecorder 不实现 requestTooLarger 接口，
-	// http.MaxBytesReader 不会自动写入 413。生产环境使用真实 http.response 时会写入 413。
-	// 这里仅验证 body 读取被限制。
-}
-
-func TestMaxBodySizeMiddleware_AllowsSmallBody(t *testing.T) {
-	var receivedBody []byte
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedBody, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mw := MaxBodySizeMiddleware(1024)(next)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("small body"))
-
-	mw.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "small body", string(receivedBody))
-}
-
 func TestDistributeMiddleware_ModelNumeric_400(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -511,4 +445,26 @@ func TestDistributeMiddleware_ModelObject_400(t *testing.T) {
 	mw.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "model must be a string")
+}
+
+func TestIsRouteName_CaseInsensitive(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{"MiningPool/foo", true},
+		{"miningpool/foo", true},
+		{"MININGPOOL/foo", true},
+		{"Edge/foo", true},
+		{"edge/foo", true},
+		{"TEE/foo", true},
+		{"tee/foo", true},
+		{"openai/foo", false},
+		{"foo", false},
+	}
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			assert.Equal(t, c.want, isRouteName(c.input))
+		})
+	}
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,8 +16,6 @@ import (
 )
 
 // ── Panic Recovery ───────────────────────────────────────
-
-const defaultMaxBodySize = 8 * 1024 * 1024 // 8 MiB
 
 func RecoveryMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,17 +31,6 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// MaxBodySizeMiddleware 限制请求体大小，防止超大请求导致内存压力/DoS
-func MaxBodySizeMiddleware(maxBytes int64) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// ── Request ID ───────────────────────────────────────────
 
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -212,23 +198,6 @@ func EmitProviderMetric(providerID uint64, success bool) {
 			m.recent = nil
 		}
 	}
-}
-
-func ShouldDisableProvider(errMsg string, statusCode int) bool {
-	if statusCode == http.StatusUnauthorized {
-		return true
-	}
-	lower := strings.ToLower(errMsg)
-	triggers := []string{
-		"insufficient_quota", "invalid_api_key", "account_deactivated",
-		"credit", "balance", "已欠费", "permission denied",
-	}
-	for _, t := range triggers {
-		if strings.Contains(lower, t) {
-			return true
-		}
-	}
-	return false
 }
 
 // ── JSON helpers ─────────────────────────────────────────

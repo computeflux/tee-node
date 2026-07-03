@@ -123,12 +123,9 @@ func (s *fakeStream) Close() error { return nil }
 // 指向该 provider 的路由。返回后会在测试结束时 ResetGlobal。
 func installScheduler(t *testing.T, providerName, modelKey, upstreamModel string, providerType uint16, fake scheduler.ProviderClient) {
 	t.Helper()
-	gw, err := scheduler.NewGatewayScheduler()
-	require.NoError(t, err)
 
-	gw.RegisterProviders(map[string]scheduler.ProviderClient{providerName: fake})
-	scheduler.SetRequestTransform(schedulerRequestTransform)
-	gw.ReloadRegistry([]*scheduler.ModelRoute{
+	reg := scheduler.NewRegistry()
+	reg.Replace([]*scheduler.ModelRoute{
 		{
 			Model: scheduler.ModelKey(modelKey),
 			Endpoints: []*scheduler.Endpoint{
@@ -149,6 +146,12 @@ func installScheduler(t *testing.T, providerName, modelKey, upstreamModel string
 			},
 		},
 	})
+
+	gw, err := scheduler.NewGatewayScheduler(reg)
+	require.NoError(t, err)
+
+	gw.RegisterProviders(map[string]scheduler.ProviderClient{providerName: fake})
+	scheduler.SetRequestTransform(schedulerRequestTransform)
 	gw.Start(context.Background())
 	scheduler.SetGlobal(gw)
 }

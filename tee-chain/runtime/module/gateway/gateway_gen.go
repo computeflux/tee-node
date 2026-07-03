@@ -85,8 +85,6 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		_, err = m.AuditModel(modelID, triggerBy, passed, detail).UnWrap()
 		return err
-	case [4]byte{0xd3, 0x66, 0xe8, 0xfb}:
-		return m.CreateOfficialRoutes()
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
 		if err := store.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err

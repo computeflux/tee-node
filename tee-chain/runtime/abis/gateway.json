@@ -2248,22 +2248,6 @@
         "selector": "0xd3194645"
       },
       {
-        "args": [],
-        "default": false,
-        "docs": [],
-        "label": "create_official_routes",
-        "mutates": true,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "ink",
-            "MessageResult"
-          ],
-          "type": 11
-        },
-        "selector": "0xd366e8fb"
-      },
-      {
         "args": [
           {
             "docs": [],

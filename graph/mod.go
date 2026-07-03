@@ -19,6 +19,7 @@ import (
 	"github.com/vektah/gqlparser/v2/ast"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway"
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	localtunnel "github.com/computeflux/tee-provider/pkg/services/local_tunnel"
 	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
@@ -50,9 +51,21 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 
 	// 启动 LLM 路由调度器（端点选择 / 并发 / 熔断 / 跨协议转换 / 计费），
 	// 供 HandleRelay 经全局单例使用。必须在 SetContractBridge 之后。
-	if err := gateway.InitScheduler(ctx, s); err != nil {
+	endpointIdxRaw, err := resolver.Indexer.Get(indexer.GatewayEndpointIndexName)
+	if err != nil {
+		return fmt.Errorf("get gateway endpoint index: %w", err)
+	}
+
+	endpointIdx, ok := endpointIdxRaw.(*indexer.GatewayEndpointIndex)
+	if !ok {
+		return fmt.Errorf("invalid gateway endpoint index type")
+	}
+
+	gw, err := gateway.InitScheduler(ctx, s, endpointIdx)
+	if err != nil {
 		return fmt.Errorf("init scheduler: %w", err)
 	}
+	resolver.Indexer.RegisterCallback(gw.OnIndexRefreshed)
 
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{

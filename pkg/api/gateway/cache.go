@@ -30,10 +30,5 @@ func FindTokenByKey(key string) *types.GatewayTokenInfo {
 	return nil
 }
 
-// findTokenCached 是内部别名，兼容 auth_middleware.go 调用。
-func findTokenCached(key string) *types.GatewayTokenInfo {
-	return FindTokenByKey(key)
-}
-
 // findTokenCachedFn 可被测试替换为 mock。
-var findTokenCachedFn func(string) *types.GatewayTokenInfo = findTokenCached
+var findTokenCachedFn func(string) *types.GatewayTokenInfo = FindTokenByKey

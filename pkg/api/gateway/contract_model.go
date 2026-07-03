@@ -66,34 +66,3 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 	return models
 }
 
-// findGatewayModelByName 按模型名称从合约查询（必须活跃），TEE 内部使用，返回完整 API Key。
-func findGatewayModelByName(pid uint64, name string) *cgateway.ModelInfoWithID {
-	bridge := getBridge()
-	if bridge == nil {
-		return nil
-	}
-	model, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.ModelInfoWithID, error) {
-		return cgateway.GatewaySecret{Gateway: *cgateway.NewGateway(runtime)}.GetModelByName(pid, name)
-	})
-	if err != nil {
-		GATEWAYLOG().Printf("[GATEWAY] SecretGetModelByName name=%s err=%v", name, err)
-		return nil
-	}
-	return model
-}
-
-// findProviderName 按名称查询 Provider。
-func findProviderName(name string) *cgateway.ProviderInfoWithID {
-	bridge := getBridge()
-	if bridge == nil {
-		return nil
-	}
-	provider, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.ProviderInfoWithID, error) {
-		return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.GetProviderByName(name)
-	})
-	if err != nil {
-		GATEWAYLOG().Printf("[GATEWAY] GetProviderByName name=%s err=%v", name, err)
-		return nil
-	}
-	return provider
-}

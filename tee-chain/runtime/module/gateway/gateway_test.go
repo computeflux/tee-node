@@ -78,6 +78,29 @@ func TestGateway_UpdateProvider_Success(t *testing.T) {
 	assert.Equal(t, "New Name", prov.Name)
 }
 
+func TestGateway_CreateProvider_ReservedName(t *testing.T) {
+	gw, _ := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	for _, name := range []string{"Edge", "edge", "MININGPOOL", "MiningPool", "tee", "TEE"} {
+		err := m.CreateProvider(name, "", "", RegionAsiaEast, 1000)
+		assert.ErrorContains(t, err, "route prefix", "name=%q", name)
+	}
+}
+
+func TestGateway_UpdateProvider_ReservedName(t *testing.T) {
+	gw, _ := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	id, _ := provOpt.UnWrap()
+
+	err := m.UpdateProvider(id, "Edge", "", "", nil, 0, 0, 0, 0)
+	assert.ErrorContains(t, err, "route prefix")
+}
+
 // ── Model Tests ──────────────────────────────────────────
 
 func TestGateway_RegisterModel_Success(t *testing.T) {
@@ -428,4 +451,74 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 	rt.Caller.T = 2
 	err := m.ApplyWithdraw(420420417, []byte{}, 0, 1_000_000, []byte("nonce1"))
 	assert.ErrorIs(t, err, ErrLowCredit)
+}
+
+// ── Route Tests ──────────────────────────────────────────
+
+func TestGateway_JoinRoute_OnlyOwner(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	provID, _ := provOpt.UnWrap()
+
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}))
+	models, err := q.ListProviderModels(provID)
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	modelID := models[0].ID
+
+	// CreateRoute requires system caller.
+	rt.System = true
+	_, _ = m.CreateRoute("dummy", EdgeRoute, 0, 0, 0, false).UnWrap()
+	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	rt.System = false
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	require.NotZero(t, routeID)
+
+	require.NoError(t, m.JoinRoute(modelID, routeID))
+
+	// other caller cannot join
+	rt.Caller = store.UniAddr{T: 1, V: []byte{0x02}}
+	err = m.JoinRoute(modelID, routeID)
+	assert.ErrorContains(t, err, "only model owner")
+}
+
+func TestGateway_LeaveRoute_OnlyOwner(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	provID, _ := provOpt.UnWrap()
+
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}))
+	models, err := q.ListProviderModels(provID)
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	modelID := models[0].ID
+
+	// CreateRoute requires system caller.
+	rt.System = true
+	_, _ = m.CreateRoute("dummy", EdgeRoute, 0, 0, 0, false).UnWrap()
+	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	rt.System = false
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	require.NotZero(t, routeID)
+
+	require.NoError(t, m.JoinRoute(modelID, routeID))
+
+	// other caller cannot leave
+	rt.Caller = store.UniAddr{T: 1, V: []byte{0x02}}
+	err = m.LeaveRoute(modelID)
+	assert.ErrorContains(t, err, "only model owner")
+
+	// owner can leave
+	rt.Caller = store.UniAddr{T: 1, V: []byte{0x01}}
+	require.NoError(t, m.LeaveRoute(modelID))
 }

@@ -36,32 +36,6 @@ func NewModelSemaphore(capacity int, softRatio float64) *ModelSemaphore {
 	return &ModelSemaphore{capacity: int64(capacity), softCap: softCap}
 }
 
-// UpdateCapacity 更新容量和软限制（用于 ReloadRegistry 后）。
-func (s *ModelSemaphore) UpdateCapacity(capacity int, softRatio float64) {
-	if s == nil {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.capacity = int64(capacity)
-	if softRatio > 1.0 {
-		s.softCap = int64(float64(capacity) * softRatio)
-		if s.softCap <= s.capacity {
-			s.softCap = s.capacity + 1
-		}
-	} else {
-		s.softCap = s.capacity
-	}
-}
-
-// Capacity 返回当前硬限制。
-func (s *ModelSemaphore) Capacity() int {
-	if s == nil {
-		return 0
-	}
-	return int(s.capacity)
-}
-
 // Acquire 获取信号量。
 // 当 s == nil 时(不限流模式),立即返回 noop release。
 func (s *ModelSemaphore) Acquire(ctx context.Context) (func(), error) {
@@ -172,46 +146,6 @@ func (s *SemaphoreSet) GetOrCreate(m ModelKey, capacity int) *ModelSemaphore {
 	sem := NewModelSemaphore(capacity, s.softRatio)
 	s.cache[m] = sem
 	return sem
-}
-
-// UpdateCapacity 更新已存在信号量的容量（用于 ReloadRegistry）。
-// 如果信号量不存在则创建。
-func (s *SemaphoreSet) UpdateCapacity(m ModelKey, capacity int) {
-	s.mu.RLock()
-	sem, ok := s.cache[m]
-	s.mu.RUnlock()
-
-	if ok {
-		sem.UpdateCapacity(capacity, s.softRatio)
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if sem, ok := s.cache[m]; ok {
-		sem.UpdateCapacity(capacity, s.softRatio)
-		return
-	}
-	sem = NewModelSemaphore(capacity, s.softRatio)
-	s.cache[m] = sem
-}
-
-// Invalidate 在路由表 Replace 时清空旧信号量。
-func (s *SemaphoreSet) Invalidate() {
-	s.mu.Lock()
-	s.cache = make(map[ModelKey]*ModelSemaphore)
-	s.mu.Unlock()
-}
-
-// Cleanup 只保留 keep 中的 model 信号量，删除其余。
-func (s *SemaphoreSet) Cleanup(keep map[ModelKey]bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for k := range s.cache {
-		if !keep[k] {
-			delete(s.cache, k)
-		}
-	}
 }
 
 // --- Circuit Breaker ---
@@ -391,25 +325,9 @@ func (bs *BreakerSet) GetOrCreate(k EndpointKey) *Breaker {
 	return b
 }
 
-// Cleanup 只保留 keep 中的 breaker，删除其余。
-func (bs *BreakerSet) Cleanup(keep map[EndpointKey]bool) {
-	bs.mu.Lock()
-	defer bs.mu.Unlock()
-	removed := 0
-	for k := range bs.set {
-		if !keep[k] {
-			delete(bs.set, k)
-			removed++
-		}
-	}
-	if removed > 0 {
-		bs.log.Info("breakers cleaned up", "removed", removed, "remaining", len(bs.set))
-	}
-}
-
 // RunTicker 启动后台 ticker,定期评估所有端点的熔断状态。
 // ctx 取消时停止。
-func (bs *BreakerSet) RunTicker(ctx context.Context, registry *Registry, interval time.Duration) {
+func (bs *BreakerSet) RunTicker(ctx context.Context, metrics EndpointMetricsSource, interval time.Duration) {
 	bs.log.Info("breaker ticker started", "interval", interval)
 	defer bs.log.Info("breaker ticker stopped")
 	t := time.NewTicker(interval)
@@ -419,23 +337,18 @@ func (bs *BreakerSet) RunTicker(ctx context.Context, registry *Registry, interva
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			eps := registry.AllEndpoints()
 			var ticked int
 			bs.mu.RLock()
-			for _, ep := range eps {
-				if ep.metrics == nil {
+			for k, b := range bs.set {
+				m := metrics.GetOrCreate(k)
+				if m == nil {
 					continue
 				}
-				k := EndpointKey{Provider: ep.Provider, KeyID: ep.KeyID}
-				b, ok := bs.set[k]
-				if !ok {
-					continue
-				}
-				b.Tick(ep.metrics, bs.log)
+				b.Tick(m, bs.log)
 				ticked++
 			}
 			bs.mu.RUnlock()
-			bs.log.Debug("breaker tick completed", "endpoints_checked", ticked, "total_endpoints", len(eps))
+			bs.log.Debug("breaker tick completed", "endpoints_checked", ticked)
 		}
 	}
 }

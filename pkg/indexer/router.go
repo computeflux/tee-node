@@ -98,34 +98,8 @@ func (g *GatewayRouterIndex) BuildFromRoutes(routes []cgateway.ModelRouteWithID)
 	}
 	g.index = newIndex
 	g.routes = newRoutes
+	Logger("GatewayRouterIndex built routes=%d", len(routes))
 	return nil
-}
-
-// ListAll 返回缓存中所有路由（按 ID 升序）。
-func (g *GatewayRouterIndex) ListAll() ([]cgateway.ModelRouteWithID, error) {
-	g.mu.RLock()
-	routes := g.routes
-	g.mu.RUnlock()
-
-	if routes == nil {
-		return nil, fmt.Errorf("gateway router index not ready")
-	}
-
-	out := make([]cgateway.ModelRouteWithID, 0, len(routes))
-	for _, r := range routes {
-		out = append(out, r)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out, nil
-}
-
-// Get 按 ID 查询单个路由。
-func (g *GatewayRouterIndex) Get(id uint64) (cgateway.ModelRouteWithID, bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	r, ok := g.routes[strconv.FormatUint(id, 10)]
-	return r, ok
 }
 
 // Search 在索引中查询路由。

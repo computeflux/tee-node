@@ -11,6 +11,8 @@
 package scheduler
 
 import (
+	"context"
+	"fmt"
 	"sort"
 	"sync/atomic"
 )
@@ -85,6 +87,11 @@ type ModelRoute struct {
 	FallbackModels []ModelKey  // 跨模型回退链(本模型所有端点失败时尝试)
 }
 
+// ModelResolver 把请求中的模型/路由名解析为可调度的 ModelRoute。
+type ModelResolver interface {
+	Resolve(ctx context.Context, model ModelKey, provider ProviderID) (*ModelRoute, error)
+}
+
 // EndpointMetrics 是单个端点的实时运行时指标。
 // 所有字段都是原子的,scheduler 在请求进入/退出时更新。
 type EndpointMetrics struct {
@@ -101,33 +108,14 @@ type EndpointMetrics struct {
 	CircuitOpen       atomic.Bool
 }
 
-// MetricsSnapshot 取一份一致性快照(用于 metrics 导出 / 调试)。
-func (m *EndpointMetrics) Snapshot() MetricsSnapshot {
-	return MetricsSnapshot{
-		InFlight:       m.InFlight.Load(),
-		TotalRequests:  m.TotalRequests.Load(),
-		SuccessCount:   m.SuccessCount.Load(),
-		ErrorCount429:  m.ErrorCount429.Load(),
-		ErrorCount5xx:  m.ErrorCount5xx.Load(),
-		ErrorCountAuth: m.ErrorCountAuth.Load(),
-	}
-}
-
-// MetricsSnapshot 是 EndpointMetrics 的非原子快照。
-type MetricsSnapshot struct {
-	InFlight       int64
-	TotalRequests  int64
-	SuccessCount   int64
-	ErrorCount429  int64
-	ErrorCount5xx  int64
-	ErrorCountAuth int64
+// EndpointMetricsSource 为 breaker ticker 提供运行时指标。
+type EndpointMetricsSource interface {
+	GetOrCreate(k EndpointKey) *EndpointMetrics
 }
 
 // routesSnapshot 是 registry 内部不可变快照。
 type routesSnapshot struct {
-	byModel    map[ModelKey]*ModelRoute
-	byEndpoint map[EndpointKey]*Endpoint
-	allModels  []ModelKey
+	byModel map[ModelKey]*ModelRoute
 }
 
 // Registry 维护一张"模型 → 端点池"的路由表。
@@ -144,8 +132,7 @@ func NewRegistry() *Registry { return &Registry{} }
 // 内部会按 Weight 降序排序端点(让选择结果更稳定)。
 func (r *Registry) Replace(routes []*ModelRoute) {
 	snap := &routesSnapshot{
-		byModel:    make(map[ModelKey]*ModelRoute, len(routes)),
-		byEndpoint: make(map[EndpointKey]*Endpoint),
+		byModel: make(map[ModelKey]*ModelRoute, len(routes)),
 	}
 	for _, route := range routes {
 		// 按 weight 降序排序,优先尝试高分端点(短路)
@@ -153,17 +140,12 @@ func (r *Registry) Replace(routes []*ModelRoute) {
 			return route.Endpoints[i].Weight > route.Endpoints[j].Weight
 		})
 		snap.byModel[route.Model] = route
-		snap.allModels = append(snap.allModels, route.Model)
 		for _, ep := range route.Endpoints {
 			if ep.metrics == nil {
 				ep.metrics = &EndpointMetrics{}
 			}
-			snap.byEndpoint[EndpointKey{Provider: ep.Provider, KeyID: ep.KeyID}] = ep
 		}
 	}
-	sort.Slice(snap.allModels, func(i, j int) bool {
-		return string(snap.allModels[i]) < string(snap.allModels[j])
-	})
 	r.snap.Store(snap)
 }
 
@@ -177,35 +159,30 @@ func (r *Registry) LookupModel(m ModelKey) *ModelRoute {
 	return snap.byModel[m]
 }
 
-// LookupEndpoint 通过 (provider, keyID) 找端点(用于 metrics 导出)。
-func (r *Registry) LookupEndpoint(k EndpointKey) *Endpoint {
-	snap := r.snap.Load()
-	if snap == nil {
-		return nil
+// Resolve 实现 ModelResolver，供静态测试注入。
+func (r *Registry) Resolve(ctx context.Context, model ModelKey, provider ProviderID) (*ModelRoute, error) {
+	route := r.LookupModel(model)
+	if route == nil {
+		return nil, fmt.Errorf("%w: %s", ErrModelNotFound, model)
 	}
-	return snap.byEndpoint[k]
+	if provider == "" {
+		return route, nil
+	}
+	// 显式指定 provider 时只保留该 provider 的端点。
+	var filtered []*Endpoint
+	for _, ep := range route.Endpoints {
+		if ep.Provider == provider {
+			filtered = append(filtered, ep)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("%w: %s/%s", ErrModelNotFound, provider, model)
+	}
+	return &ModelRoute{
+		Model:          route.Model,
+		MaxConcurrency: route.MaxConcurrency,
+		Endpoints:      filtered,
+		FallbackModels: route.FallbackModels,
+	}, nil
 }
 
-// AllEndpoints 返回所有端点的快照(用于 metrics 导出 / 后台任务)。
-func (r *Registry) AllEndpoints() []*Endpoint {
-	snap := r.snap.Load()
-	if snap == nil {
-		return nil
-	}
-	out := make([]*Endpoint, 0, len(snap.byEndpoint))
-	for _, ep := range snap.byEndpoint {
-		out = append(out, ep)
-	}
-	return out
-}
-
-// AllModels 返回已注册的全部模型(已排序)。
-func (r *Registry) AllModels() []ModelKey {
-	snap := r.snap.Load()
-	if snap == nil {
-		return nil
-	}
-	out := make([]ModelKey, len(snap.allModels))
-	copy(out, snap.allModels)
-	return out
-}

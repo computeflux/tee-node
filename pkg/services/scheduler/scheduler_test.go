@@ -111,9 +111,9 @@ func newTestScheduler(t *testing.T, maxConc int) (*Scheduler, *Registry, *mockCl
 			Model:          "gpt-4o",
 			MaxConcurrency: maxConc,
 			Endpoints: []*Endpoint{
-				{Provider: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-				{Provider: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-				{Provider: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 			FallbackModels: []ModelKey{"claude-3-5"},
 		},
@@ -121,17 +121,18 @@ func newTestScheduler(t *testing.T, maxConc int) (*Scheduler, *Registry, *mockCl
 			Model:          "claude-3-5",
 			MaxConcurrency: maxConc,
 			Endpoints: []*Endpoint{
-				{Provider: "anthropic", KeyID: "key-x", KeyValue: "v-x", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "anthropic", Protocol: "anthropic", KeyID: "key-x", KeyValue: "v-x", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 		},
 	}
 	reg.Replace(routes)
 	obs := NoopObservability()
 	sch := New(DefaultConfig(), reg, obs)
-	sch.AttachMetrics()
 	client := newMockClient()
-	sch.RegisterProvider("openai", client)
-	sch.RegisterProvider("anthropic", client)
+	sch.RegisterClients(map[ProviderID]ProviderClient{
+		"openai":    client,
+		"anthropic": client,
+	})
 	return sch, reg, client
 }
 
@@ -169,7 +170,7 @@ func TestSchedule_RetryOn429(t *testing.T) {
 }
 
 func TestSchedule_AuthError_DeadKey(t *testing.T) {
-	sch, _, client := newTestScheduler(t, 100)
+	sch, reg, client := newTestScheduler(t, 100)
 	// 增加重试次数确保所有 3 个 endpoint 都有机会被尝试（加权随机选择下概率极低）
 	sch.cfg.MaxRetries = 20
 	for _, k := range []string{"key-a", "key-b", "key-c"} {
@@ -178,13 +179,12 @@ func TestSchedule_AuthError_DeadKey(t *testing.T) {
 		}
 	}
 	// claude-3-5 fallback 也会成功，所以测试一个无 fallback 的模型
-	reg := sch.registry
 	reg.Replace([]*ModelRoute{{
 		Model: "no-fallback",
 		Endpoints: []*Endpoint{
-			{Provider: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}})
 	_, err := sch.Schedule(context.Background(), Invoke{Model: "no-fallback", Body: []byte(`{}`)})
@@ -262,8 +262,10 @@ func TestSemaphore_ConcurrencyLimit(t *testing.T) {
 		hold: blocking,
 		hook: func() { gotCount.Add(1) },
 	}
-	sch.RegisterProvider("openai", slowClient)
-	sch.RegisterProvider("anthropic", slowClient)
+	sch.RegisterClients(map[ProviderID]ProviderClient{
+		"openai":    slowClient,
+		"anthropic": slowClient,
+	})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
@@ -310,15 +312,18 @@ func TestCircuitBreaker_OpensOnHighFailureRate(t *testing.T) {
 	reg.Replace([]*ModelRoute{{
 		Model: "m",
 		Endpoints: []*Endpoint{
-			{Provider: "p", KeyID: "k", Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, Weight: 1.0},
+			{Provider: "p", Protocol: "p", KeyID: "k", Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, Weight: 1.0},
 		},
 	}})
 	obs := NoopObservability()
 	sch := New(cfg, reg, obs)
-	sch.AttachMetrics()
 
 	br := sch.breakers.GetOrCreate(EndpointKey{Provider: "p", KeyID: "k"})
-	ep := reg.LookupEndpoint(EndpointKey{Provider: "p", KeyID: "k"})
+	route := reg.LookupModel("m")
+	if route == nil || len(route.Endpoints) == 0 {
+		t.Fatal("expected route m with endpoints")
+	}
+	ep := route.Endpoints[0]
 
 	for i := 0; i < 15; i++ {
 		ep.metrics.TotalRequests.Add(1)
@@ -340,7 +345,7 @@ func TestCircuitBreaker_OpensOnHighFailureRate(t *testing.T) {
 func TestRegistry_HotReplace(t *testing.T) {
 	reg := NewRegistry()
 	reg.Replace([]*ModelRoute{{Model: "m1", Endpoints: []*Endpoint{
-		{Provider: "p", KeyID: "k1", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
+		{Provider: "p", Protocol: "p", KeyID: "k1", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
 	}}})
 	if reg.LookupModel("m1") == nil {
 		t.Fatal("expected m1")
@@ -350,7 +355,7 @@ func TestRegistry_HotReplace(t *testing.T) {
 	}
 
 	reg.Replace([]*ModelRoute{{Model: "m2", Endpoints: []*Endpoint{
-		{Provider: "p", KeyID: "k2", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
+		{Provider: "p", Protocol: "p", KeyID: "k2", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
 	}}})
 	if reg.LookupModel("m1") != nil {
 		t.Fatal("expected m1 to be gone after replace")
@@ -438,8 +443,10 @@ func TestScale_ThousandsOfEndpoints(t *testing.T) {
 		m := ModelKey(fmt.Sprintf("model-%d", i))
 		eps := make([]*Endpoint, 0, endpointsPerModel)
 		for j := 0; j < endpointsPerModel; j++ {
+			providerName := ProviderID(fmt.Sprintf("provider-%d", j%5))
 			eps = append(eps, &Endpoint{
-				Provider: ProviderID(fmt.Sprintf("provider-%d", j%5)),
+				Provider: ProviderID(providerName),
+				Protocol: ProviderID(providerName),
 				KeyID:    fmt.Sprintf("key-%d-%d", i, j),
 				KeyValue: "v",
 				Weight:   1.0,
@@ -459,9 +466,8 @@ func TestScale_ThousandsOfEndpoints(t *testing.T) {
 
 	obs := NoopObservability()
 	sch := New(DefaultConfig(), reg, obs)
-	sch.AttachMetrics()
 	for _, p := range []ProviderID{"provider-0", "provider-1", "provider-2", "provider-3", "provider-4"} {
-		sch.RegisterProvider(p, newMockClient())
+		sch.RegisterClients(map[ProviderID]ProviderClient{p: newMockClient()})
 	}
 
 	t0 = time.Now()

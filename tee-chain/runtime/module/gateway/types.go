@@ -37,9 +37,9 @@ const (
 
 // RouteType 路由类型（与模型 ProviderType 一致语义）
 const (
-	RoutePersonal uint16 = 1 // 个人
-	RouteNode     uint16 = 2 // 节点
-	RoutePrivacy  uint16 = 3 // 隐私
+	EdgeRoute       uint16 = 1 // 个人
+	MiningPoolRoute uint16 = 2 // 节点
+	TEERoute        uint16 = 3 // 隐私
 )
 
 // ── Route ────────────────────────────────────────────────
@@ -84,7 +84,7 @@ type ModelInfo struct {
 
 	// 供应商配置
 	ProviderType uint16   `json:"providerType"`      // 供应商类型 (openai, claude, ...)
-	ModelID      string   `json:"modelId"`           // 模型 ID
+	ModelID      string   `json:"modelId"`           // 模型 ID 已经废弃,无任何作用字段
 	URI          string   `json:"uri,omitempty"`     // 自定义端点，为空则用供应商官方地址
 	APIKeys      []string `json:"apiKeys,omitempty"` // API Key 列表
 

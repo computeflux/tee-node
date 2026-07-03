@@ -73,9 +73,6 @@ func (s *Selector) SetLog(l Logger) {
 	s.mu.Unlock()
 }
 
-func newCandidateSlice() []Candidate {
-	return make([]Candidate, 0, 16)
-}
 
 // Select 从 route.Endpoints 中挑一个可用端点。
 // skip 中的 KeyID(已 dead 或本轮已用)会被排除;所有候选都被排除时返回 nil,

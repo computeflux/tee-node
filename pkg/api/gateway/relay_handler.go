@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -66,8 +67,19 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 逻辑模型/路由名:去掉 "auto/" 或 "provider/" 前缀,只留 scheduler 的路由键。
-	_, modelKey := parseProviderModel(GetModelNameFromContext(r))
+	// 逻辑模型/路由名：route 以 Edge/ MiningPool/ TEE/ 开头，其余必须显式 provider/model。
+	modelNameArg := GetModelNameFromContext(r)
+	var provider, modelKey string
+	if isRouteName(modelNameArg) {
+		provider = ""
+		modelKey = modelNameArg
+	} else {
+		if !strings.Contains(modelNameArg, "/") {
+			writeProtocolError(w, r, http.StatusBadRequest, "model must be provider/model or route", "invalid_request")
+			return
+		}
+		provider, modelKey = parseProviderModel(modelNameArg)
+	}
 	bodyBytes := GetBodyFromContext(r)
 	token := GetTokenFromContext(r)
 
@@ -85,14 +97,14 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	// session 亲和:同一用户+模型优先复用上次端点(命中上游 KV cache)。
 	sessionID := ""
 	if token != nil {
-		sessionID = token.Owner + ":" + modelKey
+		sessionID = token.Owner + ":" + modelNameArg
 	}
 
 	// 把入口协议 + 请求路径塞进 ctx,scheduler 选完端点后由 provider client 据此转换请求体。
 	ctx := scheduler.WithRequest(r.Context(), string(inbound), requestPath)
 
 	if reqBody.Stream {
-		res, err := gw.ScheduleStream(ctx, modelKey, bodyBytes, sessionID)
+		res, err := gw.ScheduleStream(ctx, provider, modelKey, bodyBytes, sessionID)
 		if err != nil {
 			st, msg, typ := mapScheduleError(err)
 			writeProtocolError(w, r, st, msg, typ)
@@ -136,7 +148,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := gw.Schedule(ctx, modelKey, bodyBytes, sessionID)
+	res, err := gw.Schedule(ctx, provider, modelKey, bodyBytes, sessionID)
 	if err != nil {
 		st, msg, typ := mapScheduleError(err)
 		writeProtocolError(w, r, st, msg, typ)

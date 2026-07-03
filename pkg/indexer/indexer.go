@@ -31,11 +31,12 @@ type Index interface {
 
 // Indexer 统一管理多个合约索引的生命周期与刷新。
 type Indexer struct {
-	chain   *teechain.TeeChain
-	mu      sync.RWMutex
-	indexes map[string]Index
-	ctx     context.Context
-	cancel  context.CancelFunc
+	chain     *teechain.TeeChain
+	mu        sync.RWMutex
+	indexes   map[string]Index
+	callbacks []func()
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 // NewIndexer 创建索引管理器。
@@ -106,7 +107,26 @@ func (idx *Indexer) Stop() {
 	}
 }
 
-// Get 按名称获取已注册的索引。
+// RegisterCallback 注册一个回调，每次 RefreshAll 成功完成后触发。
+func (idx *Indexer) RegisterCallback(fn func()) {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	idx.callbacks = append(idx.callbacks, fn)
+}
+
+// runCallbacks 调用回调切片（出错不中断）。
+func runCallbacks(callbacks []func()) {
+	for _, fn := range callbacks {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					Logger("callback panic: %v", r)
+				}
+			}()
+			fn()
+		}()
+	}
+}
 func (idx *Indexer) Get(name string) (Index, error) {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
@@ -147,6 +167,9 @@ func (idx *Indexer) refreshAllLocked(ctx context.Context) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("%v", errs)
 	}
+	callbacks := make([]func(), len(idx.callbacks))
+	copy(callbacks, idx.callbacks)
+	runCallbacks(callbacks)
 	return nil
 }
 
