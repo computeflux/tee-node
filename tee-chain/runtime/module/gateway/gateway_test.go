@@ -530,8 +530,8 @@ func TestGateway_JoinRoute_OnlyOwner(t *testing.T) {
 
 	// CreateRoute requires system caller.
 	rt.System = true
-	_, _ = m.CreateRoute("dummy", EdgeRoute, 0, 0, 0, false).UnWrap()
-	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	_, _ = m.CreateRoute("dummy", MiningPoolRoute, 0, 0, 0, false).UnWrap()
+	routeRes := m.CreateRoute("MiningPool", MiningPoolRoute, 0, 0, 0, false)
 	rt.System = false
 	routeID, err := routeRes.UnWrap()
 	require.NoError(t, err)
@@ -562,8 +562,8 @@ func TestGateway_LeaveRoute_OnlyOwner(t *testing.T) {
 
 	// CreateRoute requires system caller.
 	rt.System = true
-	_, _ = m.CreateRoute("dummy", EdgeRoute, 0, 0, 0, false).UnWrap()
-	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	_, _ = m.CreateRoute("dummy", MiningPoolRoute, 0, 0, 0, false).UnWrap()
+	routeRes := m.CreateRoute("MiningPool", MiningPoolRoute, 0, 0, 0, false)
 	rt.System = false
 	routeID, err := routeRes.UnWrap()
 	require.NoError(t, err)
@@ -573,10 +573,112 @@ func TestGateway_LeaveRoute_OnlyOwner(t *testing.T) {
 
 	// other caller cannot leave
 	rt.Caller = store.UniAddr{T: 1, V: []byte{0x02}}
-	err = m.LeaveRoute(modelID)
+	err = m.LeaveRoute(modelID, routeID)
 	assert.ErrorContains(t, err, "only model owner")
 
 	// owner can leave
 	rt.Caller = store.UniAddr{T: 1, V: []byte{0x01}}
-	require.NoError(t, m.LeaveRoute(modelID))
+	require.NoError(t, m.LeaveRoute(modelID, routeID))
+}
+
+func TestGateway_JoinRoute_ModelIds(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	provID, _ := provOpt.UnWrap()
+
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}))
+	require.NoError(t, m.RegisterModel("gpt-4o", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-2"}))
+	require.NoError(t, m.RegisterModel("claude-3", ModalityText, 128000, 1, 1, 1, ProviderClaude, "", []string{"sk-3"}))
+
+	models, err := q.ListProviderModels(provID)
+	require.NoError(t, err)
+	require.Len(t, models, 3)
+
+	// CreateRoute requires system caller.
+	rt.System = true
+	routeRes := m.CreateRoute("MultiModelRoute", MiningPoolRoute, 0, 0, 0, false)
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	rt.System = false
+
+	for _, model := range models {
+		require.NoError(t, m.JoinRoute(model.ID, routeID))
+	}
+
+	route, err := q.GetRoute(routeID)
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Len(t, route.ModelIds, 3)
+	assert.ElementsMatch(t, []uint64{0, 1, 2}, route.ModelIds)
+
+	routeByName, err := q.GetRouteByName("MultiModelRoute")
+	require.NoError(t, err)
+	require.NotNil(t, routeByName)
+	require.Len(t, routeByName.Data.ModelIds, 3)
+	assert.ElementsMatch(t, []uint64{0, 1, 2}, routeByName.Data.ModelIds)
+
+	routes, err := q.ListRoutes(0, 10)
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	require.Len(t, routes[0].Data.ModelIds, 3)
+	assert.ElementsMatch(t, []uint64{0, 1, 2}, routes[0].Data.ModelIds)
+}
+
+func TestGateway_JoinRoute_PersonalToEdge(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("Personal AI", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	provID, _ := provOpt.UnWrap()
+
+	require.NoError(t, m.RegisterModel("local-llm", ModalityText, 128000, 1, 1, 1, ProviderPersonal, "", []string{"local"}))
+	models, err := q.ListProviderModels(provID)
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	modelID := models[0].ID
+
+	rt.System = true
+	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	rt.System = false
+
+	require.NoError(t, m.JoinRoute(modelID, routeID))
+
+	route, err := q.GetRoute(routeID)
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Len(t, route.ModelIds, 1)
+	assert.Equal(t, uint64(0), route.ModelIds[0])
+}
+
+func TestGateway_JoinRoute_MismatchedTypeFails(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	provOpt, _ := q.GetProviderByOwner()
+	provID, _ := provOpt.UnWrap()
+
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}))
+	models, err := q.ListProviderModels(provID)
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	modelID := models[0].ID
+
+	rt.System = true
+	routeRes := m.CreateRoute("EdgePool", EdgeRoute, 0, 0, 0, false)
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	rt.System = false
+
+	err = m.JoinRoute(modelID, routeID)
+	assert.ErrorContains(t, err, "does not match route type")
 }

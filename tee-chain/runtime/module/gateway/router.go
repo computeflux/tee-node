@@ -129,10 +129,10 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 		return errors.New("only model owner can join route")
 	}
 
-	// // 校验路由类型与模型 ProviderType 一致
-	// if model.ProviderType != route.RouteType {
-	// 	return fmt.Errorf("model providerType %d does not match route type %d", model.ProviderType, route.RouteType)
-	// }
+	// 校验路由类型与模型 ProviderType 一致
+	if getRouterTypeOfModel(model.ProviderType) != route.RouteType {
+		return fmt.Errorf("model providerType %d does not match route type %d", model.ProviderType, route.RouteType)
+	}
 
 	// 更新模型的 RouteID，价格由路由统一
 	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
@@ -151,7 +151,7 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 }
 
 // LeaveRoute 模型退出路由：恢复独立定价。
-func (g GatewayMutation) LeaveRoute(modelID uint64) error {
+func (g GatewayMutation) LeaveRoute(modelID uint64, routeID uint64) error {
 	txn := g.api.GetTxn()
 
 	model, err := g.models.Get(txn, modelID)
@@ -162,11 +162,6 @@ func (g GatewayMutation) LeaveRoute(modelID uint64) error {
 	caller := g.api.GetCaller()
 	if caller.T != model.Owner.T || !bytes.Equal(caller.V, model.Owner.V) {
 		return errors.New("only model owner can leave route")
-	}
-
-	routeID := model.RouteID
-	if routeID == 0 {
-		return errors.New("model is not in any route")
 	}
 
 	// 清除模型的 RouteID

@@ -1366,6 +1366,16 @@
               ],
               "type": 3
             }
+          },
+          {
+            "docs": [],
+            "label": "route_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
           }
         ],
         "default": false,

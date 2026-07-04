@@ -187,14 +187,18 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.JoinRoute(modelID, routeID)
 	case [4]byte{0x64, 0x2d, 0x77, 0x3b}:
-		if err := store.RequireArgLen(args, 1, "leave_route"); err != nil {
+		if err := store.RequireArgLen(args, 2, "leave_route"); err != nil {
 			return err
 		}
 		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
 		if err != nil {
 			return fmt.Errorf("leave_route: modelID: %w", err)
 		}
-		return m.LeaveRoute(modelID)
+		routeID, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return fmt.Errorf("leave_route: routeID: %w", err)
+		}
+		return m.LeaveRoute(modelID, routeID)
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
 		if err := store.RequireArgLen(args, 3, "recharge"); err != nil {
 			return err
