@@ -385,6 +385,64 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	require.NoError(t, m.SettleUsage([]Settlement{record}))
 }
 
+func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	// Setup: create provider + model
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil))
+
+	// Create route with different prices and join model 0
+	rt.System = true
+	routeRes := m.CreateRoute("miningpool/test", MiningPoolRoute, 2_000_000, 1_000_000, 4_000_000, true)
+	require.True(t, routeRes.IsOk())
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	require.NoError(t, m.JoinRoute(0, routeID))
+	rt.System = false
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.System = true
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	rt.System = false
+
+	// Settle by node (T == 0)
+	rt.Caller.T = 0
+
+	// Route pricing: in=1000, out=500 → cost = (1000*2000000 + 500*4000000) / 1000000 = 4000
+	err = m.SettleUsageWithRoute([]SettlementWithRoute{
+		{
+			User:       user,
+			RouteID:    store.NewSome(routeID),
+			ProviderID: 0,
+			ModelID:    0,
+			TokenIn:    1000,
+			TokenOut:   500,
+			Count:      1,
+			Nonce:      []byte{0x05, 0x06, 0x07, 0x08},
+		},
+	})
+	require.NoError(t, err)
+
+	// User credit decreased
+	credit, err := q.GetCredit(user)
+	require.NoError(t, err)
+	assert.Less(t, credit, int64(1_000_000))
+
+	// Provider credit increased
+	provCredit, err := q.GetProviderCredit(0)
+	require.NoError(t, err)
+	assert.Greater(t, provCredit, uint64(0))
+
+	// Provider reputation must NOT be updated for route settlement
+	prov, err := q.GetProvider(0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), prov.TotalRequests)
+	assert.Equal(t, uint32(0), prov.SuccessRate)
+}
+
 func TestGateway_Withdraw_Success(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}

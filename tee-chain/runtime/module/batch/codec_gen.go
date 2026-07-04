@@ -5,7 +5,6 @@ package batch
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 

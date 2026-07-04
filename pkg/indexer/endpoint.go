@@ -77,9 +77,16 @@ func (g *GatewayEndpointIndex) BuildFromData(models []cgateway.ModelInfoWithProv
 
 	byRoute := make(map[string]*scheduler.ModelRoute)
 	for _, r := range routes {
+		// 跳过非活跃路由
 		if !r.Data.IsActive {
 			continue
 		}
+
+		// 跳过模型 ID 为空的路由
+		if len(r.Data.ModelIds) == 0 {
+			continue
+		}
+
 		// 允许链上存储的路由名本身带前缀（如 UI 误传 "MiningPool/foo"），
 		// 索引层做一次归一化，避免请求 "MiningPool/foo" 时找不到 "MiningPool/miningpool/foo"。
 		routeName := normalizeRouteName(r.Data.RouteType, r.Data.Name)
@@ -99,6 +106,7 @@ func (g *GatewayEndpointIndex) BuildFromData(models []cgateway.ModelInfoWithProv
 			}
 			for _, ep := range eps {
 				ep.Models = append(ep.Models, routeModelKey)
+				ep.RouteID = r.ID
 			}
 			endpoints = append(endpoints, eps...)
 			if int(m.Model.MaxConcurrency) > maxConcurrency {
@@ -110,6 +118,7 @@ func (g *GatewayEndpointIndex) BuildFromData(models []cgateway.ModelInfoWithProv
 			Logger("GatewayEndpointIndex route skipped (no usable endpoints): key=%s model_ids=%v", routeKeyName, r.Data.ModelIds)
 			continue
 		}
+
 		sort.SliceStable(endpoints, func(i, j int) bool {
 			return endpoints[i].Weight > endpoints[j].Weight
 		})

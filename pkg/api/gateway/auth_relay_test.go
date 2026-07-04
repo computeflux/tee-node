@@ -39,7 +39,7 @@ func setupMockFns(t *testing.T) func() {
 		getBridgeFn = old["getBridgeFn"].(func() *teechain.TeeChain)
 		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
 		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
-		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64))
+		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64, uint64))
 		scheduler.ResetGlobal()
 	}
 }
@@ -424,7 +424,7 @@ func TestHandleRelay_Success(t *testing.T) {
 	defer cleanup()
 
 	var recorded bool
-	recordUsageAsyncFn = func(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cached uint64) {
+	recordUsageAsyncFn = func(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, routeID uint64, in uint64, out uint64, cached uint64) {
 		recorded = true
 		assert.Equal(t, uint64(10), in)
 		assert.Equal(t, uint64(5), out)
@@ -466,6 +466,71 @@ func TestHandleRelay_UpstreamError(t *testing.T) {
 
 	// 上游 4xx 被 scheduler 归类为 client error,映射回对应状态码。
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// installSchedulerWithRoute 构造挂着 fake provider client 的全局 scheduler，
+// 端点带有指定的 RouteID，供路由结算断言。
+func installSchedulerWithRoute(t *testing.T, providerName, modelKey, upstreamModel string, providerType uint16, routeID uint64, fake scheduler.ProviderClient) {
+	t.Helper()
+
+	reg := scheduler.NewRegistry()
+	reg.Replace([]*scheduler.ModelRoute{
+		{
+			Model: scheduler.ModelKey(modelKey),
+			Endpoints: []*scheduler.Endpoint{
+				{
+					Provider:           scheduler.ProviderID(providerName),
+					Protocol:           scheduler.ProviderID(providerName),
+					KeyID:              "k1",
+					KeyValue:           "sk-test",
+					BaseURL:            "https://upstream.test",
+					Weight:             1,
+					Enabled:            true,
+					Models:             []scheduler.ModelKey{scheduler.ModelKey(modelKey), "*"},
+					ModelID:            1,
+					ContractProviderID: 1,
+					ModelName:          upstreamModel,
+					ProviderType:       providerType,
+					RouteID:            routeID,
+				},
+			},
+		},
+	})
+
+	gw, err := scheduler.NewGatewayScheduler(reg)
+	require.NoError(t, err)
+
+	gw.RegisterProviders(map[string]scheduler.ProviderClient{providerName: fake})
+	scheduler.SetRequestTransform(schedulerRequestTransform)
+	gw.Start(context.Background())
+	scheduler.SetGlobal(gw)
+}
+
+func TestHandleRelay_RouteEndpointRecordsRouteID(t *testing.T) {
+	cleanup := setupMockFns(t)
+	defer cleanup()
+
+	var gotRouteID uint64
+	recordUsageAsyncFn = func(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, routeID uint64, in uint64, out uint64, cached uint64) {
+		gotRouteID = routeID
+		assert.Equal(t, uint64(7), routeID)
+	}
+
+	fake := &fakeAdaptor{
+		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`,
+	}
+	installSchedulerWithRoute(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, 7, fake)
+
+	w := httptest.NewRecorder()
+	body := `{"model":"openai/gpt-4","messages":[{"role":"user","content":"hello"}]}`
+	req := requestWithToken(makeTestToken(true), body)
+	req.URL.Path = "/v1/chat/completions"
+	req = req.WithContext(context.WithValue(req.Context(), ctxBody, []byte(body)))
+	req = req.WithContext(context.WithValue(req.Context(), ctxModelName, "openai/gpt-4"))
+	HandleRelay(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, uint64(7), gotRouteID)
 }
 
 var _ = time.Now

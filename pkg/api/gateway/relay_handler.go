@@ -251,7 +251,7 @@ func recordRelayUsage(token *types.GatewayTokenInfo, ep *scheduler.Endpoint, usa
 		ID:   ep.ModelID,
 		Data: cgateway.ModelInfo{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
 	}
-	recordUsageAsyncFn(token.Addr, token.ID, model,
+	recordUsageAsyncFn(token.Addr, token.ID, model, ep.RouteID,
 		uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
 }
 

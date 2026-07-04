@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/hex"
 	"fmt"
+	"slices"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
@@ -111,6 +112,135 @@ func (g GatewayMutation) SettleUsage(records []Settlement) error {
 		p.fail += uint64(r.FailCount)
 		provRep[r.ProviderID] = p
 	}
+
+	return nil
+}
+
+func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) error {
+	caller := g.api.GetCaller()
+	if caller.T != 0 {
+		fmt.Println("SettleUsage must call by node")
+		return fmt.Errorf("Recharge: caller is not node")
+	}
+
+	for _, r := range records {
+		// 防重放检查：每条记录必须有唯一 Nonce，已使用的 Nonce 永久拒绝
+		nonceHex := hex.EncodeToString(r.Nonce)
+		if nonceHex == "" {
+			return fmt.Errorf("settle: empty nonce")
+		}
+		exists, _ := g.settledNonces.Get(g.api.GetTxn(), nonceHex)
+		if exists != nil && *exists {
+			return nil
+		}
+
+		// 校验 provider 归属（非 system 调用时必须验证）
+		prov, err := g.providers.Get(g.api.GetTxn(), r.ProviderID)
+		if err != nil || prov == nil {
+			return fmt.Errorf("settle: %w", ErrProviderNotFound)
+		}
+
+		// 校验模型存在
+		m, err := g.models.Get(g.api.GetTxn(), r.ModelID)
+		if err != nil || m == nil {
+			return fmt.Errorf("settle: %w", ErrModelNotFound)
+		}
+
+		// 确定定价来源：路由 or 模型
+		var inPrice, cachedPrice, outPrice uint64
+		isRoute := r.RouteID.IsSome()
+		if isRoute {
+			routeID, err := r.RouteID.UnWrap()
+			if err != nil {
+				return fmt.Errorf("settle: %w", err)
+			}
+			route, err := g.routes.Get(g.api.GetTxn(), routeID)
+			if err != nil || route == nil {
+				return fmt.Errorf("settle: %w", ErrRouteNotFound)
+			}
+			if !route.IsActive {
+				return fmt.Errorf("settle: route %d is inactive", routeID)
+			}
+			if !slices.Contains(route.ModelIds, r.ModelID) {
+				return fmt.Errorf("settle: model %d not in route %d", r.ModelID, routeID)
+			}
+			inPrice, cachedPrice, outPrice = route.InPrice, route.CachedPrice, route.OutPrice
+		} else {
+			inPrice, cachedPrice, outPrice = m.InPrice, m.CachedPrice, m.OutPrice
+		}
+
+		// 计算费用（向上取整，每次调用至少 1 point）
+		uncached := r.TokenIn - r.CachedToken
+		cost := (uncached*inPrice + r.CachedToken*cachedPrice + r.TokenOut*outPrice) / 1_000_000
+		if cost == 0 {
+			cost = 1
+		}
+
+		// 扣用户余额
+		c, err := g.credit_useds.Get(g.api.GetTxn(), r.User)
+		if err != nil {
+			return fmt.Errorf("settle: qeury error %w", err)
+		}
+		if c == nil {
+			c = new(uint64)
+		}
+		*c += cost
+		g.credit_useds.Set(g.api.GetTxn(), r.User, *c)
+
+		// 加 provider 余额
+		pb, err := g.providerCredits.Get(g.api.GetTxn(), r.ProviderID)
+		if err != nil {
+			return fmt.Errorf("settle: qeury error %w", err)
+		}
+		if pb == nil {
+			pb = new(uint64)
+		}
+		*pb += cost
+		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
+
+		// 记录结算历史（Provider 维度）
+		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, ProviderSettlementRecord{
+			User:        r.User,
+			ModelID:     r.ModelID,
+			TokenIn:     r.TokenIn,
+			TokenOut:    r.TokenOut,
+			CachedToken: r.CachedToken,
+			Cost:        cost,
+			Count:       r.Count,
+			Time:        g.api.GetBlockTime(),
+		})
+		_, _ = g.userSettlementHistory.Insert(g.api.GetTxn(), r.User, UserSettlementRecord{
+			ProviderID:  r.ProviderID,
+			ModelID:     r.ModelID,
+			TokenIn:     r.TokenIn,
+			TokenOut:    r.TokenOut,
+			CachedToken: r.CachedToken,
+			Cost:        cost,
+			Count:       r.Count,
+			Time:        g.api.GetBlockTime(),
+		})
+
+		// 标记 nonce 已使用（防重放永久拒绝）
+		if err := g.settledNonces.Set(g.api.GetTxn(), nonceHex, true); err != nil {
+			return fmt.Errorf("settle: store nonce failed: %w", err)
+		}
+	}
+
+	// 聚合本轮各 Provider 的成功/失败次数，更新链上信誉（仅非路由记录）
+	type rep struct {
+		success, fail uint64
+	}
+	provRep := make(map[uint64]rep)
+	for _, r := range records {
+		if r.RouteID.IsSome() {
+			continue
+		}
+		p := provRep[r.ProviderID]
+		p.success += uint64(r.Count)
+		p.fail += uint64(r.FailCount)
+		provRep[r.ProviderID] = p
+	}
+
 	for pid, rp := range provRep {
 		total := rp.success + rp.fail
 		if total == 0 {

@@ -5,7 +5,6 @@ package gateway
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
@@ -976,6 +975,112 @@ func (v *Settlement) Decode(data []byte) (int, error) {
 		return 0, fmt.Errorf("EOF reading ProviderID")
 	}
 	v.ProviderID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TokenIn")
+	}
+	v.TokenIn = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TokenOut")
+	}
+	v.TokenOut = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CachedToken")
+	}
+	v.CachedToken = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+2 > len(data) {
+		return 0, fmt.Errorf("EOF reading Count")
+	}
+	v.Count = binary.LittleEndian.Uint16(data[off:])
+	off += 2
+	if off+2 > len(data) {
+		return 0, fmt.Errorf("EOF reading FailCount")
+	}
+	v.FailCount = binary.LittleEndian.Uint16(data[off:])
+	off += 2
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Nonce")
+		}
+		v.Nonce = make([]byte, n)
+		copy(v.Nonce, data[off:off+int(n)])
+		off += int(n)
+	}
+	return off, nil
+}
+
+// Encode SCALE 编码 SettlementWithRoute。
+func (v *SettlementWithRoute) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
+	buf = append(buf, v.User.V...)
+	if v.RouteID.IsSome() {
+		buf = append(buf, 1)
+		buf = binary.LittleEndian.AppendUint64(buf, uint64(v.RouteID.V))
+	} else {
+		buf = append(buf, 0)
+	}
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.FailCount))
+	buf = store.EncodeCompact(buf, uint64(len(v.Nonce)))
+	buf = append(buf, v.Nonce...)
+	return buf, nil
+}
+
+// Decode SCALE 解码 SettlementWithRoute。
+func (v *SettlementWithRoute) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading User.T")
+	}
+	v.User.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading User.V")
+		}
+		v.User.V = make([]byte, n)
+		copy(v.User.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading RouteID")
+	}
+	if data[off] == 0 {
+		off++
+		v.RouteID = store.NewNone[uint64]()
+	} else {
+		off++
+		var inner uint64
+		if off+8 > len(data) {
+			return 0, fmt.Errorf("EOF reading ")
+		}
+		inner = binary.LittleEndian.Uint64(data[off:])
+		off += 8
+		v.RouteID = store.NewSome(inner)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ProviderID")
+	}
+	v.ProviderID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ModelID")
+	}
+	v.ModelID = binary.LittleEndian.Uint64(data[off:])
 	off += 8
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading TokenIn")

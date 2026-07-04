@@ -187,6 +187,41 @@ func TestGatewayEndpointIndex_ResolveRoute_NameWithPrefix(t *testing.T) {
 	require.Len(t, r.Endpoints, 1)
 }
 
+func TestGatewayEndpointIndex_RouteEndpointHasRouteID(t *testing.T) {
+	idx := NewGatewayEndpointIndex()
+	models := []cgateway.ModelInfoWithProvider{
+		{
+			ID: 10,
+			Model: cgateway.ModelInfo{
+				Name:           "route-member",
+				ProviderID:     1,
+				ProviderType:   cgateway.ProviderOpenAI,
+				APIKeys:        []string{"k1"},
+				IsActive:       true,
+				MaxConcurrency: 3,
+			},
+			Provider: cgateway.ProviderInfo{Name: "p1", IsActive: true},
+		},
+	}
+	routes := []cgateway.ModelRouteWithID{
+		{
+			ID: 42,
+			Data: cgateway.ModelRoute{
+				Name:      "myroute",
+				RouteType: cgateway.MiningPoolRoute,
+				IsActive:  true,
+				ModelIds:  []uint64{10},
+			},
+		},
+	}
+	require.NoError(t, idx.BuildFromData(models, routes))
+
+	r, err := idx.Resolve(context.Background(), scheduler.ModelKey("MiningPool/myroute"), "")
+	require.NoError(t, err)
+	require.Len(t, r.Endpoints, 1)
+	require.Equal(t, uint64(42), r.Endpoints[0].RouteID)
+}
+
 func TestGatewayEndpointIndex_InactiveSkipped(t *testing.T) {
 	idx := NewGatewayEndpointIndex()
 	models := []cgateway.ModelInfoWithProvider{

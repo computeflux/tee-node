@@ -66,6 +66,9 @@ type Endpoint struct {
 	ModelName          string `json:"model_name,omitempty"`           // 上游真实 model name
 	ProviderType       uint16 `json:"provider_type,omitempty"`        // 合约 ProviderType(选 client / 转换用)
 
+	// Route identity for route-based settlement.
+	RouteID uint64 `json:"route_id,omitempty"`
+
 	// metrics 是端点的实时指标(由 Scheduler 初始化时注入)。
 	// 不导出 JSON,因为它是运行时状态。
 	metrics *EndpointMetrics

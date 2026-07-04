@@ -20,6 +20,7 @@ type usageRecord struct {
 	user        chaintypes.UniAddr
 	tokenID     uint64
 	model       *cgateway.ModelInfoWithID
+	routeID     uint64
 	tokenIn     uint64
 	tokenOut    uint64
 	cachedToken uint64
@@ -63,7 +64,7 @@ func initUsageWriter() {
 			for {
 				select {
 				case r := <-usageCh:
-					key := uintToStr(r.tokenID) + "_" + uintToStr(r.model.ID)
+					key := uintToStr(r.tokenID) + "_" + uintToStr(r.routeID) + "_" + uintToStr(r.model.ID)
 					if u, ok := batch[key]; ok {
 						u.Count++
 						u.TokenIn += r.tokenIn
@@ -74,6 +75,7 @@ func initUsageWriter() {
 							User:        r.user,
 							ModelID:     r.model.ID,
 							ProviderID:  r.model.Data.ProviderID,
+							RouteID:     r.routeID,
 							Count:       1,
 							TokenIn:     r.tokenIn,
 							TokenOut:    r.tokenOut,
@@ -91,10 +93,10 @@ func initUsageWriter() {
 // recordUsageAsyncFn 可被测试替换为 mock。
 var recordUsageAsyncFn = recordUsageAsync
 
-func recordUsageAsync(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, in uint64, out uint64, cachedTokens uint64) {
+func recordUsageAsync(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, routeID uint64, in uint64, out uint64, cachedTokens uint64) {
 	initUsageWriter()
 	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
-	usageCh <- usageRecord{user, tokenID, model, in, out, cachedTokens}
+	usageCh <- usageRecord{user, tokenID, model, routeID, in, out, cachedTokens}
 }
 
 func uintToStr(n uint64) string {
@@ -179,16 +181,14 @@ func settlePendingUsage() error {
 	GATEWAYLOG().Printf("[SETTLE] tick enter at %s", time.Now().Format("15:04:05"))
 
 	bridge := getBridge()
-
-	// 如果池中还有未消费的 settle_usage，说明上一批还在排队等待上链。
+	// 如果池中还有未消费的 settle_usage_with_route，说明上一批还在排队等待上链。
 	// 跳过本次 tick，让 usage 继续累积，等待上一批被 ApplyToChain 消费。
-	// 这样确保同一时间只有一个 settle_usage 批次在流转。
-	if bridge != nil && bridge.HasPendingContract("settle_usage") {
-		GATEWAYLOG().Printf("[SETTLE] SKIP: pool has pending settle_usage")
+	if bridge != nil && bridge.HasPendingContract("settle_usage_with_route") {
+		GATEWAYLOG().Printf("[SETTLE] SKIP: pool has pending settle_usage_with_route")
 		return nil
 	}
 
-	GATEWAYLOG().Printf("[SETTLE] SUBMIT: pool empty, collecting usage records")
+	GATEWAYLOG().Printf("[SETTLE] SUBMIT: collecting usage records")
 
 	// 1. 扫描本地 usage: 前缀的所有记录
 	//    加锁防止 flush 在读和删之间写入，导致新写入的数据被误删。
@@ -203,9 +203,9 @@ func settlePendingUsage() error {
 		return nil
 	}
 
-	// 2. 统一构造 Settlement 大数组，每条记录带唯一随机 Nonce（防重放）
-	settlements := make([]cgateway.Settlement, 0, len(records))
-	for _, r := range records {
+	// 2. 统一构造 SettlementWithRoute 大数组；RouteID 为 0 表示 None，否则 Some(routeID)。
+	routeSettlements := make([]cgateway.SettlementWithRoute, 0, len(records))
+	for i, r := range records {
 		if r == nil {
 			continue
 		}
@@ -216,18 +216,28 @@ func settlePendingUsage() error {
 			return fmt.Errorf("generate nonce: %w", err)
 		}
 
-		settlements = append(settlements, cgateway.Settlement{
+		var routeID cstore.Option[uint64]
+		if r.RouteID == 0 {
+			routeID = cstore.NewNone[uint64]()
+		} else {
+			routeID = cstore.NewSome(r.RouteID)
+		}
+
+		routeSettlements = append(routeSettlements, cgateway.SettlementWithRoute{
 			User:        r.User,
-			ModelID:     r.ModelID,
+			RouteID:     routeID,
 			ProviderID:  r.ProviderID,
+			ModelID:     r.ModelID,
 			TokenIn:     r.TokenIn,
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Count:       r.Count,
+			FailCount:   0,
 			Nonce:       nonce,
 		})
+		_ = keys[i]
 	}
-	if len(settlements) == 0 {
+	if len(routeSettlements) == 0 {
 		usageMu.Unlock()
 		return nil
 	}
@@ -235,16 +245,14 @@ func settlePendingUsage() error {
 	// 3. 一次性提交所有结算记录。
 	//    保持加锁：submit 只是把调用写入本地交易池（非阻塞上链），耗时很短；
 	//    若在此处释放锁，flush 可能在读和删之间写入同 key 的新数据，导致数据丢失。
-	if err := submitSettleUsage(settlements); err != nil {
+	if err := submitSettleUsageWithRoute(routeSettlements); err != nil {
 		usageMu.Unlock()
-		GATEWAYLOG().Printf("[SETTLE] batch submit %d records failed: %v", len(settlements), err)
-		return fmt.Errorf("submit settlements: %w", err)
+		GATEWAYLOG().Printf("[SETTLE] batch submit %d records failed: %v", len(routeSettlements), err)
+		return fmt.Errorf("submit route settlements: %w", err)
 	}
-	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(settlements), len(records))
+	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(routeSettlements), len(records))
 
 	// 4. 删除已提交的 usage 记录。
-	//    此时 pool 中已有 settle_usage（刚提交），下次 tick 会因 HasPendingContract 跳过，
-	//    等到 ApplyToChain 消费 pool 后，下次成功 tick 才会提交新一轮 usage。
 	deleted := 0
 	for _, k := range keys {
 		if err := types.SECRET_DB.DeleteByteKey(k); err != nil {
@@ -260,8 +268,8 @@ func settlePendingUsage() error {
 	return nil
 }
 
-// submitSettleUsage 提交 SettleUsage 合约调用（通过 TxManager 统一提交，自动重试）。
-func submitSettleUsage(records []cgateway.Settlement) error {
+// submitSettleUsageWithRoute 提交 SettleUsageWithRoute 合约调用。
+func submitSettleUsageWithRoute(records []cgateway.SettlementWithRoute) error {
 	bridge := getBridge()
 	if bridge == nil {
 		return fmt.Errorf("contract bridge not ready")
@@ -270,25 +278,21 @@ func submitSettleUsage(records []cgateway.Settlement) error {
 		return nil
 	}
 
-	// 检查交易池中是否已有待处理的 settle_usage，
-	// 若有则跳过本次提交，避免重复写入池中。
-	if bridge.HasPendingContract("settle_usage") {
-		GATEWAYLOG().Printf("[SETTLE] tx pool already has pending settle_usage, skip this round")
-		return fmt.Errorf("settle_usage already pending in tx pool, skip")
+	if bridge.HasPendingContract("settle_usage_with_route") {
+		GATEWAYLOG().Printf("[SETTLE] tx pool already has pending settle_usage_with_route, skip this round")
+		return fmt.Errorf("settle_usage_with_route already pending in tx pool, skip")
 	}
 
-	// SCALE 编码 Settlement 数组
 	argBytes, err := cstore.ScaleEncode(records)
 	if err != nil {
-		return fmt.Errorf("encode settlements: %w", err)
+		return fmt.Errorf("encode route settlements: %w", err)
 	}
 
-	method := cstore.MethodToSelector("SettleUsage")
+	method := cstore.MethodToSelector("SettleUsageWithRoute")
 
-	// 使用固定 dedupKey，确保交易池中最多只有一个 settle_usage 调用。
-	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage")
+	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage_with_route")
 	if err == nil {
-		GATEWAYLOG().Printf("[SETTLE] submitSettleUsage OK, %d records pushed to tx pool", len(records))
+		GATEWAYLOG().Printf("[SETTLE] submitSettleUsageWithRoute OK, %d records pushed to tx pool", len(records))
 	}
 	return err
 }

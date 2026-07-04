@@ -185,6 +185,22 @@ type Settlement struct {
 	Nonce       []byte        `json:"nonce"`     // 16 bytes 随机 nonce，防重放
 }
 
+// Settlement 单笔结算记录。
+// RouteID 为 Some 时按路由价格结算且不更新 Provider 信誉；为 None 时按模型价格结算。
+// scale-codec-gen:generate
+type SettlementWithRoute struct {
+	User        store.UniAddr        `json:"user"`
+	RouteID     store.Option[uint64] `json:"routeId"`
+	ProviderID  uint64               `json:"providerId"`
+	ModelID     uint64               `json:"modelId"`
+	TokenIn     uint64               `json:"TokenIn"`
+	TokenOut    uint64               `json:"tokensOut"`
+	CachedToken uint64               `json:"cachedToken"`
+	Count       uint16               `json:"count"`     // 成功调用次数
+	FailCount   uint16               `json:"failCount"` // 失败调用次数
+	Nonce       []byte               `json:"nonce"`     // 16 bytes 随机 nonce，防重放
+}
+
 // ── DailyUsage ───────────────────────────────────────────
 
 // DailyUsage 每日用量（已废弃，不再写入，保留类型用于兼容查询）

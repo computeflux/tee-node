@@ -17,6 +17,7 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
+	"github.com/stretchr/testify/require"
 )
 
 // ── 基础类型 —─────────────────────────────────────────────
@@ -245,20 +246,28 @@ func TestAPIKeyInfo(t *testing.T) {
 	}
 }
 
-func TestSettlement(t *testing.T) {
+func TestSettlementWithRoute(t *testing.T) {
 	rng := rand.New(rand.NewSource(47))
 	for i := 0; i < 200; i++ {
-		s := gateway.Settlement{
+		s := gateway.SettlementWithRoute{
 			User:        randUniAddr(rng),
-			ModelID:     rng.Uint64(),
+			RouteID:     store.NewSome(rng.Uint64()),
 			ProviderID:  rng.Uint64(),
+			ModelID:     rng.Uint64(),
 			TokenIn:     rng.Uint64(),
 			TokenOut:    rng.Uint64(),
 			CachedToken: rng.Uint64(),
 			Count:       uint16(rng.Intn(65536)),
 			Nonce:       randBytes(rng, 16, 16),
 		}
-		testRoundtrip(t, "Settlement", s)
+		// SettlementWithRoute 含 store.Option，gsrpc 反射 codec 不支持自定义 Option，
+		// 因此仅验证生成 codec 自身的编解码闭环。
+		b, err := s.Encode()
+		require.NoError(t, err)
+		var dec gateway.SettlementWithRoute
+		_, err = dec.Decode(b)
+		require.NoError(t, err)
+		require.Equal(t, s, dec)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -40,7 +39,7 @@ func DefaultConfig() Config {
 		EMADecay:             0.3,
 		BreakerConfig:        DefaultBreakerConfig(),
 		BreakerTickInterval:  5 * time.Second,
-		Log:                  NewStdLogger(log.Default()),
+		Log:                  noopLogger{},
 		SoftConcurrencyRatio: 1.0,
 		ModelRouteCacheTTL:   5 * time.Second,
 	}

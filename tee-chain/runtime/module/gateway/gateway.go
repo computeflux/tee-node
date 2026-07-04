@@ -22,6 +22,7 @@ var (
 	ErrLowCredit        = errors.New("low Credit")
 	ErrModelNotFound    = errors.New("model not found")
 	ErrProviderNotFound = errors.New("provider not found")
+	ErrRouteNotFound    = errors.New("route not found")
 	ErrAPIKeyNotFound   = errors.New("api key not found")
 	ErrNotOwner         = errors.New("not owner")
 	ErrDuplicateNonce   = errors.New("duplicate settlement nonce")

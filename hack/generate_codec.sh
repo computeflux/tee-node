@@ -14,22 +14,22 @@ GEN="go run ./tools/scale-codec-gen"
 
 # 需要生成 codec 的目录列表
 DIRS=(
-    "./tee-chain/contracts/store"
-    "./tee-chain/contracts/module/gov"
-    "./tee-chain/contracts/module/auth"
-    "./tee-chain/contracts/module/gateway"
-    "./tee-chain/contracts/module/batch"
+    "./tee-chain/runtime/store"
+    "./tee-chain/runtime/module/gov"
+    "./tee-chain/runtime/module/auth"
+    "./tee-chain/runtime/module/gateway"
+    "./tee-chain/runtime/module/batch"
     "./pkg/chaintypes"
 )
 
 if [ $# -gt 0 ]; then
     # 指定目录
     case "$1" in
-        store)   DIRS=("./tee-chain/contracts/store") ;;
-        gov)     DIRS=("./tee-chain/contracts/module/gov") ;;
-        auth)    DIRS=("./tee-chain/contracts/module/auth") ;;
-        gateway) DIRS=("./tee-chain/contracts/module/gateway") ;;
-        batch)   DIRS=("./tee-chain/contracts/module/batch") ;;
+        store)   DIRS=("./tee-chain/runtime/store") ;;
+        gov)     DIRS=("./tee-chain/runtime/module/gov") ;;
+        auth)    DIRS=("./tee-chain/runtime/module/auth") ;;
+        gateway) DIRS=("./tee-chain/runtime/module/gateway") ;;
+        batch)   DIRS=("./tee-chain/runtime/module/batch") ;;
         all)     ;; # 使用默认全部
         *)       echo "unknown: $1 (use: store gov auth gateway batch all)"; exit 1 ;;
     esac
@@ -44,10 +44,10 @@ done
 
 echo ">>> Fixing self-import in store/codec_gen.go ..."
 # store 包的 codec_gen.go 会错误地 import 自身，需要清理
-STORE_GEN="tee-chain/contracts/store/codec_gen.go"
+STORE_GEN="tee-chain/runtime/store/codec_gen.go"
 if [ -f "$STORE_GEN" ]; then
     # 删除 self-import 行
-    sed -i '/"github.com\/computeflux\/tee-provider\/tee-chain\/contracts\/store"/d' "$STORE_GEN"
+    sed -i '/"github.com\/computeflux\/tee-provider\/tee-chain\/runtime\/store"/d' "$STORE_GEN"
     # 删除 store. 前缀
     sed -i 's/store\.EncodeCompact/EncodeCompact/g; s/store\.DecodeCompact/DecodeCompact/g' "$STORE_GEN"
     echo "  fixed $STORE_GEN"

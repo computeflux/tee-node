@@ -331,6 +331,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("settle_usage: records: %w", err)
 		}
 		return m.SettleUsage(records)
+	case [4]byte{0x68, 0xa0, 0x49, 0xfc}:
+		if err := store.RequireArgLen(args, 1, "settle_usage_with_route"); err != nil {
+			return err
+		}
+		records, err := store.DecodeScaleArgBytes[[]SettlementWithRoute](args[0])
+		if err != nil {
+			return fmt.Errorf("settle_usage_with_route: records: %w", err)
+		}
+		return m.SettleUsageWithRoute(records)
 	case [4]byte{0x36, 0x6e, 0x82, 0x1a}:
 		if err := store.RequireArgLen(args, 2, "update_a_p_i_key"); err != nil {
 			return err

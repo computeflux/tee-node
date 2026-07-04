@@ -37,6 +37,7 @@ type GatewayDailyUsage struct {
 	User        store.UniAddr `json:"user"`
 	ProviderID  uint64        `json:"providerId"`
 	ModelID     uint64        `json:"modelId"`
+	RouteID     uint64        `json:"routeId"`
 	Count       uint16        `json:"count"`
 	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`

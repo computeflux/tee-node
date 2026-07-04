@@ -158,6 +158,11 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 			continue
 		}
 
+		// 跳过没有服务的模型
+		if m.ProviderType < 9999 && len(m.APIKeys) == 0 {
+			continue
+		}
+
 		p := item.Provider
 		modelIDs := make([]int, len(p.ModelIds))
 		for i, v := range p.ModelIds {
@@ -204,14 +209,15 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 		d := route.Data
 		// 跳过空路由模板（未关联任何模型）：这些是供模型加入的容器，
 		// 本身不可调用，在 models 列表里只会显示为空条目，干扰前端。
-		// if len(d.ModelIds) == 0 {
-		// 	continue
-		// }
+		if len(d.ModelIds) == 0 {
+			continue
+		}
 
 		// 路由在索引层不支持价格范围，这里按 inPrice 在内存中补一道价格过滤。
 		if minPrice != nil && d.InPrice < uint64(*minPrice) {
 			continue
 		}
+
 		if maxPrice != nil && d.InPrice > uint64(*maxPrice) {
 			continue
 		}
