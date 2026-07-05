@@ -161,7 +161,6 @@ type ComplexityRoot struct {
 		ClaimEarlyAccessTask func(childComplexity int, wallet string, task model.EarlyAccessTaskType) int
 		CompleteRecovery     func(childComplexity int, recoveryToken string, passwordHash string) int
 		ContractCall         func(childComplexity int, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) int
-		Faucet               func(childComplexity int, caller string, callerType int) int
 		InitDiskKey          func(childComplexity int, index string, user string) int
 		JoinDiscord          func(childComplexity int, wallet string, message string, signature string) int
 		JoinEarlyAccess      func(childComplexity int, wallet string, email *string, referralCode *string) int
@@ -336,7 +335,6 @@ type MutationResolver interface {
 	SetAuthConfig(ctx context.Context, cfg model.AuthConfigInput) (bool, error)
 	StartEpoch(ctx context.Context) (bool, error)
 	SystemContractInit(ctx context.Context, contract string) (bool, error)
-	Faucet(ctx context.Context, caller string, callerType int) (bool, error)
 	ContractCall(ctx context.Context, caller string, callerType int, nonce int, contract string, method string, args []string, signature string) (string, error)
 	JoinEarlyAccess(ctx context.Context, wallet string, email *string, referralCode *string) (*model.JoinEarlyAccessResult, error)
 	UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*model.JoinEarlyAccessResult, error)
@@ -915,18 +913,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.ContractCall(childComplexity, args["caller"].(string), args["callerType"].(int), args["nonce"].(int), args["contract"].(string), args["method"].(string), args["args"].([]string), args["signature"].(string)), true
-
-	case "Mutation.faucet":
-		if e.complexity.Mutation.Faucet == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_faucet_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.Faucet(childComplexity, args["caller"].(string), args["callerType"].(int)), true
 
 	case "Mutation.init_disk_key":
 		if e.complexity.Mutation.InitDiskKey == nil {
@@ -2286,57 +2272,6 @@ func (ec *executionContext) field_Mutation_contractCall_argsSignature(
 	}
 
 	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_faucet_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_faucet_argsCaller(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["caller"] = arg0
-	arg1, err := ec.field_Mutation_faucet_argsCallerType(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["callerType"] = arg1
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_faucet_argsCaller(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (string, error) {
-	if _, ok := rawArgs["caller"]; !ok {
-		var zeroVal string
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("caller"))
-	if tmp, ok := rawArgs["caller"]; ok {
-		return ec.unmarshalNString2string(ctx, tmp)
-	}
-
-	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_faucet_argsCallerType(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (int, error) {
-	if _, ok := rawArgs["callerType"]; !ok {
-		var zeroVal int
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("callerType"))
-	if tmp, ok := rawArgs["callerType"]; ok {
-		return ec.unmarshalNInt2int(ctx, tmp)
-	}
-
-	var zeroVal int
 	return zeroVal, nil
 }
 
@@ -8905,61 +8840,6 @@ func (ec *executionContext) fieldContext_Mutation_systemContractInit(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_systemContractInit_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_faucet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_faucet(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Faucet(rctx, fc.Args["caller"].(string), fc.Args["callerType"].(int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_faucet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_faucet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -16957,13 +16837,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "systemContractInit":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_systemContractInit(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "faucet":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_faucet(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

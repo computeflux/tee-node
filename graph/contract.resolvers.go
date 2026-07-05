@@ -7,11 +7,8 @@ package graph
 import (
 	"context"
 	"encoding/hex"
-	"math/big"
 
 	"github.com/computeflux/tee-provider/pkg/types"
-	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
-	"github.com/computeflux/tee-provider/pkg/util"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/runtime"
 	ctypes "github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -39,43 +36,6 @@ func (r *mutationResolver) SystemContractInit(ctx context.Context, contract stri
 	err := teeChain.SubmitContract(contract, method, argBytes)
 	if err != nil {
 		return false, gqlerror.Errorf("SystemContractInit submit: %v", err)
-	}
-
-	return true, nil
-}
-
-// Faucet is the resolver for the faucet field.
-func (r *mutationResolver) Faucet(ctx context.Context, caller string, callerType int) (bool, error) {
-	if util.GetEnv("CHAIN_ENV", "local") == "main" {
-		return false, gqlerror.Errorf("Faucet is disabled on main environment")
-	}
-
-	if callerType == 0 {
-		return false, gqlerror.Errorf("ContractCall: only caller type >0 is supported")
-	}
-
-	callerBytes, err := DecodeCaller(caller)
-	if err != nil {
-		return false, gqlerror.Errorf("ContractCall DecodeCaller: %v", err)
-	}
-
-	var to chaintypes.UniAddr = chaintypes.UniAddr{
-		V: callerBytes,
-		T: uint32(callerType),
-	}
-	tobt, _ := ctypes.ScaleEncode(to)
-	var value ctypes.Amount = ctypes.NewU256(big.NewInt(100000000))
-	valuebt, _ := ctypes.ScaleEncode(value)
-
-	// 创建合同调用
-	argBytes := [][]byte{tobt, valuebt}
-	contract := "gov"
-	method := ctypes.MethodToSelectorBytes("Mint")
-
-	// 节点合约交易走 TxManager
-	err = teeChain.SubmitContract(contract, method, argBytes)
-	if err != nil {
-		return false, gqlerror.Errorf("Faucet submit: %v", err)
 	}
 
 	return true, nil

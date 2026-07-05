@@ -290,6 +290,8 @@ func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, model
 		return protocol.ConvertOpenAIRequestToAnthropic(bodyBytes, providerType)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
 		return protocol.ConvertOpenAIRequestToGemini(bodyBytes, providerType)
+	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolGemini:
+		return protocol.ConvertAnthropicRequestToGemini(bodyBytes, providerType)
 	}
 	return bodyBytes, nil
 }
@@ -310,6 +312,12 @@ func convertResponse(body []byte, inbound, provider protocol.Protocol, origBody 
 		return out, bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
 		out, usage, err := protocol.ConvertGeminiResponseToOpenAI(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
+	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolGemini:
+		out, usage, err := protocol.ConvertGeminiResponseToAnthropic(body)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -356,6 +364,12 @@ func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol
 		return bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolGemini:
 		usage, err := protocol.StreamGeminiResponseToOpenAI(r, w)
+		if err != nil {
+			return nil, err
+		}
+		return bifrostUsageToRelay(usage), nil
+	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolGemini:
+		usage, err := protocol.StreamGeminiResponseToAnthropic(r, w)
 		if err != nil {
 			return nil, err
 		}

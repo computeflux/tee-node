@@ -32,6 +32,8 @@ func TestResolveUpstreamPath(t *testing.T) {
 		{"matching anthropic", ProtocolAnthropic, ProtocolAnthropic, "/v1/messages", "/v1/messages", false},
 		{"anthropic to openai", ProtocolAnthropic, ProtocolOpenAI, "/v1/messages", "/v1/chat/completions", false},
 		{"openai to anthropic", ProtocolOpenAI, ProtocolAnthropic, "/v1/chat/completions", "/v1/messages", false},
+		{"openai to gemini", ProtocolOpenAI, ProtocolGemini, "/v1/chat/completions", "/v1/chat/completions", false},
+		{"anthropic to gemini", ProtocolAnthropic, ProtocolGemini, "/v1/messages", "/v1/chat/completions", false},
 		{"unsupported anthropic endpoint", ProtocolAnthropic, ProtocolOpenAI, "/v1/complete", "", true},
 		{"unsupported openai endpoint", ProtocolOpenAI, ProtocolAnthropic, "/v1/embeddings", "", true},
 	}

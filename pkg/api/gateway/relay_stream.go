@@ -169,3 +169,10 @@ func (fw flushWriter) Write(p []byte) (int, error) {
 	}
 	return n, err
 }
+
+// Flush 实现 http.Flusher，使跨协议流式转换器可以对 flushWriter 进行类型断言。
+func (fw flushWriter) Flush() {
+	if fw.fl != nil {
+		fw.fl.Flush()
+	}
+}

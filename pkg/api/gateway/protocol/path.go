@@ -38,5 +38,11 @@ func ResolveUpstreamPath(inboundProto, providerProto Protocol, requestPath strin
 		}
 		return requestPath, nil
 	}
+	if inboundProto == ProtocolAnthropic && providerProto == ProtocolGemini {
+		if requestPath != "/v1/messages" {
+			return "", errUnsupportedConversion
+		}
+		return "/v1/chat/completions", nil
+	}
 	return "", errUnsupportedConversion
 }

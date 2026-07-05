@@ -1120,6 +1120,66 @@ func (v *SettlementWithRoute) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
+// Encode SCALE 编码 TransferRecord。
+func (v *TransferRecord) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, v.From.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.From.V)))
+	buf = append(buf, v.From.V...)
+	buf = binary.LittleEndian.AppendUint32(buf, v.To.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.To.V)))
+	buf = append(buf, v.To.V...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Amount))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	return buf, nil
+}
+
+// Decode SCALE 解码 TransferRecord。
+func (v *TransferRecord) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading From.T")
+	}
+	v.From.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading From.V")
+		}
+		v.From.V = make([]byte, n)
+		copy(v.From.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading To.T")
+	}
+	v.To.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading To.V")
+		}
+		v.To.V = make([]byte, n)
+		copy(v.To.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Amount")
+	}
+	v.Amount = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Time")
+	}
+	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	return off, nil
+}
+
 // Encode SCALE 编码 UserSettlementRecord。
 func (v *UserSettlementRecord) Encode() ([]byte, error) {
 	var buf []byte

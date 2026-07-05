@@ -312,6 +312,73 @@ func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
 	assert.Equal(t, credit1+3000, credit3)
 }
 
+func TestGateway_TransferCredit_Success(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	from := store.UniAddr{T: 1, V: []byte{0xAB}}
+	to := store.UniAddr{T: 1, V: []byte{0xCD}}
+
+	rt.System = true
+	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	rt.System = false
+
+	// Transfer from caller
+	rt.Caller = from
+	require.NoError(t, m.TransferCredit(to, 600))
+
+	fromCredit, err := q.GetCredit(from)
+	require.NoError(t, err)
+	assert.Equal(t, int64(400), fromCredit)
+
+	toCredit, err := q.GetCredit(to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(600), toCredit)
+
+	history, err := q.GetTransferHistory(from, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, history, 1)
+	assert.Equal(t, from, history[0].From)
+	assert.Equal(t, to, history[0].To)
+	assert.Equal(t, uint64(600), history[0].Amount)
+}
+
+func TestGateway_TransferCredit_Insufficient(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	from := store.UniAddr{T: 1, V: []byte{0xAB}}
+	to := store.UniAddr{T: 1, V: []byte{0xCD}}
+
+	rt.System = true
+	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	rt.System = false
+
+	rt.Caller = from
+	err := m.TransferCredit(to, 2000)
+	assert.ErrorIs(t, err, ErrLowCredit)
+}
+
+func TestGateway_TransferCredit_ZeroAmount(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	from := store.UniAddr{T: 1, V: []byte{0xAB}}
+	to := store.UniAddr{T: 1, V: []byte{0xCD}}
+
+	rt.System = true
+	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	rt.System = false
+
+	rt.Caller = from
+	require.NoError(t, m.TransferCredit(to, 0))
+
+	fromCredit, _ := q.GetCredit(from)
+	assert.Equal(t, int64(1000), fromCredit)
+}
+
 func TestGateway_SettleUsage_Success(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}

@@ -344,6 +344,19 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("settle_usage_with_route: records: %w", err)
 		}
 		return m.SettleUsageWithRoute(records)
+	case [4]byte{0x46, 0x10, 0x7d, 0x97}:
+		if err := store.RequireArgLen(args, 2, "transfer_credit"); err != nil {
+			return err
+		}
+		to, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
+		if err != nil {
+			return fmt.Errorf("transfer_credit: to: %w", err)
+		}
+		amount, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return fmt.Errorf("transfer_credit: amount: %w", err)
+		}
+		return m.TransferCredit(to, amount)
 	case [4]byte{0x36, 0x6e, 0x82, 0x1a}:
 		if err := store.RequireArgLen(args, 2, "update_a_p_i_key"); err != nil {
 			return err
@@ -776,6 +789,27 @@ func (q GatewayQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0xab, 0xd1, 0x62, 0x82}:
+		if err := store.RequireArgLen(args, 3, "get_transfer_history"); err != nil {
+			return nil, err
+		}
+		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
+		if err != nil {
+			return nil, fmt.Errorf("get_transfer_history: user: %w", err)
+		}
+		offset, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return nil, fmt.Errorf("get_transfer_history: offset: %w", err)
+		}
+		limit, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return nil, fmt.Errorf("get_transfer_history: limit: %w", err)
+		}
+		out, err := q.GetTransferHistory(user, offset, limit)
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0x56, 0xb9, 0x06, 0xc0}:
 		if err := store.RequireArgLen(args, 3, "get_user_settlement_history"); err != nil {
 			return nil, err
@@ -1049,6 +1083,7 @@ func NewGateway(api store.ContractApi) *Gateway {
 		modelAudits:           store.NewIndexedList[uint64, ModelAudit]("gateway", "model_audits_next_id", "model_audits_"),
 		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
 		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "recharge_history_k1_to_id_", "recharge_history_k1_length_", "recharge_history_k2_next_", "recharge_history_store_"),
+		transferHistory:       store.NewStoreList2D[store.UniAddr, uint32, TransferRecord]("gateway", "transfer_history_k1_to_id_", "transfer_history_k1_length_", "transfer_history_k2_next_", "transfer_history_store_"),
 		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "settlement_history_k1_to_id_", "settlement_history_k1_length_", "settlement_history_k2_next_", "settlement_history_store_"),
 		userSettlementHistory: store.NewStoreList2D[store.UniAddr, uint32, UserSettlementRecord]("gateway", "user_settlement_history_k1_to_id_", "user_settlement_history_k1_length_", "user_settlement_history_k2_next_", "user_settlement_history_store_"),
 		rechargeNonces:        &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "recharge_nonces_"},
@@ -1077,6 +1112,7 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x4c, 0x86, 0x9f, 0xc8}: "get_route",
 	[4]byte{0x8f, 0x22, 0xff, 0x1f}: "get_route_by_name",
 	[4]byte{0x74, 0xd5, 0x99, 0xfb}: "get_settlement_history",
+	[4]byte{0xab, 0xd1, 0x62, 0x82}: "get_transfer_history",
 	[4]byte{0x56, 0xb9, 0x06, 0xc0}: "get_user_settlement_history",
 	[4]byte{0xda, 0xa1, 0xc2, 0xd5}: "list_active_models",
 	[4]byte{0xc3, 0xef, 0x49, 0x0c}: "list_active_models_within_provider",

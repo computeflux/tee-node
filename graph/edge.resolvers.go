@@ -58,7 +58,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 	result := make([]*model.ModelInfo, 0, len(models))
 	for _, mid := range models {
 		m := mid.Data
-		if m.ProviderType == 9999 {
+		if m.ProviderType == 9999 && m.IsActive {
 			result = append(result, &model.ModelInfo{
 				Name:            m.Name,
 				ProviderID:      int(m.ProviderID),

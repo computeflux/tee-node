@@ -22,7 +22,10 @@ func (a *GeminiAdaptor) requestURL(baseURL, model string, stream bool) string {
 		action = "streamGenerateContent?alt=sse"
 	}
 	base := strings.TrimRight(baseURL, "/")
-	return fmt.Sprintf("%s/v1beta/models/%s:%s", base, model, action)
+	const versionPrefix = "/v1beta"
+	base = strings.TrimSuffix(base, versionPrefix)
+	model = strings.TrimPrefix(model, "models/")
+	return fmt.Sprintf("%s%s/models/%s:%s", base, versionPrefix, model, action)
 }
 
 func (a *GeminiAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byte) ([]byte, error) {

@@ -226,6 +226,15 @@ type RechargeRecord struct {
 	Time   int64         `json:"time"`
 }
 
+// TransferRecord 单笔转账记录
+// scale-codec-gen:generate
+type TransferRecord struct {
+	From   store.UniAddr `json:"from"`
+	To     store.UniAddr `json:"to"`
+	Amount uint64        `json:"amount"`
+	Time   int64         `json:"time"`
+}
+
 // ── SettlementHistory ────────────────────────────────────
 
 // SettlementRecord 单笔结算记录（Provider 视角）

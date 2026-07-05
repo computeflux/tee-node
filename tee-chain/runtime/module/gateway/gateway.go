@@ -44,6 +44,7 @@ type Gateway struct {
 	modelAudits           *store.IndexedList[uint64, ModelAudit]                          `store:"keyPfx:model_audits"`            // 系统检查记录
 	apiKeys               *store.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:api_key"`                 // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
 	rechargeHistory       *store.StoreList2D[store.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:recharge_history"`        // user → []RechargeRecord
+	transferHistory       *store.StoreList2D[store.UniAddr, uint32, TransferRecord]       `store:"keyPfx:transfer_history"`        // user → []TransferRecord
 	settlementHistory     *store.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:settlement_history"`      // providerID → []SettlementRecord
 	userSettlementHistory *store.StoreList2D[store.UniAddr, uint32, UserSettlementRecord] `store:"keyPfx:user_settlement_history"` // user → []SettlementRecord
 	rechargeNonces        *store.StoreMapping[string, bool]                               `store:"keyPfx:recharge_nonces"`         // hex(nonce) → true，充值防重放
