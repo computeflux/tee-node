@@ -150,34 +150,32 @@ cd /
 # 用 systemctl edit 追加 drop-in 配置，避免改 /etc/systemd/system/tee-node0.service 原文件。
 # Restart=always:        任意退出（含 clean exit code=0）都重启，保证节点持续在线。
 # RestartSec=5:          重启间隔 5 秒，避免崩后立刻拉起又崩造成刷日志。
-# StartLimitBurst / StartLimitIntervalSec: 60 秒内最多 10 次重启，超过后放弃。
-if [ ! -f /etc/systemd/system/tee-node0.service.d/restart.conf ]; then
-    echo "Configuring systemd restart policy for tee-node0.service ..."
-    sudo mkdir -p /etc/systemd/system/tee-node0.service.d
-    sudo tee /etc/systemd/system/tee-node0.service.d/restart.conf >/dev/null <<'EOF'
+# StartLimitIntervalSec=0 / StartLimitBurst=0: 禁用重启速率限制，使其可以无限自动重启。
+echo "Configuring systemd restart policy for tee-node0.service ..."
+sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+sudo tee /etc/systemd/system/tee-node0.service.d/restart.conf >/dev/null <<'EOF'
+[Unit]
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
 [Service]
 Restart=always
 RestartSec=5
-StartLimitBurst=10
-StartLimitIntervalSec=60
 EOF
-    sudo systemctl daemon-reload
-fi
+sudo systemctl daemon-reload
 
 # ── 进程崩溃被 systemd 拉起时，不要再重新编译，直接复用脚本已构建的二进制 ──
 # 原 /etc/systemd/system/tee-node0.service 在 ExecStartPre 里每次启动都跑
 # `ego-go build` + `ego sign`，进程崩了被 systemd 拉起时还要先编译，拖慢恢复。
 # 用 drop-in 把 ExecStartPre 重置，仅保留系统级目录/符号链接准备。
-if [ ! -f /etc/systemd/system/tee-node0.service.d/no-rebuild.conf ]; then
-    echo "Configuring systemd to skip rebuild on auto-restart ..."
-    sudo mkdir -p /etc/systemd/system/tee-node0.service.d
-    sudo tee /etc/systemd/system/tee-node0.service.d/no-rebuild.conf >/dev/null <<'EOF'
+echo "Configuring systemd to skip rebuild on auto-restart ..."
+sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+sudo tee /etc/systemd/system/tee-node0.service.d/no-rebuild.conf >/dev/null <<'EOF'
 [Service]
 ExecStartPre=
 ExecStartPre=+/bin/bash -c 'mkdir -p /srv/token_node0/token_chain_data && rm -f /token_chain_data && ln -s /srv/token_node0/token_chain_data /token_chain_data'
 EOF
-    sudo systemctl daemon-reload
-fi
+sudo systemctl daemon-reload
 
 # ── 检查并终止已有进程 ──
 if systemctl is-active --quiet tee-node0.service 2>/dev/null; then

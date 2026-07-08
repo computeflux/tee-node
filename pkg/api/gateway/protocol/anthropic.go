@@ -86,7 +86,7 @@ func ConvertOpenAIResponseToAnthropic(body []byte) (out []byte, usage *schemas.B
 				previewLen = 500
 			}
 
-			return nil, nil, fmt.Errorf("parse openai response: %w", err)
+			return nil, nil, fmt.Errorf("parse openai response: %w (body preview: %q)", err, string(body[:previewLen]))
 		}
 	}
 

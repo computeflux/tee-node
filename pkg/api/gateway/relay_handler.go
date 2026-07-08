@@ -125,7 +125,11 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		// 在它之前设 Header/WriteHeader 都仍受默认 deadline 保护。
 		if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil {
 			// 非致命:不支持就退回到服务级 WriteTimeout(本身已被我调到 600s)。
-			fmt.Printf("[relay] stream: clear write deadline unsupported: %v\n", err)
+			// http.ErrNotSupported 表示底层连接不支持 per-request 写超时（如被中间件包装），
+			// 这是预期内的退化路径，600s WriteTimeout 仍可兜底，不再刷噪音日志。
+			if !errors.Is(err, http.ErrNotSupported) {
+				fmt.Printf("[relay] stream: clear write deadline failed: %v\n", err)
+			}
 		}
 
 		usage, serr := writeRelayStream(ctx, w, res.Stream, inbound, prov)

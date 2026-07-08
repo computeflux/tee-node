@@ -43,7 +43,7 @@ func StreamGeminiResponseToOpenAI(r io.Reader, w io.Writer) (*schemas.BifrostLLM
 
 		chunk, bifrostErr, isLastChunk := evt.ToBifrostChatCompletionStream(state)
 		if bifrostErr != nil {
-			break
+			return nil, fmt.Errorf("convert gemini stream event: %v", bifrostErr)
 		}
 		if chunk == nil && !isLastChunk {
 			continue

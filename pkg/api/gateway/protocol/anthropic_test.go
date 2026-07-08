@@ -385,3 +385,44 @@ data: [DONE]
 	assert.Contains(t, output, "event: content_block_delta")
 	assert.Contains(t, output, "event: content_block_stop")
 }
+
+func TestStreamOpenAIResponseToAnthropic_SequentialToolCalls(t *testing.T) {
+	openAIStream := `data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_0","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\""}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":":\"Beijing\"}"}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_1","type":"function","function":{"name":"get_time","arguments":""}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-seq","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+data: [DONE]
+`
+
+	var buf bytes.Buffer
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	require.NoError(t, err)
+
+	output := buf.String()
+	// Should start tool 0
+	assert.Contains(t, output, `"name":"get_weather"`)
+	// Should stop tool 0
+	// Should start tool 1
+	assert.Contains(t, output, `"name":"get_time"`)
+	// Should stop tool 1
+}
+
+func TestStreamOpenAIResponseToAnthropic_InterleavedToolCalls(t *testing.T) {
+	openAIStream := `data: {"id":"chatcmpl-int","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"chatcmpl-int","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_0","type":"function","function":{"name":"get_weather","arguments":""}},{"index":1,"id":"call_1","type":"function","function":{"name":"get_time","arguments":""}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-int","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":\"Beijing\"}"}},{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":null}]}
+data: {"id":"chatcmpl-int","object":"chat.completion.chunk","created":1,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+data: [DONE]
+`
+
+	var buf bytes.Buffer
+	_, err := StreamOpenAIResponseToAnthropic(strings.NewReader(openAIStream), &buf)
+	require.NoError(t, err)
+
+	output := buf.String()
+	// Let's see what output we get
+	t.Logf("Interleaved tool call output:\n%s", output)
+}

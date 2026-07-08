@@ -167,8 +167,10 @@ func (s *streamState) handleChunk(w io.Writer, chunk openAIStreamChunk) error {
 			}
 			st, ok := s.toolCallStates[tc.Index]
 			if !ok {
-				if err := s.closeCurrentBlock(w); err != nil {
-					return err
+				if s.currentBlockType != blockToolUse {
+					if err := s.closeCurrentBlock(w); err != nil {
+						return err
+					}
 				}
 				// blockIdx 留待实际开 block 时再设置，避免指向刚关闭的旧 block。
 				st = &toolCallState{blockIdx: -1}
