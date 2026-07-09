@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/google/go-sev-guest/client"
 	"github.com/google/go-sev-guest/proto/sevsnp"
 	"github.com/google/go-sev-guest/verify"
@@ -21,7 +22,7 @@ func SnpIssue(pk chain.SignerType, call *model.TeeCall) error {
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(pk.Public())
 	if call.Tx != nil {
-		txbuf, err := MarshalVT(call.Tx)
+		txbuf, err := protoio.MarshalVT(call.Tx)
 		if err != nil {
 			return err
 		}
@@ -94,7 +95,7 @@ func SnpVerify(callData *model.TeeCall) (result *model.TeeVerifyResult, err erro
 	var msgBytes []byte
 	if callData.Tx != nil {
 		var err error
-		msgBytes, err = MarshalVT(callData.Tx)
+		msgBytes, err = protoio.MarshalVT(callData.Tx)
 		if err != nil {
 			return nil, err
 		}

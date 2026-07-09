@@ -1,101 +1,58 @@
-// Protocol Buffers for Go with Gadgets
-//
-// Copyright (c) 2013, The GoGo Authors. All rights reserved.
-// http://github.com/gogo/protobuf
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 package protoio
 
 import (
-	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
-
-	"google.golang.org/protobuf/proto"
 )
 
 // WriteMessage writes a varint length-delimited protobuf message with deterministic serialization.
 // This ensures consistent hash values across multiple serializations.
-func WriteMessage(msg proto.Message, w io.Writer) error {
-	data, err := MarshalDeterministic(msg)
-	if err != nil {
+func WriteMessage(msg VTMarshaler, w io.Writer) error {
+	buf := make([]byte, msg.SizeVT())
+	if _, err := msg.MarshalToVT(buf); err != nil {
 		return err
 	}
 
-	var buf [binary.MaxVarintLen64]byte
-	n := binary.PutUvarint(buf[:], uint64(len(data)))
-	if _, err := w.Write(buf[:n]); err != nil {
-		return err
-	}
-	_, err = w.Write(data)
+	_, err := w.Write(buf)
 	return err
 }
 
-// MarshalDeterministic serializes a protobuf message with deterministic output.
-// This ensures consistent hash values across multiple serializations.
-func MarshalDeterministic(msg proto.Message) ([]byte, error) {
-	// Prefer vtproto fast marshal if available (deterministic for non-map messages).
-	if m, ok := any(msg).(interface {
-		MarshalVT() ([]byte, error)
-	}); ok {
-		return m.MarshalVT()
+func Marshal(pb VTMarshaler) ([]byte, error) {
+	if pb == nil {
+		return nil, errors.New("pb is nil")
 	}
 
-	return proto.MarshalOptions{Deterministic: true}.Marshal(msg)
+	buf := make([]byte, pb.SizeVT())
+	if _, err := pb.MarshalToVT(buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
 }
 
-// NewDelimitedWriter returns a new delimited writer that writes varint-delimited
-// protobuf messages with deterministic serialization.
-func NewDelimitedWriter(w io.Writer) WriteCloser {
-	return &varintWriter{w: w}
+type VTMarshaler interface {
+	SizeVT() int
+	MarshalToVT([]byte) (int, error)
+	MarshalVT() ([]byte, error)
 }
 
-type varintWriter struct {
-	w io.Writer
+type VTUnmarshaler interface {
+	UnmarshalVT([]byte) error
 }
 
-func (w *varintWriter) WriteMsg(msg proto.Message) (int, error) {
-	data, err := MarshalDeterministic(msg)
-	if err != nil {
-		return 0, err
+func MarshalVT(tx any) ([]byte, error) {
+	if tx == nil {
+		return nil, nil
 	}
 
-	var buf [binary.MaxVarintLen64]byte
-	n := binary.PutUvarint(buf[:], uint64(len(data)))
-	written, err := w.w.Write(buf[:n])
-	if err != nil {
-		return written, err
+	m, ok := tx.(VTMarshaler)
+	if !ok {
+		return nil, fmt.Errorf("unsupported tee tx type %T", tx)
 	}
 
-	nw, err := w.w.Write(data)
-	written += nw
-	return written, err
-}
-
-func (w *varintWriter) Close() error {
-	if c, ok := w.w.(io.Closer); ok {
-		return c.Close()
+	buf := make([]byte, m.SizeVT())
+	if _, err := m.MarshalToVT(buf); err != nil {
+		return nil, err
 	}
-	return nil
+	return buf, nil
 }

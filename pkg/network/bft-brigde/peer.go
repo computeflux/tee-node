@@ -5,9 +5,11 @@ import (
 
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"google.golang.org/protobuf/proto"
 )
 
 const pendingMsgKey = "bft_reactor_pending_msgs"
@@ -39,19 +41,40 @@ func (p *BTFReactor) doSend(msg *model.PeerMsg) error {
 	switch payload := msg.Payload.(type) {
 	case *model.PeerMsg_DkgMessage:
 		sendData.ChannelID = topics["dkg"].ID
-		dkgMsgCopy := *payload.DkgMessage
+		dkgMsgCopy, ok := proto.Clone(payload.DkgMessage).(*model.DkgMessage)
+		if !ok {
+			return fmt.Errorf("clone dkg message failed")
+		}
 		dkgMsgCopy.To = msg.To
-		sendData.Message = &dkgMsgCopy
+		data, err := protoio.MarshalVT(dkgMsgCopy)
+		if err != nil {
+			return fmt.Errorf("marshal dkg message: %w", err)
+		}
+		sendData.Message = &bftMsgWrapper{data: data}
 	case *model.PeerMsg_BlockPartialSign:
 		sendData.ChannelID = topics["block-partial-sign"].ID
-		blockMsgCopy := *payload.BlockPartialSign
+		blockMsgCopy, ok := proto.Clone(payload.BlockPartialSign).(*model.BlockPartialSign)
+		if !ok {
+			return fmt.Errorf("clone block partial sign message failed")
+		}
 		blockMsgCopy.To = msg.To
-		sendData.Message = &blockMsgCopy
+		data, err := protoio.MarshalVT(blockMsgCopy)
+		if err != nil {
+			return fmt.Errorf("marshal block partial sign message: %w", err)
+		}
+		sendData.Message = &bftMsgWrapper{data: data}
 	case *model.PeerMsg_SecretBox:
 		sendData.ChannelID = topics["secret"].ID
-		secretMsgCopy := *payload.SecretBox
+		secretMsgCopy, ok := proto.Clone(payload.SecretBox).(*model.SecretBox)
+		if !ok {
+			return fmt.Errorf("clone secret box message failed")
+		}
 		secretMsgCopy.To = msg.To
-		sendData.Message = &secretMsgCopy
+		data, err := protoio.MarshalVT(secretMsgCopy)
+		if err != nil {
+			return fmt.Errorf("marshal secret box message: %w", err)
+		}
+		sendData.Message = &bftMsgWrapper{data: data}
 	default:
 		return fmt.Errorf("unknown message type: %T", payload)
 	}

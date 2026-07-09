@@ -13,7 +13,7 @@ import (
 
 func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	txbox := new(model.Tx)
-	err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)
+	err := protoio.Unmarshal(txbt, txbox)
 	if err != nil {
 		fmt.Println("TeeChain CheckTx protoio.ReadMessage TxBox error")
 		return CodeTypeEncodingError
@@ -28,7 +28,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 
 	// 验证合约交易 nonce（预校验，减少无效交易进入 mempool）
 	call := new(model.SysCall)
-	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err == nil {
+	if err := protoio.Unmarshal(txbox.Call, call); err == nil {
 		switch p := call.Payload.(type) {
 		case *model.SysCall_Contract:
 			contract := p.Contract

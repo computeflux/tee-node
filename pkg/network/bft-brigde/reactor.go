@@ -2,6 +2,7 @@ package bftbrigde
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/cometbft/cometbft/libs/service"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
 )
@@ -23,7 +25,7 @@ var topics = map[string]p2p.ChannelDescriptor{
 		SendQueueCapacity:   1000,
 		RecvBufferCapacity:  50 * 4096,
 		RecvMessageCapacity: MaxMsgSize,
-		MessageType:         &model.DkgMessage{},
+		MessageType:         &bftMsgWrapper{},
 	},
 	"block-partial-sign": { // block partial sign msg
 		ID:                  254,
@@ -31,7 +33,7 @@ var topics = map[string]p2p.ChannelDescriptor{
 		SendQueueCapacity:   1000,
 		RecvBufferCapacity:  50 * 4096,
 		RecvMessageCapacity: MaxMsgSize,
-		MessageType:         &model.BlockPartialSign{},
+		MessageType:         &bftMsgWrapper{},
 	},
 	"secret": {
 		ID:                  253,
@@ -39,7 +41,7 @@ var topics = map[string]p2p.ChannelDescriptor{
 		SendQueueCapacity:   1000,
 		RecvBufferCapacity:  50 * 4096,
 		RecvMessageCapacity: MaxMsgSize,
-		MessageType:         &model.SecretBox{},
+		MessageType:         &bftMsgWrapper{},
 	},
 }
 
@@ -131,17 +133,27 @@ func (r *BTFReactor) RemovePeer(p2p.Peer, any) {
 }
 
 func (r *BTFReactor) Receive(e p2p.Envelope) {
-	switch msg := e.Message.(type) {
-	case *model.DkgMessage:
+	wrapper, ok := e.Message.(*bftMsgWrapper)
+	if !ok {
+		util.LogWithRed("P2P Receive", "unexpected message type", "type", fmt.Sprintf("%T", e.Message))
+		return
+	}
+	data := wrapper.Bytes()
+
+	switch e.ChannelID {
+	case topics["dkg"].ID:
+		msg := &model.DkgMessage{}
+		if err := protoio.Unmarshal(data, msg); err != nil {
+			util.LogWithRed("P2P Receive", "unmarshal dkg message", err)
+			return
+		}
 		if !msg.To.Check(r.id) {
 			return
 		}
-
 		if r.dkgHandler == nil {
 			util.LogWithRed("P2P Receive", "dkgHandler not set")
 			return
 		}
-
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
 			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
@@ -149,21 +161,22 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 		} else {
 			msg.From = pub.String()
 		}
-		err = r.dkgHandler(msg)
-		if err != nil {
+		if err := r.dkgHandler(msg); err != nil {
 			util.LogWithRed("P2P Receive error", "dkgHandler", err)
 		}
-		return
-	case *model.BlockPartialSign:
+	case topics["block-partial-sign"].ID:
+		msg := &model.BlockPartialSign{}
+		if err := protoio.Unmarshal(data, msg); err != nil {
+			util.LogWithRed("P2P Receive", "unmarshal block partial sign message", err)
+			return
+		}
 		if !msg.To.Check(r.id) {
 			return
 		}
-
 		if r.blockPartialSignHandler == nil {
 			util.LogWithRed("P2P Receive", "blockPartialSignHandler not set")
 			return
 		}
-
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
 			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
@@ -171,15 +184,18 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 		} else {
 			msg.From = pub.String()
 		}
-		err = r.blockPartialSignHandler(msg)
-		if err != nil {
+		if err := r.blockPartialSignHandler(msg); err != nil {
 			util.LogWithRed("P2P Receive error", "blockPartialSignHandler", err)
 		}
-	case *model.SecretBox:
+	case topics["secret"].ID:
+		msg := &model.SecretBox{}
+		if err := protoio.Unmarshal(data, msg); err != nil {
+			util.LogWithRed("P2P Receive", "unmarshal secret box message", err)
+			return
+		}
 		if !msg.To.Check(r.id) {
 			return
 		}
-
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())
 		if err != nil {
 			util.LogWithYellow("P2P PubkeyFromPeerID", "Receive from unknown node", e.Src.ID(), "fallback to peer ID")
@@ -187,12 +203,11 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 		} else {
 			msg.From = pub.String()
 		}
-		err = r.secretHandler(msg)
-		if err != nil {
+		if err := r.secretHandler(msg); err != nil {
 			util.LogWithRed("P2P Receive error", "secretHandler", err)
 		}
 	default:
-		util.LogWithRed("P2P Receive", "Receive error", "msg", msg)
+		util.LogWithRed("P2P Receive", "unknown channel", e.ChannelID)
 	}
 }
 

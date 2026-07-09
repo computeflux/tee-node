@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/edgelesssys/ego/attestation"
 	"github.com/edgelesssys/ego/attestation/tcbstatus"
@@ -26,7 +27,7 @@ func SgxIssue(pk chain.SignerType, call *model.TeeCall) error {
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(pk.Public())
 	if call.Tx != nil {
-		txbuf, err := MarshalVT(call.Tx)
+		txbuf, err := protoio.MarshalVT(call.Tx)
 		if err != nil {
 			return err
 		}
@@ -57,7 +58,7 @@ func SgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	var msgBytes []byte
 	if reportData.Tx != nil {
 		var err error
-		msgBytes, err = MarshalVT(reportData.Tx)
+		msgBytes, err = protoio.MarshalVT(reportData.Tx)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,7 @@ func ClientSgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) 
 	var msgBytes []byte
 	if reportData.Tx != nil {
 		var err error
-		msgBytes, err = MarshalVT(reportData.Tx)
+		msgBytes, err = protoio.MarshalVT(reportData.Tx)
 		if err != nil {
 			return nil, err
 		}
@@ -161,24 +162,4 @@ func ClientSgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) 
 		CodeSignature: report.UniqueID,
 		CodeProductId: report.ProductID,
 	}, nil
-}
-
-type VTMarshaler interface {
-	SizeVT() int
-	MarshalToVT([]byte) (int, error)
-}
-
-func MarshalVT(tx any) ([]byte, error) {
-	if tx == nil {
-		return nil, nil
-	}
-	m, ok := tx.(VTMarshaler)
-	if !ok {
-		return nil, fmt.Errorf("unsupported tee tx type %T", tx)
-	}
-	buf := make([]byte, m.SizeVT())
-	if _, err := m.MarshalToVT(buf); err != nil {
-		return nil, err
-	}
-	return buf, nil
 }

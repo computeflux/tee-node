@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"github.com/vedhavyas/go-subkey/v2/ed25519"
@@ -30,9 +31,9 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 
 	// 处理系统请求
 	call := new(SysCall)
-	err := call.UnmarshalVT(tx.Call)
+	err := protoio.Unmarshal(tx.Call, call)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "UnmarshalVT")
 	}
 
 	err = SideSysCallVerify(caller, tx.CallerType, call, sig)

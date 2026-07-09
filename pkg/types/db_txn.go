@@ -191,7 +191,7 @@ func TxnGetProtoMessageList[T any](txn *Txn, key []byte) (list []*T, err error) 
 		}
 
 		val := new(T)
-		err = protoio.ReadMessage(bytes.NewBuffer(value), val)
+		err = protoio.Unmarshal(value, val)
 		if err == nil {
 			list = append(list, val)
 		}
@@ -214,11 +214,11 @@ func TxnGetProtoMessage[T any](txn *Txn, key []byte) (*T, error) {
 	}
 
 	val := new(T)
-	err = protoio.ReadMessage(bytes.NewBuffer(v), val)
+	err = protoio.Unmarshal(v, val)
 	return val, err
 }
 
-func TxnSetProtoMessage[T proto.Message](txn *Txn, key []byte, value T) error {
+func TxnSetProtoMessage[T protoio.VTMarshaler](txn *Txn, key []byte, value T) error {
 	buf := new(bytes.Buffer)
 	err := protoio.WriteMessage(value, buf)
 	if err != nil {

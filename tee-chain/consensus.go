@@ -267,12 +267,12 @@ func (app *TeeChain) ProcessProposal(_ context.Context, req *abci.RequestProcess
 // verifyRelayTx 验证单笔 relay tx (ProcessProposal 调用, chainExpected 跟踪区块内 nonce)
 func (app *TeeChain) verifyRelayTx(txbt []byte, chainExpected map[uint32]uint64) bool {
 	txbox := new(model.Tx)
-	if err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox); err != nil {
+	if err := protoio.Unmarshal(txbt, txbox); err != nil {
 		return true
 	}
 
 	call := new(model.SysCall)
-	if err := protoio.ReadMessage(bytes.NewBuffer(txbox.Call), call); err != nil {
+	if err := protoio.Unmarshal(txbox.Call, call); err != nil {
 		return true
 	}
 
@@ -392,7 +392,7 @@ func (app *TeeChain) ExtendVote(_ context.Context, req *abci.RequestExtendVote) 
 	}
 
 	// 序列化 TEE 证明
-	voteExtension, err := protoio.MarshalDeterministic(teeCall)
+	voteExtension, err := protoio.Marshal(teeCall)
 	if err != nil {
 		LogWithTime("💊 ExtendVote: Marshal error: " + err.Error())
 		return &abci.ResponseExtendVote{VoteExtension: []byte("")}, nil

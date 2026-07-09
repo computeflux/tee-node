@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -39,7 +40,7 @@ func TestMarshalVT_TeeCallTxRoundtrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NotNil(t, tt.call.Tx)
 
-			data, err := MarshalVT(tt.call.Tx)
+			data, err := protoio.MarshalVT(tt.call)
 			require.NoError(t, err)
 
 			// The wrapper bytes are a single field of TeeCall, so they can be
@@ -60,7 +61,7 @@ func TestMarshalVT_TeeCallTxDeterministic(t *testing.T) {
 
 	var first []byte
 	for i := 0; i < 10; i++ {
-		data, err := MarshalVT(call.Tx)
+		data, err := protoio.MarshalVT(call)
 		require.NoError(t, err)
 		if i == 0 {
 			first = data

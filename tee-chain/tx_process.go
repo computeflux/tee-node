@@ -1,7 +1,6 @@
 package teechain
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -20,13 +19,13 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
-		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)
+		err := protoio.Unmarshal(txbt, txbox)
 		if err != nil {
 			return abci.ResponseProcessProposal_REJECT
 		}
 
 		tx := new(model.SysCall)
-		err = protoio.ReadMessage(bytes.NewBuffer(txbox.Call), tx)
+		err = protoio.Unmarshal(txbox.Call, tx)
 		if err != nil {
 			return abci.ResponseProcessProposal_REJECT
 		}

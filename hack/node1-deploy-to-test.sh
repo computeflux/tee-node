@@ -12,11 +12,11 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
 # build binary
-ego-go build -o ./hack/build/dsecret ./main.go
+# ego-go build -o ./hack/build/dsecret ./main.go
 
 # sign binary
-cd ./hack/build/
-ego sign dsecret
+# cd ./hack/build/
+# ego sign dsecret
 
 cd $DIR/../
 

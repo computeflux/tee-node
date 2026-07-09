@@ -10,7 +10,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
-	"google.golang.org/protobuf/proto"
 	ecrypto "github.com/edgelesssys/ego/ecrypto"
 )
 
@@ -277,13 +276,13 @@ func DBGetProtoMessage[T any](db *DB, namespace, key string) (*T, error) {
 		return nil, nil
 	}
 	val := new(T)
-	if err := protoio.ReadMessage(bytes.NewBuffer(v), val); err != nil {
+	if err := protoio.Unmarshal(v, val); err != nil {
 		return nil, err
 	}
 	return val, nil
 }
 
-func DBSetProtoMessage[T proto.Message](db *DB, namespace, key string, value T) error {
+func DBSetProtoMessage[T protoio.VTMarshaler](db *DB, namespace, key string, value T) error {
 	buf := new(bytes.Buffer)
 	if err := protoio.WriteMessage(value, buf); err != nil {
 		return err
@@ -313,7 +312,7 @@ func DBGetProtoMessageList[T any](db *DB, namespace, key string) ([]*T, [][]byte
 			return nil, nil, err
 		}
 		val := new(T)
-		if err := protoio.ReadMessage(bytes.NewBuffer(value), val); err != nil {
+		if err := protoio.Unmarshal(value, val); err != nil {
 			// Log but don't fail the whole query; one corrupt entry
 			// shouldn't block reading of others.
 			fmt.Printf("GetProtoMessageList: skip corrupt entry at key %x: %v\n", iter.Key(), err)

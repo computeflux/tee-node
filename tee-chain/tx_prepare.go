@@ -1,7 +1,6 @@
 package teechain
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -20,13 +19,13 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 
 	for _, txbt := range txs {
 		txbox := new(model.Tx)
-		err := protoio.ReadMessage(bytes.NewBuffer(txbt), txbox)
+		err := protoio.Unmarshal(txbt, txbox)
 		if err != nil {
 			continue
 		}
 
 		tx := new(model.SysCall)
-		err = protoio.ReadMessage(bytes.NewBuffer(txbox.Call), tx)
+		err = protoio.Unmarshal(txbox.Call, tx)
 		if err != nil {
 			continue
 		}

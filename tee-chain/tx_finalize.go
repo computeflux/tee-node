@@ -1,7 +1,6 @@
 package teechain
 
 import (
-	"bytes"
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -22,7 +21,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 
 	for _, txbt := range txs {
 		tx := new(model.Tx)
-		err := protoio.ReadMessage(bytes.NewBuffer(txbt), tx)
+		err := protoio.Unmarshal(txbt, tx)
 		if err != nil {
 			return nil, err
 		}
