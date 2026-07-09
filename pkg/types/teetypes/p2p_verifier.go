@@ -7,7 +7,7 @@ import (
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/ed25519"
-	"github.com/cosmos/gogoproto/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/computeflux/tee-provider/pkg/model"
 	chain "github.com/wetee-dao/ink.go"

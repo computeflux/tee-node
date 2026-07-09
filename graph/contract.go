@@ -1,14 +1,12 @@
 package graph
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -59,12 +57,11 @@ func SubmitContractCall(caller []byte, callerType uint32, nonce uint64, contract
 		return "", fmt.Errorf("SubmitContractCall: contract verify: %w", err)
 	}
 
-	buf := new(bytes.Buffer)
-	protoio.WriteMessage(call, buf)
+	data, _ := call.MarshalVT()
 	tx := &model.Tx{
 		Caller:     caller,
 		CallerType: callerType,
-		Call:       buf.Bytes(),
+		Call:       data,
 		Signature:  signature,
 	}
 

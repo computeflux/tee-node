@@ -21,8 +21,10 @@ func SnpIssue(pk chain.SignerType, call *model.TeeCall) error {
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(pk.Public())
 	if call.Tx != nil {
-		txbuf := make([]byte, call.Tx.Size())
-		call.Tx.MarshalTo(txbuf)
+		txbuf, err := MarshalVT(call.Tx)
+		if err != nil {
+			return err
+		}
 		buf.Write(txbuf)
 	}
 
@@ -89,11 +91,13 @@ func SnpVerify(callData *model.TeeCall) (result *model.TeeVerifyResult, err erro
 	var buf bytes.Buffer
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(signer)
-	payload := callData.Tx
 	var msgBytes []byte
-	if payload != nil {
-		msgBytes = make([]byte, payload.Size())
-		payload.MarshalTo(msgBytes)
+	if callData.Tx != nil {
+		var err error
+		msgBytes, err = MarshalVT(callData.Tx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(msgBytes) > 0 {
 		buf.Write(msgBytes)

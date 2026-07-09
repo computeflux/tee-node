@@ -26,8 +26,10 @@ func SgxIssue(pk chain.SignerType, call *model.TeeCall) error {
 	buf.Write(Int64ToBytes(timestamp))
 	buf.Write(pk.Public())
 	if call.Tx != nil {
-		txbuf := make([]byte, call.Tx.Size())
-		call.Tx.MarshalTo(txbuf)
+		txbuf, err := MarshalVT(call.Tx)
+		if err != nil {
+			return err
+		}
 		buf.Write(txbuf)
 	}
 
@@ -54,8 +56,11 @@ func SgxIssue(pk chain.SignerType, call *model.TeeCall) error {
 func SgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	var msgBytes []byte
 	if reportData.Tx != nil {
-		msgBytes = make([]byte, reportData.Tx.Size())
-		reportData.Tx.MarshalTo(msgBytes)
+		var err error
+		msgBytes, err = MarshalVT(reportData.Tx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	reportBytes, timestamp := reportData.Report, reportData.Time
 
@@ -96,8 +101,11 @@ func SgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 func ClientSgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) {
 	var msgBytes []byte
 	if reportData.Tx != nil {
-		msgBytes = make([]byte, reportData.Tx.Size())
-		reportData.Tx.MarshalTo(msgBytes)
+		var err error
+		msgBytes, err = MarshalVT(reportData.Tx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var reportBytes, timestamp = reportData.Report, reportData.Time
 
@@ -153,4 +161,24 @@ func ClientSgxVerify(reportData *model.TeeCall) (*model.TeeVerifyResult, error) 
 		CodeSignature: report.UniqueID,
 		CodeProductId: report.ProductID,
 	}, nil
+}
+
+type VTMarshaler interface {
+	SizeVT() int
+	MarshalToVT([]byte) (int, error)
+}
+
+func MarshalVT(tx any) ([]byte, error) {
+	if tx == nil {
+		return nil, nil
+	}
+	m, ok := tx.(VTMarshaler)
+	if !ok {
+		return nil, fmt.Errorf("unsupported tee tx type %T", tx)
+	}
+	buf := make([]byte, m.SizeVT())
+	if _, err := m.MarshalToVT(buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
 }

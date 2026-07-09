@@ -23,8 +23,9 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/wasm"
-	"github.com/cosmos/gogoproto/proto"
 	"github.com/pkg/errors"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	bftbrigde "github.com/computeflux/tee-provider/pkg/network/bft-brigde"

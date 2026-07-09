@@ -154,7 +154,7 @@ func (s *TeeChain) SyncToHub(txIndex int64, chainId uint32, sigs [][]byte) error
 
 // SavePartialSig saves the block partial signature to the global state.
 func (s *TeeChain) savePartialSig(user_id string, msg *model.BlockPartialSign) error {
-	bt, err := msg.Marshal()
+	bt, err := msg.MarshalVT()
 	if err != nil {
 		return errors.Wrap(err, "marshal partial sig error")
 	}
@@ -171,7 +171,7 @@ func (s *TeeChain) SigListOfTx(txIndex int64, chainId uint32) ([]*model.BlockPar
 	sigs := make([]*model.BlockPartialSign, 0, len(bts))
 	for _, bt := range bts {
 		msg := new(model.BlockPartialSign)
-		err := msg.Unmarshal(bt)
+		err := msg.UnmarshalVT(bt)
 		if err != nil {
 			util.LogWithRed("GetSig", "Unmarshal error", err)
 			continue

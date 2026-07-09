@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/cometbft/cometbft/abci/types"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/pkg/errors"
 )
 
@@ -69,29 +69,34 @@ func TestGetProtoMessage(t *testing.T) {
 	_ = db
 	defer SECRET_DB.Close()
 
-	initv := types.ValidatorUpdate{Power: 10000}
+	initv := model.Tx{
+		Caller:     []byte("test-caller"),
+		CallerType: 1,
+		Call:       []byte("test-call"),
+		Signature:  []byte("test-signature"),
+	}
 
-	key := "validator" + fmt.Sprint(time.Now().Unix())
+	key := "tx" + fmt.Sprint(time.Now().Unix())
 	err = DBSetProtoMessage(SECRET_DB, "", key, &initv)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = DBSetProtoMessage(SECRET_DB, "", "val", &initv)
+	err = DBSetProtoMessage(SECRET_DB, "", "tx", &initv)
 	if err != nil {
 		t.Error(err)
 	}
 
-	returnValue, err := DBGetProtoMessage[types.ValidatorUpdate](SECRET_DB, "", key)
+	returnValue, err := DBGetProtoMessage[model.Tx](SECRET_DB, "", key)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if returnValue.Power != 10000 {
+	if returnValue.CallerType != 1 {
 		t.Error("value not equal")
 	}
 
-	list, _, err := DBGetProtoMessageList[types.ValidatorUpdate](SECRET_DB, "", "validator")
+	list, _, err := DBGetProtoMessageList[model.Tx](SECRET_DB, "", "tx")
 	if err != nil {
 		t.Error(err)
 	}

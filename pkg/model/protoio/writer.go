@@ -32,8 +32,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/cosmos/gogoproto/proto"
-	protov2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // WriteMessage writes a varint length-delimited protobuf message with deterministic serialization.
@@ -56,14 +55,14 @@ func WriteMessage(msg proto.Message, w io.Writer) error {
 // MarshalDeterministic serializes a protobuf message with deterministic output.
 // This ensures consistent hash values across multiple serializations.
 func MarshalDeterministic(msg proto.Message) ([]byte, error) {
-	// Try protov2 Message first (newer protobuf)
-	if m, ok := any(msg).(protov2.Message); ok {
-		return protov2.MarshalOptions{Deterministic: true}.Marshal(m)
+	// Prefer vtproto fast marshal if available (deterministic for non-map messages).
+	if m, ok := any(msg).(interface {
+		MarshalVT() ([]byte, error)
+	}); ok {
+		return m.MarshalVT()
 	}
 
-	// Fall back to gogoproto Marshal
-	// Note: gogoproto's Marshal is deterministic for messages without map fields
-	return proto.Marshal(msg)
+	return proto.MarshalOptions{Deterministic: true}.Marshal(msg)
 }
 
 // NewDelimitedWriter returns a new delimited writer that writes varint-delimited

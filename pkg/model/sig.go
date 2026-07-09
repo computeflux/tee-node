@@ -10,11 +10,7 @@ func (c *SysCall) BytesForSig() ([]byte, error) {
 		return ContractForSig(call), nil
 	}
 
-	data, err := c.XXX_Marshal(nil, true)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return c.MarshalVT()
 }
 
 func ContractForSig(call *ContractCall) []byte {

@@ -38,8 +38,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/cosmos/gogoproto/proto"
-	protov2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // NewDelimitedReader reads varint-delimited Protobuf messages from a reader.
@@ -109,24 +108,17 @@ func UnmarshalDelimited(data []byte, msg proto.Message) error {
 	return err
 }
 
-type newUnmarshaler interface {
-	XXX_Unmarshal([]byte) error
-}
-
 func Unmarshal(buf []byte, pb any) error {
 	if u, ok := pb.(proto.Message); ok {
-		u.Reset()
+		proto.Reset(u)
 
-		if u, ok := u.(newUnmarshaler); ok {
-			return u.XXX_Unmarshal(buf)
+		// Prefer vtproto fast unmarshal if available.
+		if u, ok := pb.(interface {
+			UnmarshalVT([]byte) error
+		}); ok {
+			return u.UnmarshalVT(buf)
 		}
-		if u, ok := u.(proto.Unmarshaler); ok {
-			return u.Unmarshal(buf)
-		}
-		if m, ok := u.(protov2.Message); ok {
-			return protov2.Unmarshal(buf, m)
-		}
-		return proto.NewBuffer(buf).Unmarshal(u)
+		return proto.Unmarshal(buf, u)
 	}
 
 	return errors.New("proto: not a proto.Message")

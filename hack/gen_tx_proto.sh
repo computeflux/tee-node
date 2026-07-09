@@ -9,7 +9,11 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../pkg/model
 
 
-protoc --proto_path=. --gogofast_out=. tx.proto
+protoc \
+  --go_out=. --go_opt=paths=source_relative \
+  --go-vtproto_out=. --go-vtproto_opt=paths=source_relative \
+  --go-vtproto_opt=features=marshal+unmarshal+size \
+  tx.proto
 
 rm -f ../../../libos-entry/model/tx.pb.go
 cp tx.pb.go ../../../libos-entry/model/

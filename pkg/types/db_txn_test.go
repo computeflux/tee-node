@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/cometbft/cometbft/abci/types"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -317,20 +317,25 @@ func TestTxn_TxnGetJson_EmptyValue(t *testing.T) {
 func TestTxn_TxnSetProtoMessage_TxnGetProtoMessage(t *testing.T) {
 	tx := setupTxnTest(t)
 
-	original := &types.ValidatorUpdate{Power: 9999}
+	original := &model.Tx{
+		Caller:     []byte("test-caller"),
+		CallerType: 9999,
+		Call:       []byte("test-call"),
+		Signature:  []byte("test-signature"),
+	}
 	err := TxnSetProtoMessage(tx, []byte("proto_key"), original)
 	require.NoError(t, err)
 
-	result, err := TxnGetProtoMessage[types.ValidatorUpdate](tx, []byte("proto_key"))
+	result, err := TxnGetProtoMessage[model.Tx](tx, []byte("proto_key"))
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, int64(9999), result.Power)
+	assert.Equal(t, uint32(9999), result.CallerType)
 }
 
 func TestTxn_TxnGetProtoMessage_NotFound(t *testing.T) {
 	tx := setupTxnTest(t)
 
-	result, err := TxnGetProtoMessage[types.ValidatorUpdate](tx, []byte("missing"))
+	result, err := TxnGetProtoMessage[model.Tx](tx, []byte("missing"))
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -338,12 +343,12 @@ func TestTxn_TxnGetProtoMessage_NotFound(t *testing.T) {
 func TestTxn_TxnGetProtoMessageList(t *testing.T) {
 	tx := setupTxnTest(t)
 
-	err := TxnSetProtoMessage(tx, []byte("validator_a"), &types.ValidatorUpdate{Power: 100})
+	err := TxnSetProtoMessage(tx, []byte("tx_a"), &model.Tx{CallerType: 100})
 	require.NoError(t, err)
-	err = TxnSetProtoMessage(tx, []byte("validator_b"), &types.ValidatorUpdate{Power: 200})
+	err = TxnSetProtoMessage(tx, []byte("tx_b"), &model.Tx{CallerType: 200})
 	require.NoError(t, err)
 
-	list, err := TxnGetProtoMessageList[types.ValidatorUpdate](tx, []byte("validator_"))
+	list, err := TxnGetProtoMessageList[model.Tx](tx, []byte("tx_"))
 	require.NoError(t, err)
 	assert.Len(t, list, 2)
 }

@@ -248,6 +248,7 @@ func (app *TeeChain) targetSyncRelay() bool {
 			SyncTxStart: &model.SyncTxStart{
 				ChainId: hubBatch.ChainID,
 				Ids:     hubBatch.IDs,
+				Time:    height,
 			},
 		},
 	}

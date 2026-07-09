@@ -45,6 +45,9 @@ func (dkg *DKG) reState() error {
 		for s, pubKey := range dkg.DkgPubKeys {
 			if pubKey != nil {
 				util.LogWithCyan("DKG PUBKEY", s.String(), pubKey.AccountString())
+				if pubKey.IsEd25519() {
+					util.LogWithCyan("DKG PUBKEY", s.String(), pubKey.H160Address().Hex())
+				}
 			}
 		}
 	}
