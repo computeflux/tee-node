@@ -94,34 +94,42 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 	if err != nil {
 		return nil, err
 	}
+
 	modelIdx, ok := modelIdxRaw.(*indexer.GatewayModelIndex)
 	if !ok {
 		return nil, fmt.Errorf("invalid gateway model index type")
 	}
+
 	modelReq := indexer.GatewayModelSearchRequest{
 		Keyword: kw,
 		Offset:  0,
 		Limit:   100000,
 	}
+
 	if minContext != nil {
 		v := uint64(*minContext)
 		modelReq.MinContext = &v
 	}
+
 	if maxContext != nil {
 		v := uint64(*maxContext)
 		modelReq.MaxContext = &v
 	}
+
 	if minPrice != nil {
 		v := uint64(*minPrice)
 		modelReq.MinPrice = &v
 	}
+
 	if maxPrice != nil {
 		v := uint64(*maxPrice)
 		modelReq.MaxPrice = &v
 	}
+
 	if modalities != nil {
 		modelReq.Modalities = uint8(*modalities)
 	}
+
 	models, err := modelIdx.Search(ctx, modelReq)
 	if err != nil {
 		return nil, err
@@ -151,6 +159,8 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 
 	// 3. models 和 routes 都直接进列表。
 	result := make([]*model.ModelInfoWithProvider, 0, len(models)+len(routes))
+	// 4. 收集可用的模型 ID，用于判断路由是否有后端。
+	modelIDSet := make(map[uint64]struct{}, len(models))
 	for _, item := range models {
 		m := item.Model
 		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
@@ -203,6 +213,7 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 				CreatedAt:     int(p.CreatedAt),
 			},
 		})
+		modelIDSet[item.ID] = struct{}{}
 	}
 
 	for _, route := range routes {
@@ -220,6 +231,20 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 
 		if maxPrice != nil && d.InPrice > uint64(*maxPrice) {
 			continue
+		}
+
+		// 个人算力路由只有当其包含的模型至少有一个存在于 models 中时才算有后端。
+		if d.RouteType == gateway.EdgeRoute {
+			hasBackend := false
+			for _, modelID := range d.ModelIds {
+				if _, ok := modelIDSet[modelID]; ok {
+					hasBackend = true
+					break
+				}
+			}
+			if !hasBackend {
+				continue
+			}
 		}
 
 		modelIds := make([]int, 0, len(d.ModelIds))
