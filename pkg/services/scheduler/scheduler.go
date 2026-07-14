@@ -227,6 +227,7 @@ func (s *Scheduler) resolveRoute(ctx context.Context, model ModelKey, provider P
 func (s *Scheduler) schedule(ctx context.Context, inv Invoke, stream bool) (*Result, error) {
 	main, err := s.resolveRoute(ctx, inv.Model, inv.Provider)
 	if err != nil {
+		fmt.Println("[schedule] RESOLVE FAILED", "model", inv.Model, "err", err)
 		if errors.Is(err, ErrModelNotFound) {
 			s.log.Warn("model not found", "model", inv.Model, "error", err)
 			return nil, fmt.Errorf("%w: %s", ErrModelNotFound, inv.Model)

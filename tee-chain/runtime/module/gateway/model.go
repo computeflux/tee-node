@@ -19,6 +19,8 @@ func (g GatewayMutation) RegisterModel(
 	providerType uint16,
 	uri string,
 	apiKeys []string,
+	maxConcurrency uint32,
+	balance uint64,
 ) error {
 	owner := g.api.GetCaller()
 
@@ -64,6 +66,8 @@ func (g GatewayMutation) RegisterModel(
 		ProviderType:    providerType,
 		URI:             uri,
 		APIKeys:         keys,
+		MaxConcurrency:  maxConcurrency,
+		Balance:         balance,
 	})
 	if err != nil {
 		return err
@@ -82,6 +86,8 @@ func (g GatewayMutation) UpdateModel(
 	inPrice, cachedPrice, outPrice uint64,
 	providerType uint16,
 	uri string,
+	maxConcurrency uint32,
+	balance uint64,
 ) error {
 	cur, err := g.models.Get(g.api.GetTxn(), ID)
 	if err != nil || cur == nil {
@@ -96,6 +102,8 @@ func (g GatewayMutation) UpdateModel(
 		m.OutPrice = outPrice
 		m.ProviderType = providerType
 		m.URI = uri
+		m.MaxConcurrency = maxConcurrency
+		m.Balance = balance
 	}); err != nil {
 		return err
 	}

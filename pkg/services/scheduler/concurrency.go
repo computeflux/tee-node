@@ -36,6 +36,14 @@ func NewModelSemaphore(capacity int, softRatio float64) *ModelSemaphore {
 	return &ModelSemaphore{capacity: int64(capacity), softCap: softCap}
 }
 
+// Inflight 返回当前正在处理中的请求数。
+func (s *ModelSemaphore) Inflight() int64 {
+	if s == nil {
+		return 0
+	}
+	return s.inflight.Load()
+}
+
 // Acquire 获取信号量。
 // 当 s == nil 时(不限流模式),立即返回 noop release。
 func (s *ModelSemaphore) Acquire(ctx context.Context) (func(), error) {
@@ -127,6 +135,16 @@ func NewSemaphoreSet(softRatio float64) *SemaphoreSet {
 		softRatio = 1.0 // 默认硬限制
 	}
 	return &SemaphoreSet{cache: make(map[ModelKey]*ModelSemaphore), softRatio: softRatio}
+}
+
+// Inflight 返回指定模型的当前并发数。
+func (s *SemaphoreSet) Inflight(m ModelKey) int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if sem, ok := s.cache[m]; ok {
+		return sem.Inflight()
+	}
+	return 0
 }
 
 // GetOrCreate 根据路由配置返回(可能新建)信号量。
@@ -291,10 +309,10 @@ func (b *Breaker) State() string {
 
 // BreakerSet 是所有端点熔断器的容器。
 type BreakerSet struct {
-	cfg  BreakerConfig
-	mu   sync.RWMutex
-	set  map[EndpointKey]*Breaker
-	log  Logger
+	cfg BreakerConfig
+	mu  sync.RWMutex
+	set map[EndpointKey]*Breaker
+	log Logger
 }
 
 // NewBreakerSet 创建 BreakerSet。

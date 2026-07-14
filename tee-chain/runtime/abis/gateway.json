@@ -455,6 +455,26 @@
               ],
               "type": 14
             }
+          },
+          {
+            "docs": [],
+            "label": "max_concurrency",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "balance",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
           }
         ],
         "default": false,
@@ -625,6 +645,26 @@
                 "Vec"
               ],
               "type": 16
+            }
+          },
+          {
+            "docs": [],
+            "label": "max_concurrency",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
+            "label": "balance",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
             }
           }
         ],

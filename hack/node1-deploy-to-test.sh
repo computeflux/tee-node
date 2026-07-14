@@ -12,11 +12,11 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
 # build binary
-# ego-go build -o ./hack/build/dsecret ./main.go
+ego-go build -o ./hack/build/dsecret ./main.go
 
 # sign binary
-# cd ./hack/build/
-# ego sign dsecret
+cd ./hack/build/
+ego sign dsecret
 
 cd $DIR/../
 
@@ -109,7 +109,7 @@ Wants=network-online.target
 Type=simple
 Environment="SIDE_CHAIN_PORT=30126"
 Environment="SIDE_CHAIN_RPC_PORT=30127"
-Environment="GQL_PORT=88"
+Environment="GQL_PORT=443"
 Environment="CHAIN_ENV=test"
 Environment="OE_SIMULATION=1"
 WorkingDirectory=/

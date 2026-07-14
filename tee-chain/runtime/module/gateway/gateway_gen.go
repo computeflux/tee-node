@@ -230,7 +230,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.RegisterAPIKey(keyHash, rateLimit)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := store.RequireArgLen(args, 9, "register_model"); err != nil {
+		if err := store.RequireArgLen(args, 11, "register_model"); err != nil {
 			return err
 		}
 		name, err := store.DecodeScaleArgBytes[string](args[0])
@@ -269,7 +269,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: apiKeys: %w", err)
 		}
-		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys)
+		maxConcurrency, err := store.DecodeScaleArgBytes[uint32](args[9])
+		if err != nil {
+			return fmt.Errorf("register_model: maxConcurrency: %w", err)
+		}
+		balance, err := store.DecodeScaleArgBytes[uint64](args[10])
+		if err != nil {
+			return fmt.Errorf("register_model: balance: %w", err)
+		}
+		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys, maxConcurrency, balance)
 	case [4]byte{0x46, 0x7f, 0x5d, 0xb4}:
 		if err := store.RequireArgLen(args, 2, "report_model"); err != nil {
 			return err
@@ -371,7 +379,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.UpdateAPIKey(keyHash, rateLimit)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := store.RequireArgLen(args, 8, "update_model"); err != nil {
+		if err := store.RequireArgLen(args, 10, "update_model"); err != nil {
 			return err
 		}
 		ID, err := store.DecodeScaleArgBytes[uint64](args[0])
@@ -406,7 +414,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: uri: %w", err)
 		}
-		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri)
+		maxConcurrency, err := store.DecodeScaleArgBytes[uint32](args[8])
+		if err != nil {
+			return fmt.Errorf("update_model: maxConcurrency: %w", err)
+		}
+		balance, err := store.DecodeScaleArgBytes[uint64](args[9])
+		if err != nil {
+			return fmt.Errorf("update_model: balance: %w", err)
+		}
+		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, maxConcurrency, balance)
 	case [4]byte{0x09, 0xb8, 0x76, 0x88}:
 		if err := store.RequireArgLen(args, 3, "update_model_a_p_i_key_ref"); err != nil {
 			return err
