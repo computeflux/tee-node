@@ -334,15 +334,6 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("revoke_a_p_i_key: keyHash: %w", err)
 		}
 		return m.RevokeAPIKey(keyHash)
-	case [4]byte{0x28, 0x08, 0x83, 0x1a}:
-		if err := store.RequireArgLen(args, 1, "settle_usage"); err != nil {
-			return err
-		}
-		records, err := store.DecodeScaleArgBytes[[]Settlement](args[0])
-		if err != nil {
-			return fmt.Errorf("settle_usage: records: %w", err)
-		}
-		return m.SettleUsage(records)
 	case [4]byte{0x68, 0xa0, 0x49, 0xfc}:
 		if err := store.RequireArgLen(args, 1, "settle_usage_with_route"); err != nil {
 			return err

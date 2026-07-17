@@ -397,9 +397,10 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 	rt.Caller.T = 0
 
 	// Settle: in=1000 tokens, out=500 tokens → cost = (1000*1000000 + 500*2000000) / 1000000 = 2002
-	err := m.SettleUsage([]Settlement{
+	err := m.SettleUsageWithRoute([]SettlementWithRoute{
 		{
 			User:       user,
+			RouteID: store.NewNone[uint64](),
 			ModelID:    0,
 			ProviderID: 0,
 			TokenIn:    1000,
@@ -434,8 +435,9 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	rt.System = false
 
 	nonce := []byte{0x01, 0x02, 0x03, 0x04}
-	record := Settlement{
+	record := SettlementWithRoute{
 		User:       user,
+		RouteID: store.NewNone[uint64](),
 		ModelID:    0,
 		ProviderID: 0,
 		TokenIn:    1000,
@@ -447,9 +449,9 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	// Settle must be called by node (T == 0)
 	rt.Caller.T = 0
 
-	require.NoError(t, m.SettleUsage([]Settlement{record}))
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{record}))
 	// Duplicate record nonce should be silently skipped (return nil), no double charge
-	require.NoError(t, m.SettleUsage([]Settlement{record}))
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{record}))
 }
 
 func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
@@ -527,8 +529,8 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 
 	// Settle must be called by node (T == 0)
 	rt.Caller.T = 0
-	require.NoError(t, m.SettleUsage([]Settlement{
-		{User: user, ModelID: 0, ProviderID: 0, TokenIn: 1000000, TokenOut: 500000, Count: 1, Nonce: []byte{0x01}},
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{
+		{User: user, RouteID: store.NewNone[uint64](), ModelID: 0, ProviderID: 0, TokenIn: 1000000, TokenOut: 500000, Count: 1, Nonce: []byte{0x01}},
 	}))
 
 	provCredit, _ := q.GetProviderCredit(0)
@@ -568,8 +570,8 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 	// Settle must be called by node (T == 0)
 	rt.Caller.T = 0
 	// Settle a small amount first
-	require.NoError(t, m.SettleUsage([]Settlement{
-		{User: user, ModelID: 0, ProviderID: 0, TokenIn: 1000, TokenOut: 500, Count: 1, Nonce: []byte{0x01}},
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{
+		{User: user, RouteID: store.NewNone[uint64](), ModelID: 0, ProviderID: 0, TokenIn: 1000, TokenOut: 500, Count: 1, Nonce: []byte{0x01}},
 	}))
 
 	// Try to withdraw more than earned as provider owner with allowed chainID

@@ -289,7 +289,6 @@ func submitSettleUsageWithRoute(records []cgateway.SettlementWithRoute) error {
 	}
 
 	method := cstore.MethodToSelector("SettleUsageWithRoute")
-
 	err = bridge.SubmitContractWithDedup("gateway", method[:], [][]byte{argBytes}, "settle_usage_with_route")
 	if err == nil {
 		GATEWAYLOG().Printf("[SETTLE] submitSettleUsageWithRoute OK, %d records pushed to tx pool", len(records))
