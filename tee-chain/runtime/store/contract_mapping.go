@@ -5,6 +5,7 @@ package store
 import (
 	"encoding/hex"
 	"strconv"
+	"strings"
 )
 
 // MappingKey 约束 mapping 的 key 类型：string、[]byte、uint64、uint32、uint16、uint8。
@@ -162,7 +163,7 @@ func (m *StoreMapping[K, V]) Set(txn StoreTx, key K, v V) error {
 	return m.set(txn, key, bt)
 }
 
-// ListCodec 读取该 mapping 下所有值并使用 codec.Decode 反序列化为 V。
+// List 读取该 mapping 下所有值并使用 ScaleDecode 反序列化为 V。
 func (m *StoreMapping[K, V]) List(txn StoreTx) ([]K, []V, error) {
 	keyPrefix := m.fullKey("")
 	keys, list, err := txn.ListByPrefix(keyPrefix)
@@ -173,15 +174,41 @@ func (m *StoreMapping[K, V]) List(txn StoreTx) ([]K, []V, error) {
 	outKeys := make([]K, 0, len(list))
 	out := make([]V, 0, len(list))
 	for i, bt := range list {
+		suffix := string(keys[i][len(keyPrefix):])
+		// 跳过索引条目（suffix 含 "_"）
+		if strings.Contains(suffix, "_") {
+			continue
+		}
 		val := new(V)
 		if err := ScaleDecode(val, bt); err != nil {
 			return nil, nil, err
 		}
 		out = append(out, *val)
-		// 解析 key 后缀为 K 类型
-		suffix := string(keys[i][len(keyPrefix):])
 		outKeys = append(outKeys, parseKeySuffix[K](suffix))
 	}
 
 	return outKeys, out, nil
+}
+
+// ListRaw 读取该 mapping 下所有值的原始字节，不反序列化。
+func (m *StoreMapping[K, V]) ListRaw(txn StoreTx) ([]K, [][]byte, error) {
+	keyPrefix := m.fullKey("")
+	keys, list, err := txn.ListByPrefix(keyPrefix)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	outKeys := make([]K, 0, len(list))
+	outVals := make([][]byte, 0, len(list))
+	for i := range list {
+		suffix := string(keys[i][len(keyPrefix):])
+		// 索引条目的 key suffix 包含 "_" (如 "idx_OwnerKey_123_abc")，主数据不含
+		if strings.Contains(suffix, "_") {
+			continue
+		}
+		outKeys = append(outKeys, parseKeySuffix[K](suffix))
+		outVals = append(outVals, list[i])
+	}
+
+	return outKeys, outVals, nil
 }

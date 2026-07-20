@@ -114,12 +114,11 @@ func main() {
 	teeChain.SetDKG(dkgIns)
 
 	// Get code versions
-	codeVersions, err := chains.MainChain.GetCodeVersions()
-	if err != nil {
-		fmt.Println("Get code versions error:", err)
-		os.Exit(1)
-	}
-	fmt.Println("Codes", codeVersions)
+	// codeVersions, err := chains.MainChain.GetCodeVersions()
+	// if err != nil {
+	// 	fmt.Println("Get code versions error:", err)
+	// 	os.Exit(1)
+	// }
 
 	// load chains
 	err = teeChain.LoadChains()

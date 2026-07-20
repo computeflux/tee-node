@@ -47,7 +47,7 @@ func LookupAPIKeyViaContract(key string) *types.GatewayTokenInfo {
 		return nil
 	}
 
-	info, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.APIKeyInfo, error) {
+	info, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) (*cgateway.APIKeyInfoV2, error) {
 		return cgateway.GatewayQuery{Gateway: *cgateway.NewGateway(runtime)}.LookupAPIKey(hash)
 	})
 	if err != nil {

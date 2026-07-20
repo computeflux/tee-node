@@ -78,6 +78,87 @@ func (v *APIKeyInfo) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
+// Encode SCALE 编码 APIKeyInfoV2。
+func (v *APIKeyInfoV2) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.OwnerKey))
+	buf = store.EncodeCompact(buf, uint64(len(v.Prefix)))
+	buf = append(buf, v.Prefix...)
+	buf = binary.LittleEndian.AppendUint32(buf, v.Owner.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.Owner.V)))
+	buf = append(buf, v.Owner.V...)
+	buf = store.EncodeCompact(buf, uint64(len(v.KeyHash)))
+	buf = append(buf, v.KeyHash...)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.RateLimit))
+	if v.IsActive {
+		buf = append(buf, 1)
+	} else {
+		buf = append(buf, 0)
+	}
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CreatedAt))
+	return buf, nil
+}
+
+// Decode SCALE 解码 APIKeyInfoV2。
+func (v *APIKeyInfoV2) Decode(data []byte) (int, error) {
+	off := 0
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading OwnerKey")
+	}
+	v.OwnerKey = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Prefix")
+		}
+		v.Prefix = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading Owner.T")
+	}
+	v.Owner.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Owner.V")
+		}
+		v.Owner.V = make([]byte, n)
+		copy(v.Owner.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading KeyHash")
+		}
+		v.KeyHash = make([]byte, n)
+		copy(v.KeyHash, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading RateLimit")
+	}
+	v.RateLimit = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading IsActive")
+	}
+	v.IsActive = data[off] != 0
+	off++
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CreatedAt")
+	}
+	v.CreatedAt = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
+
 // Encode SCALE 编码 DailyUsage。
 func (v *DailyUsage) Encode() ([]byte, error) {
 	var buf []byte

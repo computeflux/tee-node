@@ -2546,6 +2546,16 @@
           },
           {
             "docs": [],
+            "label": "prefix",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
+          },
+          {
+            "docs": [],
             "label": "rate_limit",
             "type": {
               "displayName": [
@@ -3022,6 +3032,10 @@
                 "type": 3
               },
               {
+                "name": "Prefix",
+                "type": 14
+              },
+              {
                 "name": "Owner",
                 "type": 13
               },
@@ -3045,7 +3059,7 @@
           }
         },
         "path": [
-          "APIKeyInfo"
+          "APIKeyInfoV2"
         ]
       }
     },

@@ -15,7 +15,7 @@ type bftMsgWrapper struct {
 
 func (w *bftMsgWrapper) Reset()         { w.data = nil }
 func (w *bftMsgWrapper) String() string { return fmt.Sprintf("bftMsgWrapper(%d bytes)", len(w.data)) }
-func (w *bftMsgWrapper) ProtoMessage()    {}
+func (w *bftMsgWrapper) ProtoMessage()  {}
 
 // Marshal satisfies gogo's proto.Marshaler so cometbft can send the wrapper without
 // building reflection tables for it.

@@ -36,13 +36,14 @@ type Gateway struct {
 	credit_useds          *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:credit_useds"`
 	models                *store.IndexedList[uint64, ModelInfo]                           `store:"keyPfx:models"`
 	providers             *store.IndexedList[uint64, ProviderInfo]                        `store:"keyPfx:providers"`
-	providerByOwner       *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:provider_by_owner"`       // owner → providerID（一人一 provider）
-	providerCredits       *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:provider_credit"`         // providerID → accumulated credits
-	routes                *store.IndexedList[uint64, ModelRoute]                          `store:"keyPfx:routes"`                  // 模型路由
-	modelByRoute          *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:model_by_route"`          // routeID → modelCount（反向索引）
-	modelReports          *store.IndexedList[uint64, ModelReport]                         `store:"keyPfx:model_reports"`           // 用户举报
-	modelAudits           *store.IndexedList[uint64, ModelAudit]                          `store:"keyPfx:model_audits"`            // 系统检查记录
-	apiKeys               *store.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:api_key"`                 // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
+	providerByOwner       *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:provider_by_owner"` // owner → providerID（一人一 provider）
+	providerCredits       *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:provider_credit"`   // providerID → accumulated credits
+	routes                *store.IndexedList[uint64, ModelRoute]                          `store:"keyPfx:routes"`            // 模型路由
+	modelByRoute          *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:model_by_route"`    // routeID → modelCount（反向索引）
+	modelReports          *store.IndexedList[uint64, ModelReport]                         `store:"keyPfx:model_reports"`     // 用户举报
+	modelAudits           *store.IndexedList[uint64, ModelAudit]                          `store:"keyPfx:model_audits"`      // 系统检查记录
+	APIKeys               *store.IndexedStore[string, APIKeyInfo]                         `store:"keyPfx:api_key"`           // hex(keyHash) → APIKeyInfo，带 OwnerKey exact 索引
+	APIKeysV2             *store.IndexedStore[string, APIKeyInfoV2]                       `store:"keyPfx:v2_api_key"`
 	rechargeHistory       *store.StoreList2D[store.UniAddr, uint32, RechargeRecord]       `store:"keyPfx:recharge_history"`        // user → []RechargeRecord
 	transferHistory       *store.StoreList2D[store.UniAddr, uint32, TransferRecord]       `store:"keyPfx:transfer_history"`        // user → []TransferRecord
 	settlementHistory     *store.StoreList2D[uint64, uint32, ProviderSettlementRecord]    `store:"keyPfx:settlement_history"`      // providerID → []SettlementRecord

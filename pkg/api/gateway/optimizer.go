@@ -214,12 +214,9 @@ func initUsageSettler() {
 		go func() {
 			settleTicker = time.NewTicker(SettleInterval)
 			defer settleTicker.Stop()
-			for {
-				select {
-				case <-settleTicker.C:
-					if err := settlePendingUsage(); err != nil {
-						GATEWAYLOG().Printf("[SETTLE] failed: %v", err)
-					}
+			for range settleTicker.C {
+				if err := settlePendingUsage(); err != nil {
+					GATEWAYLOG().Printf("[SETTLE] failed: %v", err)
 				}
 			}
 		}()

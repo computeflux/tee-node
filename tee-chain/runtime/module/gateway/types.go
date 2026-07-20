@@ -171,6 +171,19 @@ type APIKeyInfo struct {
 	CreatedAt uint64        `json:"createdAt"`
 }
 
+// APIKeyInfo 用户 API Key（仅存哈希，原始 key 绝不上链）
+// TEE 提供方收到明文 key 后 blake2b 哈希，再以此查询链上记录
+// scale-codec-gen:generate
+type APIKeyInfoV2 struct {
+	OwnerKey  uint64        `json:"ownerKey" idx:"exact"` // blake2b(owner.V)[:8] 转 uint64，用于索引
+	Prefix    string        `json:"prefix"`
+	Owner     store.UniAddr `json:"owner"`
+	KeyHash   []byte        `json:"keyHash"`   // blake2b(apiKey), 32 bytes
+	RateLimit uint32        `json:"rateLimit"` // 每分钟最大请求数, 0=无限制
+	IsActive  bool          `json:"isActive"`
+	CreatedAt uint64        `json:"createdAt"`
+}
+
 // Settlement 单笔结算记录
 // scale-codec-gen:generate
 type Settlement struct {

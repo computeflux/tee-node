@@ -99,6 +99,15 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 		return m.Leave()
 	case [4]byte{0x8d, 0x6e, 0x0f, 0x8c}:
 		return m.LeaveWithBurn()
+	case [4]byte{0xa6, 0x2c, 0x84, 0xf8}:
+		if err := store.RequireArgLen(args, 1, "migration"); err != nil {
+			return err
+		}
+		newVersion, err := store.DecodeScaleArgBytes[uint32](args[0])
+		if err != nil {
+			return fmt.Errorf("migration: newVersion: %w", err)
+		}
+		return m.Migration(newVersion)
 	case [4]byte{0x9b, 0x7b, 0xfa, 0x69}:
 		if err := store.RequireArgLen(args, 2, "mint"); err != nil {
 			return err
@@ -132,15 +141,6 @@ func (d GovMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("runtime_upgrade: upgrade: %w", err)
 		}
 		return m.RuntimeUpgrade(upgrade)
-	case [4]byte{0xa6, 0x2c, 0x84, 0xf8}:
-		if err := store.RequireArgLen(args, 1, "migration"); err != nil {
-			return err
-		}
-		newVersion, err := store.DecodeScaleArgBytes[uint32](args[0])
-		if err != nil {
-			return fmt.Errorf("migration: newVersion: %w", err)
-		}
-		return m.Migration(newVersion)
 	case [4]byte{0x29, 0x87, 0xd4, 0xba}:
 		if err := store.RequireArgLen(args, 1, "set_default_track"); err != nil {
 			return err

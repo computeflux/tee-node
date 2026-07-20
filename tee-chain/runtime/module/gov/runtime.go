@@ -55,15 +55,12 @@ func (d GovMutation) RuntimeUpgrade(upgrade PendingRuntimeUpgrade) error {
 	return nil
 }
 
-func (d GovMutation) Migration(newVersion uint32) error {
-	if !d.api.CallbySystem() {
+func (g GovMutation) Migration(newVersion uint32) error {
+	if !g.api.CallbySystem() {
 		return errors.New("must call by system")
 	}
 
-	if newVersion == 14 {
-		return migrations.V14()
-	}
-	return nil
+	return migrations.Migration(newVersion, g.api)
 }
 
 // RuntimeVersion 查询当前运行时版本号。

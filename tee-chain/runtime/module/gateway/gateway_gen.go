@@ -217,18 +217,22 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.Recharge(user, amount, nonce)
 	case [4]byte{0xf8, 0xea, 0x1a, 0x7b}:
-		if err := store.RequireArgLen(args, 2, "register_a_p_i_key"); err != nil {
+		if err := store.RequireArgLen(args, 3, "register_a_p_i_key"); err != nil {
 			return err
 		}
 		keyHash, err := store.DecodeScaleArgBytes[[]byte](args[0])
 		if err != nil {
 			return fmt.Errorf("register_a_p_i_key: keyHash: %w", err)
 		}
-		rateLimit, err := store.DecodeScaleArgBytes[uint32](args[1])
+		prefix, err := store.DecodeScaleArgBytes[string](args[1])
+		if err != nil {
+			return fmt.Errorf("register_a_p_i_key: prefix: %w", err)
+		}
+		rateLimit, err := store.DecodeScaleArgBytes[uint32](args[2])
 		if err != nil {
 			return fmt.Errorf("register_a_p_i_key: rateLimit: %w", err)
 		}
-		return m.RegisterAPIKey(keyHash, rateLimit)
+		return m.RegisterAPIKey(keyHash, prefix, rateLimit)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
 		if err := store.RequireArgLen(args, 11, "register_model"); err != nil {
 			return err
@@ -1088,7 +1092,8 @@ func NewGateway(api store.ContractApi) *Gateway {
 		modelByRoute:          &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "model_by_route_"},
 		modelReports:          store.NewIndexedList[uint64, ModelReport]("gateway", "model_reports_next_id", "model_reports_"),
 		modelAudits:           store.NewIndexedList[uint64, ModelAudit]("gateway", "model_audits_next_id", "model_audits_"),
-		apiKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
+		APIKeys:               store.NewIndexedStore[string, APIKeyInfo]("gateway", "api_key_"),
+		APIKeysV2:             store.NewIndexedStore[string, APIKeyInfoV2]("gateway", "v2_api_key_"),
 		rechargeHistory:       store.NewStoreList2D[store.UniAddr, uint32, RechargeRecord]("gateway", "recharge_history_k1_to_id_", "recharge_history_k1_length_", "recharge_history_k2_next_", "recharge_history_store_"),
 		transferHistory:       store.NewStoreList2D[store.UniAddr, uint32, TransferRecord]("gateway", "transfer_history_k1_to_id_", "transfer_history_k1_length_", "transfer_history_k2_next_", "transfer_history_store_"),
 		settlementHistory:     store.NewStoreList2D[uint64, uint32, ProviderSettlementRecord]("gateway", "settlement_history_k1_to_id_", "settlement_history_k1_length_", "settlement_history_k2_next_", "settlement_history_store_"),

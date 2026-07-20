@@ -1,5 +1,7 @@
 package migrations
 
-func V14() error {
+import "github.com/computeflux/tee-provider/tee-chain/runtime/store"
+
+func V14(api store.ContractApi) error {
 	return nil
 }

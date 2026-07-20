@@ -67,7 +67,6 @@ func (r *mutationResolver) UploadSecret(ctx context.Context, index string, secre
 	}
 
 	// TODO: submit as ContractCall to gateway after method is added (SysCall_HubCall removed)
-	_ = call
 	return false, gqlerror.Errorf("UploadSecret: not yet implemented in new sync flow")
 }
 

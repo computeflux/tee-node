@@ -196,7 +196,7 @@ func TestGateway_RegisterAndLookupAPIKey(t *testing.T) {
 	keyHash := make([]byte, 32)
 	copy(keyHash, []byte("hash-of-api-key-123456789012345"))
 
-	err := m.RegisterAPIKey(keyHash, 100)
+	err := m.RegisterAPIKey(keyHash, "test", 100)
 	require.NoError(t, err)
 
 	info, err := q.LookupAPIKey(keyHash)
@@ -212,9 +212,9 @@ func TestGateway_RegisterAPIKey_Duplicate(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	keyHash := make([]byte, 32)
-	require.NoError(t, m.RegisterAPIKey(keyHash, 100))
+	require.NoError(t, m.RegisterAPIKey(keyHash, "test", 100))
 
-	err := m.RegisterAPIKey(keyHash, 200)
+	err := m.RegisterAPIKey(keyHash, "test", 200)
 	assert.ErrorContains(t, err, "already registered")
 }
 
@@ -224,7 +224,7 @@ func TestGateway_RevokeAPIKey(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	keyHash := make([]byte, 32)
-	require.NoError(t, m.RegisterAPIKey(keyHash, 100))
+	require.NoError(t, m.RegisterAPIKey(keyHash, "test", 100))
 	require.NoError(t, m.RevokeAPIKey(keyHash))
 
 	info, err := q.LookupAPIKey(keyHash)
@@ -238,7 +238,7 @@ func TestGateway_RevokeAPIKey_NotOwner(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	keyHash := make([]byte, 32)
-	require.NoError(t, m.RegisterAPIKey(keyHash, 100))
+	require.NoError(t, m.RegisterAPIKey(keyHash, "test", 100))
 
 	// Change caller on same store
 	rt.Caller = store.UniAddr{T: 1, V: []byte{0x02}}
@@ -255,8 +255,8 @@ func TestGateway_GetAPIKeysByOwner(t *testing.T) {
 	keyHash2 := make([]byte, 32)
 	keyHash2[0] = 0x01
 
-	require.NoError(t, m.RegisterAPIKey(keyHash1, 100))
-	require.NoError(t, m.RegisterAPIKey(keyHash2, 200))
+	require.NoError(t, m.RegisterAPIKey(keyHash1, "test", 100))
+	require.NoError(t, m.RegisterAPIKey(keyHash2, "test", 200))
 
 	keys, err := q.GetAPIKeysByOwner(rt.Caller)
 	require.NoError(t, err)
@@ -400,7 +400,7 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 	err := m.SettleUsageWithRoute([]SettlementWithRoute{
 		{
 			User:       user,
-			RouteID: store.NewNone[uint64](),
+			RouteID:    store.NewNone[uint64](),
 			ModelID:    0,
 			ProviderID: 0,
 			TokenIn:    1000,
@@ -437,7 +437,7 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	nonce := []byte{0x01, 0x02, 0x03, 0x04}
 	record := SettlementWithRoute{
 		User:       user,
-		RouteID: store.NewNone[uint64](),
+		RouteID:    store.NewNone[uint64](),
 		ModelID:    0,
 		ProviderID: 0,
 		TokenIn:    1000,
