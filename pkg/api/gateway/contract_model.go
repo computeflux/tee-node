@@ -15,16 +15,17 @@ var gatewayModelCache = struct {
 	mu          sync.RWMutex
 	models      []cgateway.ModelInfo
 	nameMap     map[string]cgateway.ModelInfo // Name → active model，O(1) 查询
+	nameToID    map[string]uint64             // Name → on-chain model ID
 	lastRefresh time.Time
 }{}
 
 const gatewayModelCacheTTL = 5 * time.Second
 
 // fetchGatewayModelsFromContract 从合约拉取活跃模型列表，同时构建 nameMap。
-func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway.ModelInfo) {
+func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway.ModelInfo, map[string]uint64) {
 	bridge := getBridge()
 	if bridge == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	models, err := teechain.WithRuntime(bridge, func(runtime *contracts.Runtime) ([]cgateway.ModelInfoWithID, error) {
@@ -32,18 +33,20 @@ func fetchGatewayModelsFromContract() ([]cgateway.ModelInfo, map[string]cgateway
 	})
 	if err != nil {
 		GATEWAYLOG().Printf("[GATEWAY] contract list models error: %v", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	out := make([]cgateway.ModelInfo, 0, len(models))
 	nameMap := make(map[string]cgateway.ModelInfo, len(models))
+	nameToID := make(map[string]uint64, len(models))
 	for _, m := range models {
 		if m.Data.IsActive {
 			nameMap[m.Data.Name] = m.Data
+			nameToID[m.Data.Name] = m.ID
 		}
 		out = append(out, m.Data)
 	}
-	return out, nameMap
+	return out, nameMap, nameToID
 }
 
 // getCachedGatewayModels 返回缓存的合约模型列表。
@@ -56,13 +59,13 @@ func getCachedGatewayModels() []cgateway.ModelInfo {
 	}
 	gatewayModelCache.mu.RUnlock()
 
-	models, nameMap := fetchGatewayModelsFromContract()
+	models, nameMap, nameToID := fetchGatewayModelsFromContract()
 
 	gatewayModelCache.mu.Lock()
 	gatewayModelCache.models = models
 	gatewayModelCache.nameMap = nameMap
+	gatewayModelCache.nameToID = nameToID
 	gatewayModelCache.lastRefresh = time.Now()
 	gatewayModelCache.mu.Unlock()
 	return models
 }
-

@@ -108,6 +108,8 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			st, msg, typ := mapScheduleError(err)
 			writeProtocolError(w, r, st, msg, typ)
+			GATEWAYLOG().Printf("[relay] stream schedule error model=%s: %v", modelKey, err)
+			recordScheduleFailure(token, modelKey)
 			return
 		}
 		ep := res.Meta.Endpoint
@@ -128,7 +130,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			// http.ErrNotSupported 表示底层连接不支持 per-request 写超时（如被中间件包装），
 			// 这是预期内的退化路径，600s WriteTimeout 仍可兜底，不再刷噪音日志。
 			if !errors.Is(err, http.ErrNotSupported) {
-				fmt.Printf("[relay] stream: clear write deadline failed: %v\n", err)
+				GATEWAYLOG().Printf("[relay] stream: clear write deadline failed model=%s: %v", modelKey, err)
 			}
 		}
 
@@ -138,11 +140,11 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			// 计费按已发出 usage 走；指标也不计入失败窗口，避免污染熔断统计。
 			// 其他错误（含 context.DeadlineExceeded、transport 失败等）仍按失败处理。
 			if errors.Is(serr, context.Canceled) {
-				fmt.Printf("[relay] stream aborted by client model=%s provider=%d\n", modelKey, ep.ContractProviderID)
+				GATEWAYLOG().Printf("[relay] stream aborted by client model=%s provider=%d", modelKey, ep.ContractProviderID)
 			} else {
 				EmitProviderMetric(ep.ContractProviderID, false)
-				// header 多半已发出,无法再写 error body,仅记录。
-				fmt.Printf("[relay] stream error model=%s provider=%d: %v\n", modelKey, ep.ContractProviderID, serr)
+				GATEWAYLOG().Printf("[relay] stream error model=%s provider=%d: %v", modelKey, ep.ContractProviderID, serr)
+				recordRelayFailure(token, ep)
 			}
 			recordRelayUsage(token, ep, usage)
 			return
@@ -156,6 +158,8 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		st, msg, typ := mapScheduleError(err)
 		writeProtocolError(w, r, st, msg, typ)
+		GATEWAYLOG().Printf("[relay] schedule error model=%s: %v", modelKey, err)
+		recordScheduleFailure(token, modelKey)
 		return
 	}
 	ep := res.Meta.Endpoint
@@ -174,13 +178,15 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		if conv != nil {
 			EmitProviderMetric(ep.ContractProviderID, false)
 			writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
+			GATEWAYLOG().Printf("[relay] convert error model=%s provider=%d: %v", modelKey, ep.ContractProviderID, conv)
+			recordRelayFailure(token, ep)
 			return
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(outBody); err != nil {
-		fmt.Printf("[relay] write response body: %v\n", err)
+		GATEWAYLOG().Printf("[relay] write response body error model=%s provider=%d: %v", modelKey, ep.ContractProviderID, err)
 	}
 	EmitProviderMetric(ep.ContractProviderID, true)
 	recordRelayUsage(token, ep, usage)

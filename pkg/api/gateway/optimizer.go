@@ -7,8 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+	"github.com/computeflux/tee-provider/pkg/util"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
@@ -24,6 +26,7 @@ type usageRecord struct {
 	tokenIn     uint64
 	tokenOut    uint64
 	cachedToken uint64
+	failCount   uint16 // 0 = 成功调用，1 = 失败调用
 }
 
 var (
@@ -49,6 +52,7 @@ func initUsageWriter() {
 					existing, _ := types.DBGetJson[types.GatewayDailyUsage](types.SECRET_DB, "GATEWAY", "usage:"+k)
 					if existing != nil {
 						existing.Count += u.Count
+						existing.FailCount += u.FailCount
 						existing.TokenIn += u.TokenIn
 						existing.TokenOut += u.TokenOut
 						existing.CachedToken += u.CachedToken
@@ -66,7 +70,8 @@ func initUsageWriter() {
 				case r := <-usageCh:
 					key := uintToStr(r.tokenID) + "_" + uintToStr(r.routeID) + "_" + uintToStr(r.model.ID)
 					if u, ok := batch[key]; ok {
-						u.Count++
+						u.Count += 1 - uint16(r.failCount)
+						u.FailCount += r.failCount
 						u.TokenIn += r.tokenIn
 						u.TokenOut += r.tokenOut
 						u.CachedToken += r.cachedToken
@@ -76,7 +81,8 @@ func initUsageWriter() {
 							ModelID:     r.model.ID,
 							ProviderID:  r.model.Data.ProviderID,
 							RouteID:     r.routeID,
-							Count:       1,
+							Count:       1 - uint16(r.failCount),
+							FailCount:   r.failCount,
 							TokenIn:     r.tokenIn,
 							TokenOut:    r.tokenOut,
 							CachedToken: r.cachedToken,
@@ -95,8 +101,55 @@ var recordUsageAsyncFn = recordUsageAsync
 
 func recordUsageAsync(user chaintypes.UniAddr, tokenID uint64, model *cgateway.ModelInfoWithID, routeID uint64, in uint64, out uint64, cachedTokens uint64) {
 	initUsageWriter()
-	// fmt.Println("[OPTIMIZER]", model.Data.Owner.String(), model.Data.ProviderID, model.Data.Name, tokens, cachedTokens)
-	usageCh <- usageRecord{user, tokenID, model, routeID, in, out, cachedTokens}
+	usageCh <- usageRecord{user: user, tokenID: tokenID, model: model, routeID: routeID, tokenIn: in, tokenOut: out, cachedToken: cachedTokens}
+}
+
+// recordRelayFailure 记录一次失败调用，供结算时上链 FailCount。
+func recordRelayFailure(token *types.GatewayTokenInfo, ep *scheduler.Endpoint) {
+	if token == nil || ep == nil {
+		return
+	}
+	initUsageWriter()
+	model := &cgateway.ModelInfoWithID{
+		ID:   ep.ModelID,
+		Data: cgateway.ModelInfo{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
+	}
+	util.LogError("[RelayFailure]", ep.ContractProviderID, ep.ModelName)
+	usageCh <- usageRecord{user: token.Addr, tokenID: token.ID, model: model, routeID: ep.RouteID, failCount: 1}
+}
+
+// recordScheduleFailure 记录一次调度失败（无 endpoint），从缓存查找 model 信息。
+func recordScheduleFailure(token *types.GatewayTokenInfo, modelKey string) {
+	if token == nil || modelKey == "" {
+		return
+	}
+
+	// 确保缓存已填充（TTL 内命中则直接返回）
+	getCachedGatewayModels()
+
+	gatewayModelCache.mu.RLock()
+	m, ok := gatewayModelCache.nameMap[modelKey]
+	id := gatewayModelCache.nameToID[modelKey]
+	if !ok {
+		// 尝试去掉 provider 前缀再查 (如 "openai/gpt-4" → "gpt-4")
+		if _, bare := parseProviderModel(modelKey); bare != modelKey {
+			m, ok = gatewayModelCache.nameMap[bare]
+			id = gatewayModelCache.nameToID[bare]
+		}
+	}
+	gatewayModelCache.mu.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	initUsageWriter()
+	model := &cgateway.ModelInfoWithID{
+		ID:   id,
+		Data: m,
+	}
+	util.LogError("[ScheduleFailure]", m.ProviderID, m.Name)
+	usageCh <- usageRecord{user: token.Addr, tokenID: token.ID, model: model, routeID: 0, failCount: 1}
 }
 
 func uintToStr(n uint64) string {
@@ -232,7 +285,7 @@ func settlePendingUsage() error {
 			TokenOut:    r.TokenOut,
 			CachedToken: r.CachedToken,
 			Count:       r.Count,
-			FailCount:   0,
+			FailCount:   r.FailCount,
 			Nonce:       nonce,
 		})
 		_ = keys[i]

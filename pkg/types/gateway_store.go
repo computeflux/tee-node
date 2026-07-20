@@ -39,6 +39,7 @@ type GatewayDailyUsage struct {
 	ModelID     uint64        `json:"modelId"`
 	RouteID     uint64        `json:"routeId"`
 	Count       uint16        `json:"count"`
+	FailCount   uint16        `json:"failCount"`
 	TokenIn     uint64        `json:"TokenIn"`
 	TokenOut    uint64        `json:"tokensOut"`
 	CachedToken uint64        `json:"cachedToken"`

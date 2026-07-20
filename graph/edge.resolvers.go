@@ -249,7 +249,13 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 
 		modelIds := make([]int, 0, len(d.ModelIds))
 		for _, modelID := range d.ModelIds {
-			modelIds = append(modelIds, int(modelID))
+			if _, ok := modelIDSet[modelID]; ok {
+				modelIds = append(modelIds, int(modelID))
+			}
+		}
+
+		if len(modelIds) == 0 {
+			continue
 		}
 
 		result = append(result, &model.ModelInfoWithProvider{
