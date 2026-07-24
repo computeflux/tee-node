@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -22,7 +23,7 @@ func ConvertOpenAIRequestToGemini(body []byte, targetProvider uint16) ([]byte, e
 		return nil, fmt.Errorf("parse openai request: %w", err)
 	}
 
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	chatReq := oaiReq.ToBifrostChatRequest(ctx)
 	if chatReq == nil {
 		return nil, fmt.Errorf("ToBifrostChatRequest returned nil")

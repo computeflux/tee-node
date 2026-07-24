@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -20,7 +21,7 @@ func ConvertOpenAIRequestToAnthropic(body []byte, targetProvider uint16) ([]byte
 		return nil, fmt.Errorf("parse openai request: %w", err)
 	}
 
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	chatReq := oaiReq.ToBifrostChatRequest(ctx)
 	if chatReq == nil {
 		return nil, fmt.Errorf("ToBifrostChatRequest returned nil")
@@ -67,7 +68,7 @@ func ConvertAnthropicResponseToOpenAI(body []byte) (out []byte, usage *schemas.B
 	if err = json.Unmarshal(body, &antResp); err != nil {
 		return nil, nil, fmt.Errorf("parse anthropic response: %w", err)
 	}
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	responsesResp := antResp.ToBifrostResponsesResponse(ctx)
 	if responsesResp == nil {
 		return nil, nil, fmt.Errorf("ToBifrostResponsesResponse returned nil")

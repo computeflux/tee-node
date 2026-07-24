@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -30,7 +31,7 @@ func ConvertAnthropicRequestToOpenAI(body []byte, targetProvider uint16) (out []
 		stream = *anthropicReq.Stream
 	}
 
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	openAIReq := openai.ToOpenAIChatRequest(ctx, chatReq)
 	if openAIReq == nil {
 		return nil, fmt.Errorf("failed to convert to openai request")
@@ -54,7 +55,7 @@ func convertAnthropicBodyToChatReq(body []byte, targetProvider uint16) (*schemas
 		return nil, fmt.Errorf("parse anthropic request: %w", err)
 	}
 
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	responsesReq := anthropicReq.ToBifrostResponsesRequest(ctx)
 	if responsesReq == nil {
 		return nil, fmt.Errorf("ToBifrostResponsesRequest returned nil")
