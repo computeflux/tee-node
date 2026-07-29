@@ -63,7 +63,42 @@ type ClaimTaskResult {
   totalPoints: String!
 }
 
-extend type Query {
+type CheckinConfig {
+  testMode: Boolean!
+}
+
+type CheckinResult {
+  success: Boolean!
+  streak: Int!
+  pointsAwarded: String!
+  totalPoints: String!
+  unlockedDay3: Boolean!
+  unlockedDay7: Boolean!
+}
+
+type QuizQuestion {
+  id: String!
+  day: Int!
+  difficulty: String!
+  category: String!
+  question: String!
+  options: [String!]!
+}
+
+type QuizProgress {
+  total: Int!
+  answered: Int!
+  earned: String!
+}
+
+type QuizAnswerResult {
+  correct: Boolean!
+  pointsAwarded: String!
+  totalPoints: String!
+  explanation: String!
+}
+
+type Query {
   earlyAccessUser(user: String!): EarlyAccessUser!
   earlyAccessUserByEmail(email: String!): EarlyAccessUser!
   earlyAccessUserByReferralCode(referralCode: String!): EarlyAccessUser!
@@ -72,12 +107,19 @@ extend type Query {
   earlyAccessPointsHistory(user: String!, offset: Int, limit: Int): PointsHistory!
   earlyAccessStats: EarlyAccessStats!
   earlyAccessTasks(wallet: String!): [TaskStatus!]!
+  earlyAccessExport: String!
+  checkinStreak(wallet: String!): Int!
+  checkinConfig: CheckinConfig!
+  quizQuestions(wallet: String!, day: Int!): [QuizQuestion!]!
+  quizProgress(wallet: String!, day: Int!): QuizProgress!
 }
 
-extend type Mutation {
+type Mutation {
   joinEarlyAccess(wallet: String!, email: String, referralCode: String): JoinEarlyAccessResult!
   updateReferralCode(wallet: String!, referralCode: String!): JoinEarlyAccessResult!
   claimEarlyAccessTask(wallet: String!, task: EarlyAccessTaskType!): ClaimTaskResult!
   joinDiscord(wallet: String!, message: String!, signature: String!): ClaimTaskResult!
   joinTelegram(wallet: String!, message: String!, signature: String!): ClaimTaskResult!
+  dailyCheckin(wallet: String!, date: String): CheckinResult!
+  submitQuizAnswer(wallet: String!, questionId: String!, answerIndex: Int!): QuizAnswerResult!
 }

@@ -1,0 +1,322 @@
+[
+  {
+    "id": "D3-001",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "ComputeFlux Basics",
+    "question": "ComputeFlux 的主要目标是什么？",
+    "options": [
+      "提供去中心化 AI 算力访问",
+      "销售手机硬件",
+      "运营传统银行",
+      "开发电子游戏主机"
+    ],
+    "correct_answer": 0,
+    "explanation": "ComputeFlux 的核心方向是连接 AI 开发者、AI Agent 与分布式 GPU 算力资源。",
+    "source_type": "computeflux"
+  },
+  {
+    "id": "D3-002",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "ComputeFlux Basics",
+    "question": "ComputeFlux 计划提供哪种兼容接口？",
+    "options": [
+      "OpenAI-compatible API",
+      "FTP-only API",
+      "Email-only interface",
+      "Bluetooth API"
+    ],
+    "correct_answer": 0,
+    "explanation": "OpenAI-compatible API 可以降低开发者迁移和集成不同模型的成本。",
+    "source_type": "computeflux"
+  },
+  {
+    "id": "D3-003",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Fundamentals",
+    "question": "AI 推理（inference）通常指什么？",
+    "options": [
+      "使用训练好的模型生成结果",
+      "购买显卡",
+      "删除训练数据",
+      "设计网页颜色"
+    ],
+    "correct_answer": 0,
+    "explanation": "推理是模型训练完成后，根据输入生成预测或内容的过程。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-004",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Fundamentals",
+    "question": "GPU 为什么常用于 AI 计算？",
+    "options": [
+      "擅长并行计算",
+      "只能存储文本",
+      "只用于播放音乐",
+      "不能处理矩阵运算"
+    ],
+    "correct_answer": 0,
+    "explanation": "GPU 能高效执行大量并行矩阵运算，因此适合深度学习训练和推理。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-005",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "Large Language Models",
+    "question": "LLM 是什么的缩写？",
+    "options": [
+      "Large Language Model",
+      "Local Logic Machine",
+      "Long Latency Memory",
+      "Linear Learning Map"
+    ],
+    "correct_answer": 0,
+    "explanation": "LLM 指 Large Language Model，即大型语言模型。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-006",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Fundamentals",
+    "question": "模型训练和模型推理的主要区别是什么？",
+    "options": [
+      "训练用于学习参数，推理用于生成结果",
+      "两者完全相同",
+      "推理只发生在数据库中",
+      "训练不需要数据"
+    ],
+    "correct_answer": 0,
+    "explanation": "训练阶段优化模型参数；推理阶段使用已训练模型处理新输入。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-007",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "APIs",
+    "question": "API 的主要作用是什么？",
+    "options": [
+      "让不同软件系统相互通信",
+      "增加显示器亮度",
+      "给电脑充电",
+      "替代所有数据库"
+    ],
+    "correct_answer": 0,
+    "explanation": "API 定义了软件之间调用功能和交换数据的方式。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-008",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Agents",
+    "question": "AI Agent 通常是什么？",
+    "options": [
+      "能够感知、决策并执行任务的软件系统",
+      "一种显卡品牌",
+      "一种数据库格式",
+      "一种加密货币钱包"
+    ],
+    "correct_answer": 0,
+    "explanation": "AI Agent 通常会接收目标、调用工具、做出决策并执行任务。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-009",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "ComputeFlux Basics",
+    "question": "ComputeFlux 想连接哪些参与者？",
+    "options": [
+      "AI 开发者、AI Agent 与 GPU 提供者",
+      "只有游戏玩家",
+      "只有银行",
+      "只有手机用户"
+    ],
+    "correct_answer": 0,
+    "explanation": "ComputeFlux 的定位之一是连接算力需求方和算力提供方。",
+    "source_type": "computeflux"
+  },
+  {
+    "id": "D3-010",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "Decentralized Compute",
+    "question": "去中心化算力网络的一个潜在优势是什么？",
+    "options": [
+      "减少对单一云服务商的依赖",
+      "保证所有任务零成本",
+      "完全不需要网络",
+      "永远不会出现故障"
+    ],
+    "correct_answer": 0,
+    "explanation": "分布式供给可以降低对单一中心化基础设施的依赖。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-011",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Safety",
+    "question": "AI 幻觉（hallucination）指什么？",
+    "options": [
+      "模型生成看似合理但不准确的信息",
+      "GPU 温度过低",
+      "网页加载太快",
+      "密码被加密"
+    ],
+    "correct_answer": 0,
+    "explanation": "AI 幻觉是模型输出不真实或无法由证据支持的信息。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-012",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "Privacy",
+    "question": "为什么 AI 应用需要重视隐私？",
+    "options": [
+      "用户输入可能包含敏感数据",
+      "因为模型不能处理文本",
+      "因为 GPU 不支持网络",
+      "因为所有数据都公开"
+    ],
+    "correct_answer": 0,
+    "explanation": "提示词、文档和业务数据可能包含敏感或专有信息。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-013",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "TEE",
+    "question": "TEE 的主要用途是什么？",
+    "options": [
+      "在受保护环境中执行代码和处理数据",
+      "提升屏幕分辨率",
+      "压缩视频文件",
+      "替代互联网连接"
+    ],
+    "correct_answer": 0,
+    "explanation": "可信执行环境可帮助隔离敏感代码和数据，降低被外部篡改或窥探的风险。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-014",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Fundamentals",
+    "question": "Token 在语言模型中通常指什么？",
+    "options": [
+      "模型处理文本时使用的基本单位",
+      "一种显卡",
+      "一种操作系统",
+      "一种数据库表"
+    ],
+    "correct_answer": 0,
+    "explanation": "语言模型会把文本拆分成 token 后进行处理。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-015",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "APIs",
+    "question": "OpenAI-compatible 接口的一个优势是什么？",
+    "options": [
+      "开发者可复用现有工具和代码",
+      "所有模型输出完全相同",
+      "无需身份验证",
+      "自动消除所有费用"
+    ],
+    "correct_answer": 0,
+    "explanation": "兼容接口可让现有 SDK、工具和代码更容易迁移到新的模型服务。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-016",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "ComputeFlux Product",
+    "question": "ComputeFlux 的统一网关主要帮助解决什么问题？",
+    "options": [
+      "连接不同模型与算力来源",
+      "替代所有操作系统",
+      "生产实体显卡",
+      "管理家庭电器"
+    ],
+    "correct_answer": 0,
+    "explanation": "统一网关让应用可以通过一致接口访问不同 AI 模型和算力。",
+    "source_type": "computeflux"
+  },
+  {
+    "id": "D3-017",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "AI Fundamentals",
+    "question": "下列哪项最可能影响 AI 推理速度？",
+    "options": [
+      "模型大小和可用算力",
+      "网页背景颜色",
+      "键盘品牌",
+      "文件名长度"
+    ],
+    "correct_answer": 0,
+    "explanation": "模型规模、硬件能力、批量大小和输入长度都会影响推理速度。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-018",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "Responsible AI",
+    "question": "负责任地使用 AI 时，较好的做法是什么？",
+    "options": [
+      "核实重要输出并保护敏感数据",
+      "无条件相信所有回答",
+      "公开所有私人数据",
+      "隐藏模型限制"
+    ],
+    "correct_answer": 0,
+    "explanation": "重要场景下应验证输出、保护隐私并向用户说明限制。",
+    "source_type": "general_ai"
+  },
+  {
+    "id": "D3-019",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "ComputeFlux Basics",
+    "question": "GPU 提供者在 ComputeFlux 网络中的潜在角色是什么？",
+    "options": [
+      "贡献可用算力资源",
+      "发布天气预报",
+      "制造所有 AI 模型",
+      "管理用户邮箱"
+    ],
+    "correct_answer": 0,
+    "explanation": "GPU 提供者可以向网络贡献计算资源，供开发者和 AI Agent 使用。",
+    "source_type": "computeflux"
+  },
+  {
+    "id": "D3-020",
+    "day": 3,
+    "difficulty": "beginner",
+    "category": "Decentralized Compute",
+    "question": "分布式算力市场需要解决的一个关键问题是什么？",
+    "options": [
+      "任务结果的可信性和资源质量",
+      "让所有用户使用同一密码",
+      "取消所有日志",
+      "禁止模型更新"
+    ],
+    "correct_answer": 0,
+    "explanation": "分布式环境下需要验证提供者、执行过程、结果和服务质量。",
+    "source_type": "general_ai"
+  }
+]
