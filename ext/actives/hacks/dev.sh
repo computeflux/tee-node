@@ -22,6 +22,8 @@ echo "[dev] CHECKIN_TEST_MODE=true (test mode enabled)"
 
 export CHECKIN_TEST_MODE=true
 
+# FLUX_TEST on-chain token minting (optional — edit flux_config.json to enable)
+
 if [ -n "$DATA_FILE" ]; then
     go run ./cmd/server -port="$PORT" -data="$DATA_FILE" -db="./data"
 else

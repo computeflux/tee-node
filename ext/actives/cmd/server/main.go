@@ -51,6 +51,20 @@ func main() {
 		return
 	}
 
+	// Initialize on-chain FLUX_TEST token minting
+	// Initialize on-chain FLUX_TEST token minting (optional — skips if flux_config.json not found)
+	if err := actives.InitFluxChain("flux_config.json"); err != nil {
+		fmt.Fprintf(os.Stderr, "init flux chain: %v\n", err)
+		os.Exit(1)
+	}
+
+	if addr := actives.FluxSigner(); addr != "" {
+		util.LogWithBlue("FLUX", fmt.Sprintf("Signer: %s", addr))
+	}
+
+	// Start background worker for auto-minting historical points
+	actives.StartMintWorker()
+
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},

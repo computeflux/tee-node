@@ -88,16 +88,26 @@ type TaskStatusInfo struct {
 type StreakInfo struct {
 	Streak       int    `json:"streak"`
 	LastCheckin  string `json:"lastCheckin"` // YYYY-MM-DD
+	WeekCheckin  int    `json:"weekCheckin"` // check-in count this week (max 7)
+	WeekKey      string `json:"weekKey"`     // ISO year-week "2006-W05"
 	UnlockedDay3 bool   `json:"unlockedDay3"`
 	UnlockedDay7 bool   `json:"unlockedDay7"`
 }
 
-const checkinPoints = 5
-const day3QuizPoints = 50
-const day7QuizPoints = 100
+const (
+	checkinPoints  = 5
+	day3QuizPoints = 50
+	day7QuizPoints = 100
+	maxWeekCheckin = 7
+)
 
 func todayKey() string {
 	return time.Now().UTC().Format("2006-01-02")
+}
+
+func weekKey() string {
+	y, w := time.Now().UTC().ISOWeek()
+	return fmt.Sprintf("%d-W%02d", y, w)
 }
 
 func (s *EarlyAccessStore) loadStreak(wallet string) (*StreakInfo, error) {
@@ -120,19 +130,31 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 		si = &StreakInfo{}
 	}
 
+	// ── Weekly limit ──────────────────────────────────────
+	currentWeek := weekKey()
+	if si.WeekKey != currentWeek {
+		// New week: reset counter
+		si.WeekCheckin = 0
+		si.WeekKey = currentWeek
+	}
+
 	if dateStr == "" {
 		if CheckinTestMode && si.LastCheckin != "" {
-			// Test mode: auto-advance date so each call simulates a new day
 			lastDt, _ := time.Parse("2006-01-02", si.LastCheckin)
 			dateStr = lastDt.AddDate(0, 0, 1).Format("2006-01-02")
 		} else {
 			dateStr = todayKey()
 		}
 	}
-	fmt.Printf("[checkin] DailyCheckin wallet=%s date=%s testMode=%v\n", wallet, dateStr, CheckinTestMode)
+	fmt.Printf("[checkin] DailyCheckin wallet=%s date=%s testMode=%v week=%s count=%d\n",
+		wallet, dateStr, CheckinTestMode, si.WeekKey, si.WeekCheckin)
+
+	// Weekly limit applies in ALL modes (including test mode)
+	if si.WeekCheckin >= maxWeekCheckin {
+		return 0, 0, false, false, fmt.Errorf("weekly limit reached: max %d check-ins per week", maxWeekCheckin)
+	}
 
 	if !CheckinTestMode {
-		// Validate date format (skip in test mode)
 		dt, err := time.Parse("2006-01-02", dateStr)
 		if err != nil {
 			return 0, 0, false, false, fmt.Errorf("invalid date format, use YYYY-MM-DD")
@@ -143,7 +165,6 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 		}
 
 		if si.LastCheckin == dateStr {
-			// Already checked in for this date, just return current state
 			pts, _ := s.loadPoints(wallet)
 			return si.Streak, pts, si.UnlockedDay3, si.UnlockedDay7, nil
 		}
@@ -157,12 +178,12 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 	if si.LastCheckin == "" || dateStr == expectedNext {
 		si.Streak++
 	} else if dateStr == yesterday {
-		// Catching up on yesterday: reset streak counter but keep any earned quiz unlocks.
 		si.Streak = 1
 	} else {
 		si.Streak = 1
 	}
 	si.LastCheckin = dateStr
+	si.WeekCheckin++
 
 	if si.Streak == 3 {
 		si.UnlockedDay3 = true
@@ -183,6 +204,9 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 	stats, _ := s.loadStats()
 	stats.TotalPointsDistributed += checkinPoints
 	s.saveStats(stats)
+
+	// Async on-chain reward via contract
+	go Distribute([]string{wallet}, []int64{checkinPoints})
 
 	total, _ := s.loadPoints(wallet)
 	return si.Streak, total, si.UnlockedDay3, si.UnlockedDay7, nil
@@ -373,6 +397,9 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 	(*answered)[questionID] = true
 	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, fmt.Sprintf("answered:%s:day%d", wallet, day), answered)
 
+	// Async on-chain reward via contract
+	go Distribute([]string{wallet}, []int64{pts})
+
 	total, _ := s.loadPoints(wallet)
 	_ = total
 
@@ -482,6 +509,8 @@ func (s *EarlyAccessStore) ClaimTask(wallet, task string) (bool, int64, int64, e
 	stats.TotalPointsDistributed += pts
 	s.saveStats(stats)
 	s.saveTasks(wallet, tasks)
+
+	go Distribute([]string{wallet}, []int64{pts})
 
 	t, _ := s.loadPoints(wallet)
 	return true, pts, t, nil
@@ -862,4 +891,104 @@ func TryImport(data string) error {
 		dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "imported", &importedFlag)
 	})
 	return errResult
+}
+
+// SyncMintHistory scans all historical points and batch-mints FLUX_TEST tokens.
+// Only mints wallets that haven't been minted yet. Max batchSize per on-chain tx.
+func RunSyncMintHistory(batchSize int) (int, error) {
+	if !IsFluxChainReady() {
+		return 0, fmt.Errorf("FLUX chain not configured")
+	}
+	if batchSize <= 0 {
+		batchSize = 50
+	}
+
+	ps := []byte(eaNamespace + "_points:")
+	iter, err := dbstore.SECRET_DB.NewIter(&pebble.IterOptions{LowerBound: ps})
+	if err != nil {
+		return 0, fmt.Errorf("iter: %w", err)
+	}
+	defer iter.Close()
+
+	var (
+		wallets []string
+		points  []int64
+		minted  int
+	)
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		k := string(iter.Key())
+		if !strings.HasPrefix(k, eaNamespace+"_points:") {
+			break
+		}
+		wallet := k[len(eaNamespace+"_points:"):]
+
+		flag, _ := dbstore.DBGetJson[bool](dbstore.SECRET_DB, eaNamespace, "minted:"+wallet)
+		if flag != nil && *flag {
+			continue
+		}
+
+		raw := make([]byte, len(iter.Value()))
+		copy(raw, iter.Value())
+		val, err := dbstore.SECRET_DB.Unseal(raw)
+		if err != nil {
+			continue
+		}
+		var pts int64
+		if err := json.Unmarshal(val, &pts); err != nil || pts <= 0 {
+			continue
+		}
+
+		wallets = append(wallets, wallet)
+		points = append(points, pts)
+	}
+
+	if len(wallets) == 0 {
+		return 0, nil
+	}
+
+	for i := 0; i < len(wallets); i += batchSize {
+		end := i + batchSize
+		if end > len(wallets) {
+			end = len(wallets)
+		}
+		batchWallets := wallets[i:end]
+		batchPoints := points[i:end]
+
+		fmt.Printf("[mint] batch %d/%d: %d wallets\n", i/batchSize+1, (len(wallets)+batchSize-1)/batchSize, len(batchWallets))
+
+		if err := Distribute(batchWallets, batchPoints); err != nil {
+			return minted, fmt.Errorf("batch mint failed at %d: %w", i, err)
+		}
+
+		// Mark as minted
+		for _, w := range batchWallets {
+			t := true
+			dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "minted:"+w, &t)
+			minted++
+		}
+	}
+
+	return minted, nil
+}
+
+// StartMintWorker starts a background goroutine that auto-discovers unminted points
+// and batch-mints FLUX_TEST tokens every 5 seconds.
+func StartMintWorker() {
+	go func() {
+		if !IsFluxChainReady() {
+			fmt.Println("[mint-worker] FLUX chain not ready, worker disabled")
+			return
+		}
+		fmt.Println("[mint-worker] started (interval: 5s)")
+		for {
+			time.Sleep(5 * time.Second)
+			n, err := RunSyncMintHistory(50)
+			if err != nil {
+				fmt.Printf("[mint-worker] error: %v\n", err)
+			} else if n > 0 {
+				fmt.Printf("[mint-worker] minted %d wallets\n", n)
+			}
+		}
+	}()
 }

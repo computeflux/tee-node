@@ -122,4 +122,5 @@ type Mutation {
   joinTelegram(wallet: String!, message: String!, signature: String!): ClaimTaskResult!
   dailyCheckin(wallet: String!, date: String): CheckinResult!
   submitQuizAnswer(wallet: String!, questionId: String!, answerIndex: Int!): QuizAnswerResult!
+
 }

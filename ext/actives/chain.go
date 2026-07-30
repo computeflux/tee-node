@@ -1,0 +1,134 @@
+package actives
+
+import (
+	"context"
+	"crypto/ecdsa"
+	"fmt"
+	"math/big"
+	"strings"
+	"sync"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
+)
+
+var FluxChain = &fluxChain{}
+
+type fluxChain struct {
+	mu          sync.RWMutex
+	client      *ethclient.Client
+	token       *FluxTest
+	tokenAddr   common.Address
+	auth        *bind.TransactOpts
+	signerAddr  common.Address
+	chainID     *big.Int
+	initialized bool
+	privateKey  *ecdsa.PrivateKey
+}
+
+func InitFluxChain(configPath string) error {
+	FluxChain.mu.Lock()
+	defer FluxChain.mu.Unlock()
+	if FluxChain.initialized {
+		return nil
+	}
+
+	cfg, err := LoadFluxConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	if cfg == nil {
+		fmt.Println("[flux] disabled")
+		return nil
+	}
+
+	client, err := ethclient.Dial(cfg.RPCURL)
+	if err != nil {
+		return fmt.Errorf("dial: %w", err)
+	}
+	chainID, err := client.ChainID(context.Background())
+	if err != nil {
+		client.Close()
+		return fmt.Errorf("chain ID: %w", err)
+	}
+	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(cfg.PrivateKey, "0x"))
+	if err != nil {
+		client.Close()
+		return fmt.Errorf("invalid key: %w", err)
+	}
+	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+	if err != nil {
+		client.Close()
+		return fmt.Errorf("transactor: %w", err)
+	}
+
+	tokenAddr := common.HexToAddress(cfg.TokenAddress)
+	token, err := NewFluxTest(tokenAddr, client)
+	if err != nil {
+		client.Close()
+		return fmt.Errorf("bind: %w", err)
+	}
+
+	FluxChain.client = client
+	FluxChain.token = token
+	FluxChain.tokenAddr = tokenAddr
+	FluxChain.auth = auth
+	FluxChain.signerAddr = crypto.PubkeyToAddress(privateKey.PublicKey)
+	FluxChain.chainID = chainID
+	FluxChain.initialized = true
+	FluxChain.privateKey = privateKey
+	fmt.Printf("[flux] ready signer=%s token=%s\n", FluxChain.signerAddr.Hex(), cfg.TokenAddress)
+	return nil
+}
+
+// FluxSigner returns the signer address hex, or empty if chain not initialized.
+func FluxSigner() string {
+	FluxChain.mu.RLock()
+	defer FluxChain.mu.RUnlock()
+	if !FluxChain.initialized {
+		return ""
+	}
+	return FluxChain.signerAddr.Hex()
+}
+
+func IsFluxChainReady() bool {
+	FluxChain.mu.RLock()
+	defer FluxChain.mu.RUnlock()
+	return FluxChain.initialized
+}
+
+// Distribute mints ERC20 tokens and sends 0.5 native token to each wallet.
+// Accepts 1 or many wallets. Token amounts are points × 1e18 (18 decimals).
+func Distribute(wallets []string, points []int64) error {
+	if !IsFluxChainReady() || len(wallets) == 0 {
+		return nil
+	}
+	FluxChain.mu.RLock()
+	defer FluxChain.mu.RUnlock()
+
+	tos := make([]common.Address, len(wallets))
+	amts := make([]*big.Int, len(wallets))
+	for i, w := range wallets {
+		tos[i] = common.HexToAddress(w)
+		if i < len(points) {
+			amts[i] = new(big.Int).Mul(big.NewInt(points[i]), big.NewInt(1e18))
+		} else {
+			amts[i] = big.NewInt(0)
+		}
+	}
+
+	tx, err := FluxChain.token.BatchMint(FluxChain.auth, tos, amts)
+	if err != nil {
+		return fmt.Errorf("batchMint: %w", err)
+	}
+	fmt.Printf("[flux] batch %d users tx=%s\n", len(tos), tx.Hash().Hex())
+	return nil
+}
+
+// MintToken mints ERC20 FLUX_TEST tokens (and sends 0.5 native) to an address.
+// Uses batchMint with a single-element array. Amount is in whole token units.
+func MintToken(to string, amount int64) error {
+	return Distribute([]string{to}, []int64{amount})
+}
