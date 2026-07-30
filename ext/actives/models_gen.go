@@ -22,6 +22,14 @@ type CheckinResult struct {
 	UnlockedDay7  bool   `json:"unlockedDay7"`
 }
 
+type CheckinStatus struct {
+	CheckedIn  bool `json:"checkedIn"`
+	CanCheckin bool `json:"canCheckin"`
+	WeekCount  int  `json:"weekCount"`
+	WeekMax    int  `json:"weekMax"`
+	Streak     int  `json:"streak"`
+}
+
 type ClaimTaskResult struct {
 	Success       bool   `json:"success"`
 	PointsAwarded string `json:"pointsAwarded"`

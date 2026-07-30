@@ -54,7 +54,7 @@ func dbSetJson(key string, val any) error {
 	if err != nil {
 		return err
 	}
-	return pebbleDB.Set(eaKey(key), b, pebble.NoSync)
+	return pebbleDB.Set(eaKey(key), b, pebble.Sync)
 }
 
 func init() {
@@ -260,6 +260,30 @@ func (s *EarlyAccessStore) GetStreak(wallet string) int {
 		return si.Streak
 	}
 	return 0
+}
+
+func (s *EarlyAccessStore) GetCheckinStatus(wallet string) (checkedIn bool, canCheckin bool, weekCount int, weekMax int, streak int) {
+	wallet = strings.ToLower(wallet)
+	weekMax = maxWeekCheckin
+	si, _ := s.loadStreak(wallet)
+	if si == nil {
+		canCheckin = true
+		return
+	}
+	today := todayKey()
+	currentWeek := weekKey()
+	if si.WeekKey != currentWeek {
+		weekCount = 0
+	} else {
+		weekCount = si.WeekCheckin
+	}
+	checkedIn = si.LastCheckin == today
+	canCheckin = !checkedIn && weekCount < weekMax
+	streak = si.Streak
+	if !CheckinTestMode && si.LastCheckin != today {
+		streak = 0
+	}
+	return
 }
 
 // ── Quiz Questions ──────────────────────────────────────

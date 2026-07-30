@@ -29,7 +29,7 @@ show_usage() {
 Usage: $0 <command>
 
 Commands:
-  build       构建 server + import_data 二进制到 build/
+  build       构建 server  二进制到 build/
   deploy      构建 → 同步远程 → 安装 systemd → 启动
   logs        实时查看远程日志
   status      查看远程服务状态
@@ -42,13 +42,12 @@ EOF
 # 1. Build
 # -------------------------------------------------
 do_build() {
-    echo "[build] Building server + import_data ..."
+    echo "[build] Building server ..."
     mkdir -p build
 
     go build -o build/server ./cmd/server
-    go build -o build/import_data ./cmd/import_data
 
-    echo "[build] Done: build/server, build/import_data"
+    echo "[build] Done: build/server"
 }
 
 # -------------------------------------------------
@@ -56,8 +55,8 @@ do_build() {
 # -------------------------------------------------
 do_sync() {
     echo "[sync] Syncing to $REMOTE_HOST:$REMOTE_DIR ..."
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build $REMOTE_DIR/data"
-    rsync -avz -e ssh build/server build/import_data "$REMOTE_HOST:$REMOTE_DIR/build/"
+    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build"
+    rsync -avz -e ssh build/server "$REMOTE_HOST:$REMOTE_DIR/build/"
     echo "[sync] Done."
 }
 

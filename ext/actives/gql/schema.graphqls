@@ -76,6 +76,14 @@ type CheckinResult {
   unlockedDay7: Boolean!
 }
 
+type CheckinStatus {
+  checkedIn: Boolean!
+  canCheckin: Boolean!
+  weekCount: Int!
+  weekMax: Int!
+  streak: Int!
+}
+
 type QuizQuestion {
   id: String!
   day: Int!
@@ -109,6 +117,7 @@ type Query {
   earlyAccessTasks(wallet: String!): [TaskStatus!]!
   earlyAccessExport: String!
   checkinStreak(wallet: String!): Int!
+  checkinStatus(wallet: String!): CheckinStatus!
   checkinConfig: CheckinConfig!
   quizQuestions(wallet: String!, day: Int!): [QuizQuestion!]!
   quizProgress(wallet: String!, day: Int!): QuizProgress!

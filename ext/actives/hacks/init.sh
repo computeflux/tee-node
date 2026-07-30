@@ -12,7 +12,7 @@ echo "[init] Creating data directory: $DB_PATH ..."
 mkdir -p "$DB_PATH"
 
 echo "[init] Running gqlgen generate..."
-go run github.com/99designs/gqlgen generate --config gql/gqlgen.yml
+gqlgen generate --config gql/gqlgen.yml
 
 echo "[init] Done."
 echo ""

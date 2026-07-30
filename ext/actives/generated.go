@@ -49,6 +49,14 @@ type ComplexityRoot struct {
 		UnlockedDay7  func(childComplexity int) int
 	}
 
+	CheckinStatus struct {
+		CanCheckin func(childComplexity int) int
+		CheckedIn  func(childComplexity int) int
+		Streak     func(childComplexity int) int
+		WeekCount  func(childComplexity int) int
+		WeekMax    func(childComplexity int) int
+	}
+
 	ClaimTaskResult struct {
 		PointsAwarded func(childComplexity int) int
 		Success       func(childComplexity int) int
@@ -104,6 +112,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		CheckinConfig                 func(childComplexity int) int
+		CheckinStatus                 func(childComplexity int, wallet string) int
 		CheckinStreak                 func(childComplexity int, wallet string) int
 		EarlyAccessExport             func(childComplexity int) int
 		EarlyAccessPoints             func(childComplexity int, user string) int
@@ -178,6 +187,7 @@ type QueryResolver interface {
 	EarlyAccessTasks(ctx context.Context, wallet string) ([]*TaskStatus, error)
 	EarlyAccessExport(ctx context.Context) (string, error)
 	CheckinStreak(ctx context.Context, wallet string) (int, error)
+	CheckinStatus(ctx context.Context, wallet string) (*CheckinStatus, error)
 	CheckinConfig(ctx context.Context) (*CheckinConfig, error)
 	QuizQuestions(ctx context.Context, wallet string, day int) ([]*QuizQuestion, error)
 	QuizProgress(ctx context.Context, wallet string, day int) (*QuizProgress, error)
@@ -244,6 +254,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CheckinResult.UnlockedDay7(childComplexity), true
+
+	case "CheckinStatus.canCheckin":
+		if e.ComplexityRoot.CheckinStatus.CanCheckin == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CheckinStatus.CanCheckin(childComplexity), true
+	case "CheckinStatus.checkedIn":
+		if e.ComplexityRoot.CheckinStatus.CheckedIn == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CheckinStatus.CheckedIn(childComplexity), true
+	case "CheckinStatus.streak":
+		if e.ComplexityRoot.CheckinStatus.Streak == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CheckinStatus.Streak(childComplexity), true
+	case "CheckinStatus.weekCount":
+		if e.ComplexityRoot.CheckinStatus.WeekCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CheckinStatus.WeekCount(childComplexity), true
+	case "CheckinStatus.weekMax":
+		if e.ComplexityRoot.CheckinStatus.WeekMax == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CheckinStatus.WeekMax(childComplexity), true
 
 	case "ClaimTaskResult.pointsAwarded":
 		if e.ComplexityRoot.ClaimTaskResult.PointsAwarded == nil {
@@ -468,6 +509,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.CheckinConfig(childComplexity), true
+	case "Query.checkinStatus":
+		if e.ComplexityRoot.Query.CheckinStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_checkinStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CheckinStatus(childComplexity, args["wallet"].(string)), true
 	case "Query.checkinStreak":
 		if e.ComplexityRoot.Query.CheckinStreak == nil {
 			break
@@ -842,6 +894,22 @@ func (ec *executionContext) childFields_CheckinResult(ctx context.Context, field
 		return ec.fieldContext_CheckinResult_unlockedDay7(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type CheckinResult", field.Name)
+}
+
+func (ec *executionContext) childFields_CheckinStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "checkedIn":
+		return ec.fieldContext_CheckinStatus_checkedIn(ctx, field)
+	case "canCheckin":
+		return ec.fieldContext_CheckinStatus_canCheckin(ctx, field)
+	case "weekCount":
+		return ec.fieldContext_CheckinStatus_weekCount(ctx, field)
+	case "weekMax":
+		return ec.fieldContext_CheckinStatus_weekMax(ctx, field)
+	case "streak":
+		return ec.fieldContext_CheckinStatus_streak(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CheckinStatus", field.Name)
 }
 
 func (ec *executionContext) childFields_ClaimTaskResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -1316,6 +1384,20 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_checkinStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_checkinStreak_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1707,6 +1789,121 @@ func (ec *executionContext) _CheckinResult_unlockedDay7(ctx context.Context, fie
 }
 func (ec *executionContext) fieldContext_CheckinResult_unlockedDay7(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("CheckinResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _CheckinStatus_checkedIn(ctx context.Context, field graphql.CollectedField, obj *CheckinStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CheckinStatus_checkedIn(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CheckedIn, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CheckinStatus_checkedIn(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CheckinStatus", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _CheckinStatus_canCheckin(ctx context.Context, field graphql.CollectedField, obj *CheckinStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CheckinStatus_canCheckin(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CanCheckin, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CheckinStatus_canCheckin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CheckinStatus", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _CheckinStatus_weekCount(ctx context.Context, field graphql.CollectedField, obj *CheckinStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CheckinStatus_weekCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WeekCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CheckinStatus_weekCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CheckinStatus", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CheckinStatus_weekMax(ctx context.Context, field graphql.CollectedField, obj *CheckinStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CheckinStatus_weekMax(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.WeekMax, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CheckinStatus_weekMax(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CheckinStatus", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CheckinStatus_streak(ctx context.Context, field graphql.CollectedField, obj *CheckinStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CheckinStatus_streak(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Streak, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CheckinStatus_streak(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CheckinStatus", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _ClaimTaskResult_success(ctx context.Context, field graphql.CollectedField, obj *ClaimTaskResult) (ret graphql.Marshaler) {
@@ -2933,6 +3130,50 @@ func (ec *executionContext) fieldContext_Query_checkinStreak(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_checkinStreak_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_checkinStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_checkinStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CheckinStatus(ctx, fc.Args["wallet"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *CheckinStatus) graphql.Marshaler {
+			return ec.marshalNCheckinStatus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐCheckinStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_checkinStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CheckinStatus(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_checkinStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4763,6 +5004,64 @@ func (ec *executionContext) _CheckinResult(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var checkinStatusImplementors = []string{"CheckinStatus"}
+
+func (ec *executionContext) _CheckinStatus(ctx context.Context, sel ast.SelectionSet, obj *CheckinStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, checkinStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CheckinStatus")
+		case "checkedIn":
+			out.Values[i] = ec._CheckinStatus_checkedIn(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "canCheckin":
+			out.Values[i] = ec._CheckinStatus_canCheckin(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weekCount":
+			out.Values[i] = ec._CheckinStatus_weekCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weekMax":
+			out.Values[i] = ec._CheckinStatus_weekMax(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "streak":
+			out.Values[i] = ec._CheckinStatus_streak(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var claimTaskResultImplementors = []string{"ClaimTaskResult"}
 
 func (ec *executionContext) _ClaimTaskResult(ctx context.Context, sel ast.SelectionSet, obj *ClaimTaskResult) graphql.Marshaler {
@@ -5422,6 +5721,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_checkinStreak(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "checkinStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_checkinStatus(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -6234,6 +6555,20 @@ func (ec *executionContext) marshalNCheckinResult2ᚖgithubᚗcomᚋcomputeflux�
 		return graphql.Null
 	}
 	return ec._CheckinResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCheckinStatus2githubᚗcomᚋcomputefluxᚋactivesᚐCheckinStatus(ctx context.Context, sel ast.SelectionSet, v CheckinStatus) graphql.Marshaler {
+	return ec._CheckinStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCheckinStatus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐCheckinStatus(ctx context.Context, sel ast.SelectionSet, v *CheckinStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CheckinStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNClaimTaskResult2githubᚗcomᚋcomputefluxᚋactivesᚐClaimTaskResult(ctx context.Context, sel ast.SelectionSet, v ClaimTaskResult) graphql.Marshaler {

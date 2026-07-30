@@ -111,6 +111,17 @@ func (r *queryResolver) CheckinStreak(ctx context.Context, wallet string) (int, 
 	return Store.GetStreak(wallet), nil
 }
 
+func (r *queryResolver) CheckinStatus(ctx context.Context, wallet string) (*CheckinStatus, error) {
+	checkedIn, canCheckin, weekCount, weekMax, streak := Store.GetCheckinStatus(wallet)
+	return &CheckinStatus{
+		CheckedIn:  checkedIn,
+		CanCheckin: canCheckin,
+		WeekCount:  weekCount,
+		WeekMax:    weekMax,
+		Streak:     streak,
+	}, nil
+}
+
 func (r *queryResolver) QuizQuestions(ctx context.Context, wallet string, day int) ([]*QuizQuestion, error) {
 	qs := Store.GetQuestionsForDay(wallet, day)
 	out := make([]*QuizQuestion, len(qs))
