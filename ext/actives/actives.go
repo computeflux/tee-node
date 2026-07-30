@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
-
-	dbstore "github.com/computeflux/tee-provider/pkg/types"
 )
 
 const eaNamespace = "EARLY_POINTS"
@@ -20,7 +18,44 @@ const eaNamespace = "EARLY_POINTS"
 var (
 	Store           = &EarlyAccessStore{}
 	CheckinTestMode bool
+	pebbleDB        *pebble.DB
 )
+
+// InitDB sets the pebble DB instance for the actives package.
+func InitDB(db *pebble.DB) {
+	pebbleDB = db
+}
+
+func eaKey(key string) []byte {
+	return []byte(eaNamespace + "/" + key)
+}
+
+func dbGetJson[T any](key string) (*T, error) {
+	v, closer, err := pebbleDB.Get(eaKey(key))
+	if err != nil {
+		if err == pebble.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer closer.Close()
+	if len(v) == 0 {
+		return nil, nil
+	}
+	var val T
+	if err := json.Unmarshal(v, &val); err != nil {
+		return nil, err
+	}
+	return &val, nil
+}
+
+func dbSetJson(key string, val any) error {
+	b, err := json.Marshal(val)
+	if err != nil {
+		return err
+	}
+	return pebbleDB.Set(eaKey(key), b, pebble.NoSync)
+}
 
 func init() {
 	if v := os.Getenv("CHECKIN_TEST_MODE"); v == "true" || v == "1" {
@@ -111,12 +146,12 @@ func weekKey() string {
 }
 
 func (s *EarlyAccessStore) loadStreak(wallet string) (*StreakInfo, error) {
-	v, _ := dbstore.DBGetJson[StreakInfo](dbstore.SECRET_DB, eaNamespace, "streak:"+strings.ToLower(wallet))
+	v, _ := dbGetJson[StreakInfo]("streak:" + strings.ToLower(wallet))
 	return v, nil
 }
 
 func (s *EarlyAccessStore) saveStreak(wallet string, si *StreakInfo) error {
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "streak:"+strings.ToLower(wallet), si)
+	return dbSetJson("streak:"+strings.ToLower(wallet), si)
 }
 
 func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, bool, bool, error) {
@@ -289,7 +324,7 @@ func (s *EarlyAccessStore) GetQuestionsForDay(wallet string, day int) []*QuizQue
 	}
 
 	// Filter out already answered (stored in DB per user)
-	answered, _ := dbstore.DBGetJson[map[string]bool](dbstore.SECRET_DB, eaNamespace, fmt.Sprintf("answered:%s:day%d", wallet, day))
+	answered, _ := dbGetJson[map[string]bool](fmt.Sprintf("answered:%s:day%d", wallet, day))
 	answeredCount := 0
 	if answered != nil {
 		answeredCount = len(*answered)
@@ -319,7 +354,7 @@ func (s *EarlyAccessStore) GetQuizProgress(wallet string, day int) (total, answe
 		return 0, 0, 0
 	}
 	total = len(all)
-	answeredSet, _ := dbstore.DBGetJson[map[string]bool](dbstore.SECRET_DB, eaNamespace, fmt.Sprintf("answered:%s:day%d", wallet, day))
+	answeredSet, _ := dbGetJson[map[string]bool](fmt.Sprintf("answered:%s:day%d", wallet, day))
 	if answeredSet != nil {
 		answered = len(*answeredSet)
 	}
@@ -365,7 +400,7 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 	}
 
 	// Check if already answered
-	answered, _ := dbstore.DBGetJson[map[string]bool](dbstore.SECRET_DB, eaNamespace, fmt.Sprintf("answered:%s:day%d", wallet, day))
+	answered, _ := dbGetJson[map[string]bool](fmt.Sprintf("answered:%s:day%d", wallet, day))
 	if answered != nil && (*answered)[questionID] {
 		return false, 0, "", fmt.Errorf("question already answered")
 	}
@@ -395,7 +430,7 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 		answered = &map[string]bool{}
 	}
 	(*answered)[questionID] = true
-	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, fmt.Sprintf("answered:%s:day%d", wallet, day), answered)
+	dbSetJson(fmt.Sprintf("answered:%s:day%d", wallet, day), answered)
 
 	// Async on-chain reward via contract
 	go Distribute([]string{wallet}, []int64{pts})
@@ -430,7 +465,7 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 	defer s.mu.Unlock()
 
 	wallet = strings.ToLower(wallet)
-	if existing, _ := dbstore.DBGetJson[DbUser](dbstore.SECRET_DB, eaNamespace, "user:"+wallet); existing != nil {
+	if existing, _ := dbGetJson[DbUser]("user:" + wallet); existing != nil {
 		return false, nil
 	}
 
@@ -445,7 +480,7 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 	user := &DbUser{Wallet: wallet, JoinedAt: now, ReferralCode: generateReferralCode(wallet), Email: email}
 
 	pts := int64(100)
-	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "points:"+wallet, &pts)
+	dbSetJson("points:"+wallet, &pts)
 	s.appendHistory(wallet, "100", "join_early_access", now, nil)
 
 	stats, _ := s.loadStats()
@@ -466,14 +501,14 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 		}
 	}
 
-	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "user:"+wallet, user)
+	dbSetJson("user:"+wallet, user)
 	s.saveCodeToWallet(user.ReferralCode, wallet)
 	if email != "" {
 		s.saveEmailToWallet(email, wallet)
 	}
 	s.saveStats(stats)
 	tasks := map[string]string{"JOIN_EARLY_ACCESS": now}
-	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks)
+	dbSetJson("tasks:"+wallet, &tasks)
 	return true, nil
 }
 
@@ -482,7 +517,7 @@ func (s *EarlyAccessStore) ClaimTask(wallet, task string) (bool, int64, int64, e
 	defer s.mu.Unlock()
 
 	wallet = strings.ToLower(wallet)
-	if u, _ := dbstore.DBGetJson[DbUser](dbstore.SECRET_DB, eaNamespace, "user:"+wallet); u == nil {
+	if u, _ := dbGetJson[DbUser]("user:" + wallet); u == nil {
 		return false, 0, 0, fmt.Errorf("user not joined")
 	}
 
@@ -521,7 +556,7 @@ func (s *EarlyAccessStore) UpdateReferralCode(wallet, referralCode string) (bool
 	defer s.mu.Unlock()
 
 	wallet, code := strings.ToLower(wallet), strings.ToLower(referralCode)
-	user, _ := dbstore.DBGetJson[DbUser](dbstore.SECRET_DB, eaNamespace, "user:"+wallet)
+	user, _ := dbGetJson[DbUser]("user:" + wallet)
 	if user == nil {
 		return false, fmt.Errorf("user not joined")
 	}
@@ -548,7 +583,7 @@ func (s *EarlyAccessStore) UpdateReferralCode(wallet, referralCode string) (bool
 	stats, _ := s.loadStats()
 	stats.TotalPointsDistributed += 250
 	stats.TotalReferrals++
-	dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "user:"+wallet, user)
+	dbSetJson("user:"+wallet, user)
 	s.saveStats(stats)
 	return true, nil
 }
@@ -572,7 +607,7 @@ func (s *EarlyAccessStore) GetTasks(wallet string) []*TaskStatusInfo {
 // ── Read-only ────────────────────────────────────────────
 
 func (s *EarlyAccessStore) GetUser(wallet string) *UserRecord {
-	v, _ := dbstore.DBGetJson[DbUser](dbstore.SECRET_DB, eaNamespace, "user:"+strings.ToLower(wallet))
+	v, _ := dbGetJson[DbUser]("user:" + strings.ToLower(wallet))
 	if v == nil {
 		return nil
 	}
@@ -601,7 +636,7 @@ func (s *EarlyAccessStore) GetPoints(wallet string) string {
 }
 
 func (s *EarlyAccessStore) GetReferralInfo(wallet string) (code, referrer string, earnings int64, referrals []string) {
-	u, _ := dbstore.DBGetJson[DbUser](dbstore.SECRET_DB, eaNamespace, "user:"+strings.ToLower(wallet))
+	u, _ := dbGetJson[DbUser]("user:" + strings.ToLower(wallet))
 	if u != nil {
 		code, referrer = u.ReferralCode, u.Referrer
 	}
@@ -615,7 +650,7 @@ func (s *EarlyAccessStore) GetReferralInfo(wallet string) (code, referrer string
 }
 
 func (s *EarlyAccessStore) GetPointsHistory(wallet string, offset, limit int) ([]*HistoryRecord, int) {
-	list, _ := dbstore.DBGetJson[[]DbHistory](dbstore.SECRET_DB, eaNamespace, "history:"+strings.ToLower(wallet))
+	list, _ := dbGetJson[[]DbHistory]("history:" + strings.ToLower(wallet))
 	if list == nil {
 		return nil, 0
 	}
@@ -653,7 +688,7 @@ func (s *EarlyAccessStore) GetStats() StatsRecord {
 // ── Internal helpers ─────────────────────────────────────
 
 func (s *EarlyAccessStore) loadPoints(w string) (int64, error) {
-	v, _ := dbstore.DBGetJson[int64](dbstore.SECRET_DB, eaNamespace, "points:"+w)
+	v, _ := dbGetJson[int64]("points:" + w)
 	if v == nil {
 		return 0, nil
 	}
@@ -663,21 +698,21 @@ func (s *EarlyAccessStore) loadPoints(w string) (int64, error) {
 func (s *EarlyAccessStore) addPoints(w string, d int64) error {
 	c, _ := s.loadPoints(w)
 	n := c + d
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "points:"+w, &n)
+	return dbSetJson("points:"+w, &n)
 }
 
 func (s *EarlyAccessStore) appendHistory(w, amount, reason, ts string, related *string) error {
-	list, _ := dbstore.DBGetJson[[]DbHistory](dbstore.SECRET_DB, eaNamespace, "history:"+w)
+	list, _ := dbGetJson[[]DbHistory]("history:" + w)
 	var r []DbHistory
 	if list != nil {
 		r = *list
 	}
 	r = append(r, DbHistory{Amount: amount, Reason: reason, Timestamp: ts, RelatedUser: related})
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "history:"+w, &r)
+	return dbSetJson("history:"+w, &r)
 }
 
 func (s *EarlyAccessStore) loadStats() (StatsRecord, error) {
-	v, _ := dbstore.DBGetJson[DbStats](dbstore.SECRET_DB, eaNamespace, "stats")
+	v, _ := dbGetJson[DbStats]("stats")
 	if v == nil {
 		return StatsRecord{}, nil
 	}
@@ -685,11 +720,11 @@ func (s *EarlyAccessStore) loadStats() (StatsRecord, error) {
 }
 
 func (s *EarlyAccessStore) saveStats(v StatsRecord) error {
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "stats", &DbStats{UserCount: v.UserCount, TotalPointsDistributed: v.TotalPointsDistributed, TotalReferrals: v.TotalReferrals})
+	return dbSetJson("stats", &DbStats{UserCount: v.UserCount, TotalPointsDistributed: v.TotalPointsDistributed, TotalReferrals: v.TotalReferrals})
 }
 
 func (s *EarlyAccessStore) loadCodeToWallet(code string) (string, error) {
-	v, _ := dbstore.DBGetJson[string](dbstore.SECRET_DB, eaNamespace, "code:"+code)
+	v, _ := dbGetJson[string]("code:" + code)
 	if v == nil {
 		return "", nil
 	}
@@ -697,11 +732,11 @@ func (s *EarlyAccessStore) loadCodeToWallet(code string) (string, error) {
 }
 
 func (s *EarlyAccessStore) saveCodeToWallet(code, wallet string) error {
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "code:"+code, &wallet)
+	return dbSetJson("code:"+code, &wallet)
 }
 
 func (s *EarlyAccessStore) loadEmailToWallet(email string) (string, error) {
-	v, _ := dbstore.DBGetJson[string](dbstore.SECRET_DB, eaNamespace, "email:"+email)
+	v, _ := dbGetJson[string]("email:" + email)
 	if v == nil {
 		return "", nil
 	}
@@ -709,11 +744,11 @@ func (s *EarlyAccessStore) loadEmailToWallet(email string) (string, error) {
 }
 
 func (s *EarlyAccessStore) saveEmailToWallet(email, wallet string) error {
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "email:"+email, &wallet)
+	return dbSetJson("email:"+email, &wallet)
 }
 
 func (s *EarlyAccessStore) loadReferrals(code string) ([]string, error) {
-	v, _ := dbstore.DBGetJson[[]string](dbstore.SECRET_DB, eaNamespace, "referrals:"+code)
+	v, _ := dbGetJson[[]string]("referrals:" + code)
 	if v == nil {
 		return nil, nil
 	}
@@ -723,11 +758,11 @@ func (s *EarlyAccessStore) loadReferrals(code string) ([]string, error) {
 func (s *EarlyAccessStore) appendReferral(code, wallet string) error {
 	l, _ := s.loadReferrals(code)
 	l = append(l, wallet)
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "referrals:"+code, &l)
+	return dbSetJson("referrals:"+code, &l)
 }
 
 func (s *EarlyAccessStore) loadTasks(wallet string) (map[string]string, error) {
-	v, _ := dbstore.DBGetJson[map[string]string](dbstore.SECRET_DB, eaNamespace, "tasks:"+wallet)
+	v, _ := dbGetJson[map[string]string]("tasks:" + wallet)
 	if v == nil {
 		return nil, nil
 	}
@@ -735,7 +770,7 @@ func (s *EarlyAccessStore) loadTasks(wallet string) (map[string]string, error) {
 }
 
 func (s *EarlyAccessStore) saveTasks(wallet string, tasks map[string]string) error {
-	return dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "tasks:"+wallet, &tasks)
+	return dbSetJson("tasks:"+wallet, &tasks)
 }
 
 // ── Export / Import ───────────────────────────────────────
@@ -758,24 +793,20 @@ func (s *EarlyAccessStore) Export() string {
 		Codes: make(map[string]string), Emails: make(map[string]string),
 		Referrals: make(map[string][]string),
 	}
-	ps := []byte(eaNamespace + "_")
-	iter, err := dbstore.SECRET_DB.NewIter(&pebble.IterOptions{LowerBound: ps})
+	ps := []byte(eaNamespace + "/")
+	iter, err := pebbleDB.NewIter(&pebble.IterOptions{LowerBound: ps})
 	if err != nil {
 		return "{}"
 	}
 	defer iter.Close()
 	for iter.First(); iter.Valid(); iter.Next() {
 		k := string(iter.Key())
-		if !strings.HasPrefix(k, eaNamespace+"_") {
+		if !strings.HasPrefix(k, eaNamespace+"/") {
 			break
 		}
 		key := k[len(ps):]
-		raw := make([]byte, len(iter.Value()))
-		copy(raw, iter.Value())
-		val, err := dbstore.SECRET_DB.Unseal(raw)
-		if err != nil {
-			continue
-		}
+		val := make([]byte, len(iter.Value()))
+		copy(val, iter.Value())
 
 		switch {
 		case strings.HasPrefix(key, "user:"):
@@ -829,7 +860,7 @@ var importOnce sync.Once
 func TryImport(data string) error {
 	var errResult error
 	importOnce.Do(func() {
-		flag, _ := dbstore.DBGetJson[bool](dbstore.SECRET_DB, eaNamespace, "imported")
+		flag, _ := dbGetJson[bool]("imported")
 		if flag != nil && *flag {
 			errResult = fmt.Errorf("import already completed")
 			return
@@ -840,55 +871,55 @@ func TryImport(data string) error {
 			return
 		}
 		for k, v := range d.Users {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "user:"+k, &v); err != nil {
+			if err := dbSetJson("user:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.Points {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "points:"+k, &v); err != nil {
+			if err := dbSetJson("points:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.History {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "history:"+k, &v); err != nil {
+			if err := dbSetJson("history:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.Tasks {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "tasks:"+k, &v); err != nil {
+			if err := dbSetJson("tasks:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.Codes {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "code:"+k, &v); err != nil {
+			if err := dbSetJson("code:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.Emails {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "email:"+k, &v); err != nil {
+			if err := dbSetJson("email:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		for k, v := range d.Referrals {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "referrals:"+k, &v); err != nil {
+			if err := dbSetJson("referrals:"+k, &v); err != nil {
 				errResult = err
 				return
 			}
 		}
 		if d.Stats != nil {
-			if err := dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "stats", d.Stats); err != nil {
+			if err := dbSetJson("stats", d.Stats); err != nil {
 				errResult = err
 				return
 			}
 		}
 		importedFlag := true
-		dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "imported", &importedFlag)
+		dbSetJson("imported", &importedFlag)
 	})
 	return errResult
 }
@@ -903,8 +934,8 @@ func RunSyncMintHistory(batchSize int) (int, error) {
 		batchSize = 50
 	}
 
-	ps := []byte(eaNamespace + "_points:")
-	iter, err := dbstore.SECRET_DB.NewIter(&pebble.IterOptions{LowerBound: ps})
+	ps := []byte(eaNamespace + "/points:")
+	iter, err := pebbleDB.NewIter(&pebble.IterOptions{LowerBound: ps})
 	if err != nil {
 		return 0, fmt.Errorf("iter: %w", err)
 	}
@@ -918,22 +949,18 @@ func RunSyncMintHistory(batchSize int) (int, error) {
 
 	for iter.First(); iter.Valid(); iter.Next() {
 		k := string(iter.Key())
-		if !strings.HasPrefix(k, eaNamespace+"_points:") {
+		if !strings.HasPrefix(k, eaNamespace+"/points:") {
 			break
 		}
-		wallet := k[len(eaNamespace+"_points:"):]
+		wallet := k[len(eaNamespace+"/points:"):]
 
-		flag, _ := dbstore.DBGetJson[bool](dbstore.SECRET_DB, eaNamespace, "minted:"+wallet)
+		flag, _ := dbGetJson[bool]("minted:" + wallet)
 		if flag != nil && *flag {
 			continue
 		}
 
-		raw := make([]byte, len(iter.Value()))
-		copy(raw, iter.Value())
-		val, err := dbstore.SECRET_DB.Unseal(raw)
-		if err != nil {
-			continue
-		}
+		val := make([]byte, len(iter.Value()))
+		copy(val, iter.Value())
 		var pts int64
 		if err := json.Unmarshal(val, &pts); err != nil || pts <= 0 {
 			continue
@@ -964,7 +991,7 @@ func RunSyncMintHistory(batchSize int) (int, error) {
 		// Mark as minted
 		for _, w := range batchWallets {
 			t := true
-			dbstore.DBSetJson(dbstore.SECRET_DB, eaNamespace, "minted:"+w, &t)
+			dbSetJson("minted:"+w, &t)
 			minted++
 		}
 	}

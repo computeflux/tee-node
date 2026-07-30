@@ -6,15 +6,20 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "[init] Creating data directory..."
-mkdir -p data
+DB_PATH="${DB_PATH:-./data}"
+
+echo "[init] Creating data directory: $DB_PATH ..."
+mkdir -p "$DB_PATH"
 
 echo "[init] Running gqlgen generate..."
 go run github.com/99designs/gqlgen generate --config gql/gqlgen.yml
 
 echo "[init] Done."
 echo ""
-echo "  Next steps:"
-echo "    ./dev.sh              Start dev server on :9100"
-echo "    ./dev.sh 9200         Start dev server on :9200"
-echo "    ./init.sh -import=file.json   Import data then start"
+echo "  Hacks:"
+echo "    ./hacks/dev.sh               Start dev server on :9100"
+echo "    ./hacks/dev.sh 9200          Start dev server on :9200"
+echo "    ./hacks/import.sh data.json  Import historical data"
+echo ""
+echo "  Go run:"
+echo "    go run ./cmd/mint -to=0x... -amount=1000   Mint FLUX_TEST tokens"

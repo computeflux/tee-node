@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/computeflux/tee-provider/ext/actives"
+	"github.com/computeflux/actives"
 )
 
 func main() {

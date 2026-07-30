@@ -15,43 +15,37 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/cockroachdb/pebble"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/vektah/gqlparser/v2/ast"
 
-	"github.com/computeflux/tee-provider/ext/actives"
-	"github.com/computeflux/tee-provider/pkg/types"
-	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/actives"
 )
+
+func logBlue(tag, msg string) {
+	fmt.Printf("\033[34m[%s]\033[0m %s\n", tag, msg)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 func main() {
 	port := flag.String("port", "9100", "listening port")
-	data := flag.String("data", "", "exported JSON file path (one-time import)")
 	dbPath := flag.String("db", "./actives_data", "PebbleDB data path")
 	flag.Parse()
 
-	db, err := types.NewDBWithPath(*dbPath)
+	db, err := pebble.Open(*dbPath, &pebble.Options{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init db: %v\n", err)
 		os.Exit(1)
 	}
 	defer db.Close()
+	actives.InitDB(db)
 
-	if *data != "" {
-		b, err := os.ReadFile(*data)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read data: %v\n", err)
-			os.Exit(1)
-		}
-		if err := actives.TryImport(string(b)); err != nil {
-			fmt.Fprintf(os.Stderr, "import: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("Imported.")
-		return
-	}
-
-	// Initialize on-chain FLUX_TEST token minting
+	// Initialize on-chain FLUX_TEST token minting (optional)
 	// Initialize on-chain FLUX_TEST token minting (optional — skips if flux_config.json not found)
 	if err := actives.InitFluxChain("flux_config.json"); err != nil {
 		fmt.Fprintf(os.Stderr, "init flux chain: %v\n", err)
@@ -59,7 +53,7 @@ func main() {
 	}
 
 	if addr := actives.FluxSigner(); addr != "" {
-		util.LogWithBlue("FLUX", fmt.Sprintf("Signer: %s", addr))
+		logBlue("FLUX", fmt.Sprintf("Signer: %s", addr))
 	}
 
 	// Start background worker for auto-minting historical points
@@ -95,8 +89,8 @@ func main() {
 	})
 	router.Handle("/gql", srv)
 
-	util.LogWithBlue("API", "  /gql        -> GraphQL (actives: early access)")
-	util.LogWithBlue("API", "  /           -> Playground")
+	logBlue("API", "  /gql        -> GraphQL (actives: early access)")
+	logBlue("API", "  /           -> Playground")
 
 	server := &http.Server{
 		Addr:         ":" + *port,
@@ -110,16 +104,16 @@ func main() {
 	defer stop()
 
 	go func() {
-		certFile := "./token_chain_data/ssl/ser.pem"
-		keyFile := "./token_chain_data/ssl/ser.key"
-		if util.IsFileExists(certFile) && util.IsFileExists(keyFile) {
-			util.LogWithBlue("Listen", fmt.Sprintf("https://0.0.0.0:%s", *port))
+		certFile := "./ssl/ser.pem"
+		keyFile := "./ssl/ser.key"
+		if fileExists(certFile) && fileExists(keyFile) {
+			logBlue("Listen", fmt.Sprintf("https://0.0.0.0:%s", *port))
 			if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
 				fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 				os.Exit(1)
 			}
 		} else {
-			util.LogWithBlue("Listen", fmt.Sprintf("http://0.0.0.0:%s", *port))
+			logBlue("Listen", fmt.Sprintf("http://0.0.0.0:%s", *port))
 			if err := server.ListenAndServe(); err != nil {
 				fmt.Fprintf(os.Stderr, "server error: %v\n", err)
 				os.Exit(1)

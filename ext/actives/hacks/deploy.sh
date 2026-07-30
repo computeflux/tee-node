@@ -3,38 +3,34 @@ set -e
 
 # get shell path
 SOURCE="$0"
-while [ -h "$SOURCE"  ]; do
-    DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
+while [ -h "$SOURCE" ]; do
+    DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
     SOURCE="$(readlink "$SOURCE")"
-    [[ $SOURCE != /*  ]] && SOURCE="$DIR/$SOURCE"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
 done
-DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
-cd $DIR/..
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+cd "$DIR/.."
 
 # -------------------------------------------------
 # Config
 # -------------------------------------------------
 APP_NAME="actives"
-REMOTE_HOST="computefluxtest"
-REMOTE_DIR="/srv/actives"
-DATA_FILE="${DATA_FILE:-}"    # pass DATA_FILE=./formatted.json to import on deploy
+REMOTE_HOST="${REMOTE_HOST:-computefluxtest}"
+REMOTE_DIR="${REMOTE_DIR:-/srv/actives}"
+DB_PATH="${DB_PATH:-./data}"
 
 # -------------------------------------------------
 # Helpers
 # -------------------------------------------------
-remote_exec() {
-    ssh "$REMOTE_HOST" "$@"
-}
+remote_exec() { ssh "$REMOTE_HOST" "$@"; }
 
 show_usage() {
     cat << EOF
-Usage: $0 <command> [options]
+Usage: $0 <command>
 
 Commands:
-  gqlgen      在本地运行 gqlgen generate 生成 GraphQL 代码
-  build       构建二进制到 ./hack/build/
-  deploy      构建 + 同步远程 + 安装 systemd + 启动
-  import      DATA_FILE=./data.json $0 deploy  首次部署时导入数据
+  build       构建 server + import_data 二进制到 build/
+  deploy      构建 → 同步远程 → 安装 systemd → 启动
   logs        实时查看远程日志
   status      查看远程服务状态
   restart     重启远程服务
@@ -43,85 +39,35 @@ EOF
 }
 
 # -------------------------------------------------
-# 1. Generate GraphQL code
-# -------------------------------------------------
-do_gqlgen() {
-    echo "[local] Running gqlgen generate..."
-    cd "$DIR/.."
-    go run github.com/99designs/gqlgen generate --config gql/gqlgen.yml
-    echo "[local] gqlgen done: generated.go + models_gen.go"
-}
-
-# -------------------------------------------------
-# 2. Build binary
+# 1. Build
 # -------------------------------------------------
 do_build() {
-    echo "[local] Building $APP_NAME ..."
-    mkdir -p "$DIR/../hack/build"
+    echo "[build] Building server + import_data ..."
+    mkdir -p build
 
-    # Check if ego-go is available (for SGX)
-    if command -v ego-go &> /dev/null; then
-        ego-go build -o "$DIR/../hack/build/$APP_NAME" .
-    else
-        go build -o "$DIR/../hack/build/$APP_NAME" .
-    fi
+    go build -o build/server ./cmd/server
+    go build -o build/import_data ./cmd/import_data
 
-    # Sign for SGX if ego is available
-    if command -v ego &> /dev/null; then
-        echo "[local] Signing with ego..."
-        cd "$DIR/../hack/build"
-        ego sign "$APP_NAME" 2>/dev/null || echo "[local] No private key for signing, skipping"
-        cd -
-    fi
-
-    echo "[local] Build done: hack/build/$APP_NAME"
+    echo "[build] Done: build/server, build/import_data"
 }
 
 # -------------------------------------------------
-# 3. Sync to remote
+# 2. Sync to remote
 # -------------------------------------------------
-sync_to_remote() {
-    echo "[local] Syncing binary to $REMOTE_HOST:$REMOTE_DIR ..."
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build"
-    rsync -avz -e ssh --delete "$DIR/../hack/build/" "$REMOTE_HOST:$REMOTE_DIR/build/"
-}
-
-# 4. Import data (one-time, on first deploy)
-do_import() {
-    if [ -z "$DATA_FILE" ]; then
-        echo "No DATA_FILE set, skipping import."
-        echo "  Usage: DATA_FILE=./formatted.json $0 deploy"
-        return
-    fi
-    if [ ! -f "$DATA_FILE" ]; then
-        echo "ERROR: $DATA_FILE not found" >&2
-        exit 1
-    fi
-
-    # 初始化远程数据目录
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/data"
-
-    # 同步本地已有数据（如果有）
-    LOCAL_DATA="$DIR/../ext/actives/data"
-    if [ -d "$LOCAL_DATA" ] && [ -n "$(ls -A "$LOCAL_DATA" 2>/dev/null)" ]; then
-        echo "[local] Syncing existing data directory ..."
-        rsync -avz -e ssh "$LOCAL_DATA/" "$REMOTE_HOST:$REMOTE_DIR/data/"
-    fi
-
-    # 导入 JSON 数据
-    echo "[local] Importing $DATA_FILE to $REMOTE_HOST ..."
-    rsync -avz -e ssh "$DATA_FILE" "$REMOTE_HOST:$REMOTE_DIR/data_import.json"
-    remote_exec "cd $REMOTE_DIR && ./build/actives -db=$REMOTE_DIR/data -data=$REMOTE_DIR/data_import.json"
-    echo "[local] Import done."
+do_sync() {
+    echo "[sync] Syncing to $REMOTE_HOST:$REMOTE_DIR ..."
+    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build $REMOTE_DIR/data"
+    rsync -avz -e ssh build/server build/import_data "$REMOTE_HOST:$REMOTE_DIR/build/"
+    echo "[sync] Done."
 }
 
 # -------------------------------------------------
-# 5. Install systemd service
+# 3. Install systemd service
 # -------------------------------------------------
-install_systemd_service() {
-    echo "[remote] Installing systemd service ${APP_NAME}.service ..."
+do_install() {
+    echo "[install] Installing systemd service ${APP_NAME}.service ..."
 
-    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/${APP_NAME}.service" > /dev/null << 'SYSTEMD'
+    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/${APP_NAME}.service" > /dev/null << SYSTEMD
 [Unit]
 Description=ComputeFlux Actives (Early Access Service)
 After=network-online.target
@@ -129,15 +75,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/srv/actives
-ExecStart=/srv/actives/build/actives -port=9100 -db=/srv/actives/data
+WorkingDirectory=$REMOTE_DIR
+ExecStart=$REMOTE_DIR/build/server -port=9100 -db=$REMOTE_DIR/data
 Restart=always
 RestartSec=5
-StartLimitInterval=60s
-StartLimitBurst=3
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=actives
+SyslogIdentifier=$APP_NAME
 
 [Install]
 WantedBy=multi-user.target
@@ -145,13 +89,14 @@ SYSTEMD
 
     remote_exec "sudo systemctl daemon-reload"
     remote_exec "sudo systemctl enable ${APP_NAME}.service"
+    echo "[install] Done."
 }
 
 # -------------------------------------------------
-# 6. Start and tail logs
+# 4. Start and tail logs
 # -------------------------------------------------
-start_and_tail_logs() {
-    echo "[remote] Starting ${APP_NAME}.service ..."
+do_start() {
+    echo "[start] Restarting ${APP_NAME}.service ..."
     remote_exec "sudo systemctl restart ${APP_NAME}.service"
     sleep 1
     remote_exec "sudo systemctl status ${APP_NAME}.service --no-pager"
@@ -168,31 +113,15 @@ start_and_tail_logs() {
 CMD="${1:-deploy}"
 
 case "$CMD" in
-    gqlgen)
-        do_gqlgen
-        ;;
-
     build)
-        do_gqlgen
         do_build
         ;;
 
     deploy)
-        do_gqlgen
         do_build
-        sync_to_remote
-        do_import
-        install_systemd_service
-        start_and_tail_logs
-        ;;
-
-    import)
-        # 单独导入数据到已在运行的服务
-        if [ -z "$DATA_FILE" ]; then
-            echo "Usage: DATA_FILE=./data.json $0 import"
-            exit 1
-        fi
-        do_import
+        do_sync
+        do_install
+        do_start
         ;;
 
     logs)
@@ -211,7 +140,7 @@ case "$CMD" in
 
     stop)
         remote_exec "sudo systemctl stop ${APP_NAME}.service"
-        remote_exec "sudo systemctl status ${APP_NAME}.service --no-pager"
+        echo "[stop] ${APP_NAME}.service stopped."
         ;;
 
     *)
