@@ -138,6 +138,10 @@ func isRateLimitText(s string) bool {
 
 func isNetworkError(s string) bool {
 	low := toLower(s)
+	// OpenEnclave / SGX errors are transient and should be retried on another endpoint
+	if containsAny(low, "oe_", "openenclave", "sgx") {
+		return true
+	}
 	return containsAny(low, "connection refused", "connection reset", "no such host",
 		"timeout", "tls handshake", "eof", "broken pipe", "i/o timeout", "dial tcp")
 }

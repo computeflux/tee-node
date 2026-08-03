@@ -42,6 +42,7 @@ hack/contract_cache
 k8s.yaml
 ext/experimental/dss
 
+ext/actives/build
 hack/build/keys
 tee-chain/runtime/wasm/ego/ego
 ext/email_test.go

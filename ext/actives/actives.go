@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -68,7 +69,6 @@ type EarlyAccessStore struct {
 }
 
 // ── DB types ─────────────────────────────────────────────
-
 type DbUser struct {
 	Wallet       string `json:"wallet"`
 	JoinedAt     string `json:"joinedAt"`
@@ -154,6 +154,22 @@ func (s *EarlyAccessStore) saveStreak(wallet string, si *StreakInfo) error {
 	return dbSetJson("streak:"+strings.ToLower(wallet), si)
 }
 
+// resetWeekIfNeeded 检测跨周并重置周签到计数,写回 DB。
+// 返回是否发生了重置。
+func (s *EarlyAccessStore) resetWeekIfNeeded(wallet string, si *StreakInfo) bool {
+	currentWeek := weekKey()
+	if si.WeekKey != currentWeek {
+		si.WeekCheckin = 0
+		si.WeekKey = currentWeek
+		_ = s.saveStreak(wallet, si)
+		fmt.Printf("[checkin] resetWeek wallet=%s oldWeek=%s newWeek=%s oldCount=%d -> 0\n",
+			wallet, si.WeekKey, currentWeek, si.WeekCheckin)
+		return true
+	}
+	fmt.Printf("[checkin] resetWeek wallet=%s week=%s count=%d (no reset)\n", wallet, si.WeekKey, si.WeekCheckin)
+	return false
+}
+
 func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, bool, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -166,17 +182,22 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 	}
 
 	// ── Weekly limit ──────────────────────────────────────
-	currentWeek := weekKey()
-	if si.WeekKey != currentWeek {
-		// New week: reset counter
-		si.WeekCheckin = 0
-		si.WeekKey = currentWeek
-	}
+	// 跨周自动重置(写回 DB),周一可签到次数/已签到次数归零
+	s.resetWeekIfNeeded(wallet, si)
 
 	if dateStr == "" {
 		if CheckinTestMode && si.LastCheckin != "" {
 			lastDt, _ := time.Parse("2006-01-02", si.LastCheckin)
-			dateStr = lastDt.AddDate(0, 0, 1).Format("2006-01-02")
+			next := lastDt.AddDate(0, 0, 1)
+			// test mode 快进限制:不能超过本周日,避免 lastCheckin 变成未来无限推进
+			now := time.Now().UTC()
+			monday := now.AddDate(0, 0, -((int(now.Weekday()) + 6) % 7)) // ISO 周起点(周一)
+			sunday := monday.AddDate(0, 0, 6).Truncate(24 * time.Hour)
+			if next.After(sunday) {
+				return 0, 0, false, false,
+					fmt.Errorf("test mode: fast-forward limited to this week (max %s)", sunday.Format("2006-01-02"))
+			}
+			dateStr = next.Format("2006-01-02")
 		} else {
 			dateStr = todayKey()
 		}
@@ -268,21 +289,21 @@ func (s *EarlyAccessStore) GetCheckinStatus(wallet string) (checkedIn bool, canC
 	si, _ := s.loadStreak(wallet)
 	if si == nil {
 		canCheckin = true
+		fmt.Printf("[checkin] status wallet=%s streak=nil -> canCheckin=true\n", wallet)
 		return
 	}
+	// 跨周立即重置并写回,前端周一即可看到归零后的次数
+	s.resetWeekIfNeeded(wallet, si)
 	today := todayKey()
-	currentWeek := weekKey()
-	if si.WeekKey != currentWeek {
-		weekCount = 0
-	} else {
-		weekCount = si.WeekCheckin
-	}
+	weekCount = si.WeekCheckin
 	checkedIn = si.LastCheckin == today
 	canCheckin = !checkedIn && weekCount < weekMax
 	streak = si.Streak
 	if !CheckinTestMode && si.LastCheckin != today {
 		streak = 0
 	}
+	fmt.Printf("[checkin] status wallet=%s today=%s lastCheckin=%s week=%s weekCount=%d checkedIn=%v canCheckin=%v streak=%d\n",
+		wallet, today, si.LastCheckin, si.WeekKey, weekCount, checkedIn, canCheckin, streak)
 	return
 }
 
@@ -330,39 +351,47 @@ func (s *EarlyAccessStore) GetQuestionsForDay(wallet string, day int) []*QuizQue
 	}
 
 	// Get compiled-in questions
-	var all map[string]*QuizQuestionRecord
+	var questionPool map[string]*QuizQuestionRecord
 	if day == 3 {
-		all = Day3QuestionsData
-		fmt.Printf("[quiz]  Day3QuestionsData len=%d\n", len(all))
+		questionPool = Day3QuestionsData
+		fmt.Printf("[quiz]  Day3QuestionsData len=%d\n", len(questionPool))
 	} else if day == 7 {
-		all = Day7QuestionsData
-		fmt.Printf("[quiz]  Day7QuestionsData len=%d\n", len(all))
+		questionPool = Day7QuestionsData
+		fmt.Printf("[quiz]  Day7QuestionsData len=%d\n", len(questionPool))
 	} else {
 		fmt.Printf("[quiz]  unsupported day=%d, returning nil\n", day)
 		return nil
 	}
 
-	if all == nil {
+	if questionPool == nil {
 		fmt.Printf("[quiz]  WARN: compiled-in questions map is NIL for day=%d!\n", day)
 		return nil
 	}
 
-	// Filter out already answered (stored in DB per user)
+	// Filter out already answered
 	answered, _ := dbGetJson[map[string]bool](fmt.Sprintf("answered:%s:day%d", wallet, day))
-	answeredCount := 0
-	if answered != nil {
-		answeredCount = len(*answered)
-	}
-	fmt.Printf("[quiz]  answered count=%d\n", answeredCount)
 
-	var out []*QuizQuestionRecord
-	for id, q := range all {
+	// Collect unanswered questions
+	var unanswered []*QuizQuestionRecord
+	for id, q := range questionPool {
 		if answered != nil && (*answered)[id] {
 			continue
 		}
-		out = append(out, q)
+		unanswered = append(unanswered, q)
 	}
-	fmt.Printf("[quiz]  returning %d unanswered questions\n", len(out))
+
+	// Randomly select up to 5 questions
+	count := 5
+	if len(unanswered) < count {
+		count = len(unanswered)
+	}
+	var out []*QuizQuestionRecord
+	if count > 0 {
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+		rng.Shuffle(len(unanswered), func(i, j int) { unanswered[i], unanswered[j] = unanswered[j], unanswered[i] })
+		out = unanswered[:count]
+	}
+	fmt.Printf("[quiz]  returning %d questions (from %d unanswered)\n", len(out), len(unanswered))
 	return out
 }
 
@@ -377,10 +406,18 @@ func (s *EarlyAccessStore) GetQuizProgress(wallet string, day int) (total, answe
 	} else {
 		return 0, 0, 0
 	}
-	total = len(all)
+	// Total is at most 5 per round (matches GetQuestionsForDay limit)
+	// Each round shows up to 5 questions
+	total = 5
+	if len(all) < total {
+		total = len(all)
+	}
 	answeredSet, _ := dbGetJson[map[string]bool](fmt.Sprintf("answered:%s:day%d", wallet, day))
 	if answeredSet != nil {
 		answered = len(*answeredSet)
+		if answered > total {
+			answered = total
+		}
 	}
 	// The answered set only records correctly-answered questions (wrong answers not stored),
 	// so each entry = ptsPerQ earned.

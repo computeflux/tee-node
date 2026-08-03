@@ -308,7 +308,7 @@ func (s *Scheduler) tryOneModel(
 	stream bool,
 	isFallback bool,
 ) (*Result, error) {
-	var deadKeys, usedKeys map[string]bool
+	var deadKeys, usedKeys, failKeys map[string]bool
 	lastWasRateLimit := false
 	var lastUpstreamErr error // 最近一次端点调用的真实错误,用于耗尽时回传给调用方
 	lastClass := ClassUnknown // 最近一次失败时的错误分类
@@ -360,14 +360,14 @@ func (s *Scheduler) tryOneModel(
 		if ep == nil {
 			// 排除已 dead(401)和本轮已被限流(429)的 key,这样所有候选都被排除时
 			// Select 返回 nil,触发下面的「第二次机会」清空逻辑,而不是空转重试已用 key。
-			ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
+			ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys, failKeys))
 		}
 		if ep == nil {
 			// 池子空了:若是 429 周期耗尽,清掉 usedKeys 给滑过窗口的 key 第二次机会
 			if lastWasRateLimit && len(usedKeys) > 0 {
 				s.log.Debug("clearing usedKeys for rate-limit retry", "model", model)
 				usedKeys = nil
-				ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys))
+				ep, noEpReason = s.selector.Select(ctx, route, s.cfg.ColdStartSamples, skipSet(deadKeys, usedKeys, failKeys))
 			}
 			if ep == nil {
 				s.log.Warn("no available endpoint", "model", model, "attempt", attempt, "reason", noEpReason)
@@ -376,8 +376,8 @@ func (s *Scheduler) tryOneModel(
 				break
 			}
 		}
-		if deadKeys[ep.KeyID] || usedKeys[ep.KeyID] {
-			s.log.Debug("skipping dead/used key", "model", model, "key_id", ep.KeyID, "attempt", attempt)
+		if deadKeys[ep.KeyID] || usedKeys[ep.KeyID] || failKeys[ep.KeyID] {
+			s.log.Debug("skipping dead/used/failed key", "model", model, "key_id", ep.KeyID, "attempt", attempt)
 			continue
 		}
 
@@ -546,6 +546,14 @@ func (s *Scheduler) tryOneModel(
 
 		case ClassTransient:
 			breaker.RecordFailure(ep.metrics, s.log)
+			if failKeys == nil {
+				failKeys = map[string]bool{}
+			}
+			failKeys[ep.KeyID] = true
+			// 清除 session affinity，避免下一次请求又绑到这个故障端点
+			if inv.SessionID != "" {
+				s.affinity.Delete(inv.SessionID)
+			}
 			s.log.Info("transient error, retrying after backoff",
 				"model", model,
 				"provider", ep.Provider,
@@ -592,15 +600,18 @@ func (s *Scheduler) tryOneModel(
 
 // skipSet 合并 dead/used 两个 key 集合给 selector.Select 排除。
 // 都为空时返回 nil(Select 视为不排除)。
-func skipSet(deadKeys, usedKeys map[string]bool) map[string]bool {
-	if len(deadKeys) == 0 && len(usedKeys) == 0 {
+func skipSet(deadKeys, usedKeys, failKeys map[string]bool) map[string]bool {
+	if len(deadKeys) == 0 && len(usedKeys) == 0 && len(failKeys) == 0 {
 		return nil
 	}
-	skip := make(map[string]bool, len(deadKeys)+len(usedKeys))
+	skip := make(map[string]bool, len(deadKeys)+len(usedKeys)+len(failKeys))
 	for k := range deadKeys {
 		skip[k] = true
 	}
 	for k := range usedKeys {
+		skip[k] = true
+	}
+	for k := range failKeys {
 		skip[k] = true
 	}
 	return skip

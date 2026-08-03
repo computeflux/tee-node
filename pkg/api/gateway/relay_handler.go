@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -94,10 +96,11 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		requestPath = protocol.CanonicalAnthropicPath(requestPath)
 	}
 
-	// session 亲和:同一用户+模型优先复用上次端点(命中上游 KV cache)。
-	sessionID := ""
-	if token != nil {
-		sessionID = token.Owner + ":" + modelNameArg
+	// session 亲和:同一会话+模型优先复用上次端点(命中上游 KV cache)。
+	// 优先级:请求体里的 session_id > 按入口协议解析首条消息哈希 > token.Owner+model。
+	sessionID := token.Owner
+	if sid := extractSessionID(bodyBytes, inbound); sid != "" {
+		sessionID = token.Owner + ":" + sid
 	}
 
 	// 把入口协议 + 请求路径塞进 ctx,scheduler 选完端点后由 provider client 据此转换请求体。
@@ -387,6 +390,103 @@ func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol
 	default:
 		return nil, fmt.Errorf("unsupported stream protocol pair: inbound=%v provider=%v", inbound, provider)
 	}
+}
+
+// extractSessionID 按入口协议解析请求体,提取会话 ID。
+// extractSessionID 按入口协议解析请求体,提取会话 ID。
+// 约定:客户端统一传 session_id(唯一标准字段,不猜别名);
+// 没传就用首条消息哈希(同一对话稳定)。
+//   - openai:    messages[0].content
+//   - anthropic: messages[0].content(string 或 blocks[].text)
+//   - gemini:    contents[0].parts[].text
+func extractSessionID(body []byte, p protocol.Protocol) string {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return ""
+	}
+
+	// 1. 客户端显式传的会话 ID(兼容常见 agent 的不同字段名)
+	for _, k := range []string{"session_id", "sessionId", "session", "conversation_id", "conversationId", "conversation", "thread_id", "threadId"} {
+		if v, ok := raw[k]; ok {
+			var s string
+			if json.Unmarshal(v, &s) == nil && s != "" {
+				return s
+			}
+		}
+	}
+
+	// 1b. 也可能放在 metadata 里(部分 SDK 约定,如 Anthropic metadata.user_id)
+	if meta, ok := raw["metadata"]; ok {
+		var m map[string]string
+		if json.Unmarshal(meta, &m) == nil {
+			for _, k := range []string{"session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId", "user_id"} {
+				if s := m[k]; s != "" {
+					return s
+				}
+			}
+		}
+	}
+
+	// 2. 按入口协议解析首条消息
+	var firstMsg string
+	switch p {
+	case protocol.ProtocolAnthropic:
+		if msgs, ok := raw["messages"]; ok {
+			var arr []struct {
+				Content any `json:"content"`
+			}
+			if json.Unmarshal(msgs, &arr) == nil && len(arr) > 0 {
+				firstMsg = messageContentText(arr[0].Content)
+			}
+		}
+	case protocol.ProtocolGemini:
+		if contents, ok := raw["contents"]; ok {
+			var arr []struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			}
+			if json.Unmarshal(contents, &arr) == nil && len(arr) > 0 {
+				for _, part := range arr[0].Parts {
+					firstMsg += part.Text
+				}
+			}
+		}
+	default: // openai
+		if msgs, ok := raw["messages"]; ok {
+			var arr []struct {
+				Content any `json:"content"`
+			}
+			if json.Unmarshal(msgs, &arr) == nil && len(arr) > 0 {
+				firstMsg = messageContentText(arr[0].Content)
+			}
+		}
+	}
+	if firstMsg != "" {
+		h := sha256.Sum256([]byte(firstMsg))
+		return "msg:" + hex.EncodeToString(h[:16])
+	}
+	return ""
+}
+
+// messageContentText 把不同形态的 message content 提取为文本。
+// string → 原样;数组(多模态 blocks) → 拼接 text 字段。
+func messageContentText(content any) string {
+	switch c := content.(type) {
+	case string:
+		return c
+	case []any:
+		var sb strings.Builder
+		for _, part := range c {
+			if m, ok := part.(map[string]any); ok {
+				if t, ok := m["text"].(string); ok {
+					sb.WriteString(t)
+				}
+			}
+		}
+		return sb.String()
+	}
+	return ""
 }
 
 func HandleListModels(w http.ResponseWriter, r *http.Request) {
