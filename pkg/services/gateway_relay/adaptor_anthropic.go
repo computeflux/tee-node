@@ -38,7 +38,7 @@ func (a *AnthropicAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body 
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
-	return httpDo(ctx, url, sendBody, func(req *http.Request) {
+	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-api-key", ep.KeyValue)
 		req.Header.Set("anthropic-version", "2023-06-01")
 	})
@@ -54,7 +54,7 @@ func (a *AnthropicAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, b
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
-	return httpStream(ctx, url, sendBody, func(req *http.Request) {
+	return httpStream(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-api-key", ep.KeyValue)
 		req.Header.Set("anthropic-version", "2023-06-01")
 	})

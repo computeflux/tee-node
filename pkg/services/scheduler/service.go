@@ -3,6 +3,8 @@ package scheduler
 import (
 	"context"
 	"fmt"
+
+	"github.com/computeflux/tee-provider/pkg/util"
 )
 
 // GatewayScheduler 把 Scheduler 封装成 TEE 节点的一个服务。
@@ -21,7 +23,9 @@ func NewGatewayScheduler(resolver ModelResolver) (*GatewayScheduler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create observability: %w", err)
 	}
-	sch := New(DefaultConfig(), resolver, obs)
+	cfg := DefaultConfig()
+	cfg.Log = utilLogger{} // 接入全局日志系统(util), 支持等级过滤 + 终端/文件输出
+	sch := New(cfg, resolver, obs)
 	logger := sch.log
 	gw := &GatewayScheduler{
 		scheduler: sch,
@@ -31,6 +35,15 @@ func NewGatewayScheduler(resolver ModelResolver) (*GatewayScheduler, error) {
 	logger.Info("gateway scheduler initialized")
 	return gw, nil
 }
+
+// utilLogger 把全局日志系统(util)适配为调度器的 Logger 接口。
+// 调度器内部日志(熔断/路由缓存/会话亲和等)统一走全局日志。
+type utilLogger struct{}
+
+func (utilLogger) Debug(msg string, kvs ...any) { util.LogDebugf("%s%s", msg, formatKVs(kvs)) }
+func (utilLogger) Info(msg string, kvs ...any)  { util.LogInfof("%s%s", msg, formatKVs(kvs)) }
+func (utilLogger) Warn(msg string, kvs ...any)  { util.LogWarnf("%s%s", msg, formatKVs(kvs)) }
+func (utilLogger) Error(msg string, kvs ...any) { util.LogErrorf("%s%s", msg, formatKVs(kvs)) }
 
 // RegisterProviders 批量注册 provider。
 func (g *GatewayScheduler) RegisterProviders(providers map[string]ProviderClient) {

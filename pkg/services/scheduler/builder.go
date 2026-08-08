@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/computeflux/tee-provider/pkg/util"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
@@ -65,7 +66,7 @@ func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfo, prov
 		endpoints = append(endpoints, &Endpoint{
 			Provider:           ProviderID(providerName),
 			Protocol:           ProviderID(protocol),
-			KeyID:              fmt.Sprintf("%s-%d", model.ModelID, i),
+			KeyID:              fmt.Sprintf("%d-%d", modelID, i),
 			KeyValue:           key,
 			BaseURL:            baseURL,
 			Weight:             1.0, // 合约暂无权重，均分
@@ -80,7 +81,7 @@ func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfo, prov
 	}
 
 	if len(endpoints) == 0 && model.ProviderType != cgateway.ProviderPersonal {
-		fmt.Printf("[scheduler] model %s (provider=%s type=%d) has no usable API keys, endpoint_count=0", model.Name, providerName, model.ProviderType)
+		util.LogWarnf("[scheduler] model %s (provider=%s type=%d) has no usable API keys, endpoint_count=0", model.Name, providerName, model.ProviderType)
 	}
 	return endpoints
 }

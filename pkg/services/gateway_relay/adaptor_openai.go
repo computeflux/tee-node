@@ -42,7 +42,7 @@ func (a *OpenAIAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []b
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, upstreamPath)
-	return httpDo(ctx, url, sendBody, func(req *http.Request) {
+	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+ep.KeyValue)
 		for k, v := range ep.ExtraHeaders {
 			req.Header.Set(k, v)
@@ -64,7 +64,7 @@ func (a *OpenAIAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body
 	if ep.Protocol == scheduler.ProviderID("openai") {
 		out = injectStreamUsage(sendBody)
 	}
-	return httpStream(ctx, url, out, func(req *http.Request) {
+	return httpStream(ctx, ep, url, out, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+ep.KeyValue)
 		for k, v := range ep.ExtraHeaders {
 			req.Header.Set(k, v)

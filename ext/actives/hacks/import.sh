@@ -19,4 +19,9 @@ if [ -z "$DATA_FILE" ]; then
 fi
 
 echo "[import] Importing: $DATA_FILE (db: $DB_PATH)"
-go run ./cmd/import_data -data="$DATA_FILE" -db="$DB_PATH"
+if command -v go >/dev/null 2>&1; then
+    go run ./cmd/import_data -data="$DATA_FILE" -db="$DB_PATH"
+else
+    echo "[import] go not found, using prebuilt binary: build/import_data"
+    ./build/import_data -data="$DATA_FILE" -db="$DB_PATH"
+fi

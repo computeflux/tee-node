@@ -46,8 +46,9 @@ do_build() {
     mkdir -p build
 
     go build -o build/server ./cmd/server
+    go build -o build/import_data ./cmd/import_data
 
-    echo "[build] Done: build/server"
+    echo "[build] Done: build/server, build/import_data"
 }
 
 # -------------------------------------------------
@@ -55,8 +56,11 @@ do_build() {
 # -------------------------------------------------
 do_sync() {
     echo "[sync] Syncing to $REMOTE_HOST:$REMOTE_DIR ..."
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build"
+    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/build $REMOTE_DIR/hacks"
     rsync -avz -e ssh build/server "$REMOTE_HOST:$REMOTE_DIR/build/"
+    rsync -avz -e ssh build/import_data "$REMOTE_HOST:$REMOTE_DIR/build/"
+    rsync -avz -e ssh hacks/import.sh "$REMOTE_HOST:$REMOTE_DIR/hacks/"
+    rsync -avz -e ssh flux_config_main.json "$REMOTE_HOST:$REMOTE_DIR/flux_config.json"
     echo "[sync] Done."
 }
 

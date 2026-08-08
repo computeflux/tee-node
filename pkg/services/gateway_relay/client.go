@@ -5,16 +5,17 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
+	"github.com/computeflux/tee-provider/pkg/util"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
@@ -85,7 +86,7 @@ const sseMaxLineBytes = 1 << 20 // 1 MiB
 
 // httpDo 构造 POST 请求、发送、读取非流式响应。
 // >=400 的响应转成 *scheduler.UpstreamError 供调度器分类重试。
-func httpDo(ctx context.Context, url string, body []byte, setHeaders func(*http.Request)) ([]byte, error) {
+func httpDo(ctx context.Context, ep *scheduler.Endpoint, url string, body []byte, setHeaders func(*http.Request)) ([]byte, error) {
 	req, err := newPostRequest(ctx, url, body)
 	if err != nil {
 		return nil, err
@@ -96,15 +97,15 @@ func httpDo(ctx context.Context, url string, body []byte, setHeaders func(*http.
 
 	resp, err := doHTTPClient.Do(req)
 	if err != nil {
-		log.Printf("[relay] httpDo transport error url=%s err=%v", url, err)
+		util.LogErrorf("[relay] httpDo transport error endpoint=%s url=%s err=%v", endpointLabel(ep), url, err)
 		return nil, err
 	}
-	return readResponse(resp)
+	return readResponse(resp, ep)
 }
 
 // httpStream 构造 POST 请求、发送、打开 SSE 流。
 // >=400 的响应转成 *scheduler.UpstreamError。
-func httpStream(ctx context.Context, url string, body []byte, setHeaders func(*http.Request)) (scheduler.Stream, error) {
+func httpStream(ctx context.Context, ep *scheduler.Endpoint, url string, body []byte, setHeaders func(*http.Request)) (scheduler.Stream, error) {
 	req, err := newPostRequest(ctx, url, body)
 	if err != nil {
 		return nil, err
@@ -115,10 +116,10 @@ func httpStream(ctx context.Context, url string, body []byte, setHeaders func(*h
 
 	resp, err := streamHTTPClient.Do(req)
 	if err != nil {
-		log.Printf("[relay] httpStream transport error url=%s err=%v", url, err)
+		util.LogErrorf("[relay] httpStream transport error endpoint=%s url=%s err=%v", endpointLabel(ep), url, err)
 		return nil, err
 	}
-	return openStream(ctx, resp)
+	return openStream(ctx, resp, ep)
 }
 
 // newPostRequest 构造一个 POST 请求(JSON body)。
@@ -133,7 +134,7 @@ func newPostRequest(ctx context.Context, url string, body []byte) (*http.Request
 
 // readResponse 读非流式响应。4xx/5xx 转成 *scheduler.UpstreamError 让调度器分类重试。
 // 错误响应 body 截断至 upstreamErrorBodyLimit 以避免恶意上游或异常 body 撑爆内存。
-func readResponse(resp *http.Response) ([]byte, error) {
+func readResponse(resp *http.Response, ep *scheduler.Endpoint) ([]byte, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyLimit+1))
@@ -146,6 +147,7 @@ func readResponse(resp *http.Response) ([]byte, error) {
 		if readErr != nil {
 			msg += "; read_error=" + readErr.Error()
 		}
+		logUpstreamError(resp, ep, msg)
 		return nil, &scheduler.UpstreamError{
 			Status:  resp.StatusCode,
 			Message: msg,
@@ -155,7 +157,7 @@ func readResponse(resp *http.Response) ([]byte, error) {
 }
 
 // openStream 把响应封装成 scheduler.Stream。4xx/5xx 转成 *scheduler.UpstreamError。
-func openStream(ctx context.Context, resp *http.Response) (scheduler.Stream, error) {
+func openStream(ctx context.Context, resp *http.Response, ep *scheduler.Endpoint) (scheduler.Stream, error) {
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
 		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyLimit+1))
@@ -168,6 +170,7 @@ func openStream(ctx context.Context, resp *http.Response) (scheduler.Stream, err
 		if readErr != nil {
 			msg += "; read_error=" + readErr.Error()
 		}
+		logUpstreamError(resp, ep, msg)
 		return nil, &scheduler.UpstreamError{
 			Status:  resp.StatusCode,
 			Message: msg,
@@ -186,6 +189,66 @@ func openStream(ctx context.Context, resp *http.Response) (scheduler.Stream, err
 		}()
 	}
 	return s, nil
+}
+
+// logUpstreamError 记录上游错误详情，格式分三段：
+//
+//	endpoint 身份 | 实际发出的请求 | 上游响应
+//
+// 只提取 model 字段而非整个请求体，避免把用户 prompt 等敏感内容打进日志；
+// KeyValue(API Key 明文)绝不打印，只打印 KeyID。
+func logUpstreamError(resp *http.Response, ep *scheduler.Endpoint, msg string) {
+	url, bodyModel := "", ""
+	if resp.Request != nil {
+		url = resp.Request.URL.String()
+		if resp.Request.GetBody != nil {
+			rb, err := resp.Request.GetBody()
+			if err == nil {
+				defer rb.Close()
+				if b, rerr := io.ReadAll(io.LimitReader(rb, 64<<10)); rerr == nil {
+					bodyModel = modelFromBody(b)
+				}
+			}
+		}
+	}
+
+	req := fmt.Sprintf("url=%s", url)
+	if ep != nil && ep.ModelName != "" && ep.ModelName != bodyModel {
+		req += fmt.Sprintf(" model=%q body_model=%q", ep.ModelName, bodyModel)
+	} else if bodyModel != "" {
+		req += fmt.Sprintf(" model=%q", bodyModel)
+	}
+
+	util.LogErrorf("[relay] upstream error: %s | %s | status=%d resp=%s",
+		endpointLabel(ep), req, resp.StatusCode, truncateLog(msg, 1024))
+}
+
+// endpointLabel 生成日志用的 endpoint 身份标识（不含 API Key 明文）。
+func endpointLabel(ep *scheduler.Endpoint) string {
+	if ep == nil {
+		return "endpoint=nil"
+	}
+	return fmt.Sprintf("provider=%s provider_id=%d model_id=%d key=%s route=%d proto=%s base=%s",
+		ep.Provider, ep.ContractProviderID, ep.ModelID, ep.KeyID, ep.RouteID, ep.Protocol, ep.BaseURL)
+}
+
+// truncateLog 截断过长的日志字段，防止上游异常响应撑爆单行日志。
+func truncateLog(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	return s[:limit] + fmt.Sprintf("...[truncated %d bytes]", len(s))
+}
+
+// modelFromBody 从 JSON 请求体提取 model 字段（缺失或非 JSON 时返回空串）。
+func modelFromBody(b []byte) string {
+	var doc struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		return ""
+	}
+	return doc.Model
 }
 
 // sseStream 把 HTTP response body 的 SSE 流逐行透传成 scheduler.Stream。

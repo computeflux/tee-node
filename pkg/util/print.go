@@ -1,9 +1,5 @@
 package util
 
-import (
-	"fmt"
-)
-
 ///黑色 (Black)	  30	40
 ///红色 (Red)	  31	41
 ///绿色 (Green)	  32	42
@@ -25,72 +21,14 @@ const (
 	Gray   = "\033[1;30;47m"
 )
 
-func LogWithYellow(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
+// 以下彩色 API 全部接入全局日志系统(util/logger.go):
+// 终端保持原有彩色输出, 同时按等级过滤并写入文件(纯文本)。
+// 除 LogWithRed 为 Error 级外, 其余均为 Info 级。
 
-	b = append(b, Yellow+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithCyan(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Cyan+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithGray(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Gray+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithPurple(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Purple+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithRed(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Red+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithGreen(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Green+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
-
-func LogWithBlue(tag string, a ...any) {
-	b := make([]any, 0, len(a)+3)
-
-	b = append(b, Blue+" "+tag)
-	b = append(b, Reset)
-	b = append(b, a...)
-
-	fmt.Println(b...)
-}
+func LogWithYellow(tag string, a ...any) { logColored(LevelInfo, Yellow, tag, a...) }
+func LogWithCyan(tag string, a ...any)   { logColored(LevelInfo, Cyan, tag, a...) }
+func LogWithGray(tag string, a ...any)   { logColored(LevelInfo, Gray, tag, a...) }
+func LogWithPurple(tag string, a ...any) { logColored(LevelInfo, Purple, tag, a...) }
+func LogWithRed(tag string, a ...any)    { logColored(LevelError, Red, tag, a...) }
+func LogWithGreen(tag string, a ...any)  { logColored(LevelInfo, Green, tag, a...) }
+func LogWithBlue(tag string, a ...any)   { logColored(LevelInfo, Blue, tag, a...) }

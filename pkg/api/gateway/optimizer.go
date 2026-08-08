@@ -119,7 +119,7 @@ func recordRelayFailure(token *types.GatewayTokenInfo, ep *scheduler.Endpoint) {
 }
 
 // recordScheduleFailure 记录一次调度失败（无 endpoint），从缓存查找 model 信息。
-func recordScheduleFailure(token *types.GatewayTokenInfo, modelKey string) {
+func recordScheduleFailure(token *types.GatewayTokenInfo, modelKey string, err error) {
 	if token == nil || modelKey == "" {
 		return
 	}
@@ -148,7 +148,7 @@ func recordScheduleFailure(token *types.GatewayTokenInfo, modelKey string) {
 		ID:   id,
 		Data: m,
 	}
-	util.LogError("[ScheduleFailure]", m.ProviderID, m.Name)
+	util.LogError("[ScheduleFailure]", m.ProviderID, m.Name, err)
 	usageCh <- usageRecord{user: token.Addr, tokenID: token.ID, model: model, routeID: 0, failCount: 1}
 }
 

@@ -112,7 +112,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			st, msg, typ := mapScheduleError(err)
 			writeProtocolError(w, r, st, msg, typ)
 			GATEWAYLOG().Printf("[relay] stream schedule error model=%s: %v", modelKey, err)
-			recordScheduleFailure(token, modelKey)
+			recordScheduleFailure(token, modelKey, err)
 			return
 		}
 		ep := res.Meta.Endpoint
@@ -162,7 +162,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		st, msg, typ := mapScheduleError(err)
 		writeProtocolError(w, r, st, msg, typ)
 		GATEWAYLOG().Printf("[relay] schedule error model=%s: %v", modelKey, err)
-		recordScheduleFailure(token, modelKey)
+		recordScheduleFailure(token, modelKey, err)
 		return
 	}
 	ep := res.Meta.Endpoint

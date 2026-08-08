@@ -34,7 +34,7 @@ func (a *GeminiAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []b
 		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, ep.ModelName, false)
-	return httpDo(ctx, url, sendBody, func(req *http.Request) {
+	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-goog-api-key", ep.KeyValue)
 	})
 }
@@ -45,7 +45,7 @@ func (a *GeminiAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body
 		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
 	url := a.requestURL(ep.BaseURL, ep.ModelName, true)
-	return httpStream(ctx, url, sendBody, func(req *http.Request) {
+	return httpStream(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-goog-api-key", ep.KeyValue)
 	})
 }

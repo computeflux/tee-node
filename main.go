@@ -35,6 +35,20 @@ func main() {
 	chainEnv := util.GetEnv("CHAIN_ENV", "local")
 	chainPort := util.GetEnvInt("SIDE_CHAIN_PORT", 61001)
 
+	// 初始化全局日志系统:
+	//   LOG_LEVEL   日志等级 debug/info/warn/error/off, 默认 info
+	//   LOG_STDOUT  是否输出到终端(1/0), 默认 1(方便调试)
+	//   LOG_FILE    日志文件路径, 默认 ./token_chain_data/app.log
+	logLevel := util.ParseLogLevel(util.GetEnv("LOG_LEVEL", "warn"))
+	logStdout := util.GetEnvInt("LOG_STDOUT", 1) == 1
+	logFile := util.GetEnv("LOG_FILE", "./token_chain_data/app.log")
+	if err := util.SetupLog(util.LogOptions{
+		Level: logLevel, ToStdout: logStdout, ToFile: true, FilePath: logFile,
+	}); err != nil {
+		fmt.Println("Setup log error:", err)
+		os.Exit(1)
+	}
+
 	// Init app db
 	db, err := store.NewDB()
 	if err != nil {

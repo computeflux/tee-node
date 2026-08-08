@@ -131,8 +131,8 @@ type StreakInfo struct {
 
 const (
 	checkinPoints  = 5
-	day3QuizPoints = 50
-	day7QuizPoints = 100
+	day3QuizPoints = 10
+	day7QuizPoints = 20
 	maxWeekCheckin = 7
 )
 
@@ -277,10 +277,9 @@ func (s *EarlyAccessStore) GetStreak(wallet string) int {
 	}
 	today := todayKey()
 	fmt.Printf("[streak] GetStreak wallet=%s today=%s lastCheckin=%s streak=%d testMode=%v\n", wallet, today, si.LastCheckin, si.Streak, CheckinTestMode)
-	if CheckinTestMode || si.LastCheckin == today {
-		return si.Streak
-	}
-	return 0
+
+	// 同上:返回存储的连续签到天数,而不是在未当天签到时报 0
+	return si.Streak
 }
 
 func (s *EarlyAccessStore) GetCheckinStatus(wallet string) (checkedIn bool, canCheckin bool, weekCount int, weekMax int, streak int) {
@@ -298,10 +297,9 @@ func (s *EarlyAccessStore) GetCheckinStatus(wallet string) (checkedIn bool, canC
 	weekCount = si.WeekCheckin
 	checkedIn = si.LastCheckin == today
 	canCheckin = !checkedIn && weekCount < weekMax
+
+	// 连续签到天数以最后一次签到为准,当天签到前也保持展示,前端需要看到已完成的签到
 	streak = si.Streak
-	if !CheckinTestMode && si.LastCheckin != today {
-		streak = 0
-	}
 	fmt.Printf("[checkin] status wallet=%s today=%s lastCheckin=%s week=%s weekCount=%d checkedIn=%v canCheckin=%v streak=%d\n",
 		wallet, today, si.LastCheckin, si.WeekKey, weekCount, checkedIn, canCheckin, streak)
 	return

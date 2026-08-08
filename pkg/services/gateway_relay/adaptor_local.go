@@ -53,7 +53,7 @@ func (a *LocalAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []by
 	if err != nil {
 		return nil, err
 	}
-	return readResponse(resp)
+	return readResponse(resp, ep)
 }
 
 func (a *LocalAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body []byte) (scheduler.Stream, error) {
@@ -61,5 +61,5 @@ func (a *LocalAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body 
 	if err != nil {
 		return nil, err
 	}
-	return openStream(ctx, resp)
+	return openStream(ctx, resp, ep)
 }
