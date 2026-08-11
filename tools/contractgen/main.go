@@ -1205,16 +1205,17 @@ func storeKeyPrefix(field string) string {
 
 // smartSnakeCase 将驼峰转为蛇形，处理连续大写字母（如 ID -> id）
 func smartSnakeCase(s string) string {
+	rs := []rune(s)
 	var b strings.Builder
-	for i, r := range s {
+	for i, r := range rs {
 		if i > 0 && r >= 'A' && r <= 'Z' {
 			// 前一个字符是小写，或者后一个字符是小写，才添加下划线
 			// 连续大写字母不添加下划线（如 ID）
-			prev := []rune(s)[i-1]
+			prev := rs[i-1]
 			if prev >= 'a' && prev <= 'z' {
 				b.WriteByte('_')
-			} else if i+1 < len(s) {
-				next := []rune(s)[i+1]
+			} else if i+1 < len(rs) {
+				next := rs[i+1]
 				if next >= 'a' && next <= 'z' {
 					b.WriteByte('_')
 				}

@@ -153,7 +153,19 @@ func readResponse(resp *http.Response, ep *scheduler.Endpoint) ([]byte, error) {
 			Message: msg,
 		}
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyLimit))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, upstreamErrorBodyLimit+1))
+	if err != nil {
+		return nil, fmt.Errorf("read upstream response: %w", err)
+	}
+	if len(respBody) > upstreamErrorBodyLimit {
+		// 成功响应也超限：静默截断会让调用方拿到损坏的 JSON 且错误难以定位，
+		// 这里显式报错而不是返回截断数据。
+		return nil, &scheduler.UpstreamError{
+			Status:  resp.StatusCode,
+			Message: fmt.Sprintf("upstream success response exceeds %d bytes limit", upstreamErrorBodyLimit),
+		}
+	}
+	return respBody, nil
 }
 
 // openStream 把响应封装成 scheduler.Stream。4xx/5xx 转成 *scheduler.UpstreamError。
@@ -291,7 +303,7 @@ func (s *sseStream) Next(ctx context.Context) (*scheduler.StreamChunk, error) {
 		}
 	}
 
-	line, err := s.reader.ReadBytes('\n')
+	line, err := s.readLine()
 	if err != nil {
 		if errors.Is(err, io.EOF) {
 			s.Close()
@@ -310,6 +322,30 @@ func (s *sseStream) Next(ctx context.Context) (*scheduler.StreamChunk, error) {
 	idx := s.idx
 	s.idx++
 	return &scheduler.StreamChunk{Data: line, Index: idx}, nil
+}
+
+// readLine 读取一行 SSE 数据（含换行符）。
+//
+// 用 ReadSlice 按 64KB 缓冲分片累积，每片后检查总长度：超过 sseMaxLineBytes 的
+// 畸形单行直接报错，避免恶意/异常上游发送超长单行导致内存无限增长（bufio.ReadBytes
+// 会把整行累积到内存里，无上限）。
+func (s *sseStream) readLine() ([]byte, error) {
+	var line []byte
+	for {
+		frag, err := s.reader.ReadSlice('\n')
+		line = append(line, frag...)
+		if len(line) > sseMaxLineBytes {
+			return nil, fmt.Errorf("sse line exceeds %d bytes limit", sseMaxLineBytes)
+		}
+		if err == nil {
+			return line, nil
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		// EOF 或底层错误：返回已累积的残留字节
+		return line, err
+	}
 }
 
 func (s *sseStream) Close() error {

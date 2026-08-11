@@ -226,9 +226,11 @@ func (b *Breaker) Allow(metrics *EndpointMetrics) bool {
 		return false
 
 	case breakerHalfOpen:
-		// 只放行 HalfOpenProbes 个探测
-		total := b.hoSuccess.Load() + b.hoFailure.Load()
-		return total < int32(b.cfg.HalfOpenProbes)
+		// 放行探测请求，直到成功或失败计数任一达到 HalfOpenProbes。
+		// 注意：不能按“总探测数”限流 —— 若成功/失败混合（如 2 成功 + 1 失败）
+		// 两个阈值都没达到却耗尽了探测预算，请求会被永久拒绝，状态机卡死在 half-open。
+		return b.hoSuccess.Load() < int32(b.cfg.HalfOpenProbes) &&
+			b.hoFailure.Load() < int32(b.cfg.HalfOpenProbes)
 	}
 	return false
 }

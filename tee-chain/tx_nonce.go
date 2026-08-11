@@ -21,7 +21,8 @@ func GetNodeNextNonce(node ink.SignerType) uint64 {
 func GetNextCallerNonce(caller []byte, callerType uint32) uint64 {
 	key := GetCallerNonceKey(caller, callerType)
 	bt, err := dbstore.SECRET_DB.GetFromByteKey([]byte(key))
-	if err != nil || len(bt) == 0 {
+	// 长度不足 8 字节视为无效数据，避免 binary.BigEndian.Uint64 panic（CheckTx 路径）
+	if err != nil || len(bt) < 8 {
 		return 1
 	}
 	return binary.BigEndian.Uint64(bt) + 1
@@ -36,7 +37,7 @@ func TxnGetCurrentCallerNonce(txn *dbstore.Txn, caller []byte, callerType uint32
 		}
 		return 0, err
 	}
-	if len(bt) == 0 {
+	if len(bt) < 8 {
 		return 0, nil
 	}
 	return binary.BigEndian.Uint64(bt), nil

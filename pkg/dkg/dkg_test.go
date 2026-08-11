@@ -28,15 +28,57 @@ var newPeerSecret = []string{
 	"66dfdf585852c8aa4b111c15b69d4b40ad6db7cfabd7ae0b25384c950f5018cb2b4c0a71a9d97d6eb9bfcb29acc0d71df41015c5c5cc697d9471728a2a508a8a",
 }
 
+// stopDKGs 停止所有 DKG 并等待本地 peer 的在途消息处理完成，
+// 必须在 db.Close() 之前执行（通过 defer 逆序保证），
+// 否则后台 handler goroutine 会继续向已关闭的 pebble DB 写入而 panic。
+// 注意顺序：必须先全部 Stop()（关闭消息链并等各自处理循环退出），
+// 再统一 Wait()（等待派发 goroutine），否则 Wait 可能在其它节点的
+// 处理循环仍在派发新消息时提前返回。
+func stopDKGs(dkgs []*DKG) {
+	for _, d := range dkgs {
+		d.Stop()
+	}
+	for _, d := range dkgs {
+		if lp, ok := d.Peer.(*local.Peer); ok {
+			lp.Wait()
+		}
+	}
+}
+
+// waitDKGReady 等待所有 DKG 完成共识迁移（DkgKeyShares 就绪），
+// 确保上一轮 epoch 的消息全部处理完、网络达到静止，再进入下一轮。
+func waitDKGReady(t *testing.T, dkgs []*DKG) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		ready := true
+		for _, d := range dkgs {
+			if d.GetDkgKeyShare(crypto.SuiteEd25519) == nil {
+				ready = false
+				break
+			}
+		}
+		if ready {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timeout waiting for all DKGs to complete consensus")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 func runEpoch(t *testing.T, dkgs []*DKG, validators []*chaintypes.Validator, epoch uint32, tag string) (*crypto.PubKey, *crypto.PubKey) {
 	t.Helper()
 
 	done := make(chan struct{})
+	success := false
 	err := dkgs[0].TryEpochConsensus(dkgtypes.ConsensusMsg{
 		Validators: validators,
 		Epoch:      epoch,
 	}, func(signer *DssSigner, nodeId uint64) {
 		util.LogWithBlue("CONSENSUS SUCCESS "+tag, nodeId)
+		success = true
 		for _, d := range dkgs {
 			d.ToNewEpoch()
 		}
@@ -53,6 +95,12 @@ func runEpoch(t *testing.T, dkgs []*DKG, validators []*chaintypes.Validator, epo
 	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatal("DKG consensus timeout for " + tag)
+	}
+
+	// 等所有节点完成迁移后再返回，避免下一轮 epoch 开始时
+	// 仍有上一轮的消息在途（会导致响应/交易污染新一轮会话）。
+	if success {
+		waitDKGReady(t, dkgs)
 	}
 
 	edPub := dkgs[0].GetDkgPubKey(crypto.SuiteEd25519)
@@ -94,6 +142,10 @@ func TestNetwork(t *testing.T) {
 		go dkg.Start()
 		dkgs = append(dkgs, dkg)
 	}
+	// 先于 db.Close() 执行（defer LIFO）：停止 DKG 并等待在途消息。
+	// 注意：必须用闭包捕获 dkgs，因为 E2 阶段还会 append 新节点，
+	// 直接传切片会固化为 3 个元素的旧 header，导致新增节点从未被 Stop。
+	defer func() { stopDKGs(dkgs) }()
 
 	// Epoch 1
 	edPub1, blsPub1 := runEpoch(t, dkgs, validators, 1, "E1")

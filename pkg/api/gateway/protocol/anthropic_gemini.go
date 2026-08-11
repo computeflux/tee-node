@@ -46,15 +46,25 @@ func StreamGeminiResponseToAnthropic(r io.Reader, w io.Writer) (*schemas.Bifrost
 		intermediateUsage *schemas.BifrostLLMUsage
 		intermediateErr   error
 	)
+	// done 用于同步中间转换 goroutine 的结果写出：StreamOpenAIResponseToAnthropic
+	// 读到 [DONE] 就会返回，此时中间 goroutine 可能还没执行下方两个赋值，
+	// 直接读 intermediateErr/intermediateUsage 是数据竞争（race detector 会报）。
+	done := make(chan struct{})
 	go func() {
 		intermediateUsage, intermediateErr = StreamGeminiResponseToOpenAI(r, pipeW)
 		_ = pipeW.Close()
+		close(done)
 	}()
 
 	outUsage, err := StreamOpenAIResponseToAnthropic(pr, w)
 	if err != nil {
+		// 解除中间 goroutine 可能的管道写入阻塞，避免泄漏。
+		pr.CloseWithError(err)
 		return nil, err
 	}
+	// 中间 goroutine 的最后一次写入是 [DONE]（StreamGeminiResponseToOpenAI 固定
+	// 以它收尾），已被上面消费；等待其完成赋值后再读结果，不会死锁。
+	<-done
 	if intermediateErr != nil {
 		return nil, intermediateErr
 	}

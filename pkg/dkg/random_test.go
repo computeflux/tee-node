@@ -56,6 +56,8 @@ func TestRandomShareGeneration(t *testing.T) {
 		go dkg.Start()
 		dkgs = append(dkgs, dkg)
 	}
+	// 先于 db.Close() 执行（defer LIFO）：停止 DKG 并等待在途消息
+	defer stopDKGs(dkgs)
 
 	// Run main DKG consensus.
 	err = dkgs[0].TryEpochConsensus(dkgtypes.ConsensusMsg{
@@ -71,8 +73,8 @@ func TestRandomShareGeneration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Wait for main DKG to complete.
-	time.Sleep(time.Second * 1)
+	// Wait for main DKG to complete and all nodes to migrate.
+	waitDKGReady(t, dkgs)
 
 	// Trigger random share generation explicitly on node 0 only.
 	// The P2P broadcast ensures all nodes receive the deals/responses.

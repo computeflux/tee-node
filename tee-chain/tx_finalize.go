@@ -50,6 +50,11 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				return nil, err
 			}
 		case *model.SysCall_SyncTxStart:
+			// 空 ids 会让 DeleteSigOfTx(Ids[0]) 越界 panic；
+			// 且 HubSyncStep2 也会拒绝，若不拦截 FinalizeBlock 将报错导致链停摆
+			if len(p.SyncTxStart.Ids) == 0 {
+				return nil, errors.New("sync tx start: empty ids")
+			}
 			// 清理所有共识缓存（纳入 txn，与区块提交原子化）
 			if err := app.DeleteSigOfTx(txn, int64(p.SyncTxStart.Ids[0])); err != nil {
 				return nil, errors.Wrap(err, "delete sigs at sync tx start")
@@ -83,13 +88,13 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 			}
 
 			// 批量更新 batch 中 hub call 的状态
-			{
-				runtime, _ := app.buildContractRuntime(txn, height, ts)
-				bm := batch.BatchSecret{Batch: *batch.NewBatch(runtime)}
-				status := batch.HubCallDone
-
-				// 只更新成功,失败交易后面重试,主链有防重放
-				if p.SyncTxEnd.IsSeccseed {
+			if p.SyncTxEnd.IsSeccseed {
+				runtime, err := app.buildContractRuntime(txn, height, ts)
+				if err != nil {
+					util.LogWithRed("FinalizeTx", "buildContractRuntime error:", err)
+				} else {
+					bm := batch.BatchSecret{Batch: *batch.NewBatch(runtime)}
+					status := batch.HubCallDone
 					for _, id := range p.SyncTxEnd.Ids {
 						if err := bm.SetHubCallStatus(id, status); err != nil {
 							util.LogWithRed("FinalizeTx", "SetHubCallStatus error for id", id, ":", err)
@@ -110,8 +115,10 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				runtime, _ := app.buildContractRuntime(txn, height, ts)
-				if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
+				runtime, err := app.buildContractRuntime(txn, height, ts)
+				if err != nil {
+					util.LogWithRed("Finalize TX", "buildContractRuntime error:", err)
+				} else if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
 					return nil, errors.Wrap(err, "contract mutation error")
 				}
@@ -127,7 +134,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 			}
 
 			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce && callerType != 0 {
+			if txNonce != expectedNonce {
 				return nil, errors.Errorf(
 					"invalid nonce: expected %d, got %d (caller %x, type %d)",
 					expectedNonce, txNonce, caller, callerType,
@@ -183,8 +190,11 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 
 func (app *TeeChain) buildContractRuntime(txn *dbstore.Txn, height int64, ts time.Time) (*contracts.Runtime, error) {
 	pub, err := app.GetDkgPubkey()
-	if err != nil || pub == nil {
+	if err != nil {
 		return nil, errors.Wrap(err, "get dkg pubkey for relay sync")
+	}
+	if pub == nil {
+		return nil, errors.New("get dkg pubkey for relay sync: nil pubkey")
 	}
 
 	version, err := GetRuntimeVersionAtHeight(txn, height)

@@ -94,6 +94,8 @@ func persistAuthUserToChain(chain *teechain.TeeChain, user *types.AuthUser) {
 			fmt.Printf("[AUTH] failed to marshal auth user %s: %v\n", u.Email, err)
 			return
 		}
+		// AuthUser.Email 字段已存放 HashEmailKey 后的值（见 VerifyOtp/SocialLogin/SetPassword），
+		// 直接拼接即可，避免二次哈希导致读侧（getAuthUserFromContract）读不到。
 		key := "auth_user:" + u.Email
 		const maxRetries = 3
 		var lastErr error

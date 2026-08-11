@@ -68,12 +68,18 @@ func (s *WalletService) SignTx(email string, tx *TxRequest) (string, error) {
 
 	gasPrice := new(big.Int)
 	if tx.GasPrice != "" {
-		gasPrice, _ = new(big.Int).SetString(cleanHex(tx.GasPrice), 16)
+		// 注意：SetString 失败返回 nil，直接赋值会让下面 gasPrice.Sign() panic
+		if g, ok := new(big.Int).SetString(cleanHex(tx.GasPrice), 16); ok {
+			gasPrice = g
+		}
 	}
 
 	value := new(big.Int)
 	if tx.Value != "" {
-		value, _ = new(big.Int).SetString(cleanHex(tx.Value), 16)
+		// SetString 失败返回 nil，直接赋值会让 RLP 编码时 panic
+		if v, ok := new(big.Int).SetString(cleanHex(tx.Value), 16); ok {
+			value = v
+		}
 	}
 
 	toAddr := ethcrypto.CreateAddress(ethcrypto.PubkeyToAddress(priv.PublicKey), nonce)

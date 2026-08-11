@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -513,12 +514,17 @@ func TestPersistAuthUserToChain_RetryAndObservability(t *testing.T) {
 	_, cleanup := setupAuthTest(t, "test-seed-secret")
 	defer cleanup()
 
-	calls := 0
+	var calls atomic.Int32
 	originalFn := authStoreAuthUserFn
+	// 恢复全局函数前必须等后台 goroutine 退出，否则读写 authStoreAuthUserFn 产生数据竞争
 	defer func() { authStoreAuthUserFn = originalFn }()
 
+	done := make(chan struct{})
 	authStoreAuthUserFn = func(chain *teechain.TeeChain, ref string, ciphertext []byte) error {
-		calls++
+		calls.Add(1)
+		if calls.Load() >= 3 {
+			close(done) // 3 次重试完成后通知测试
+		}
 		return fmt.Errorf("simulated chain failure")
 	}
 
@@ -526,9 +532,13 @@ func TestPersistAuthUserToChain_RetryAndObservability(t *testing.T) {
 	persistAuthUserToChain(&teechain.TeeChain{}, user)
 
 	// Wait for goroutine + retries: 3 retries with 0ms, 500ms, 1000ms backoff.
-	time.Sleep(2 * time.Second)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("retries did not complete in time")
+	}
 
-	assert.GreaterOrEqual(t, calls, 3, "expected at least 3 retry attempts")
+	assert.GreaterOrEqual(t, calls.Load(), int32(3), "expected at least 3 retry attempts")
 }
 
 // TestPersistAuthUserToChain_NilChain_NoPanic ensures nil chain/user is safe.

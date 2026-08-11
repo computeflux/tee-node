@@ -328,6 +328,67 @@ func TestWallet_SignTx_WrongPassword(t *testing.T) {
 	require.Error(t, err)
 }
 
+// 回归测试：GasPrice/Value 为非法 hex 时不得 panic（此前会 nil 指针解引用崩溃），
+// 且应回退到默认 gas / 零 value 并成功签名。
+func TestWallet_SignTx_InvalidHexGasPriceAndValue(t *testing.T) {
+	ws := setupTestWallet(t)
+	email := "alice@example.com"
+	ws.DeriveAddress(email)
+
+	tx := &TxRequest{
+		To:           "0xDeadBeef00000000000000000000000000000000",
+		Value:        "0xzz-not-hex",
+		Gas:          "0x5208",
+		GasPrice:     "0xzz-not-hex",
+		Nonce:        "0x0",
+		ChainID:      "0x1",
+		PasswordHash: "",
+	}
+
+	raw, err := ws.SignTx(email, tx)
+	require.NoError(t, err)
+	require.NotEmpty(t, raw)
+
+	// 解码回放，验证回退行为：GasPrice 使用默认 2e12，Value 为 0
+	data, err := hex.DecodeString(cleanHex(raw))
+	require.NoError(t, err)
+	signedTx := &types.Transaction{}
+	require.NoError(t, signedTx.UnmarshalBinary(data))
+
+	assert.Equal(t, uint64(21000), signedTx.Gas())
+	assert.Equal(t, big.NewInt(2000000000000), signedTx.GasPrice())
+	assert.Equal(t, int64(0), signedTx.Value().Int64())
+}
+
+// 回归测试：Nonce/Gas 为非法 hex 时也不得 panic，应回退为 0/默认值
+func TestWallet_SignTx_InvalidHexNonceAndGas(t *testing.T) {
+	ws := setupTestWallet(t)
+	email := "alice@example.com"
+	ws.DeriveAddress(email)
+
+	tx := &TxRequest{
+		To:           "0xDeadBeef00000000000000000000000000000000",
+		Value:        "0x0",
+		Gas:          "0xzz-not-hex",
+		GasPrice:     "0x1DCD6500",
+		Nonce:        "0xzz-not-hex",
+		ChainID:      "0x1",
+		PasswordHash: "",
+	}
+
+	raw, err := ws.SignTx(email, tx)
+	require.NoError(t, err)
+	require.NotEmpty(t, raw)
+
+	data, err := hex.DecodeString(cleanHex(raw))
+	require.NoError(t, err)
+	signedTx := &types.Transaction{}
+	require.NoError(t, signedTx.UnmarshalBinary(data))
+
+	assert.Equal(t, uint64(21000), signedTx.Gas(), "invalid gas hex must fall back to default gas limit")
+	assert.Equal(t, uint64(0), signedTx.Nonce(), "invalid nonce hex must fall back to 0")
+}
+
 func TestWallet_SignTx_DefaultGas(t *testing.T) {
 	ws := setupTestWallet(t)
 	email := "alice@example.com"

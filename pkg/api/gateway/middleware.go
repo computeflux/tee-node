@@ -31,7 +31,6 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-Id")
@@ -66,6 +65,14 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap 让 http.ResponseController 能穿透包装层找到底层 ResponseWriter。
+// 没有它，HandleRelay 里为长流式响应清除 per-request 写超时的
+// NewResponseController(...).SetWriteDeadline(time.Time{}) 会返回 ErrNotSupported
+// 而静默失效，长流（> 全局 WriteTimeout）会被服务端强制掐断。
+func (rw *responseWriter) Unwrap() http.ResponseWriter {
+	return rw.ResponseWriter
 }
 
 // Flush 实现 http.Flusher，支持 SSE 流式响应。

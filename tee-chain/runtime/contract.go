@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -35,6 +36,11 @@ func getWasmEngine() *wasm.Engine {
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (data []byte, err error) {
+	// 方法选择器必须是完整的 4 字节；否则下方 module.Query 对选择器的
+	// 切片/数组转换会越界 panic（恶意交易 / 跨合约调用可触发）。
+	if len(call.GetMethod()) < 4 {
+		return nil, fmt.Errorf("invalid method selector length: %d", len(call.GetMethod()))
+	}
 	if version == module.NativeVersion {
 		return module.Query(call, runtime)
 	}
@@ -48,6 +54,11 @@ func Query(version uint32, call store.ContractCall, runtime store.ContractApi) (
 //   - version == wasm.NativeVersion：使用原生 Go 快速路径
 //   - version != wasm.NativeVersion：使用 WASM 兼容路径
 func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi) error {
+	// 方法选择器必须是完整的 4 字节；否则下方 [4]byte(call.GetMethod()[:4])
+	// 会因切片越界而 panic（恶意交易 / 跨合约调用可触发，不应依赖调用方 recover）。
+	if len(call.GetMethod()) < 4 {
+		return fmt.Errorf("invalid method selector length: %d", len(call.GetMethod()))
+	}
 	selector := [4]byte(call.GetMethod()[:4])
 	if selector == store.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.GetName())) {
 		return nil

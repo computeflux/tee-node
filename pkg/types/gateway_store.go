@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -97,4 +98,20 @@ func GetNextID(key string) uint64 {
 
 func SetNextID(key string, id uint64) error {
 	return DBSetJson(SECRET_DB, "GATEWAY", "next:"+key, &id)
+}
+
+// nextIDMu 保护 GetNextID/SetNextID 的“读-增-写”序列，防止并发分配重复 ID。
+var nextIDMu sync.Mutex
+
+// AllocNextID 原子地分配并推进下一个 ID：等价于 GetNextID + SetNextID(+1)，
+// 但整体持有互斥锁，避免并发登录拿到相同 ID 导致 token 记录互相覆盖。
+// 若推进失败（DB 写失败）返回 error，避免下次分配出相同 ID 覆盖已有记录。
+func AllocNextID(key string) (uint64, error) {
+	nextIDMu.Lock()
+	defer nextIDMu.Unlock()
+	id := GetNextID(key)
+	if err := SetNextID(key, id+1); err != nil {
+		return 0, fmt.Errorf("alloc next id %q: %w", key, err)
+	}
+	return id, nil
 }

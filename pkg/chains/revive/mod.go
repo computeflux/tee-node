@@ -84,6 +84,9 @@ func NewContract(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (*Contr
 }
 
 func (c *Contract) GetChainUrls() []string {
+	if c == nil || c.config == nil {
+		return nil
+	}
 	return c.config.Urls
 }
 
@@ -101,6 +104,9 @@ func (c *Contract) ChainType() string {
 }
 
 func (c *Contract) ChainId() uint32 {
+	if c == nil || c.config == nil {
+		return 0
+	}
 	return c.config.ChainID
 }
 

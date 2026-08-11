@@ -73,8 +73,11 @@ func NewBTFReactor(name string) *BTFReactor {
 }
 
 // SetID 设置本节点的公钥标识，应在 P2P 启动前调用。
+// 设置后重新加载待发队列：pendingMsgKey 依赖 id，而 NewBTFReactor 构造时
+// id 尚未设置，若不在此处加载，保存/加载使用的 key 不一致导致消息无法恢复。
 func (r *BTFReactor) SetID(id *crypto.PubKey) {
 	r.id = id
+	r.loadPendingMsgs()
 }
 
 // SetOnSwitchReady 设置P2P网络就绪回调
@@ -85,8 +88,12 @@ func (r *BTFReactor) SetOnSwitchReady(callback func()) {
 // 实现 Service 接口的 OnStart 生命周期钩子
 func (r *BTFReactor) OnStart() error {
 	nodeInfo := r.Switch.NodeInfo()
-	address, _ := nodeInfo.NetAddress()
-	util.LogWithYellow("Local Address ", address.String())
+	address, err := nodeInfo.NetAddress()
+	if err != nil {
+		util.LogWithYellow("Local Address ", err)
+	} else {
+		util.LogWithYellow("Local Address ", address.String())
+	}
 	r.PrintPeers("P2P OnStart")
 
 	return nil

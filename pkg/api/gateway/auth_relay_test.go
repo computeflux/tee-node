@@ -340,6 +340,28 @@ func TestDistributeMiddleware_InsufficientCredit(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "insufficient credit")
 }
 
+// 回归测试：DistributeMiddleware 单独注册（漏掉 TokenAuthMiddleware）时
+// 必须 401 而不是在 token.Addr 处 nil 解引用 panic。
+func TestDistributeMiddleware_NoTokenInContext(t *testing.T) {
+	cleanup := setupMockFns(t)
+	defer cleanup()
+
+	getBridgeFn = func() *teechain.TeeChain { return &teechain.TeeChain{} }
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := DistributeMiddleware(next)
+	w := httptest.NewRecorder()
+	// 不带 token 的请求：requestWithToken(nil, ...) 不注入 ctxToken
+	req := requestWithToken(nil, `{"model":"openai/gpt-4"}`)
+	mw.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "authentication required")
+}
+
 // ── HandleListModels ───────────────────────────────────────
 
 func TestHandleListModels_WithModels(t *testing.T) {

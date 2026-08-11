@@ -24,7 +24,7 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 			util.LogWithRed("P2P Receive", "unmarshal dkg message", err)
 			return
 		}
-		if !msg.To.Check(r.id) {
+		if msg.To == nil || !msg.To.Check(r.id) {
 			return
 		}
 		if r.dkgHandler == nil {
@@ -47,7 +47,7 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 			util.LogWithRed("P2P Receive", "unmarshal block partial sign message", err)
 			return
 		}
-		if !msg.To.Check(r.id) {
+		if msg.To == nil || !msg.To.Check(r.id) {
 			return
 		}
 		if r.blockPartialSignHandler == nil {
@@ -70,7 +70,11 @@ func (r *BTFReactor) Receive(e p2p.Envelope) {
 			util.LogWithRed("P2P Receive", "unmarshal secret box message", err)
 			return
 		}
-		if !msg.To.Check(r.id) {
+		if msg.To == nil || !msg.To.Check(r.id) {
+			return
+		}
+		if r.secretHandler == nil {
+			util.LogWithRed("P2P Receive", "secretHandler not set")
 			return
 		}
 		pub, err := r.GetPubkeyFromPeerID(e.Src.ID())

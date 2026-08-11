@@ -120,6 +120,7 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 
 	// 收集所有 suite 的 response 一起发送（使用缓存的结果，避免二次调用 ProcessDeals）
 	respMsg := &dkgtypes.ConsensusRespMsg{
+		Epoch:     pmessage.Epoch, // 标记响应所属的共识会话，接收方用于丢弃过期响应
 		Responses: make(map[crypto.SuiteType][]byte),
 	}
 	for st, resp := range cachedResps {
@@ -143,7 +144,7 @@ func (dkg *DKG) handleDeal(OrgId string, data []byte) error {
 		util.LogError("DEAL", "Send deal_resp error", err)
 	}
 
-	util.LogOk("DEAL", "Sent deal responses for epoch", dkg.Epoch)
+	util.LogOk("DEAL", "Sent deal responses for epoch", pmessage.Epoch)
 	return nil
 }
 
@@ -164,6 +165,18 @@ func (dkg *DKG) handleDealResp(OrgId string, data []byte) error {
 		respMsg.Responses = map[crypto.SuiteType][]byte{
 			crypto.SuiteEd25519: data,
 		}
+	}
+
+	// 丢弃上一轮 epoch 的过期响应，避免污染当前共识会话
+	// 注意：必须持锁读取 dkg.Epoch，否则与 ToNewEpoch 的写入产生数据竞争
+	// 注意：这里用 <=（而非 <）是故意的——dkg.Epoch 只在共识成功后推进，
+	// respMsg.Epoch == curEpoch 说明该响应属于“已完成”的共识轮次，同样应丢弃；
+	// 与 handleDeal 里 `dkg.Epoch >= newMsg.Epoch` 的判定保持一致。
+	dkg.mu.RLock()
+	curEpoch := dkg.Epoch
+	dkg.mu.RUnlock()
+	if respMsg.Epoch > 0 && respMsg.Epoch <= curEpoch {
+		return nil
 	}
 
 	dkg.mu.Lock()

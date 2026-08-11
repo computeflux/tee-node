@@ -35,6 +35,9 @@ type PriShareWithSuite struct {
 
 // Custom JSON serialization
 func (d PriShareWithSuite) MarshalJSON() ([]byte, error) {
+	if d.PriShare == nil || d.V == nil {
+		return nil, fmt.Errorf("PriShareWithSuite.MarshalJSON: nil private share")
+	}
 	sbuf, err := d.V.MarshalBinary()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal private share: %w", err)
@@ -85,6 +88,8 @@ func (d *PriShareWithSuite) UnmarshalJSON(bt []byte) error {
 		I: jsonData.I,
 		V: key,
 	}
+
+	d.Suite = jsonData.Suite
 
 	return nil
 }

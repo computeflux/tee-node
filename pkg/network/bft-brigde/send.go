@@ -21,6 +21,11 @@ func (p *BTFReactor) Send(msg *model.PeerMsg) error {
 			util.LogWithRed("BTFReactor.Send", "Failed to save pending message:", err)
 			return err
 		}
+		// 同时加入内存队列：flushPendingMsgs 只发送内存队列，
+		// 若仅写 DB，这些消息会在 SetSwitch 时被 clearPendingMsgs 清掉而丢失。
+		p.pendingMu.Lock()
+		p.pendingMsgs = append(p.pendingMsgs, msg)
+		p.pendingMu.Unlock()
 		util.LogWithYellow("BTFReactor.Send", "P2P not ready, message saved to db")
 		return nil
 	}
@@ -78,7 +83,7 @@ func (p *BTFReactor) doSend(msg *model.PeerMsg) error {
 		return fmt.Errorf("unknown message type: %T", payload)
 	}
 
-	if msg.To.Check(p.id) {
+	if msg.To != nil && msg.To.Check(p.id) {
 		p.Receive(sendData)
 	}
 
@@ -142,12 +147,14 @@ func (p *BTFReactor) loadPendingMsgs() {
 		return
 	}
 
-	// 直接存储 PeerMsg 到内存队列
+	// 直接存储 PeerMsg 到内存队列（幂等：SetID 可能触发二次加载，已有消息时跳过）
 	p.pendingMu.Lock()
-	p.pendingMsgs = append(p.pendingMsgs, store.Msgs...)
+	if len(p.pendingMsgs) == 0 {
+		p.pendingMsgs = append(p.pendingMsgs, store.Msgs...)
+	}
 	p.pendingMu.Unlock()
 
-	util.LogWithYellow("BTFReactor.loadPendingMsgs", "Loaded", len(p.pendingMsgs), "pending messages from db")
+	util.LogWithYellow("BTFReactor.loadPendingMsgs", "Loaded", len(store.Msgs), "pending messages from db")
 }
 
 // clearPendingMsgs 清空数据库中的待发送消息

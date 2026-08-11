@@ -37,6 +37,15 @@ func (s *TeeChain) revSecret(m any) error {
 	}
 }
 
+// parseH160 将字节转换为 H160，长度不是 20 时返回错误。
+// types.H160([]byte) 是数组转换，长度不匹配会 panic，而 NameSpace 来自不可信请求方（API/P2P）。
+func parseH160(b []byte) (types.H160, error) {
+	if len(b) != 20 {
+		return types.H160{}, fmt.Errorf("invalid H160 length: %d", len(b))
+	}
+	return types.H160(b), nil
+}
+
 // BroadcastDecryptSecret broadcast decrypt secret request to all nodes
 func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptResp, error) {
 	suite := suites.MustFind("Ed25519")
@@ -71,6 +80,7 @@ func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRes
 
 	// 收集至少达到阈值数量的节点响应
 	var timeoutErr error
+collect:
 	for range threshold {
 		preRecerveMu.RLock()
 		ch, ok := preRecerve[req.Id]
@@ -82,12 +92,13 @@ func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRes
 		case d := <-ch:
 			if d.Error != nil {
 				timeoutErr = fmt.Errorf("%s", "HandleDecryptSecret error: "+string(d.Error))
-				break
+				break collect
 			}
 			dshares = append(dshares, d)
 		case <-time.After(30 * time.Second):
 			util.LogError("BroadcastDecryptSecret", "Timeout receiving from channel")
 			timeoutErr = fmt.Errorf("timeout receiving from channel")
+			break collect
 		}
 	}
 	// drain remaining messages and clean up channel to avoid goroutine leaks
@@ -109,7 +120,10 @@ func (s *TeeChain) BroadcastReencryptReq(req *model.PodStart) (*model.DecryptRes
 		return nil, timeoutErr
 	}
 
-	nameSpace := types.H160(req.NameSpace)
+	nameSpace, err := parseH160(req.NameSpace)
+	if err != nil {
+		return nil, fmt.Errorf("invalid namespace: %w", err)
+	}
 	dkgPubKey, err := s.GetDkgPubkey()
 	if err != nil {
 		return nil, fmt.Errorf("get dkg pubkey: %w", err)
@@ -215,7 +229,10 @@ func (s *TeeChain) HandleReencryptReq(req *model.PodStart, from string) error {
 		return fmt.Errorf("client pubkey is nil")
 	}
 	// 获取命名空间
-	nameSpace := types.H160(req.NameSpace)
+	nameSpace, err := parseH160(req.NameSpace)
+	if err != nil {
+		return fmt.Errorf("invalid namespace: %w", err)
+	}
 	// 获取本节点的份额，并进行重新加密操作
 	dkgShare, err := dkg.Share()
 	if err != nil {
@@ -295,6 +312,9 @@ func (s *TeeChain) HandleReencryptReq(req *model.PodStart, from string) error {
 // RevAndVerifyDecryptSecret 验证解密后的秘密
 func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 	suite := suites.MustFind("Ed25519")
+	if shares == nil || shares.Req == nil {
+		return fmt.Errorf("invalid decrypt shares resp: nil req")
+	}
 	req := shares.Req
 
 	// 获取分布式密钥的份额和多项式承诺
@@ -305,7 +325,10 @@ func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 	poly := share.NewPubPoly(suite, nil, commits.Public)
 
 	// 解析程序的空间
-	nameSpace := types.H160(req.NameSpace)
+	nameSpace, err := parseH160(req.NameSpace)
+	if err != nil {
+		return fmt.Errorf("invalid namespace: %w", err)
+	}
 	// 解析客户端的公钥
 	clientPubKey := crypto.PubKeyFromByte(req.PubKey)
 	if clientPubKey == nil {
@@ -323,8 +346,15 @@ func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 			return fmt.Errorf("decode decrypt share: %w", err)
 		}
 
+		// 响应方可能发送未请求的索引，此时 secrets[index] 为 nil，
+		// proxy_reenc.Verify 内部会解引用 panic，必须先校验
+		secret, ok := secrets[index]
+		if !ok {
+			shares.Error = []byte("Verify error: unexpected secret index")
+			return s.sendReencryptResp(req.Id, shares)
+		}
+
 		// 验证重新加密的回复
-		secret := secrets[index]
 		err = proxy_reenc.Verify(poly, secret, *clientPubKey, reply)
 		if err != nil {
 			shares.Error = []byte("Verify error")
@@ -342,9 +372,14 @@ func (s *TeeChain) VerifyReencryptResp(shares *model.DecryptSharesResp) error {
 			return fmt.Errorf("decode decrypt share: %w", err)
 		}
 
+		diskKey, ok := diskKeys[index]
+		if !ok {
+			shares.Error = []byte("Verify error: unexpected disk key index")
+			return s.sendReencryptResp(req.Id, shares)
+		}
+
 		// 验证重新加密的回复
-		secret := diskKeys[index]
-		err = proxy_reenc.Verify(poly, secret, *clientPubKey, reply)
+		err = proxy_reenc.Verify(poly, diskKey, *clientPubKey, reply)
 		if err != nil {
 			shares.Error = []byte("Verify error")
 			return s.sendReencryptResp(req.Id, shares)

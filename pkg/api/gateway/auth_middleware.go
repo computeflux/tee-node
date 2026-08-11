@@ -84,6 +84,12 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 
 		// 检查用户积分
 		token := GetTokenFromContext(r)
+		if token == nil {
+			// 防御:DistributeMiddleware 必须嵌套在 TokenAuthMiddleware 之后使用。
+			// 若被单独注册(漏掉认证层)这里直接 401,而不是在下面 token.Addr 处 panic。
+			writeProtocolError(w, r, http.StatusUnauthorized, "authentication required", "auth_error")
+			return
+		}
 		if bridge := getBridgeFn(); bridge != nil {
 			credit, err := gatewayGetCreditFn(bridge, token.Addr)
 			if err != nil {

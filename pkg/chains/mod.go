@@ -2,7 +2,6 @@ package chains
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/chains/revive"
@@ -100,10 +99,10 @@ func connectMainChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (M
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:
-		util.LogError("CHAIN", "unsupported chain type", config.ChainType)
-		os.Exit(1)
+		// 不支持的链类型返回错误而不是 os.Exit(1)：
+		// 库函数直接退出进程会让调用方（如连接 "main" 环境的 EVM 配置）无法处理错误。
+		return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 	}
-	return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 }
 
 func GetChainByID(chainId uint32) (ChainApi, error) {
@@ -123,8 +122,7 @@ func connectChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (Chain
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:
-		util.LogError("CHAIN", "unsupported chain type", config.ChainType)
-		os.Exit(1)
+		// 不支持的链类型返回错误而不是 os.Exit(1)：库函数直接退出进程会让调用方无法处理错误。
+		return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 	}
-	return nil, fmt.Errorf("unsupported chain type: %s", config.ChainType)
 }

@@ -216,7 +216,8 @@ func TestRecover_InsufficientShares(t *testing.T) {
 		{I: 1, V: suite.Point().Base()},
 	}
 	result, err := Recover(suite, shares, 3, 5)
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insufficient shares")
 	assert.Nil(t, result)
 }
 
@@ -377,7 +378,142 @@ func TestReencrypt_InvalidEncCmt(t *testing.T) {
 	assert.Contains(t, err.Error(), "unmarshal encCmt")
 }
 
-// ── hashPoints ─────────────────────────────────────────────
+// ── Nil Guards ─────────────────────────────────────────────
+
+func TestReencrypt_NilPriShare(t *testing.T) {
+	suite, _, pubPoly, dkgCommit, _, _, clientPubKey := setupReencTest(t)
+
+	scrt := []byte("nil-pri-share")
+	encCmt, _ := EncryptSecret(suite, dkgCommit, scrt)
+	secretStore := makeSecretStore(t, encCmt)
+
+	// 空 PriShare（网络/存储损坏数据可能触发）
+	badShare := dkgtypes.DistKeyShare{
+		CommitsWrap: dkgtypes.KyberPoints{
+			Public: []kyber.Point{pubPoly.Eval(0).V},
+		},
+	}
+	_, err := Reencrypt(badShare, secretStore, *clientPubKey)
+	require.Error(t, err)
+
+	// 共享中的 V 为 nil
+	badShare2 := dkgtypes.DistKeyShare{
+		CommitsWrap: dkgtypes.KyberPoints{
+			Public: []kyber.Point{pubPoly.Eval(0).V},
+		},
+		PriShareWrap: dkgtypes.PriShareWithSuite{
+			PriShare: &share.PriShare{I: 0},
+			Suite:    "ed25519",
+		},
+	}
+	_, err = Reencrypt(badShare2, secretStore, *clientPubKey)
+	require.Error(t, err)
+}
+
+func TestReencrypt_NilSecret(t *testing.T) {
+	suite, priPoly, _, _, _, _, clientPubKey := setupReencTest(t)
+
+	dks := dkgtypes.DistKeyShare{
+		CommitsWrap: dkgtypes.KyberPoints{
+			Public: []kyber.Point{suite.Point().Base()},
+		},
+		PriShareWrap: dkgtypes.PriShareWithSuite{
+			PriShare: &share.PriShare{
+				I: 0,
+				V: priPoly.Eval(0).V,
+			},
+			Suite: "ed25519",
+		},
+	}
+
+	// nil secret
+	_, err := Reencrypt(dks, nil, *clientPubKey)
+	require.Error(t, err)
+
+	// 空 encCmt
+	_, err = Reencrypt(dks, &model.SecretStore{}, *clientPubKey)
+	require.Error(t, err)
+}
+
+func TestVerify_NilReply(t *testing.T) {
+	suite, priPoly, pubPoly, dkgCommit, _, _, clientPubKey := setupReencTest(t)
+
+	scrt := []byte("nil-reply")
+	encCmt, _ := EncryptSecret(suite, dkgCommit, scrt)
+	secretStore := makeSecretStore(t, encCmt)
+
+	dks := makeDistKeyShare(t, suite, 0, priPoly, pubPoly)
+	poly := share.NewPubPoly(suite, nil, dks.CommitsWrap.Public)
+
+	t.Run("nil_reply", func(t *testing.T) {
+		err := Verify(poly, secretStore, *clientPubKey, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("nil_share_point", func(t *testing.T) {
+		err := Verify(poly, secretStore, *clientPubKey, &ReencryptReply{
+			Challenge: suite.Scalar(),
+			Proof:     suite.Scalar(),
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("nil_challenge_or_proof", func(t *testing.T) {
+		reply, err := Reencrypt(dks, secretStore, *clientPubKey)
+		require.NoError(t, err)
+		reply.Challenge = nil
+		err = Verify(poly, secretStore, *clientPubKey, reply)
+		require.Error(t, err)
+	})
+
+	t.Run("nil_poly", func(t *testing.T) {
+		reply, err := Reencrypt(dks, secretStore, *clientPubKey)
+		require.NoError(t, err)
+		err = Verify(nil, secretStore, *clientPubKey, reply)
+		require.Error(t, err)
+	})
+
+	t.Run("nil_secret", func(t *testing.T) {
+		reply, err := Reencrypt(dks, secretStore, *clientPubKey)
+		require.NoError(t, err)
+		err = Verify(poly, nil, *clientPubKey, reply)
+		require.Error(t, err)
+	})
+}
+
+func TestVerify_NilClientPoint(t *testing.T) {
+	suite, priPoly, pubPoly, dkgCommit, _, _, clientPubKey := setupReencTest(t)
+
+	scrt := []byte("nil-client-point")
+	encCmt, _ := EncryptSecret(suite, dkgCommit, scrt)
+	secretStore := makeSecretStore(t, encCmt)
+
+	dks := makeDistKeyShare(t, suite, 0, priPoly, pubPoly)
+	poly := share.NewPubPoly(suite, nil, dks.CommitsWrap.Public)
+
+	// 非法字节长度的公钥 -> Point() 返回 nil
+	badPub := crypto.PubKey{}
+	badPub.PublicKey = []byte("too-short")
+
+	_, err := Reencrypt(dks, secretStore, badPub)
+	require.Error(t, err)
+
+	reply, err := Reencrypt(dks, secretStore, *clientPubKey)
+	require.NoError(t, err)
+	err = Verify(poly, secretStore, badPub, reply)
+	require.Error(t, err)
+}
+
+func TestDecryptSecret_NilArgs(t *testing.T) {
+	suite := suites.MustFind("Ed25519")
+	point := suite.Point().Base()
+	scalar := suite.Scalar()
+
+	_, err := DecryptSecret(suite, nil, nil, point, scalar)
+	require.Error(t, err)
+	_, err = DecryptSecret(suite, nil, point, point, nil)
+	require.Error(t, err)
+}
 
 func TestHashPoints(t *testing.T) {
 	suite := suites.MustFind("Ed25519")

@@ -34,7 +34,18 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 		case *model.SysCall_EpochStart:
 		case *model.SysCall_EpochEnd:
 		case *model.SysCall_SyncTxStart:
+			// 空 ids 会在 FinalizeBlock 时触发 DeleteSigOfTx(Ids[0]) 越界/链停摆，
+			// 必须在提案阶段拦截
+			if len(p.SyncTxStart.Ids) == 0 {
+				fmt.Println("ProcessTx REJECT: SyncTxStart with empty ids")
+				return abci.ResponseProcessProposal_REJECT
+			}
 		case *model.SysCall_SyncTxEnd:
+			// 空 ids 会使 HubSyncEnd 报错，FinalizeBlock 失败导致链停摆
+			if len(p.SyncTxEnd.Ids) == 0 {
+				fmt.Println("ProcessTx REJECT: SyncTxEnd with empty ids")
+				return abci.ResponseProcessProposal_REJECT
+			}
 		case *model.SysCall_Empty:
 		case *model.SysCall_Contract:
 			caller := txbox.GetCaller()
@@ -49,7 +60,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 			}
 
 			expectedNonce := currentNonce + 1
-			if txNonce != expectedNonce && callerType != 0 {
+			if txNonce != expectedNonce {
 				fmt.Printf("ProcessTx REJECT: invalid nonce, expected %d, got %d (caller %x, type %d)\n", expectedNonce, txNonce, caller, callerType)
 				return abci.ResponseProcessProposal_REJECT
 			}

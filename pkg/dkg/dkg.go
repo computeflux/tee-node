@@ -122,7 +122,7 @@ func NewDKG(
 		return nil, fmt.Errorf("restore dkg: %w", err)
 	}
 
-	dkg.mainChain, err = types.NewPersistChan[*model.DkgMessage]("dkg", 1000)
+	dkg.mainChain, err = types.NewPersistChan[*model.DkgMessage]("dkg:"+NodeSecret.GetPublicForSuite(crypto.SuiteEd25519).SS58(), 1000)
 	if err != nil {
 		return nil, fmt.Errorf("create dkg persist chan: %w", err)
 	}

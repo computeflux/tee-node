@@ -280,10 +280,11 @@ func newResponseWaiter(id string) *responseWaiter {
 // tunnelResponseBody 实现了 io.ReadCloser，从 dataChan 中读取数据
 type tunnelResponseBody struct {
 	waiter      *responseWaiter
-	stream      io.Closer   // 底层 yamux stream，Close() 时释放
-	reqID       string      // 用于从 registry 清理
+	stream      io.Closer // 底层 yamux stream，Close() 时释放
+	reqID       string    // 用于从 registry 清理
 	buffer      []byte
 	closed      bool
+	done        bool // doneChan 信号已到达（guarded by mu）
 	mu          sync.Mutex
 	readTimeout time.Duration
 }
@@ -301,8 +302,26 @@ func (b *tunnelResponseBody) Read(p []byte) (int, error) {
 		return n, nil
 	}
 
-	// 优先读取 dataChan，避免和 doneChan 的 race condition
-	// 如果 dataChan 有数据，必须优先消费，不能跳过最后一个 Data 帧
+	// done 信号已到达：只排空 dataChan 中剩余的数据，然后 EOF。
+	// 不能在 done 到达时直接返回 EOF：done 与最后一个 Data 帧可能同时就绪，
+	// 若 select 随机选中 doneChan，剩余数据会丢失导致响应截断。
+	if b.done {
+		n, ok, err := b.takeData(p)
+		if ok || err != nil {
+			return n, err
+		}
+		b.closed = true
+		return 0, io.EOF
+	}
+
+	// 优先非阻塞消费 dataChan（如果已有数据，必须先消费，不能跳过最后一个 Data 帧）
+	if n, ok, err := b.takeData(p); ok || err != nil {
+		return n, err
+	}
+
+	// dataChan 为空时，阻塞等待 data / done / 超时
+	timer := time.NewTimer(b.readTimeout)
+	defer timer.Stop()
 	select {
 	case data := <-b.waiter.dataChan:
 		if len(data) == 0 {
@@ -313,30 +332,45 @@ func (b *tunnelResponseBody) Read(p []byte) (int, error) {
 			b.buffer = data[n:]
 		}
 		return n, nil
-	default:
-		// dataChan 为空时，等待 dataChan、doneChan 或超时
-		select {
-		case data := <-b.waiter.dataChan:
-			if len(data) == 0 {
-				return 0, io.EOF
-			}
-			n := copy(p, data)
-			if n < len(data) {
-				b.buffer = data[n:]
-			}
-			return n, nil
-		case <-b.waiter.doneChan:
-			b.closed = true
-			return 0, io.EOF
-		case <-time.After(b.readTimeout):
-			b.closed = true
-			return 0, fmt.Errorf("tunnel read timeout")
+	case <-b.waiter.doneChan:
+		// 用标志记住 done，而不是只消费一次：若此刻 dataChan 还有剩余数据
+		// （数据与 done 同时就绪时 select 随机选择），后续 Read 必须继续排空。
+		b.done = true
+		if n, ok, err := b.takeData(p); ok || err != nil {
+			return n, err
 		}
+		b.closed = true
+		return 0, io.EOF
+	case <-timer.C:
+		b.closed = true
+		return 0, fmt.Errorf("tunnel read timeout")
+	}
+}
+
+// takeData 尝试从 dataChan 非阻塞取一块数据。
+// 返回 (n, ok=true) 表示取到数据；ok=false 且 err=nil 表示当前无数据。
+func (b *tunnelResponseBody) takeData(p []byte) (int, bool, error) {
+	select {
+	case data := <-b.waiter.dataChan:
+		if len(data) == 0 {
+			return 0, false, io.EOF
+		}
+		n := copy(p, data)
+		if n < len(data) {
+			b.buffer = data[n:]
+		}
+		return n, true, nil
+	default:
+		return 0, false, nil
 	}
 }
 
 func (b *tunnelResponseBody) Close() error {
 	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return nil
+	}
 	b.closed = true
 	b.mu.Unlock()
 	// 通知 readResponseFrames 停止向 channel 写入，防止 goroutine 泄漏

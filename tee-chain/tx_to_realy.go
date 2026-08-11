@@ -185,6 +185,9 @@ func HubSyncStep2(chainId uint32, ids []uint64, txn *store.Txn) error {
 		tx = &AsyncBatchState{}
 	}
 
+	// 标记同步开始：isHubSyncRuningForChain 依赖 LastSync 判断“同步进行中”，
+	// 若不设置，其他 proposer 会对同一批 batch 重复发起 SyncTxStart（重复聚合/提交）。
+	tx.LastSync = time.Now().Unix()
 	return store.TxnSetJson(txn, store.ComboNamespaceKey(GLOABL_STATE, hubSyncIndexKey(chainId)), tx)
 }
 

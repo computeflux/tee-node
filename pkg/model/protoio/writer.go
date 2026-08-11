@@ -6,8 +6,9 @@ import (
 	"io"
 )
 
-// WriteMessage writes a varint length-delimited protobuf message with deterministic serialization.
+// WriteMessage writes a single protobuf message to w using deterministic serialization.
 // This ensures consistent hash values across multiple serializations.
+// 注意：不写入长度前缀，调用方需保证每个 value 恰好是一条消息（如单个 DB key）。
 func WriteMessage(msg VTMarshaler, w io.Writer) error {
 	buf := make([]byte, msg.SizeVT())
 	if _, err := msg.MarshalToVT(buf); err != nil {

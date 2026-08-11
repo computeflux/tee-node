@@ -24,24 +24,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	addr := strings.TrimPrefix(os.Args[1], "0x")
-	addrBytes, err := hex.DecodeString(addr)
+	out, err := ethAddrToUniAddrHex(os.Args[1])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: invalid hex address: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+	fmt.Println(out)
+}
+
+// ethAddrToUniAddrHex 将以太坊地址（带/不带 0x 前缀）转换为 SCALE 编码的
+// UniAddr（T=2 EVM + 地址字节）的 hex 字符串。
+func ethAddrToUniAddrHex(addr string) (string, error) {
+	addr = strings.TrimPrefix(addr, "0x")
+	addrBytes, err := hex.DecodeString(addr)
+	if err != nil {
+		return "", fmt.Errorf("invalid hex address: %w", err)
+	}
 	if len(addrBytes) != 20 {
-		fmt.Fprintf(os.Stderr, "Error: Ethereum address must be 20 bytes, got %d\n", len(addrBytes))
-		os.Exit(1)
+		return "", fmt.Errorf("ethereum address must be 20 bytes, got %d", len(addrBytes))
 	}
 
 	uni := cstore.UniAddr{T: 2, V: addrBytes}
-
 	encoded, err := uni.Encode()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: encode UniAddr: %v\n", err)
-		os.Exit(1)
+		return "", fmt.Errorf("encode UniAddr: %w", err)
 	}
-
-	fmt.Println(hex.EncodeToString(encoded))
+	return hex.EncodeToString(encoded), nil
 }

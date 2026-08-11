@@ -22,12 +22,12 @@ func TestGatewayEndpointIndex_ResolveProviderModel(t *testing.T) {
 		{
 			ID: 1,
 			Model: cgateway.ModelInfo{
-				Name:         "MiniMax-M2.7",
-				ModelID:      "mini-max-m27",
-				ProviderID:   100,
-				ProviderType: cgateway.ProviderOpenAI,
-				APIKeys:      []string{"key1"},
-				IsActive:     true,
+				Name:           "MiniMax-M2.7",
+				ModelID:        "mini-max-m27",
+				ProviderID:     100,
+				ProviderType:   cgateway.ProviderOpenAI,
+				APIKeys:        []string{"key1"},
+				IsActive:       true,
 				MaxConcurrency: 5,
 			},
 			Provider: cgateway.ProviderInfo{Name: "Local", IsActive: true},
@@ -35,12 +35,12 @@ func TestGatewayEndpointIndex_ResolveProviderModel(t *testing.T) {
 		{
 			ID: 2,
 			Model: cgateway.ModelInfo{
-				Name:         "MiniMax-M2.7",
-				ModelID:      "mini-max-m27",
-				ProviderID:   200,
-				ProviderType: cgateway.ProviderOpenAI,
-				APIKeys:      []string{"key2", "key3"},
-				IsActive:     true,
+				Name:           "MiniMax-M2.7",
+				ModelID:        "mini-max-m27",
+				ProviderID:     200,
+				ProviderType:   cgateway.ProviderOpenAI,
+				APIKeys:        []string{"key2", "key3"},
+				IsActive:       true,
 				MaxConcurrency: 8,
 			},
 			Provider: cgateway.ProviderInfo{Name: "OpenAI", IsActive: true},
@@ -53,10 +53,11 @@ func TestGatewayEndpointIndex_ResolveProviderModel(t *testing.T) {
 	require.Len(t, r.Endpoints, 1)
 	require.Equal(t, "key1", r.Endpoints[0].KeyValue)
 
-	// modelID lookup
-	r2, err := idx.Resolve(context.Background(), scheduler.ModelKey("mini-max-m27"), scheduler.ProviderID("OpenAI"))
+	// 按 provider + 模型名（而非 ModelID）查找：系统按 Name 建索引
+	r2, err := idx.Resolve(context.Background(), scheduler.ModelKey("MiniMax-M2.7"), scheduler.ProviderID("OpenAI"))
 	require.NoError(t, err)
 	require.Len(t, r2.Endpoints, 2)
+	require.Equal(t, "key2", r2.Endpoints[0].KeyValue)
 }
 
 func TestGatewayEndpointIndex_ResolveBareModel_NotSupported(t *testing.T) {
@@ -65,11 +66,11 @@ func TestGatewayEndpointIndex_ResolveBareModel_NotSupported(t *testing.T) {
 		{
 			ID: 1,
 			Model: cgateway.ModelInfo{
-				Name:         "gpt-4",
-				ProviderID:   100,
-				ProviderType: cgateway.ProviderOpenAI,
-				APIKeys:      []string{"a"},
-				IsActive:     true,
+				Name:           "gpt-4",
+				ProviderID:     100,
+				ProviderType:   cgateway.ProviderOpenAI,
+				APIKeys:        []string{"a"},
+				IsActive:       true,
 				MaxConcurrency: 1,
 			},
 			Provider: cgateway.ProviderInfo{Name: "OpenAI", IsActive: true},
@@ -87,11 +88,11 @@ func TestGatewayEndpointIndex_ResolveRoute(t *testing.T) {
 		{
 			ID: 10,
 			Model: cgateway.ModelInfo{
-				Name:         "route-member",
-				ProviderID:   1,
-				ProviderType: cgateway.ProviderOpenAI,
-				APIKeys:      []string{"k1"},
-				IsActive:     true,
+				Name:           "route-member",
+				ProviderID:     1,
+				ProviderType:   cgateway.ProviderOpenAI,
+				APIKeys:        []string{"k1"},
+				IsActive:       true,
 				MaxConcurrency: 3,
 			},
 			Provider: cgateway.ProviderInfo{Name: "p1", IsActive: true},

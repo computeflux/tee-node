@@ -35,7 +35,7 @@ func (s *To) Check(id *crypto.PubKey) bool {
 	case *To_Broadcast:
 		return true
 	case *To_Nodes:
-		if id == nil {
+		if id == nil || to.Nodes == nil {
 			return false
 		}
 		for _, v := range to.Nodes.L {

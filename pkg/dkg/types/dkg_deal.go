@@ -101,12 +101,16 @@ func (c *ConsensusMsg) UnmarshalJSON(bt []byte) error {
 }
 
 // ConsensusRespMsg carries responses for multiple suites.
+// Epoch identifies which consensus session the responses belong to;
+// receivers use it to drop stale responses from a previous epoch.
 type ConsensusRespMsg struct {
+	Epoch     uint32
 	Responses map[crypto.SuiteType][]byte
 }
 
 // jsonConsensusRespMsg is the JSON-serializable form of ConsensusRespMsg.
 type jsonConsensusRespMsg struct {
+	Epoch     uint32            `json:"epoch"`
 	Responses map[string][]byte `json:"responses"`
 }
 
@@ -115,7 +119,7 @@ func (c ConsensusRespMsg) MarshalJSON() ([]byte, error) {
 	for st, data := range c.Responses {
 		stringResp[st.String()] = data
 	}
-	return json.Marshal(jsonConsensusRespMsg{Responses: stringResp})
+	return json.Marshal(jsonConsensusRespMsg{Epoch: c.Epoch, Responses: stringResp})
 }
 
 func (c *ConsensusRespMsg) UnmarshalJSON(bt []byte) error {
@@ -123,6 +127,7 @@ func (c *ConsensusRespMsg) UnmarshalJSON(bt []byte) error {
 	if err := json.Unmarshal(bt, &raw); err != nil {
 		return err
 	}
+	c.Epoch = raw.Epoch
 	c.Responses = make(map[crypto.SuiteType][]byte, len(raw.Responses))
 	for stStr, data := range raw.Responses {
 		st, err := crypto.SuiteTypeFromString(stStr)
@@ -140,9 +145,15 @@ type DealBundle struct {
 }
 
 func (d DealBundle) MarshalJSON() ([]byte, error) {
+	if d.DealBundle == nil {
+		return nil, fmt.Errorf("DealBundle.MarshalJSON: nil deal bundle")
+	}
 	public := d.Public
 	points := make([][]byte, len(public))
 	for i, p := range public {
+		if p == nil {
+			return nil, fmt.Errorf("DealBundle.MarshalJSON: nil point at index %d", i)
+		}
 		b, err := p.MarshalBinary()
 		if err != nil {
 			return nil, fmt.Errorf("MarshalBinary public error: %w", err)
@@ -221,6 +232,9 @@ func (d KyberPoints) MarshalJSON() ([]byte, error) {
 	public := d.Public
 	points := make([][]byte, len(public))
 	for i, p := range public {
+		if p == nil {
+			return nil, fmt.Errorf("KyberPoints.MarshalJSON: nil point at index %d", i)
+		}
 		b, err := p.MarshalBinary()
 		if err != nil {
 			return nil, fmt.Errorf("MarshalBinary public error: %w", err)

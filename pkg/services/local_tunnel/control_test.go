@@ -65,7 +65,9 @@ func TestDynamicModelRegisterUnregister(t *testing.T) {
 	// 等待服务端完成注册
 	time.Sleep(50 * time.Millisecond)
 	for _, e := range srv.Pool().AllEntries() {
+		e.mu.Lock()
 		e.Available = true
+		e.mu.Unlock()
 	}
 
 	// 动态注册 model-b
@@ -74,7 +76,9 @@ func TestDynamicModelRegisterUnregister(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	for _, e := range srv.Pool().AllEntries() {
+		e.mu.Lock()
 		e.Available = true
+		e.mu.Unlock()
 	}
 
 	if got := srv.Pool().Count(routeKey(1, "model-a")); got != 1 {

@@ -60,7 +60,7 @@ func (s *TeeChain) PrepareTx(txs [][]byte, finaltx *[][]byte, height int64, bloc
 			}
 
 			expectedNonce := currentNonce + 1
-			if contractNonce != expectedNonce && txbox.GetCallerType() > 0 {
+			if contractNonce != expectedNonce {
 				util.LogWithGray("PrepareTx", "Skip contract tx with invalid nonce, expected", expectedNonce, "got", contractNonce)
 				continue
 			}

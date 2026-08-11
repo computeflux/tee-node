@@ -111,7 +111,11 @@ func (s *TeeChain) GetDiskKeys(user types.H160, indexs []uint64) (map[uint64]*mo
 	}
 
 	for i, key := range keys {
-		k := strings.Split(string(key), "_")[2]
+		parts := strings.Split(string(key), "_")
+		if len(parts) < 3 {
+			return nil, fmt.Errorf("invalid key format: %s", string(key))
+		}
+		k := parts[2]
 		index, err := strconv.ParseUint(k, 10, 64)
 		if err != nil {
 			return nil, err

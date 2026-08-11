@@ -502,7 +502,7 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 
 var taskPoints = map[string]int64{
 	"JOIN_EARLY_ACCESS": 100, "VERIFY_EMAIL": 50, "CONNECT_WALLET": 50,
-	"JOIN_DISCORD": 100, "JOIN_TELEGRAM": 100, "INVITE_FRIEND": 200,
+	"JOIN_DISCORD": 100, "JOIN_TELEGRAM": 100, "INVITE_FRIEND": 75,
 }
 
 var allTaskTypes = []string{"JOIN_EARLY_ACCESS", "VERIFY_EMAIL", "CONNECT_WALLET", "JOIN_DISCORD", "JOIN_TELEGRAM", "INVITE_FRIEND"}
@@ -550,11 +550,11 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 		if rw, _ := s.loadCodeToWallet(strings.ToLower(*referralCode)); rw != "" && rw != wallet {
 			user.Referrer = rw
 			s.appendReferral(strings.ToLower(*referralCode), wallet)
-			b1, b2 := int64(50), int64(200)
+			b1, b2 := int64(50), int64(75)
 			s.addPoints(wallet, b1)
 			s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
 			s.addPoints(rw, b2)
-			s.appendHistory(rw, "200", "referral_reward_inviter", now, &wallet)
+			s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
 			stats.TotalPointsDistributed += b1 + b2
 			stats.TotalReferrals++
 		}
@@ -636,11 +636,11 @@ func (s *EarlyAccessStore) UpdateReferralCode(wallet, referralCode string) (bool
 	s.appendReferral(code, wallet)
 	s.addPoints(wallet, 50)
 	s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
-	s.addPoints(rw, 200)
-	s.appendHistory(rw, "200", "referral_reward_inviter", now, &wallet)
+	s.addPoints(rw, 75)
+	s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
 
 	stats, _ := s.loadStats()
-	stats.TotalPointsDistributed += 250
+	stats.TotalPointsDistributed += 125
 	stats.TotalReferrals++
 	dbSetJson("user:"+wallet, user)
 	s.saveStats(stats)
@@ -703,7 +703,7 @@ func (s *EarlyAccessStore) GetReferralInfo(wallet string) (code, referrer string
 	if len(r) > 0 {
 		referrals = make([]string, len(r))
 		copy(referrals, r)
-		earnings = int64(len(r)) * 200
+		earnings = int64(len(r)) * 75
 	}
 	return
 }

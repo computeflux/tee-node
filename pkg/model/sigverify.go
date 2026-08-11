@@ -2,6 +2,7 @@ package model
 
 import (
 	"bytes"
+	stded25519 "crypto/ed25519"
 	"encoding/hex"
 	"fmt"
 
@@ -45,6 +46,9 @@ func VerifyTxSigner(tx *Tx) (*SysCall, error) {
 }
 
 func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signature []byte) error {
+	if call == nil {
+		return errors.New("syscall is nil")
+	}
 	switch callerType {
 	case 0: // chain node ed25519
 		sigBytes, err := call.BytesForSig()
@@ -104,6 +108,13 @@ func SideContractPolkadotVerify(caller []byte, call []byte, signature []byte) er
 }
 
 func Ed25519SignVerify(pubkeyBt []byte, msg []byte, signature []byte) bool {
+	// go-subkey 的 FromPublicKey 不校验公钥长度，stdlib ed25519.Verify
+	// 对非法长度会直接 panic；caller 来自不可信交易数据（CheckTx 共识路径），
+	// 必须先校验长度，否则恶意交易可导致节点崩溃。
+	if len(pubkeyBt) != stded25519.PublicKeySize {
+		return false
+	}
+
 	pubkey, err := ed25519.Scheme{}.FromPublicKey(pubkeyBt)
 	if err != nil {
 		return false

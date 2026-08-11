@@ -65,6 +65,8 @@ func TestDSS(t *testing.T) {
 
 		dkgs = append(dkgs, dkg)
 	}
+	// 先于 db.Close() 执行（defer LIFO）：停止 DKG 并等待在途消息
+	defer stopDKGs(dkgs)
 
 	done := make(chan struct{})
 	consensusOk := false
@@ -94,6 +96,9 @@ func TestDSS(t *testing.T) {
 	if !consensusOk {
 		t.Fatal("DKG consensus failed")
 	}
+
+	// 等所有节点完成共识迁移后再签名，否则部分节点 DkgKeyShares 仍为 nil
+	waitDKGReady(t, dkgs)
 
 	msg, _ := hex.DecodeString("64070000000000528c1e000f000000d6eec26135305a8ad257a20d003357284c8aa03d0bdb2b357ab0a22371e11ef2d6eec26135305a8ad257a20d003357284c8aa03d0bdb2b357ab0a22371e11ef200")
 	signers := []DssSigner{}
@@ -189,6 +194,8 @@ func TestDssSubmitTx(t *testing.T) {
 
 		dkgs = append(dkgs, dkg)
 	}
+	// 先于 db.Close() 执行（defer LIFO）：停止 DKG 并等待在途消息
+	defer stopDKGs(dkgs)
 
 	err = dkgs[0].TryEpochConsensus(dkgtypes.ConsensusMsg{
 		Validators: validators,

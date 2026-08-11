@@ -75,7 +75,10 @@ func createUserAPIKey(owner string, addrHex string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	nextID := types.GetNextID("gateway_token")
+	nextID, err := types.AllocNextID("gateway_token")
+	if err != nil {
+		return "", fmt.Errorf("allocate gateway token id: %w", err)
+	}
 
 	// 构造 UniAddr：以太坊地址 callerType=2（EVM），去掉 0x 前缀
 	addr := chaintypes.UniAddr{T: 2, V: []byte{}}
@@ -99,7 +102,6 @@ func createUserAPIKey(owner string, addrHex string) (string, error) {
 	if err := types.SetGatewayTokenByKey(token); err != nil {
 		return "", fmt.Errorf("failed to store gateway token: %w", err)
 	}
-	types.SetNextID("gateway_token", nextID+1)
 
 	return apiKey, nil
 }

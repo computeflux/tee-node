@@ -88,7 +88,9 @@ func TestProviderIsolation(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 	for _, e := range srv.Pool().AllEntries() {
+		e.mu.Lock()
 		e.Available = true
+		e.mu.Unlock()
 	}
 
 	if got := srv.Pool().Count(routeKey(1, "model-a")); got != 1 {

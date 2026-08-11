@@ -47,6 +47,10 @@ func initUsageWriter() {
 				if len(batch) == 0 {
 					return
 				}
+				if types.SECRET_DB == nil {
+					// DB 尚未初始化（启动早期或测试环境）：保留批次，等下次 flush 再写。
+					return
+				}
 				usageMu.Lock()
 				for k, u := range batch {
 					existing, _ := types.DBGetJson[types.GatewayDailyUsage](types.SECRET_DB, "GATEWAY", "usage:"+k)
@@ -239,6 +243,11 @@ func settlePendingUsage() error {
 	}
 
 	GATEWAYLOG().Printf("[SETTLE] SUBMIT: collecting usage records")
+
+	if types.SECRET_DB == nil {
+		GATEWAYLOG().Printf("[SETTLE] SKIP: SECRET_DB not initialized")
+		return nil
+	}
 
 	// 1. 扫描本地 usage: 前缀的所有记录
 	//    加锁防止 flush 在读和删之间写入，导致新写入的数据被误删。

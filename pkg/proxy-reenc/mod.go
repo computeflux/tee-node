@@ -137,10 +137,22 @@ var (
 // }
 
 func Reencrypt(distKeyShare dkgtypes.DistKeyShare, secret *model.SecretStore, clientPubKey crypto.PubKey) (*ReencryptReply, error) {
-	ste := clientPubKey.Suite()
+	priShare := distKeyShare.PriShare()
+	if priShare == nil || priShare.V == nil {
+		return nil, fmt.Errorf("invalid dist key share: nil private share")
+	}
+	if secret == nil || len(secret.RawEncCmt) == 0 {
+		return nil, fmt.Errorf("invalid secret store: nil or empty encCmt")
+	}
 
-	idx := distKeyShare.PriShare().I
-	ski := distKeyShare.PriShare().V
+	ste := clientPubKey.Suite()
+	clientPoint := clientPubKey.Point()
+	if clientPoint == nil {
+		return nil, fmt.Errorf("invalid client public key")
+	}
+
+	idx := priShare.I
+	ski := priShare.V
 
 	encCmt := ste.Point()
 	err := encCmt.UnmarshalBinary(secret.RawEncCmt)
@@ -148,7 +160,7 @@ func Reencrypt(distKeyShare dkgtypes.DistKeyShare, secret *model.SecretStore, cl
 		return nil, fmt.Errorf("unmarshal encCmt: %w", err)
 	}
 
-	xncSki, chlgi, proofi, err := reencrypt(ste, ski, clientPubKey.Point(), encCmt)
+	xncSki, chlgi, proofi, err := reencrypt(ste, ski, clientPoint, encCmt)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +176,23 @@ func Reencrypt(distKeyShare dkgtypes.DistKeyShare, secret *model.SecretStore, cl
 }
 
 // Verify verifies an incoming re-encryption reply from another node.
+// 所有输入均来自网络数据，必须防御 nil（否则 kyber 内部解引用会 panic）。
 func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey crypto.PubKey, r *ReencryptReply) error {
+	if dkgCmt == nil {
+		return fmt.Errorf("invalid dkg commitment: nil")
+	}
+	if secret == nil || len(secret.RawEncCmt) == 0 {
+		return fmt.Errorf("invalid secret store: nil or empty encCmt")
+	}
+	if r == nil || r.Share.V == nil || r.Challenge == nil || r.Proof == nil {
+		return fmt.Errorf("invalid reencrypt reply: nil field")
+	}
+
+	clientPoint := clientPubKey.Point()
+	if clientPoint == nil {
+		return fmt.Errorf("invalid client public key")
+	}
+
 	ste := clientPubKey.Suite()
 
 	encCmt := ste.Point()
@@ -176,7 +204,7 @@ func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey crypt
 	xncSki := r.Share.V
 	idx := r.Share.I
 	err = verify(ste,
-		clientPubKey.Point(),
+		clientPoint,
 		encCmt,
 		xncSki,
 		r.Challenge,
@@ -192,8 +220,10 @@ func Verify(dkgCmt *share.PubPoly, secret *model.SecretStore, clientPubKey crypt
 }
 
 func Recover(ste suites.Suite, xncSki []*share.PubShare, t uint32, n uint32) (kyber.Point, error) {
+	// 份额不足时返回错误而非 (nil, nil)：调用方普遍直接使用返回值
+	// （如 BroadcastReencryptReq 里 xncCmt.MarshalBinary()），nil 会导致 panic。
 	if len(xncSki) < int(t) {
-		return nil, nil
+		return nil, fmt.Errorf("insufficient shares: got %d, need %d", len(xncSki), t)
 	}
 
 	return share.RecoverCommit(ste, xncSki, t, n)
@@ -356,6 +386,10 @@ func DecryptSecret(
 	scrt []byte,
 	err error,
 ) {
+	if ste == nil || dkgPk == nil || xncCmt == nil || rdrSk == nil {
+		return nil, fmt.Errorf("decrypt secret: nil argument")
+	}
+
 	// To retrieve each key slice (Ki) from the encrypted key point (Ki + rsG),
 	// we must deduct the encryption point (rsG). This can be inferred from
 	// the re-encrypted schnorr-commit (rsG + xsG) by removing the product of
