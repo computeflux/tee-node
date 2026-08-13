@@ -10,7 +10,7 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
 
-	"github.com/computeflux/tee-provider/pkg/api/gateway"
+	"github.com/computeflux/tee-provider/pkg/contractquery"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
@@ -53,7 +53,7 @@ func (g *GatewayRouterIndex) Bleve() bleve.Index {
 
 // Refresh 从链上拉取全部路由并重建索引。
 func (g *GatewayRouterIndex) Refresh(ctx context.Context, chain *teechain.TeeChain) error {
-	routes, err := gateway.GatewayListAllRoutes(chain, 0, 100000)
+	routes, err := contractquery.GatewayListAllRoutes(chain, 0, 100000)
 	if err != nil {
 		return fmt.Errorf("list all routes: %w", err)
 	}

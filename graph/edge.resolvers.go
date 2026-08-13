@@ -89,48 +89,14 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 		kw = *keyword
 	}
 
-	// 1. 模型：走 GatewayModelIndex，应用全部筛选条件。
-	modelIdxRaw, err := r.Indexer.Get(indexer.GatewayModelIndexName)
-	if err != nil {
-		return nil, err
-	}
-
-	modelIdx, ok := modelIdxRaw.(*indexer.GatewayModelIndex)
-	if !ok {
-		return nil, fmt.Errorf("invalid gateway model index type")
-	}
-
+	// 1. 模型：走索引器（与 /v1/models 同一数据路径），应用全部筛选条件。
 	modelReq := indexer.GatewayModelSearchRequest{
 		Keyword: kw,
 		Offset:  0,
 		Limit:   100000,
 	}
 
-	if minContext != nil {
-		v := uint64(*minContext)
-		modelReq.MinContext = &v
-	}
-
-	if maxContext != nil {
-		v := uint64(*maxContext)
-		modelReq.MaxContext = &v
-	}
-
-	if minPrice != nil {
-		v := uint64(*minPrice)
-		modelReq.MinPrice = &v
-	}
-
-	if maxPrice != nil {
-		v := uint64(*maxPrice)
-		modelReq.MaxPrice = &v
-	}
-
-	if modalities != nil {
-		modelReq.Modalities = uint8(*modalities)
-	}
-
-	models, err := modelIdx.Search(ctx, modelReq)
+	models, err := r.Indexer.ListModels(ctx, modelReq)
 	if err != nil {
 		return nil, err
 	}
@@ -155,24 +121,13 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 		return nil, err
 	}
 
-	pool := localtunnel.GetGlobalPool()
-
 	// 3. models 和 routes 都直接进列表。
 	result := make([]*model.ModelInfoWithProvider, 0, len(models)+len(routes))
 	// 4. 收集可用的模型 ID，用于判断路由是否有后端。
+	// 可用性过滤（个人算力隧道在线、第三方有 APIKey）已在 Indexer.ListModels 内完成。
 	modelIDSet := make(map[uint64]struct{}, len(models))
 	for _, item := range models {
 		m := item.Model
-		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
-		if m.ProviderType == 9999 && !pool.HasEntry(m.ProviderID, m.Name) {
-			continue
-		}
-
-		// 跳过没有服务的模型
-		if m.ProviderType < 9999 && len(m.APIKeys) == 0 {
-			continue
-		}
-
 		p := item.Provider
 		modelIDs := make([]int, len(p.ModelIds))
 		for i, v := range p.ModelIds {

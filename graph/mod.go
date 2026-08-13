@@ -46,6 +46,9 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	// 注入合约查询桥接（Gateway 数据从合约读取）
 	gateway.SetContractBridge(s)
 
+	// 注册全局索引器，供 /v1/models 直接读取
+	indexer.SetGlobal(resolver.Indexer)
+
 	// 启动 Gateway 优化组件：异步用量 writer + 缓存刷新 + 限流器清理 + 用量结算
 	gateway.InitOptimizations()
 

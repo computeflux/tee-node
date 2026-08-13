@@ -47,6 +47,19 @@ func NewIndexer(chain *teechain.TeeChain) *Indexer {
 	}
 }
 
+// 全局索引器实例，供网关 API（/v1/models 等）直接访问。
+var globalIndexer *Indexer
+
+// SetGlobal 设置全局索引器实例，由服务启动时注册。
+func SetGlobal(idx *Indexer) {
+	globalIndexer = idx
+}
+
+// GetGlobal 返回全局索引器实例；未注册时返回 nil。
+func GetGlobal() *Indexer {
+	return globalIndexer
+}
+
 // Register 注册一个索引实现。
 // 索引名必须唯一，重复注册返回错误。
 func (idx *Indexer) Register(index Index) error {

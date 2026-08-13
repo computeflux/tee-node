@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/computeflux/tee-provider/pkg/api/gateway/protocol"
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
@@ -489,11 +490,32 @@ func messageContentText(content any) string {
 	return ""
 }
 
+// HandleListModels 直接读索引器返回可调用模型列表（与 GraphQL Models 同一数据路径），
+// 模型 id 为 providerName/modelName，可直接用于后续请求。
 func HandleListModels(w http.ResponseWriter, r *http.Request) {
-	models := make([]map[string]any, 0)
-	for _, m := range getCachedGatewayModelsFn() {
+	idx := indexer.GetGlobal()
+	if idx == nil {
+		writeProtocolError(w, r, http.StatusServiceUnavailable, "models index not ready", "server_error")
+		return
+	}
+
+	entries, err := idx.ListModels(r.Context(), indexer.GatewayModelSearchRequest{Offset: 0, Limit: 100000})
+	if err != nil {
+		writeProtocolError(w, r, http.StatusInternalServerError, "list models failed", "server_error")
+		return
+	}
+
+	models := make([]map[string]any, 0, len(entries))
+	for _, e := range entries {
+		providerName := e.Provider.Name
+		if providerName == "" {
+			providerName = fmt.Sprintf("provider-%x", e.Provider.Owner)
+		}
 		models = append(models, map[string]any{
-			"id": m.Name, "object": "model", "owned_by": fmt.Sprintf("%x", m.Owner.V),
+			"id":       providerName + "/" + e.Model.Name,
+			"object":   "model",
+			"created":  e.Model.CreatedAt,
+			"owned_by": fmt.Sprintf("%x", e.Model.Owner.V),
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")

@@ -9,7 +9,7 @@ import (
 
 	"github.com/blevesearch/bleve/v2"
 
-	"github.com/computeflux/tee-provider/pkg/api/gateway"
+	"github.com/computeflux/tee-provider/pkg/contractquery"
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
@@ -39,12 +39,12 @@ func (g *GatewayEndpointIndex) Bleve() bleve.Index { return nil }
 
 // Refresh 从链上拉取未脱敏模型与路由，重建端点缓存。
 func (g *GatewayEndpointIndex) Refresh(ctx context.Context, chain *teechain.TeeChain) error {
-	models, err := gateway.GatewaySecretListActiveModelsWithinProvider(chain)
+	models, err := contractquery.GatewaySecretListActiveModelsWithinProvider(chain)
 	if err != nil {
 		return fmt.Errorf("list secret active models: %w", err)
 	}
 
-	routes, err := gateway.GatewayListAllRoutes(chain, 0, 100000)
+	routes, err := contractquery.GatewayListAllRoutes(chain, 0, 100000)
 	if err != nil {
 		return fmt.Errorf("list routes: %w", err)
 	}

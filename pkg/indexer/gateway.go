@@ -11,7 +11,7 @@ import (
 	"github.com/blevesearch/bleve/v2/mapping"
 	"github.com/blevesearch/bleve/v2/search/query"
 
-	"github.com/computeflux/tee-provider/pkg/api/gateway"
+	"github.com/computeflux/tee-provider/pkg/contractquery"
 	teechain "github.com/computeflux/tee-provider/tee-chain"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
@@ -56,7 +56,7 @@ func (g *GatewayModelIndex) Bleve() bleve.Index {
 
 // Refresh 从链上拉取全部活跃模型并重建索引。
 func (g *GatewayModelIndex) Refresh(ctx context.Context, chain *teechain.TeeChain) error {
-	models, err := gateway.GatewayListActiveModelsWithinProvider(chain, 0, 0, 0, 0, 0, 100000)
+	models, err := contractquery.GatewayListActiveModelsWithinProvider(chain, 0, 0, 0, 0, 0, 100000)
 	if err != nil {
 		return fmt.Errorf("list active models: %w", err)
 	}

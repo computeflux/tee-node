@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/indexer"
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
@@ -24,21 +25,20 @@ import (
 func setupMockFns(t *testing.T) func() {
 	// Save all mockable function pointers and restore on cleanup
 	old := map[string]any{
-		"findTokenCachedFn":        findTokenCachedFn,
-		"getBridgeFn":              getBridgeFn,
-		"gatewayGetCreditFn":       gatewayGetCreditFn,
-		"getCachedGatewayModelsFn": getCachedGatewayModelsFn,
-		"recordUsageAsyncFn":       recordUsageAsyncFn,
+		"findTokenCachedFn":  findTokenCachedFn,
+		"getBridgeFn":        getBridgeFn,
+		"gatewayGetCreditFn": gatewayGetCreditFn,
+		"recordUsageAsyncFn": recordUsageAsyncFn,
 	}
 
 	// Reset global state
 	providerMetrics = make(map[uint64]*providerMetric)
+	indexer.SetGlobal(nil)
 
 	return func() {
 		findTokenCachedFn = old["findTokenCachedFn"].(func(string) *types.GatewayTokenInfo)
 		getBridgeFn = old["getBridgeFn"].(func() *teechain.TeeChain)
 		gatewayGetCreditFn = old["gatewayGetCreditFn"].(func(*teechain.TeeChain, chaintypes.UniAddr) (int64, error))
-		getCachedGatewayModelsFn = old["getCachedGatewayModelsFn"].(func() []cgateway.ModelInfo)
 		recordUsageAsyncFn = old["recordUsageAsyncFn"].(func(chaintypes.UniAddr, uint64, *cgateway.ModelInfoWithID, uint64, uint64, uint64, uint64))
 		scheduler.ResetGlobal()
 	}
@@ -364,16 +364,41 @@ func TestDistributeMiddleware_NoTokenInContext(t *testing.T) {
 
 // ── HandleListModels ───────────────────────────────────────
 
+// installModelsIndex 用给定模型构建全局索引器（含可用性过滤所需的 APIKey）。
+func installModelsIndex(t *testing.T, models []cgateway.ModelInfoWithProvider) {
+	t.Helper()
+
+	idx := indexer.NewIndexer(nil)
+	modelIdx := indexer.NewGatewayModelIndex()
+	require.NoError(t, modelIdx.BuildFromModels(models))
+	require.NoError(t, idx.Register(modelIdx))
+	indexer.SetGlobal(idx)
+}
+
 func TestHandleListModels_WithModels(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	getCachedGatewayModelsFn = func() []cgateway.ModelInfo {
-		return []cgateway.ModelInfo{
-			{Name: "gpt-4", Owner: cstore.UniAddr{T: 0, V: []byte{0x01}}, IsActive: true},
-			{Name: "claude-3", Owner: cstore.UniAddr{T: 0, V: []byte{0x02}}, IsActive: true},
-		}
-	}
+	installModelsIndex(t, []cgateway.ModelInfoWithProvider{
+		{
+			ID: 1,
+			Model: cgateway.ModelInfo{
+				Name: "gpt-4", Owner: cstore.UniAddr{T: 0, V: []byte{0x01}},
+				ProviderType: cgateway.ProviderOpenAI, APIKeys: []string{"sk-1"}, IsActive: true,
+				CreatedAt: 1700000000,
+			},
+			Provider: cgateway.ProviderInfo{Name: "openai", Owner: cstore.UniAddr{T: 0, V: []byte{0xaa}}},
+		},
+		{
+			ID: 2,
+			Model: cgateway.ModelInfo{
+				Name: "claude-3", Owner: cstore.UniAddr{T: 0, V: []byte{0x02}},
+				ProviderType: cgateway.ProviderClaude, APIKeys: []string{"sk-2"}, IsActive: true,
+				CreatedAt: 1700000001,
+			},
+			Provider: cgateway.ProviderInfo{Name: "anthropic", Owner: cstore.UniAddr{T: 0, V: []byte{0xbb}}},
+		},
+	})
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
@@ -385,15 +410,18 @@ func TestHandleListModels_WithModels(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &body)
 	data := body["data"].([]any)
 	assert.Len(t, data, 2)
-	assert.Equal(t, "gpt-4", data[0].(map[string]any)["id"])
-	assert.Equal(t, "claude-3", data[1].(map[string]any)["id"])
+	assert.Equal(t, "openai/gpt-4", data[0].(map[string]any)["id"])
+	assert.Equal(t, "anthropic/claude-3", data[1].(map[string]any)["id"])
+	assert.Equal(t, float64(1700000000), data[0].(map[string]any)["created"])
+	assert.Equal(t, float64(1700000001), data[1].(map[string]any)["created"])
+	assert.Equal(t, "model", data[0].(map[string]any)["object"])
 }
 
 func TestHandleListModels_Empty(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	getCachedGatewayModelsFn = func() []cgateway.ModelInfo { return nil }
+	installModelsIndex(t, nil)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
