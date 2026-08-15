@@ -1,18 +1,41 @@
 package actives
 
 import (
+	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cockroachdb/pebble"
 )
+
+// ── 客户端 IP（HTTP 中间件注入）──────────────────────────
+
+type ctxKey string
+
+const clientIPKey ctxKey = "actives_client_ip"
+
+// WithClientIP 将客户端 IP 注入请求 context（由 cmd/server 中间件调用）。
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, clientIPKey, ip)
+}
+
+// ClientIPFromContext 从请求 context 读取客户端 IP。
+func ClientIPFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(clientIPKey).(string); ok {
+		return v
+	}
+	return ""
+}
 
 const eaNamespace = "EARLY_POINTS"
 
@@ -75,6 +98,7 @@ type DbUser struct {
 	Referrer     string `json:"referrer"`
 	ReferralCode string `json:"referralCode"`
 	Email        string `json:"email"`
+	Alias        string `json:"alias,omitempty"`
 }
 
 type DbHistory struct {
@@ -88,6 +112,36 @@ type DbStats struct {
 	UserCount              int   `json:"userCount"`
 	TotalPointsDistributed int64 `json:"totalPointsDistributed"`
 	TotalReferrals         int   `json:"totalReferrals"`
+}
+
+// DbConfig 防女巫开关 + 更新审计（key: "config"）。
+type DbConfig struct {
+	IpCheckEnabled            bool   `json:"ipCheckEnabled"`
+	DeferredSettlementEnabled bool   `json:"deferredSettlementEnabled"`
+	UpdatedBy                 string `json:"updatedBy"`
+	UpdatedAt                 string `json:"updatedAt"`
+}
+
+// DbIpRecord 用户 IP 记录（key: "ip:<wallet>"）。
+type DbIpRecord struct {
+	FirstIP   string   `json:"firstIp"`
+	LastIPs   []string `json:"lastIps"`
+	FirstSeen string   `json:"firstSeen"`
+	LastSeen  string   `json:"lastSeen"`
+}
+
+// DbReferral 推荐关系（key: "referrals:<code>"）。Settled=false 表示邀请人积分仍在 pending。
+type DbReferral struct {
+	Wallet    string `json:"wallet"`
+	Settled   bool   `json:"settled"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// DbPendingRef 待结算推荐（key: "pendingref:<inviteeWallet>"）。
+type DbPendingRef struct {
+	Inviter   string `json:"inviter"`
+	Code      string `json:"code"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type UserRecord struct {
@@ -260,6 +314,9 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 	stats, _ := s.loadStats()
 	stats.TotalPointsDistributed += checkinPoints
 	s.saveStats(stats)
+
+	// 有效行为：结算待发的推荐奖励（邀请人 +75）
+	s.settlePending(wallet)
 
 	// Async on-chain reward via contract
 	go Distribute([]string{wallet}, []int64{checkinPoints})
@@ -491,6 +548,9 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 	(*answered)[questionID] = true
 	dbSetJson(fmt.Sprintf("answered:%s:day%d", wallet, day), answered)
 
+	// 有效行为：结算待发的推荐奖励（邀请人 +75）
+	s.settlePending(wallet)
+
 	// Async on-chain reward via contract
 	go Distribute([]string{wallet}, []int64{pts})
 
@@ -519,24 +579,43 @@ func generateReferralCode(wallet string) string {
 	return "ref_" + hex.EncodeToString(h[:])[:8]
 }
 
-func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (bool, error) {
+// uniqueReferralCode 生成未被占用的邀请码：优先 wallet 后 8 位，
+// 碰撞时退化为 sha256 哈希的更长片段，直至唯一（兜底加随机后缀）。
+// 调用方需持有锁。
+func (s *EarlyAccessStore) uniqueReferralCode(wallet string) string {
+	base := generateReferralCode(wallet)
+	if owner, _ := s.loadCodeToWallet(base); owner == "" {
+		return base
+	}
+	h := sha256.Sum256([]byte(wallet))
+	hexHash := hex.EncodeToString(h[:])
+	for i := 8; i <= len(hexHash); i += 8 {
+		code := "ref_" + hexHash[:i]
+		if owner, _ := s.loadCodeToWallet(code); owner == "" {
+			return code
+		}
+	}
+	return fmt.Sprintf("ref_%s_%d", hexHash[:8], time.Now().UnixNano()%1000000)
+}
+
+func (s *EarlyAccessStore) Join(wallet, email, ip string, referralCode *string) (bool, string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	wallet = strings.ToLower(wallet)
 	if existing, _ := dbGetJson[DbUser]("user:" + wallet); existing != nil {
-		return false, nil
+		return false, "", false, nil
 	}
 
 	email = strings.ToLower(email)
 	if email != "" {
 		if ew, _ := s.loadEmailToWallet(email); ew != "" && ew != wallet {
-			return false, fmt.Errorf("email already registered")
+			return false, "", false, fmt.Errorf("email already registered")
 		}
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	user := &DbUser{Wallet: wallet, JoinedAt: now, ReferralCode: generateReferralCode(wallet), Email: email}
+	user := &DbUser{Wallet: wallet, JoinedAt: now, ReferralCode: s.uniqueReferralCode(wallet), Email: email}
 
 	pts := int64(100)
 	dbSetJson("points:"+wallet, &pts)
@@ -546,17 +625,47 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 	stats.UserCount++
 	stats.TotalPointsDistributed += pts
 
+	warning := ""
+	referralAwarded := false
+	cfg := loadAntiSybilConfig()
+
 	if referralCode != nil && *referralCode != "" {
-		if rw, _ := s.loadCodeToWallet(strings.ToLower(*referralCode)); rw != "" && rw != wallet {
-			user.Referrer = rw
-			s.appendReferral(strings.ToLower(*referralCode), wallet)
-			b1, b2 := int64(50), int64(75)
-			s.addPoints(wallet, b1)
-			s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
-			s.addPoints(rw, b2)
-			s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
-			stats.TotalPointsDistributed += b1 + b2
-			stats.TotalReferrals++
+		code := strings.ToLower(*referralCode)
+		if rw, _ := s.loadCodeToWallet(code); rw != "" && rw != wallet {
+			// 记录到邀请人当前 code 下：别名变更后老链接（旧码）仍可用，推荐记录不丢失
+			inviterCode := code
+			if inv := s.GetUser(rw); inv != nil && inv.ReferralCode != "" {
+				inviterCode = inv.ReferralCode
+			}
+			// IP 防女巫：邀请人与被邀请人相同 IP → 不建立推荐关系、不发推荐奖励
+			if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+				warning = "Not eligible for referral reward, only base registration reward"
+			} else {
+				user.Referrer = rw
+				s.appendReferral(inviterCode, wallet, now, !cfg.DeferredSettlementEnabled)
+				stats.TotalReferrals++
+
+				if cfg.DeferredSettlementEnabled {
+					// 延迟结算：邀请人的 75 分待被邀请人完成签到/答题后发放
+					s.savePendingRef(wallet, rw, inviterCode, now)
+					s.addPoints(wallet, 50)
+					s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
+					stats.TotalPointsDistributed += 50
+				} else {
+					s.addPoints(wallet, 50)
+					s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
+					s.addPoints(rw, 75)
+					s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
+					stats.TotalPointsDistributed += 125
+				}
+				// 特定邀请码额外积分：奖励给通过该码加入的被邀请人
+				if bonus := referralBonusFor(code); bonus > 0 {
+					s.addPoints(wallet, bonus)
+					s.appendHistory(wallet, fmt.Sprintf("%d", bonus), "referral_bonus", now, &rw)
+					stats.TotalPointsDistributed += bonus
+				}
+				referralAwarded = true
+			}
 		}
 	}
 
@@ -565,10 +674,11 @@ func (s *EarlyAccessStore) Join(wallet, email string, referralCode *string) (boo
 	if email != "" {
 		s.saveEmailToWallet(email, wallet)
 	}
+	s.recordIp(wallet, ip)
 	s.saveStats(stats)
 	tasks := map[string]string{"JOIN_EARLY_ACCESS": now}
 	dbSetJson("tasks:"+wallet, &tasks)
-	return true, nil
+	return true, warning, referralAwarded, nil
 }
 
 func (s *EarlyAccessStore) ClaimTask(wallet, task string) (bool, int64, int64, error) {
@@ -610,41 +720,156 @@ func (s *EarlyAccessStore) ClaimTask(wallet, task string) (bool, int64, int64, e
 	return true, pts, t, nil
 }
 
-func (s *EarlyAccessStore) UpdateReferralCode(wallet, referralCode string) (bool, error) {
+// CheckReferralEligibility 加入前预检查：查询当前 IP 使用该邀请码加入是否可获得推荐奖励。
+// 与 Join / UpdateReferralCode 中的防女巫逻辑保持一致，供前端在提交加入前提示用户。
+// wallet 为空时跳过"已加入/自己邀请自己"检查，仅做同 IP 判断。
+// 返回 eligible（是否可获得奖励）与 reason（不可获得时的原因文案，空串表示可以）。
+func (s *EarlyAccessStore) CheckReferralEligibility(wallet, ip, referralCode string) (bool, string) {
+	wallet = strings.ToLower(wallet)
+	code := strings.ToLower(referralCode)
+	if wallet != "" {
+		if u, _ := dbGetJson[DbUser]("user:" + wallet); u != nil {
+			return false, "already joined"
+		}
+	}
+	rw, _ := s.loadCodeToWallet(code)
+	if rw == "" || (wallet != "" && rw == wallet) {
+		return false, "invalid code"
+	}
+	cfg := loadAntiSybilConfig()
+	if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+		return false, "Not eligible for referral reward, only base registration reward"
+	}
+	return true, ""
+}
+
+func (s *EarlyAccessStore) UpdateReferralCode(wallet, ip, referralCode string) (bool, string, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	wallet, code := strings.ToLower(wallet), strings.ToLower(referralCode)
 	user, _ := dbGetJson[DbUser]("user:" + wallet)
 	if user == nil {
-		return false, fmt.Errorf("user not joined")
+		return false, "", false, fmt.Errorf("user not joined")
 	}
 	if user.Referrer != "" {
-		return false, fmt.Errorf("referral already set")
+		return false, "", false, fmt.Errorf("referral already set")
 	}
 	if user.ReferralCode == code {
-		return false, fmt.Errorf("cannot use own code")
+		return false, "", false, fmt.Errorf("cannot use own code")
 	}
 
 	rw, _ := s.loadCodeToWallet(code)
 	if rw == "" || rw == wallet {
-		return false, fmt.Errorf("invalid code")
+		return false, "", false, fmt.Errorf("invalid code")
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	user.Referrer = rw
-	s.appendReferral(code, wallet)
-	s.addPoints(wallet, 50)
-	s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
-	s.addPoints(rw, 75)
-	s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
+	warning := ""
+	referralAwarded := false
+	cfg := loadAntiSybilConfig()
 
-	stats, _ := s.loadStats()
-	stats.TotalPointsDistributed += 125
-	stats.TotalReferrals++
-	dbSetJson("user:"+wallet, user)
-	s.saveStats(stats)
-	return true, nil
+	// IP 防女巫：相同 IP 不建立推荐关系、不发推荐奖励
+	if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+		warning = "Not eligible for referral reward, only base registration reward"
+	} else {
+		// 记录到邀请人当前 code 下：别名变更后老链接（旧码）仍可用，推荐记录不丢失
+		inviterCode := code
+		if inv := s.GetUser(rw); inv != nil && inv.ReferralCode != "" {
+			inviterCode = inv.ReferralCode
+		}
+		user.Referrer = rw
+		s.appendReferral(inviterCode, wallet, now, !cfg.DeferredSettlementEnabled)
+		s.addPoints(wallet, 50)
+		s.appendHistory(wallet, "50", "referral_reward_invitee", now, &rw)
+		stats, _ := s.loadStats()
+		stats.TotalReferrals++
+
+		if cfg.DeferredSettlementEnabled {
+			// 延迟结算：邀请人的 75 分待被邀请人完成签到/答题后发放
+			s.savePendingRef(wallet, rw, inviterCode, now)
+			stats.TotalPointsDistributed += 50
+		} else {
+			s.addPoints(rw, 75)
+			s.appendHistory(rw, "75", "referral_reward_inviter", now, &wallet)
+			stats.TotalPointsDistributed += 125
+		}
+		// 特定邀请码额外积分：奖励给通过该码设置推荐关系的被邀请人
+		if bonus := referralBonusFor(code); bonus > 0 {
+			s.addPoints(wallet, bonus)
+			s.appendHistory(wallet, fmt.Sprintf("%d", bonus), "referral_bonus", now, &rw)
+			stats.TotalPointsDistributed += bonus
+		}
+		dbSetJson("user:"+wallet, user)
+		s.saveStats(stats)
+		referralAwarded = true
+	}
+	s.recordIp(wallet, ip)
+	return true, warning, referralAwarded, nil
+}
+
+// ── 自定义邀请链接（别名）────────────────────────────────
+
+var reservedAliases = map[string]bool{
+	"admin": true, "support": true, "official": true, "team": true,
+	"system": true, "test": true, "invite": true, "join": true,
+}
+
+// validAlias 校验自定义邀请别名，返回错误信息（空串表示合法）。
+func validAlias(a string) string {
+	if len(a) < 4 || len(a) > 32 {
+		return "alias must be 4-32 characters"
+	}
+	if strings.HasPrefix(a, "ref_") {
+		return "alias cannot start with ref_"
+	}
+	for _, r := range a {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return "alias can only contain lowercase letters, digits, - and _"
+		}
+	}
+	if reservedAliases[a] {
+		return "alias is reserved"
+	}
+	return ""
+}
+
+// UpdateReferralAlias 设置用户的自定义邀请别名。
+// 旧自动码（ref_xxx）保留映射，老链接继续有效；推荐记录迁移到新别名下。
+func (s *EarlyAccessStore) UpdateReferralAlias(wallet, alias string) (bool, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	wallet, alias = strings.ToLower(wallet), strings.ToLower(alias)
+	user, _ := dbGetJson[DbUser]("user:" + wallet)
+	if user == nil {
+		return false, "", fmt.Errorf("user not joined")
+	}
+	if msg := validAlias(alias); msg != "" {
+		return false, "", fmt.Errorf("%s", msg)
+	}
+	if owner, _ := s.loadCodeToWallet(alias); owner != "" && owner != wallet {
+		return false, "", fmt.Errorf("alias already taken")
+	}
+
+	oldCode := user.ReferralCode
+	user.ReferralCode = alias
+	user.Alias = alias
+	if err := dbSetJson("user:"+wallet, user); err != nil {
+		return false, "", err
+	}
+	if err := s.saveCodeToWallet(alias, wallet); err != nil {
+		return false, "", err
+	}
+
+	// 迁移推荐记录到新别名，旧 code 映射保留（旧链接继续可用）
+	if oldCode != "" && oldCode != alias {
+		if refs, _ := s.loadReferrals(oldCode); len(refs) > 0 {
+			dbSetJson("referrals:"+alias, &refs)
+			pebbleDB.Delete(eaKey("referrals:"+oldCode), pebble.Sync)
+		}
+	}
+	return true, alias, nil
 }
 
 func (s *EarlyAccessStore) GetTasks(wallet string) []*TaskStatusInfo {
@@ -694,16 +919,21 @@ func (s *EarlyAccessStore) GetPoints(wallet string) string {
 	return fmt.Sprintf("%d", v)
 }
 
-func (s *EarlyAccessStore) GetReferralInfo(wallet string) (code, referrer string, earnings int64, referrals []string) {
+func (s *EarlyAccessStore) GetReferralInfo(wallet string) (code, alias, referrer string, earnings int64, pending int, referrals []string) {
 	u, _ := dbGetJson[DbUser]("user:" + strings.ToLower(wallet))
 	if u != nil {
-		code, referrer = u.ReferralCode, u.Referrer
+		code, alias, referrer = u.ReferralCode, u.Alias, u.Referrer
 	}
-	r, _ := s.loadReferrals(code)
-	if len(r) > 0 {
-		referrals = make([]string, len(r))
-		copy(referrals, r)
-		earnings = int64(len(r)) * 75
+	refs, _ := s.loadReferrals(code)
+	if len(refs) > 0 {
+		for _, r := range refs {
+			referrals = append(referrals, r.Wallet)
+			if r.Settled {
+				earnings += 75
+			} else {
+				pending++
+			}
+		}
 	}
 	return
 }
@@ -806,18 +1036,366 @@ func (s *EarlyAccessStore) saveEmailToWallet(email, wallet string) error {
 	return dbSetJson("email:"+email, &wallet)
 }
 
-func (s *EarlyAccessStore) loadReferrals(code string) ([]string, error) {
-	v, _ := dbGetJson[[]string]("referrals:" + code)
-	if v == nil {
-		return nil, nil
+func (s *EarlyAccessStore) loadReferrals(code string) ([]DbReferral, error) {
+	v, closer, err := pebbleDB.Get(eaKey("referrals:" + code))
+	if err != nil {
+		if err == pebble.ErrNotFound {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return *v, nil
+	defer closer.Close()
+	val := make([]byte, len(v))
+	copy(val, v)
+
+	var refs []DbReferral
+	if json.Unmarshal(val, &refs) == nil {
+		return refs, nil
+	}
+	// 兼容旧数据：历史上存的是 []string（加入即结算），迁移为 Settled=true
+	var legacy []string
+	if json.Unmarshal(val, &legacy) == nil {
+		refs = make([]DbReferral, 0, len(legacy))
+		for _, w := range legacy {
+			refs = append(refs, DbReferral{Wallet: w, Settled: true})
+		}
+		dbSetJson("referrals:"+code, &refs)
+		return refs, nil
+	}
+	return nil, nil
 }
 
-func (s *EarlyAccessStore) appendReferral(code, wallet string) error {
-	l, _ := s.loadReferrals(code)
-	l = append(l, wallet)
-	return dbSetJson("referrals:"+code, &l)
+func (s *EarlyAccessStore) appendReferral(code, wallet, ts string, settled bool) error {
+	refs, _ := s.loadReferrals(code)
+	if refs == nil {
+		refs = []DbReferral{}
+	}
+	refs = append(refs, DbReferral{Wallet: wallet, Settled: settled, CreatedAt: ts})
+	return dbSetJson("referrals:"+code, &refs)
+}
+
+// ── 防女巫：配置 / IP / 延迟结算 ────────────────────────
+
+const configKey = "config"
+
+// adminPasswordFile 管理密码配置文件：敏感操作（如修改防女巫开关）需传入该密码。
+// 密码放在 flux_config.json 的 admin_password 字段中，运维直接编辑该文件即可。
+var adminPasswordFile = "flux_config.json"
+
+// loadAdminPassword 从配置文件读取管理密码。文件不存在或解析失败时返回空串。
+func loadAdminPassword() string {
+	b, err := os.ReadFile(adminPasswordFile)
+	if err != nil {
+		return ""
+	}
+	var cfg FluxConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return ""
+	}
+	return cfg.AdminPassword
+}
+
+// checkAdminPassword 校验密码（常量时间比较，避免时序侧信道）。
+func checkAdminPassword(pw string) bool {
+	want := loadAdminPassword()
+	if want == "" || pw == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(pw), []byte(want)) == 1
+}
+
+// loadAntiSybilConfig 读取防女巫配置，未配置时默认全部开启。
+func loadAntiSybilConfig() DbConfig {
+	v, _ := dbGetJson[DbConfig](configKey)
+	if v == nil {
+		return DbConfig{IpCheckEnabled: true, DeferredSettlementEnabled: true}
+	}
+	return *v
+}
+
+func saveAntiSybilConfig(c DbConfig) error {
+	return dbSetJson(configKey, &c)
+}
+
+// GetAntiSybilConfig 返回当前防女巫配置。
+func (s *EarlyAccessStore) GetAntiSybilConfig() DbConfig {
+	return loadAntiSybilConfig()
+}
+
+// UpdateAntiSybilConfig 更新防女巫开关。敏感操作：必须传入配置文件（flux_config.json 的 admin_password）中的密码。
+func (s *EarlyAccessStore) UpdateAntiSybilConfig(wallet, password string, ipCheck, deferred bool) (DbConfig, string) {
+	if !checkAdminPassword(password) {
+		cfg := loadAntiSybilConfig()
+		if loadAdminPassword() == "" {
+			return cfg, "admin password not configured"
+		}
+		return cfg, "invalid password"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	wallet = strings.ToLower(wallet)
+	cfg := loadAntiSybilConfig()
+	cfg.IpCheckEnabled = ipCheck
+	cfg.DeferredSettlementEnabled = deferred
+	cfg.UpdatedBy = wallet
+	cfg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := saveAntiSybilConfig(cfg); err != nil {
+		return loadAntiSybilConfig(), err.Error()
+	}
+	return cfg, ""
+}
+
+// ── 邀请码额外积分（推荐码加成）───────────────────────────
+
+const refBonusKey = "refbonus"
+
+// DbRefBonus 特定邀请码的额外积分配置：通过该邀请码加入的被邀请人额外获得 BonusPoints 积分。
+type DbRefBonus struct {
+	Code        string `json:"code"`
+	BonusPoints int64  `json:"bonusPoints"`
+	UpdatedBy   string `json:"updatedBy"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+func loadRefBonusConfig() map[string]DbRefBonus {
+	v, _ := dbGetJson[map[string]DbRefBonus](refBonusKey)
+	if v == nil {
+		return map[string]DbRefBonus{}
+	}
+	return *v
+}
+
+func saveRefBonusConfig(m map[string]DbRefBonus) error {
+	return dbSetJson(refBonusKey, &m)
+}
+
+// GetReferralBonusConfigs 返回全部邀请码额外积分配置（按 code 排序）。
+func (s *EarlyAccessStore) GetReferralBonusConfigs() []DbRefBonus {
+	m := loadRefBonusConfig()
+	out := make([]DbRefBonus, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
+	return out
+}
+
+// SetReferralBonus 设置/移除特定邀请码的额外积分。敏感操作：必须传入配置文件中的管理密码。
+// bonusPoints <= 0 时移除该邀请码的配置。
+func (s *EarlyAccessStore) SetReferralBonus(wallet, password, code string, bonusPoints int64) ([]DbRefBonus, string) {
+	if !checkAdminPassword(password) {
+		if loadAdminPassword() == "" {
+			return s.GetReferralBonusConfigs(), "admin password not configured"
+		}
+		return s.GetReferralBonusConfigs(), "invalid password"
+	}
+
+	code = strings.ToLower(strings.TrimSpace(code))
+	if code == "" {
+		return s.GetReferralBonusConfigs(), "code required"
+	}
+	if len(code) > 64 {
+		return s.GetReferralBonusConfigs(), "code too long"
+	}
+	for _, r := range code {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return s.GetReferralBonusConfigs(), "code can only contain lowercase letters, digits, - and _"
+		}
+	}
+	if bonusPoints < 0 {
+		return s.GetReferralBonusConfigs(), "bonus points cannot be negative"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg := loadRefBonusConfig()
+	if bonusPoints == 0 {
+		delete(cfg, code)
+	} else {
+		cfg[code] = DbRefBonus{
+			Code: code, BonusPoints: bonusPoints,
+			UpdatedBy: strings.ToLower(wallet), UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+	if err := saveRefBonusConfig(cfg); err != nil {
+		return s.GetReferralBonusConfigs(), err.Error()
+	}
+	return s.GetReferralBonusConfigs(), ""
+}
+
+// referralBonusFor 查询邀请码的额外积分（无配置返回 0）。
+func referralBonusFor(code string) int64 {
+	if v, ok := loadRefBonusConfig()[strings.ToLower(code)]; ok {
+		return v.BonusPoints
+	}
+	return 0
+}
+
+// recordIp 记录用户的 IP（首次 + 最近 5 个）与 IP 反查索引。调用方需持有锁。
+// IP 未变化时跳过写库，避免每次查询都产生 pebble 写入。
+func (s *EarlyAccessStore) recordIp(wallet, ip string) {
+	ip = normalizeIP(ip)
+	if ip == "" || wallet == "" {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	rec, _ := dbGetJson[DbIpRecord]("ip:" + wallet)
+	if rec == nil {
+		// 新用户：首次 IP 直接落库
+		rec = &DbIpRecord{FirstIP: ip, FirstSeen: now, LastSeen: now, LastIPs: []string{}}
+		dbSetJson("ip:"+wallet, rec)
+		s.indexIp(wallet, ip)
+		return
+	}
+	last := ""
+	if len(rec.LastIPs) > 0 {
+		last = rec.LastIPs[len(rec.LastIPs)-1]
+	}
+	if last == ip || (len(rec.LastIPs) == 0 && rec.FirstIP == ip) {
+		return // IP 未变化，无需写库
+	}
+	for _, old := range rec.LastIPs {
+		if old == ip {
+			return // 历史出现过，不重复追加
+		}
+	}
+	rec.LastSeen = now
+	rec.LastIPs = append(rec.LastIPs, ip)
+	if len(rec.LastIPs) > 5 {
+		rec.LastIPs = rec.LastIPs[len(rec.LastIPs)-5:]
+	}
+	dbSetJson("ip:"+wallet, rec)
+	s.indexIp(wallet, ip)
+}
+
+// indexIp 维护 IP 反查索引（批量注册检测）。调用方需持有锁。
+func (s *EarlyAccessStore) indexIp(wallet, ip string) {
+	users, _ := dbGetJson[[]string]("ipidx:" + ip)
+	if users == nil {
+		users = &[]string{}
+	}
+	found := false
+	for _, w := range *users {
+		if w == wallet {
+			found = true
+			break
+		}
+	}
+	if !found {
+		*users = append(*users, wallet)
+		if len(*users) > 100 {
+			*users = (*users)[len(*users)-100:]
+		}
+		dbSetJson("ipidx:"+ip, users)
+	}
+}
+
+// RecordClientIp 由 resolver 调用：用户刷新页面/查询时更新其 IP 记录，保持最近 IP 新鲜，
+// 使同 IP 邀请检查始终基于邀请人当前实际使用的 IP。仅记录已注册用户；内部加锁，可安全调用。
+func (s *EarlyAccessStore) RecordClientIp(wallet, ip string) {
+	wallet = strings.ToLower(wallet)
+	if wallet == "" || ip == "" {
+		return
+	}
+	if u, _ := dbGetJson[DbUser]("user:" + wallet); u == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recordIp(wallet, ip)
+}
+
+// normalizeIP 标准化 IP 表示（IPv6 小写、IPv4 去除前导零等），无法解析时原样返回。
+func normalizeIP(ip string) string {
+	ip = strings.TrimSpace(ip)
+	if p := net.ParseIP(ip); p != nil {
+		return p.String()
+	}
+	return ip
+}
+
+// ipMatches 判断 ip 是否与该用户记录过的任一 IP 相同。
+func (s *EarlyAccessStore) ipMatches(ip, wallet string) bool {
+	ip = normalizeIP(ip)
+	rec, _ := dbGetJson[DbIpRecord]("ip:" + wallet)
+	if rec == nil {
+		return false
+	}
+	if rec.FirstIP == ip {
+		return true
+	}
+	for _, x := range rec.LastIPs {
+		if x == ip {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *EarlyAccessStore) loadPendingRef(wallet string) (*DbPendingRef, error) {
+	return dbGetJson[DbPendingRef]("pendingref:" + wallet)
+}
+
+func (s *EarlyAccessStore) savePendingRef(wallet, inviter, code, ts string) error {
+	return dbSetJson("pendingref:"+wallet, &DbPendingRef{Inviter: inviter, Code: code, CreatedAt: ts})
+}
+
+// settlePending 结算被邀请人的待发推荐奖励：邀请人 +75 分。
+// 由签到/答题成功后触发。调用方需持有锁。
+func (s *EarlyAccessStore) settlePending(wallet string) {
+	p, _ := s.loadPendingRef(wallet)
+	if p == nil {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	// 标记推荐关系已结算（邀请人改过别名时，推荐记录已迁移到其当前 code 下）
+	codes := []string{p.Code}
+	if inv := s.GetUser(p.Inviter); inv != nil && inv.ReferralCode != "" && inv.ReferralCode != p.Code {
+		codes = append(codes, inv.ReferralCode)
+	}
+	settled := false // 记录已处于 Settled（无论本次标记还是之前已标记）
+	granted := false // 本次实际发生 false→true 转换（真正发放了积分）
+	for _, c := range codes {
+		refs, _ := s.loadReferrals(c)
+		if refs == nil {
+			continue
+		}
+		for i := range refs {
+			if refs[i].Wallet == wallet {
+				if !refs[i].Settled {
+					refs[i].Settled = true
+					dbSetJson("referrals:"+c, &refs)
+					granted = true
+				}
+				settled = true
+				break
+			}
+		}
+		if settled {
+			break
+		}
+	}
+	if !settled {
+		// 推荐记录缺失（异常）：本次不发分，等待下次签到/答题再触发，避免重复发分
+		return
+	}
+
+	// 发放邀请人积分（仅首次结算：崩溃/重放不会重复发放）
+	if granted {
+		s.addPoints(p.Inviter, 75)
+		s.appendHistory(p.Inviter, "75", "referral_reward_inviter", now, &wallet)
+		stats, _ := s.loadStats()
+		stats.TotalPointsDistributed += 75
+		s.saveStats(stats)
+	}
+
+	// 清理 pending 记录
+	pebbleDB.Delete(eaKey("pendingref:"+wallet), pebble.Sync)
+	fmt.Printf("[anti-sybil] settled pending referral: invitee=%s inviter=%s\n", wallet, p.Inviter)
 }
 
 func (s *EarlyAccessStore) loadTasks(wallet string) (map[string]string, error) {
@@ -834,15 +1412,41 @@ func (s *EarlyAccessStore) saveTasks(wallet string, tasks map[string]string) err
 
 // ── Export / Import ───────────────────────────────────────
 
+// DbReferrals 兼容新旧格式的推荐列表：新版 []DbReferral，旧版 []string。
+type DbReferrals []DbReferral
+
+func (r *DbReferrals) UnmarshalJSON(b []byte) error {
+	var refs []DbReferral
+	if err := json.Unmarshal(b, &refs); err == nil {
+		*r = refs
+		return nil
+	}
+	var legacy []string
+	if err := json.Unmarshal(b, &legacy); err != nil {
+		return err
+	}
+	refs = make([]DbReferral, 0, len(legacy))
+	for _, w := range legacy {
+		refs = append(refs, DbReferral{Wallet: w, Settled: true})
+	}
+	*r = refs
+	return nil
+}
+
 type ExportedData struct {
-	Users     map[string]DbUser            `json:"users"`
-	Points    map[string]int64             `json:"points"`
-	History   map[string][]DbHistory       `json:"history"`
-	Tasks     map[string]map[string]string `json:"tasks"`
-	Codes     map[string]string            `json:"codes"`
-	Emails    map[string]string            `json:"emails"`
-	Referrals map[string][]string          `json:"referrals"`
-	Stats     *DbStats                     `json:"stats"`
+	Users       map[string]DbUser            `json:"users"`
+	Points      map[string]int64             `json:"points"`
+	History     map[string][]DbHistory       `json:"history"`
+	Tasks       map[string]map[string]string `json:"tasks"`
+	Codes       map[string]string            `json:"codes"`
+	Emails      map[string]string            `json:"emails"`
+	Referrals   map[string]DbReferrals       `json:"referrals"`
+	PendingRefs map[string]DbPendingRef      `json:"pendingRefs,omitempty"`
+	Stats       *DbStats                     `json:"stats"`
+	Config      *DbConfig                    `json:"config,omitempty"`
+	RefBonuses  map[string]DbRefBonus        `json:"refBonuses,omitempty"`
+	IpRecords   map[string]DbIpRecord        `json:"ipRecords,omitempty"`
+	IpIndex     map[string][]string          `json:"ipIndex,omitempty"`
 }
 
 func (s *EarlyAccessStore) Export() string {
@@ -850,7 +1454,8 @@ func (s *EarlyAccessStore) Export() string {
 		Users: make(map[string]DbUser), Points: make(map[string]int64),
 		History: make(map[string][]DbHistory), Tasks: make(map[string]map[string]string),
 		Codes: make(map[string]string), Emails: make(map[string]string),
-		Referrals: make(map[string][]string),
+		Referrals: make(map[string]DbReferrals), PendingRefs: make(map[string]DbPendingRef),
+		IpRecords: make(map[string]DbIpRecord), IpIndex: make(map[string][]string),
 	}
 	ps := []byte(eaNamespace + "/")
 	iter, err := pebbleDB.NewIter(&pebble.IterOptions{LowerBound: ps})
@@ -899,14 +1504,39 @@ func (s *EarlyAccessStore) Export() string {
 				d.Emails[key[6:]] = v
 			}
 		case strings.HasPrefix(key, "referrals:"):
-			var v []string
+			var refs DbReferrals
+			if json.Unmarshal(val, &refs) == nil {
+				d.Referrals[key[10:]] = refs
+			}
+		case strings.HasPrefix(key, "pendingref:"):
+			var v DbPendingRef
 			if json.Unmarshal(val, &v) == nil {
-				d.Referrals[key[10:]] = v
+				d.PendingRefs[key[11:]] = v
 			}
 		case key == "stats":
 			var v DbStats
 			if json.Unmarshal(val, &v) == nil {
 				d.Stats = &v
+			}
+		case key == "config":
+			var v DbConfig
+			if json.Unmarshal(val, &v) == nil {
+				d.Config = &v
+			}
+		case key == refBonusKey:
+			var v map[string]DbRefBonus
+			if json.Unmarshal(val, &v) == nil {
+				d.RefBonuses = v
+			}
+		case strings.HasPrefix(key, "ip:"):
+			var v DbIpRecord
+			if json.Unmarshal(val, &v) == nil {
+				d.IpRecords[key[3:]] = v
+			}
+		case strings.HasPrefix(key, "ipidx:"):
+			var v []string
+			if json.Unmarshal(val, &v) == nil {
+				d.IpIndex[key[6:]] = v
 			}
 		}
 	}
@@ -965,8 +1595,38 @@ func TryImport(data string) error {
 				return
 			}
 		}
-		for k, v := range d.Referrals {
-			if err := dbSetJson("referrals:"+k, &v); err != nil {
+		for k, refs := range d.Referrals {
+			if err := dbSetJson("referrals:"+k, &refs); err != nil {
+				errResult = err
+				return
+			}
+		}
+		for k, v := range d.PendingRefs {
+			if err := dbSetJson("pendingref:"+k, &v); err != nil {
+				errResult = err
+				return
+			}
+		}
+		if d.Config != nil {
+			if err := dbSetJson("config", d.Config); err != nil {
+				errResult = err
+				return
+			}
+		}
+		if d.RefBonuses != nil {
+			if err := dbSetJson(refBonusKey, &d.RefBonuses); err != nil {
+				errResult = err
+				return
+			}
+		}
+		for k, v := range d.IpRecords {
+			if err := dbSetJson("ip:"+k, &v); err != nil {
+				errResult = err
+				return
+			}
+		}
+		for k, v := range d.IpIndex {
+			if err := dbSetJson("ipidx:"+k, &v); err != nil {
 				errResult = err
 				return
 			}

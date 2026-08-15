@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +31,17 @@ func logBlue(tag, msg string) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// clientIPMiddleware 提取客户端真实 IP（无反向代理，直接取 RemoteAddr）并注入 context。
+func clientIPMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			ip = host
+		}
+		next.ServeHTTP(w, r.WithContext(actives.WithClientIP(r.Context(), ip)))
+	})
 }
 
 func main() {
@@ -68,6 +80,7 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           86400,
 	}))
+	router.Use(clientIPMiddleware)
 
 	router.Handle("/", playground.Handler("Actives", "/gql"))
 

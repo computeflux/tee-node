@@ -9,6 +9,18 @@ import (
 	"strconv"
 )
 
+type AntiSybilConfig struct {
+	IPCheckEnabled            bool    `json:"ipCheckEnabled"`
+	DeferredSettlementEnabled bool    `json:"deferredSettlementEnabled"`
+	UpdatedBy                 *string `json:"updatedBy,omitempty"`
+	UpdatedAt                 *string `json:"updatedAt,omitempty"`
+}
+
+type AntiSybilConfigResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type CheckinConfig struct {
 	TestMode bool `json:"testMode"`
 }
@@ -56,8 +68,10 @@ type EarlyAccessUser struct {
 }
 
 type JoinEarlyAccessResult struct {
-	Success bool    `json:"success"`
-	TxHash  *string `json:"txHash,omitempty"`
+	Success         bool    `json:"success"`
+	TxHash          *string `json:"txHash,omitempty"`
+	Warning         *string `json:"warning,omitempty"`
+	ReferralAwarded bool    `json:"referralAwarded"`
 }
 
 type Mutation struct {
@@ -101,10 +115,29 @@ type QuizQuestion struct {
 	Options    []string `json:"options"`
 }
 
+type ReferralBonus struct {
+	Code        string  `json:"code"`
+	BonusPoints int     `json:"bonusPoints"`
+	UpdatedBy   *string `json:"updatedBy,omitempty"`
+	UpdatedAt   *string `json:"updatedAt,omitempty"`
+}
+
+type ReferralBonusResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+type ReferralEligibilityResult struct {
+	Eligible bool    `json:"eligible"`
+	Reason   *string `json:"reason,omitempty"`
+}
+
 type ReferralInfo struct {
 	Code      *string  `json:"code,omitempty"`
+	Alias     *string  `json:"alias,omitempty"`
 	Referrer  *string  `json:"referrer,omitempty"`
 	Earnings  string   `json:"earnings"`
+	Pending   int      `json:"pending"`
 	Referrals []string `json:"referrals"`
 }
 

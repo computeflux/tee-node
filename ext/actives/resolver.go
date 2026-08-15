@@ -3,6 +3,9 @@ package actives
 import (
 	"context"
 	"fmt"
+	"math"
+	"sync"
+	"time"
 )
 
 // Resolver implements the generated ResolverRoot interface.
@@ -14,9 +17,15 @@ func (r *Resolver) Query() QueryResolver       { return &queryResolver{r} }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 
+// touchClientIp 记录请求来源 IP：用户刷新页面/活跃时保持其 IP 记录新鲜。
+func (r *Resolver) touchClientIp(ctx context.Context, wallet string) {
+	Store.RecordClientIp(wallet, ClientIPFromContext(ctx))
+}
+
 // ── Query ────────────────────────────────────────────────
 
 func (r *queryResolver) EarlyAccessUser(ctx context.Context, user string) (*EarlyAccessUser, error) {
+	r.touchClientIp(ctx, user)
 	u := Store.GetUser(user)
 	if u == nil {
 		return &EarlyAccessUser{IsUser: false}, nil
@@ -44,14 +53,23 @@ func (r *queryResolver) EarlyAccessUserByReferralCode(ctx context.Context, refer
 }
 
 func (r *queryResolver) EarlyAccessPoints(ctx context.Context, user string) (*EarlyAccessPoints, error) {
+	r.touchClientIp(ctx, user)
 	return &EarlyAccessPoints{Total: Store.GetPoints(user)}, nil
 }
 
 func (r *queryResolver) EarlyAccessReferral(ctx context.Context, user string) (*ReferralInfo, error) {
-	code, referrer, earnings, referrals := Store.GetReferralInfo(user)
-	res := &ReferralInfo{Earnings: fmt.Sprintf("%d", earnings), Referrals: referrals}
+	r.touchClientIp(ctx, user)
+	code, alias, referrer, earnings, pending, referrals := Store.GetReferralInfo(user)
+	res := &ReferralInfo{
+		Earnings:  fmt.Sprintf("%d", earnings),
+		Pending:   pending,
+		Referrals: referrals,
+	}
 	if code != "" {
 		res.Code = &code
+	}
+	if alias != "" {
+		res.Alias = &alias
 	}
 	if referrer != "" {
 		res.Referrer = &referrer
@@ -60,6 +78,7 @@ func (r *queryResolver) EarlyAccessReferral(ctx context.Context, user string) (*
 }
 
 func (r *queryResolver) EarlyAccessPointsHistory(ctx context.Context, user string, offset *int, limit *int) (*PointsHistory, error) {
+	r.touchClientIp(ctx, user)
 	o, l := 0, 20
 	if offset != nil {
 		o = *offset
@@ -87,6 +106,7 @@ func (r *queryResolver) EarlyAccessStats(ctx context.Context) (*EarlyAccessStats
 }
 
 func (r *queryResolver) EarlyAccessTasks(ctx context.Context, wallet string) ([]*TaskStatus, error) {
+	r.touchClientIp(ctx, wallet)
 	tasks := Store.GetTasks(wallet)
 	out := make([]*TaskStatus, len(tasks))
 	for i, t := range tasks {
@@ -101,6 +121,56 @@ func (r *queryResolver) EarlyAccessExport(ctx context.Context) (string, error) {
 	return Store.Export(), nil
 }
 
+func (r *queryResolver) AntiSybilConfig(ctx context.Context) (*AntiSybilConfig, error) {
+	cfg := Store.GetAntiSybilConfig()
+	res := &AntiSybilConfig{
+		IPCheckEnabled:            cfg.IpCheckEnabled,
+		DeferredSettlementEnabled: cfg.DeferredSettlementEnabled,
+	}
+	if cfg.UpdatedBy != "" {
+		res.UpdatedBy = &cfg.UpdatedBy
+	}
+	if cfg.UpdatedAt != "" {
+		res.UpdatedAt = &cfg.UpdatedAt
+	}
+	return res, nil
+}
+
+func (r *queryResolver) ReferralBonusConfigs(ctx context.Context) ([]*ReferralBonus, error) {
+	items := Store.GetReferralBonusConfigs()
+	out := make([]*ReferralBonus, len(items))
+	for i, it := range items {
+		if it.BonusPoints > math.MaxInt32 {
+			return nil, fmt.Errorf("bonus points %d out of range", it.BonusPoints)
+		}
+		b := &ReferralBonus{Code: it.Code, BonusPoints: int(it.BonusPoints)}
+		if it.UpdatedBy != "" {
+			b.UpdatedBy = &it.UpdatedBy
+		}
+		if it.UpdatedAt != "" {
+			b.UpdatedAt = &it.UpdatedAt
+		}
+		out[i] = b
+	}
+	return out, nil
+}
+
+// ReferralEligibility 加入前预检查：当前 IP 用该邀请码加入是否可获得推荐奖励。
+// wallet 可空：传入时额外检查已加入/自邀，为空时仅做同 IP 判断。
+func (r *queryResolver) ReferralEligibility(ctx context.Context, wallet *string, referralCode string) (*ReferralEligibilityResult, error) {
+	ip := ClientIPFromContext(ctx)
+	w := ""
+	if wallet != nil {
+		w = *wallet
+	}
+	eligible, reason := Store.CheckReferralEligibility(w, ip, referralCode)
+	res := &ReferralEligibilityResult{Eligible: eligible}
+	if reason != "" {
+		res.Reason = &reason
+	}
+	return res, nil
+}
+
 func (r *queryResolver) CheckinConfig(ctx context.Context) (*CheckinConfig, error) {
 	return &CheckinConfig{
 		TestMode: CheckinTestMode,
@@ -108,10 +178,12 @@ func (r *queryResolver) CheckinConfig(ctx context.Context) (*CheckinConfig, erro
 }
 
 func (r *queryResolver) CheckinStreak(ctx context.Context, wallet string) (int, error) {
+	r.touchClientIp(ctx, wallet)
 	return Store.GetStreak(wallet), nil
 }
 
 func (r *queryResolver) CheckinStatus(ctx context.Context, wallet string) (*CheckinStatus, error) {
+	r.touchClientIp(ctx, wallet)
 	checkedIn, canCheckin, weekCount, weekMax, streak := Store.GetCheckinStatus(wallet)
 	return &CheckinStatus{
 		CheckedIn:  checkedIn,
@@ -123,6 +195,7 @@ func (r *queryResolver) CheckinStatus(ctx context.Context, wallet string) (*Chec
 }
 
 func (r *queryResolver) QuizQuestions(ctx context.Context, wallet string, day int) ([]*QuizQuestion, error) {
+	r.touchClientIp(ctx, wallet)
 	qs := Store.GetQuestionsForDay(wallet, day)
 	out := make([]*QuizQuestion, len(qs))
 	for i, q := range qs {
@@ -135,6 +208,7 @@ func (r *queryResolver) QuizQuestions(ctx context.Context, wallet string, day in
 }
 
 func (r *queryResolver) QuizProgress(ctx context.Context, wallet string, day int) (*QuizProgress, error) {
+	r.touchClientIp(ctx, wallet)
 	total, answered, earned := Store.GetQuizProgress(wallet, day)
 	return &QuizProgress{Total: total, Answered: answered, Earned: fmt.Sprintf("%d", earned)}, nil
 }
@@ -146,22 +220,79 @@ func (r *mutationResolver) JoinEarlyAccess(ctx context.Context, wallet string, e
 	if email != nil {
 		e = *email
 	}
-	ok, err := Store.Join(wallet, e, referralCode)
+	ip := ClientIPFromContext(ctx)
+	ok, warning, awarded, err := Store.Join(wallet, e, ip, referralCode)
 	if err != nil {
-		return &JoinEarlyAccessResult{Success: ok, TxHash: strPtr(err.Error())}, nil
+		return &JoinEarlyAccessResult{Success: false, TxHash: strPtr(err.Error()), ReferralAwarded: false}, nil
 	}
-	return &JoinEarlyAccessResult{Success: ok}, nil
+	res := &JoinEarlyAccessResult{Success: ok, ReferralAwarded: awarded}
+	if warning != "" {
+		res.Warning = &warning
+	}
+	return res, nil
 }
 
 func (r *mutationResolver) UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*JoinEarlyAccessResult, error) {
-	ok, err := Store.UpdateReferralCode(wallet, referralCode)
+	ip := ClientIPFromContext(ctx)
+	ok, warning, awarded, err := Store.UpdateReferralCode(wallet, ip, referralCode)
 	if err != nil {
-		return &JoinEarlyAccessResult{Success: ok, TxHash: strPtr(err.Error())}, nil
+		return &JoinEarlyAccessResult{Success: false, TxHash: strPtr(err.Error()), ReferralAwarded: false}, nil
 	}
-	return &JoinEarlyAccessResult{Success: ok}, nil
+	res := &JoinEarlyAccessResult{Success: ok, ReferralAwarded: awarded}
+	if warning != "" {
+		res.Warning = &warning
+	}
+	return res, nil
+}
+
+func (r *mutationResolver) UpdateReferralAlias(ctx context.Context, wallet string, alias string, signature string) (*JoinEarlyAccessResult, error) {
+	r.touchClientIp(ctx, wallet)
+	// 签名验证：只有钱包所有者（对 alias 内容的 EIP-191 签名）才能修改自己的别名
+	if !verifyEIP191Signature(wallet, signature, alias) {
+		return &JoinEarlyAccessResult{Success: false, TxHash: strPtr("invalid signature"), ReferralAwarded: false}, nil
+	}
+	ok, _, err := Store.UpdateReferralAlias(wallet, alias)
+	if err != nil {
+		return &JoinEarlyAccessResult{Success: false, TxHash: strPtr(err.Error()), ReferralAwarded: false}, nil
+	}
+	return &JoinEarlyAccessResult{Success: ok, ReferralAwarded: false}, nil
+}
+
+func (r *mutationResolver) UpdateAntiSybilConfig(ctx context.Context, wallet string, password string, ipCheckEnabled bool, deferredSettlementEnabled bool) (*AntiSybilConfigResult, error) {
+	ip := ClientIPFromContext(ctx)
+	if adminLocked(ip) {
+		return &AntiSybilConfigResult{Success: false, Message: "too many failed attempts, try again later"}, nil
+	}
+	cfg, msg := Store.UpdateAntiSybilConfig(wallet, password, ipCheckEnabled, deferredSettlementEnabled)
+	if msg != "" {
+		if isAdminAuthError(msg) {
+			recordAdminFailure(ip)
+		}
+		return &AntiSybilConfigResult{Success: false, Message: msg}, nil
+	}
+	clearAdminFailures(ip)
+	_ = cfg
+	return &AntiSybilConfigResult{Success: true, Message: "ok"}, nil
+}
+
+func (r *mutationResolver) SetReferralBonus(ctx context.Context, wallet string, password string, code string, bonusPoints int) (*ReferralBonusResult, error) {
+	ip := ClientIPFromContext(ctx)
+	if adminLocked(ip) {
+		return &ReferralBonusResult{Success: false, Message: "too many failed attempts, try again later"}, nil
+	}
+	_, msg := Store.SetReferralBonus(wallet, password, code, int64(bonusPoints))
+	if msg != "" {
+		if isAdminAuthError(msg) {
+			recordAdminFailure(ip)
+		}
+		return &ReferralBonusResult{Success: false, Message: msg}, nil
+	}
+	clearAdminFailures(ip)
+	return &ReferralBonusResult{Success: true, Message: "ok"}, nil
 }
 
 func (r *mutationResolver) ClaimEarlyAccessTask(ctx context.Context, wallet string, task EarlyAccessTaskType) (*ClaimTaskResult, error) {
+	r.touchClientIp(ctx, wallet)
 	ok, awarded, total, err := Store.ClaimTask(wallet, string(task))
 	if err != nil {
 		return &ClaimTaskResult{Success: false}, nil
@@ -170,6 +301,7 @@ func (r *mutationResolver) ClaimEarlyAccessTask(ctx context.Context, wallet stri
 }
 
 func (r *mutationResolver) JoinDiscord(ctx context.Context, wallet string, message string, signature string) (*ClaimTaskResult, error) {
+	r.touchClientIp(ctx, wallet)
 	ok, awarded, total, err := Store.ClaimTask(wallet, "JOIN_DISCORD")
 	if err != nil {
 		return &ClaimTaskResult{Success: false}, nil
@@ -178,6 +310,7 @@ func (r *mutationResolver) JoinDiscord(ctx context.Context, wallet string, messa
 }
 
 func (r *mutationResolver) JoinTelegram(ctx context.Context, wallet string, message string, signature string) (*ClaimTaskResult, error) {
+	r.touchClientIp(ctx, wallet)
 	ok, awarded, total, err := Store.ClaimTask(wallet, "JOIN_TELEGRAM")
 	if err != nil {
 		return &ClaimTaskResult{Success: false}, nil
@@ -186,6 +319,7 @@ func (r *mutationResolver) JoinTelegram(ctx context.Context, wallet string, mess
 }
 
 func (r *mutationResolver) DailyCheckin(ctx context.Context, wallet string, date *string) (*CheckinResult, error) {
+	r.touchClientIp(ctx, wallet)
 	dateStr := ""
 	if date != nil {
 		dateStr = *date
@@ -201,6 +335,7 @@ func (r *mutationResolver) DailyCheckin(ctx context.Context, wallet string, date
 }
 
 func (r *mutationResolver) SubmitQuizAnswer(ctx context.Context, wallet string, questionID string, answerIndex int) (*QuizAnswerResult, error) {
+	r.touchClientIp(ctx, wallet)
 	correct, pts, explanation, err := Store.SubmitQuizAnswer(wallet, questionID, answerIndex)
 	if err != nil {
 		return &QuizAnswerResult{Correct: false, Explanation: err.Error()}, nil
@@ -213,3 +348,64 @@ func (r *mutationResolver) SubmitQuizAnswer(ctx context.Context, wallet string, 
 }
 
 func strPtr(s string) *string { return &s }
+
+// ── 管理操作防爆破：按来源 IP 简单限流 ──────────────────────
+// 管理密码来自配置文件（无独立账号体系），这是除常量时间比较外的第一道防线：
+// 连续密码验证失败 maxAdminFailAttempts 次后，锁定该 IP lockoutDuration。
+// 仅内存态，重启清零；仅对密码类错误计数，不误伤其他参数错误。
+
+const (
+	maxAdminFailAttempts = 5
+	adminLockoutDuration = 10 * time.Minute
+)
+
+type adminFailState struct {
+	count int
+	until time.Time
+}
+
+var (
+	adminFailMu   sync.Mutex
+	adminFailures = make(map[string]adminFailState)
+)
+
+// isAdminAuthError 判断 Store 返回的错误是否为密码验证类错误。
+func isAdminAuthError(msg string) bool {
+	return msg == "invalid password" || msg == "admin password not configured"
+}
+
+// adminLocked 检查该 IP 是否处于锁定状态。
+func adminLocked(ip string) bool {
+	adminFailMu.Lock()
+	defer adminFailMu.Unlock()
+	st, ok := adminFailures[ip]
+	if !ok {
+		return false
+	}
+	if time.Now().Before(st.until) {
+		return true
+	}
+	delete(adminFailures, ip) // 锁定期已过，清理
+	return false
+}
+
+// recordAdminFailure 记录一次密码验证失败。
+func recordAdminFailure(ip string) {
+	adminFailMu.Lock()
+	defer adminFailMu.Unlock()
+	st := adminFailures[ip]
+	st.count++
+	if st.count >= maxAdminFailAttempts {
+		st.until = time.Now().Add(adminLockoutDuration)
+		st.count = 0
+		fmt.Printf("[admin] anti-brute-force: ip=%s locked for %s\n", ip, adminLockoutDuration)
+	}
+	adminFailures[ip] = st
+}
+
+// clearAdminFailures 成功后清零该 IP 的失败计数。
+func clearAdminFailures(ip string) {
+	adminFailMu.Lock()
+	defer adminFailMu.Unlock()
+	delete(adminFailures, ip)
+}

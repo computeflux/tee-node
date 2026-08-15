@@ -6,31 +6,11 @@ package graph
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
-
-// ── ERC20 列表缓存（10 分钟 TTL）─────────────────────────
-
-const erc20ListCacheTTL = 10 * time.Minute
-
-type erc20CacheEntry struct {
-	items      []*model.Erc20Item
-	fetchedAt  time.Time
-	refreshing bool // 后台刷新进行中，避免过期瞬间的并发请求打爆节点
-}
-
-// 按 chainId 缓存的 ERC20 列表。
-// 用户始终优先读取缓存：缓存新鲜直接返回；过期时先返回旧数据再后台刷新（stale-while-revalidate）。
-var erc20ListCache = struct {
-	mu      sync.Mutex
-	entries map[uint32]*erc20CacheEntry
-}{entries: make(map[uint32]*erc20CacheEntry)}
 
 // Erc20List is the resolver for the erc20List field.
 func (r *queryResolver) Erc20List(ctx context.Context, chainID int) ([]*model.Erc20Item, error) {
@@ -69,55 +49,5 @@ func (r *queryResolver) Erc20List(ctx context.Context, chainID int) ([]*model.Er
 	// 已有后台刷新在进行中：直接返回旧数据
 	items := entry.items
 	erc20ListCache.mu.Unlock()
-	return items, nil
-}
-
-// refreshErc20ListCache 后台刷新指定链的 ERC20 缓存。
-// 刷新失败时保留旧缓存（下次过期仍会再次尝试），刷新成功则更新 fetchedAt。
-func refreshErc20ListCache(cid uint32) {
-	items, err := fetchErc20List(cid)
-	if err != nil {
-		util.LogError("ERC20", "refresh cache", cid, err)
-	}
-
-	erc20ListCache.mu.Lock()
-	entry := erc20ListCache.entries[cid]
-	if err == nil {
-		if entry == nil {
-			entry = &erc20CacheEntry{}
-			erc20ListCache.entries[cid] = entry
-		}
-		entry.items = items
-		entry.fetchedAt = time.Now()
-	}
-	if entry != nil {
-		entry.refreshing = false
-	}
-	erc20ListCache.mu.Unlock()
-}
-
-// fetchErc20List 从链上拉取 ERC20 列表并转换为 GraphQL 模型。
-func fetchErc20List(chainId uint32) ([]*model.Erc20Item, error) {
-	chain, err := chains.GetChainByID(chainId)
-	if err != nil {
-		return nil, err
-	}
-	tokens, err := chain.GetErc20List()
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]*model.Erc20Item, 0, len(tokens))
-	for _, t := range tokens {
-		items = append(items, &model.Erc20Item{
-			Address:  t.Address,
-			Active:   t.Active,
-			Rate:     t.Rate,
-			Unit:     t.Unit,
-			Name:     t.Name,
-			Symbol:   t.Symbol,
-			Decimals: int(t.Decimals),
-		})
-	}
 	return items, nil
 }

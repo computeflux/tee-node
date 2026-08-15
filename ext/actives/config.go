@@ -11,9 +11,10 @@ import (
 
 // FluxConfig holds FLUX_TEST contract configuration.
 type FluxConfig struct {
-	RPCURL       string `json:"rpc_url"`
-	PrivateKey   string `json:"private_key"`
-	TokenAddress string `json:"token_address"`
+	RPCURL        string `json:"rpc_url"`
+	PrivateKey    string `json:"private_key"`
+	TokenAddress  string `json:"token_address"`
+	AdminPassword string `json:"admin_password"`
 }
 
 // LoadFluxConfig loads FLUX configuration from the given JSON file.

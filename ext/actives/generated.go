@@ -36,6 +36,18 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AntiSybilConfig struct {
+		DeferredSettlementEnabled func(childComplexity int) int
+		IPCheckEnabled            func(childComplexity int) int
+		UpdatedAt                 func(childComplexity int) int
+		UpdatedBy                 func(childComplexity int) int
+	}
+
+	AntiSybilConfigResult struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	CheckinConfig struct {
 		TestMode func(childComplexity int) int
 	}
@@ -83,18 +95,23 @@ type ComplexityRoot struct {
 	}
 
 	JoinEarlyAccessResult struct {
-		Success func(childComplexity int) int
-		TxHash  func(childComplexity int) int
+		ReferralAwarded func(childComplexity int) int
+		Success         func(childComplexity int) int
+		TxHash          func(childComplexity int) int
+		Warning         func(childComplexity int) int
 	}
 
 	Mutation struct {
-		ClaimEarlyAccessTask func(childComplexity int, wallet string, task EarlyAccessTaskType) int
-		DailyCheckin         func(childComplexity int, wallet string, date *string) int
-		JoinDiscord          func(childComplexity int, wallet string, message string, signature string) int
-		JoinEarlyAccess      func(childComplexity int, wallet string, email *string, referralCode *string) int
-		JoinTelegram         func(childComplexity int, wallet string, message string, signature string) int
-		SubmitQuizAnswer     func(childComplexity int, wallet string, questionID string, answerIndex int) int
-		UpdateReferralCode   func(childComplexity int, wallet string, referralCode string) int
+		ClaimEarlyAccessTask  func(childComplexity int, wallet string, task EarlyAccessTaskType) int
+		DailyCheckin          func(childComplexity int, wallet string, date *string) int
+		JoinDiscord           func(childComplexity int, wallet string, message string, signature string) int
+		JoinEarlyAccess       func(childComplexity int, wallet string, email *string, referralCode *string) int
+		JoinTelegram          func(childComplexity int, wallet string, message string, signature string) int
+		SetReferralBonus      func(childComplexity int, wallet string, password string, code string, bonusPoints int) int
+		SubmitQuizAnswer      func(childComplexity int, wallet string, questionID string, answerIndex int) int
+		UpdateAntiSybilConfig func(childComplexity int, wallet string, password string, ipCheckEnabled bool, deferredSettlementEnabled bool) int
+		UpdateReferralAlias   func(childComplexity int, wallet string, alias string, signature string) int
+		UpdateReferralCode    func(childComplexity int, wallet string, referralCode string) int
 	}
 
 	PointsHistory struct {
@@ -111,6 +128,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AntiSybilConfig               func(childComplexity int) int
 		CheckinConfig                 func(childComplexity int) int
 		CheckinStatus                 func(childComplexity int, wallet string) int
 		CheckinStreak                 func(childComplexity int, wallet string) int
@@ -125,6 +143,8 @@ type ComplexityRoot struct {
 		EarlyAccessUserByReferralCode func(childComplexity int, referralCode string) int
 		QuizProgress                  func(childComplexity int, wallet string, day int) int
 		QuizQuestions                 func(childComplexity int, wallet string, day int) int
+		ReferralBonusConfigs          func(childComplexity int) int
+		ReferralEligibility           func(childComplexity int, wallet *string, referralCode string) int
 	}
 
 	QuizAnswerResult struct {
@@ -149,9 +169,28 @@ type ComplexityRoot struct {
 		Question   func(childComplexity int) int
 	}
 
+	ReferralBonus struct {
+		BonusPoints func(childComplexity int) int
+		Code        func(childComplexity int) int
+		UpdatedAt   func(childComplexity int) int
+		UpdatedBy   func(childComplexity int) int
+	}
+
+	ReferralBonusResult struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
+	ReferralEligibilityResult struct {
+		Eligible func(childComplexity int) int
+		Reason   func(childComplexity int) int
+	}
+
 	ReferralInfo struct {
+		Alias     func(childComplexity int) int
 		Code      func(childComplexity int) int
 		Earnings  func(childComplexity int) int
+		Pending   func(childComplexity int) int
 		Referrals func(childComplexity int) int
 		Referrer  func(childComplexity int) int
 	}
@@ -170,11 +209,14 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	JoinEarlyAccess(ctx context.Context, wallet string, email *string, referralCode *string) (*JoinEarlyAccessResult, error)
 	UpdateReferralCode(ctx context.Context, wallet string, referralCode string) (*JoinEarlyAccessResult, error)
+	UpdateReferralAlias(ctx context.Context, wallet string, alias string, signature string) (*JoinEarlyAccessResult, error)
 	ClaimEarlyAccessTask(ctx context.Context, wallet string, task EarlyAccessTaskType) (*ClaimTaskResult, error)
 	JoinDiscord(ctx context.Context, wallet string, message string, signature string) (*ClaimTaskResult, error)
 	JoinTelegram(ctx context.Context, wallet string, message string, signature string) (*ClaimTaskResult, error)
 	DailyCheckin(ctx context.Context, wallet string, date *string) (*CheckinResult, error)
 	SubmitQuizAnswer(ctx context.Context, wallet string, questionID string, answerIndex int) (*QuizAnswerResult, error)
+	UpdateAntiSybilConfig(ctx context.Context, wallet string, password string, ipCheckEnabled bool, deferredSettlementEnabled bool) (*AntiSybilConfigResult, error)
+	SetReferralBonus(ctx context.Context, wallet string, password string, code string, bonusPoints int) (*ReferralBonusResult, error)
 }
 type QueryResolver interface {
 	EarlyAccessUser(ctx context.Context, user string) (*EarlyAccessUser, error)
@@ -191,6 +233,9 @@ type QueryResolver interface {
 	CheckinConfig(ctx context.Context) (*CheckinConfig, error)
 	QuizQuestions(ctx context.Context, wallet string, day int) ([]*QuizQuestion, error)
 	QuizProgress(ctx context.Context, wallet string, day int) (*QuizProgress, error)
+	AntiSybilConfig(ctx context.Context) (*AntiSybilConfig, error)
+	ReferralBonusConfigs(ctx context.Context) ([]*ReferralBonus, error)
+	ReferralEligibility(ctx context.Context, wallet *string, referralCode string) (*ReferralEligibilityResult, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -210,6 +255,44 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AntiSybilConfig.deferredSettlementEnabled":
+		if e.ComplexityRoot.AntiSybilConfig.DeferredSettlementEnabled == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfig.DeferredSettlementEnabled(childComplexity), true
+	case "AntiSybilConfig.ipCheckEnabled":
+		if e.ComplexityRoot.AntiSybilConfig.IPCheckEnabled == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfig.IPCheckEnabled(childComplexity), true
+	case "AntiSybilConfig.updatedAt":
+		if e.ComplexityRoot.AntiSybilConfig.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfig.UpdatedAt(childComplexity), true
+	case "AntiSybilConfig.updatedBy":
+		if e.ComplexityRoot.AntiSybilConfig.UpdatedBy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfig.UpdatedBy(childComplexity), true
+
+	case "AntiSybilConfigResult.message":
+		if e.ComplexityRoot.AntiSybilConfigResult.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfigResult.Message(childComplexity), true
+	case "AntiSybilConfigResult.success":
+		if e.ComplexityRoot.AntiSybilConfigResult.Success == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AntiSybilConfigResult.Success(childComplexity), true
 
 	case "CheckinConfig.testMode":
 		if e.ComplexityRoot.CheckinConfig.TestMode == nil {
@@ -368,6 +451,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.EarlyAccessUser.Wallet(childComplexity), true
 
+	case "JoinEarlyAccessResult.referralAwarded":
+		if e.ComplexityRoot.JoinEarlyAccessResult.ReferralAwarded == nil {
+			break
+		}
+
+		return e.ComplexityRoot.JoinEarlyAccessResult.ReferralAwarded(childComplexity), true
 	case "JoinEarlyAccessResult.success":
 		if e.ComplexityRoot.JoinEarlyAccessResult.Success == nil {
 			break
@@ -380,6 +469,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.JoinEarlyAccessResult.TxHash(childComplexity), true
+	case "JoinEarlyAccessResult.warning":
+		if e.ComplexityRoot.JoinEarlyAccessResult.Warning == nil {
+			break
+		}
+
+		return e.ComplexityRoot.JoinEarlyAccessResult.Warning(childComplexity), true
 
 	case "Mutation.claimEarlyAccessTask":
 		if e.ComplexityRoot.Mutation.ClaimEarlyAccessTask == nil {
@@ -436,6 +531,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.JoinTelegram(childComplexity, args["wallet"].(string), args["message"].(string), args["signature"].(string)), true
+	case "Mutation.setReferralBonus":
+		if e.ComplexityRoot.Mutation.SetReferralBonus == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setReferralBonus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetReferralBonus(childComplexity, args["wallet"].(string), args["password"].(string), args["code"].(string), args["bonusPoints"].(int)), true
 	case "Mutation.submitQuizAnswer":
 		if e.ComplexityRoot.Mutation.SubmitQuizAnswer == nil {
 			break
@@ -447,6 +553,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SubmitQuizAnswer(childComplexity, args["wallet"].(string), args["questionId"].(string), args["answerIndex"].(int)), true
+	case "Mutation.updateAntiSybilConfig":
+		if e.ComplexityRoot.Mutation.UpdateAntiSybilConfig == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateAntiSybilConfig_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateAntiSybilConfig(childComplexity, args["wallet"].(string), args["password"].(string), args["ipCheckEnabled"].(bool), args["deferredSettlementEnabled"].(bool)), true
+	case "Mutation.updateReferralAlias":
+		if e.ComplexityRoot.Mutation.UpdateReferralAlias == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateReferralAlias_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateReferralAlias(childComplexity, args["wallet"].(string), args["alias"].(string), args["signature"].(string)), true
 	case "Mutation.updateReferralCode":
 		if e.ComplexityRoot.Mutation.UpdateReferralCode == nil {
 			break
@@ -503,6 +631,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PointsHistoryItem.Timestamp(childComplexity), true
 
+	case "Query.antiSybilConfig":
+		if e.ComplexityRoot.Query.AntiSybilConfig == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.AntiSybilConfig(childComplexity), true
 	case "Query.checkinConfig":
 		if e.ComplexityRoot.Query.CheckinConfig == nil {
 			break
@@ -643,6 +777,23 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.QuizQuestions(childComplexity, args["wallet"].(string), args["day"].(int)), true
+	case "Query.referralBonusConfigs":
+		if e.ComplexityRoot.Query.ReferralBonusConfigs == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.ReferralBonusConfigs(childComplexity), true
+	case "Query.referralEligibility":
+		if e.ComplexityRoot.Query.ReferralEligibility == nil {
+			break
+		}
+
+		args, err := ec.field_Query_referralEligibility_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ReferralEligibility(childComplexity, args["wallet"].(*string), args["referralCode"].(string)), true
 
 	case "QuizAnswerResult.correct":
 		if e.ComplexityRoot.QuizAnswerResult.Correct == nil {
@@ -725,6 +876,63 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.QuizQuestion.Question(childComplexity), true
 
+	case "ReferralBonus.bonusPoints":
+		if e.ComplexityRoot.ReferralBonus.BonusPoints == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonus.BonusPoints(childComplexity), true
+	case "ReferralBonus.code":
+		if e.ComplexityRoot.ReferralBonus.Code == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonus.Code(childComplexity), true
+	case "ReferralBonus.updatedAt":
+		if e.ComplexityRoot.ReferralBonus.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonus.UpdatedAt(childComplexity), true
+	case "ReferralBonus.updatedBy":
+		if e.ComplexityRoot.ReferralBonus.UpdatedBy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonus.UpdatedBy(childComplexity), true
+
+	case "ReferralBonusResult.message":
+		if e.ComplexityRoot.ReferralBonusResult.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonusResult.Message(childComplexity), true
+	case "ReferralBonusResult.success":
+		if e.ComplexityRoot.ReferralBonusResult.Success == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralBonusResult.Success(childComplexity), true
+
+	case "ReferralEligibilityResult.eligible":
+		if e.ComplexityRoot.ReferralEligibilityResult.Eligible == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralEligibilityResult.Eligible(childComplexity), true
+	case "ReferralEligibilityResult.reason":
+		if e.ComplexityRoot.ReferralEligibilityResult.Reason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralEligibilityResult.Reason(childComplexity), true
+
+	case "ReferralInfo.alias":
+		if e.ComplexityRoot.ReferralInfo.Alias == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralInfo.Alias(childComplexity), true
 	case "ReferralInfo.code":
 		if e.ComplexityRoot.ReferralInfo.Code == nil {
 			break
@@ -737,6 +945,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ReferralInfo.Earnings(childComplexity), true
+	case "ReferralInfo.pending":
+		if e.ComplexityRoot.ReferralInfo.Pending == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ReferralInfo.Pending(childComplexity), true
 	case "ReferralInfo.referrals":
 		if e.ComplexityRoot.ReferralInfo.Referrals == nil {
 			break
@@ -870,6 +1084,30 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // Each function is generated once per unique object type, deduplicating the
 // switch statements that were previously inlined in every fieldContext_* function.
 
+func (ec *executionContext) childFields_AntiSybilConfig(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "ipCheckEnabled":
+		return ec.fieldContext_AntiSybilConfig_ipCheckEnabled(ctx, field)
+	case "deferredSettlementEnabled":
+		return ec.fieldContext_AntiSybilConfig_deferredSettlementEnabled(ctx, field)
+	case "updatedBy":
+		return ec.fieldContext_AntiSybilConfig_updatedBy(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_AntiSybilConfig_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AntiSybilConfig", field.Name)
+}
+
+func (ec *executionContext) childFields_AntiSybilConfigResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "success":
+		return ec.fieldContext_AntiSybilConfigResult_success(ctx, field)
+	case "message":
+		return ec.fieldContext_AntiSybilConfigResult_message(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AntiSybilConfigResult", field.Name)
+}
+
 func (ec *executionContext) childFields_CheckinConfig(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "testMode":
@@ -968,6 +1206,10 @@ func (ec *executionContext) childFields_JoinEarlyAccessResult(ctx context.Contex
 		return ec.fieldContext_JoinEarlyAccessResult_success(ctx, field)
 	case "txHash":
 		return ec.fieldContext_JoinEarlyAccessResult_txHash(ctx, field)
+	case "warning":
+		return ec.fieldContext_JoinEarlyAccessResult_warning(ctx, field)
+	case "referralAwarded":
+		return ec.fieldContext_JoinEarlyAccessResult_referralAwarded(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type JoinEarlyAccessResult", field.Name)
 }
@@ -1042,14 +1284,52 @@ func (ec *executionContext) childFields_QuizQuestion(ctx context.Context, field 
 	return nil, fmt.Errorf("no field named %q was found under type QuizQuestion", field.Name)
 }
 
+func (ec *executionContext) childFields_ReferralBonus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "code":
+		return ec.fieldContext_ReferralBonus_code(ctx, field)
+	case "bonusPoints":
+		return ec.fieldContext_ReferralBonus_bonusPoints(ctx, field)
+	case "updatedBy":
+		return ec.fieldContext_ReferralBonus_updatedBy(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_ReferralBonus_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ReferralBonus", field.Name)
+}
+
+func (ec *executionContext) childFields_ReferralBonusResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "success":
+		return ec.fieldContext_ReferralBonusResult_success(ctx, field)
+	case "message":
+		return ec.fieldContext_ReferralBonusResult_message(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ReferralBonusResult", field.Name)
+}
+
+func (ec *executionContext) childFields_ReferralEligibilityResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "eligible":
+		return ec.fieldContext_ReferralEligibilityResult_eligible(ctx, field)
+	case "reason":
+		return ec.fieldContext_ReferralEligibilityResult_reason(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ReferralEligibilityResult", field.Name)
+}
+
 func (ec *executionContext) childFields_ReferralInfo(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "code":
 		return ec.fieldContext_ReferralInfo_code(ctx, field)
+	case "alias":
+		return ec.fieldContext_ReferralInfo_alias(ctx, field)
 	case "referrer":
 		return ec.fieldContext_ReferralInfo_referrer(ctx, field)
 	case "earnings":
 		return ec.fieldContext_ReferralInfo_earnings(ctx, field)
+	case "pending":
+		return ec.fieldContext_ReferralInfo_pending(ctx, field)
 	case "referrals":
 		return ec.fieldContext_ReferralInfo_referrals(ctx, field)
 	}
@@ -1318,6 +1598,44 @@ func (ec *executionContext) field_Mutation_joinTelegram_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_setReferralBonus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "password",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["password"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "code",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["code"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "bonusPoints",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["bonusPoints"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_submitQuizAnswer_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1345,6 +1663,74 @@ func (ec *executionContext) field_Mutation_submitQuizAnswer_args(ctx context.Con
 		return nil, err
 	}
 	args["answerIndex"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAntiSybilConfig_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "password",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["password"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "ipCheckEnabled",
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalNBoolean2bool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["ipCheckEnabled"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "deferredSettlementEnabled",
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalNBoolean2bool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deferredSettlementEnabled"] = arg3
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateReferralAlias_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "alias",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["alias"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "signature",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["signature"] = arg2
 	return args, nil
 }
 
@@ -1570,6 +1956,28 @@ func (ec *executionContext) field_Query_quizQuestions_args(ctx context.Context, 
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_referralEligibility_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "referralCode",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["referralCode"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field___Directive_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1629,6 +2037,144 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ***************************** args.gotpl *****************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AntiSybilConfig_ipCheckEnabled(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfig_ipCheckEnabled(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IPCheckEnabled, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfig_ipCheckEnabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfig", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _AntiSybilConfig_deferredSettlementEnabled(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfig_deferredSettlementEnabled(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeferredSettlementEnabled, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfig_deferredSettlementEnabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfig", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _AntiSybilConfig_updatedBy(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfig_updatedBy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedBy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfig_updatedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfig", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AntiSybilConfig_updatedAt(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfig_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfig_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfig", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AntiSybilConfigResult_success(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfigResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfigResult_success(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Success, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfigResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfigResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _AntiSybilConfigResult_message(ctx context.Context, field graphql.CollectedField, obj *AntiSybilConfigResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AntiSybilConfigResult_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AntiSybilConfigResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AntiSybilConfigResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
 
 func (ec *executionContext) _CheckinConfig_testMode(ctx context.Context, field graphql.CollectedField, obj *CheckinConfig) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -2251,6 +2797,52 @@ func (ec *executionContext) fieldContext_JoinEarlyAccessResult_txHash(_ context.
 	return graphql.NewScalarFieldContext("JoinEarlyAccessResult", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _JoinEarlyAccessResult_warning(ctx context.Context, field graphql.CollectedField, obj *JoinEarlyAccessResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_JoinEarlyAccessResult_warning(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Warning, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_JoinEarlyAccessResult_warning(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("JoinEarlyAccessResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _JoinEarlyAccessResult_referralAwarded(ctx context.Context, field graphql.CollectedField, obj *JoinEarlyAccessResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_JoinEarlyAccessResult_referralAwarded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReferralAwarded, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_JoinEarlyAccessResult_referralAwarded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("JoinEarlyAccessResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
 func (ec *executionContext) _Mutation_joinEarlyAccess(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2333,6 +2925,50 @@ func (ec *executionContext) fieldContext_Mutation_updateReferralCode(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateReferralCode_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateReferralAlias(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateReferralAlias(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateReferralAlias(ctx, fc.Args["wallet"].(string), fc.Args["alias"].(string), fc.Args["signature"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *JoinEarlyAccessResult) graphql.Marshaler {
+			return ec.marshalNJoinEarlyAccessResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐJoinEarlyAccessResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateReferralAlias(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_JoinEarlyAccessResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateReferralAlias_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2553,6 +3189,94 @@ func (ec *executionContext) fieldContext_Mutation_submitQuizAnswer(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_submitQuizAnswer_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateAntiSybilConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateAntiSybilConfig(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateAntiSybilConfig(ctx, fc.Args["wallet"].(string), fc.Args["password"].(string), fc.Args["ipCheckEnabled"].(bool), fc.Args["deferredSettlementEnabled"].(bool))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *AntiSybilConfigResult) graphql.Marshaler {
+			return ec.marshalNAntiSybilConfigResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfigResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateAntiSybilConfig(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AntiSybilConfigResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateAntiSybilConfig_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setReferralBonus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setReferralBonus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetReferralBonus(ctx, fc.Args["wallet"].(string), fc.Args["password"].(string), fc.Args["code"].(string), fc.Args["bonusPoints"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *ReferralBonusResult) graphql.Marshaler {
+			return ec.marshalNReferralBonusResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonusResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setReferralBonus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ReferralBonusResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setReferralBonus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3300,6 +4024,114 @@ func (ec *executionContext) fieldContext_Query_quizProgress(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_antiSybilConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_antiSybilConfig(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().AntiSybilConfig(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *AntiSybilConfig) graphql.Marshaler {
+			return ec.marshalNAntiSybilConfig2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfig(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_antiSybilConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AntiSybilConfig(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_referralBonusConfigs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_referralBonusConfigs(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().ReferralBonusConfigs(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ReferralBonus) graphql.Marshaler {
+			return ec.marshalNReferralBonus2ᚕᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonusᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_referralBonusConfigs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ReferralBonus(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_referralEligibility(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_referralEligibility(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ReferralEligibility(ctx, fc.Args["wallet"].(*string), fc.Args["referralCode"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *ReferralEligibilityResult) graphql.Marshaler {
+			return ec.marshalNReferralEligibilityResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralEligibilityResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_referralEligibility(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ReferralEligibilityResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_referralEligibility_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3675,6 +4507,190 @@ func (ec *executionContext) fieldContext_QuizQuestion_options(_ context.Context,
 	return graphql.NewScalarFieldContext("QuizQuestion", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _ReferralBonus_code(ctx context.Context, field graphql.CollectedField, obj *ReferralBonus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonus_code(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Code, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonus_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralBonus_bonusPoints(ctx context.Context, field graphql.CollectedField, obj *ReferralBonus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonus_bonusPoints(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BonusPoints, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonus_bonusPoints(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonus", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralBonus_updatedBy(ctx context.Context, field graphql.CollectedField, obj *ReferralBonus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonus_updatedBy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedBy, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonus_updatedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralBonus_updatedAt(ctx context.Context, field graphql.CollectedField, obj *ReferralBonus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonus_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonus_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralBonusResult_success(ctx context.Context, field graphql.CollectedField, obj *ReferralBonusResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonusResult_success(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Success, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonusResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonusResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralBonusResult_message(ctx context.Context, field graphql.CollectedField, obj *ReferralBonusResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralBonusResult_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralBonusResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralBonusResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralEligibilityResult_eligible(ctx context.Context, field graphql.CollectedField, obj *ReferralEligibilityResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralEligibilityResult_eligible(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Eligible, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralEligibilityResult_eligible(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralEligibilityResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralEligibilityResult_reason(ctx context.Context, field graphql.CollectedField, obj *ReferralEligibilityResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralEligibilityResult_reason(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Reason, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralEligibilityResult_reason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralEligibilityResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _ReferralInfo_code(ctx context.Context, field graphql.CollectedField, obj *ReferralInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3695,6 +4711,29 @@ func (ec *executionContext) _ReferralInfo_code(ctx context.Context, field graphq
 	)
 }
 func (ec *executionContext) fieldContext_ReferralInfo_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralInfo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralInfo_alias(ctx context.Context, field graphql.CollectedField, obj *ReferralInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralInfo_alias(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Alias, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralInfo_alias(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ReferralInfo", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -3742,6 +4781,29 @@ func (ec *executionContext) _ReferralInfo_earnings(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_ReferralInfo_earnings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ReferralInfo", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ReferralInfo_pending(ctx context.Context, field graphql.CollectedField, obj *ReferralInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ReferralInfo_pending(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Pending, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ReferralInfo_pending(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ReferralInfo", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _ReferralInfo_referrals(ctx context.Context, field graphql.CollectedField, obj *ReferralInfo) (ret graphql.Marshaler) {
@@ -4903,6 +5965,102 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** object.gotpl ****************************
 
+var antiSybilConfigImplementors = []string{"AntiSybilConfig"}
+
+func (ec *executionContext) _AntiSybilConfig(ctx context.Context, sel ast.SelectionSet, obj *AntiSybilConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, antiSybilConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AntiSybilConfig")
+		case "ipCheckEnabled":
+			out.Values[i] = ec._AntiSybilConfig_ipCheckEnabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deferredSettlementEnabled":
+			out.Values[i] = ec._AntiSybilConfig_deferredSettlementEnabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedBy":
+			out.Values[i] = ec._AntiSybilConfig_updatedBy(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._AntiSybilConfig_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var antiSybilConfigResultImplementors = []string{"AntiSybilConfigResult"}
+
+func (ec *executionContext) _AntiSybilConfigResult(ctx context.Context, sel ast.SelectionSet, obj *AntiSybilConfigResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, antiSybilConfigResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AntiSybilConfigResult")
+		case "success":
+			out.Values[i] = ec._AntiSybilConfigResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._AntiSybilConfigResult_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var checkinConfigImplementors = []string{"CheckinConfig"}
 
 func (ec *executionContext) _CheckinConfig(ctx context.Context, sel ast.SelectionSet, obj *CheckinConfig) graphql.Marshaler {
@@ -5281,6 +6439,16 @@ func (ec *executionContext) _JoinEarlyAccessResult(ctx context.Context, sel ast.
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "warning":
+			out.Values[i] = ec._JoinEarlyAccessResult_warning(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "referralAwarded":
+			out.Values[i] = ec._JoinEarlyAccessResult_referralAwarded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5336,6 +6504,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateReferralAlias":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateReferralAlias(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "claimEarlyAccessTask":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_claimEarlyAccessTask(ctx, field)
@@ -5367,6 +6542,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "submitQuizAnswer":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_submitQuizAnswer(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateAntiSybilConfig":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateAntiSybilConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setReferralBonus":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setReferralBonus(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -5821,6 +7010,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "antiSybilConfig":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_antiSybilConfig(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "referralBonusConfigs":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_referralBonusConfigs(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "referralEligibility":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_referralEligibility(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -6020,6 +7275,145 @@ func (ec *executionContext) _QuizQuestion(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var referralBonusImplementors = []string{"ReferralBonus"}
+
+func (ec *executionContext) _ReferralBonus(ctx context.Context, sel ast.SelectionSet, obj *ReferralBonus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralBonusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReferralBonus")
+		case "code":
+			out.Values[i] = ec._ReferralBonus_code(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bonusPoints":
+			out.Values[i] = ec._ReferralBonus_bonusPoints(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedBy":
+			out.Values[i] = ec._ReferralBonus_updatedBy(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._ReferralBonus_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var referralBonusResultImplementors = []string{"ReferralBonusResult"}
+
+func (ec *executionContext) _ReferralBonusResult(ctx context.Context, sel ast.SelectionSet, obj *ReferralBonusResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralBonusResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReferralBonusResult")
+		case "success":
+			out.Values[i] = ec._ReferralBonusResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._ReferralBonusResult_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var referralEligibilityResultImplementors = []string{"ReferralEligibilityResult"}
+
+func (ec *executionContext) _ReferralEligibilityResult(ctx context.Context, sel ast.SelectionSet, obj *ReferralEligibilityResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, referralEligibilityResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ReferralEligibilityResult")
+		case "eligible":
+			out.Values[i] = ec._ReferralEligibilityResult_eligible(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reason":
+			out.Values[i] = ec._ReferralEligibilityResult_reason(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var referralInfoImplementors = []string{"ReferralInfo"}
 
 func (ec *executionContext) _ReferralInfo(ctx context.Context, sel ast.SelectionSet, obj *ReferralInfo) graphql.Marshaler {
@@ -6037,6 +7431,11 @@ func (ec *executionContext) _ReferralInfo(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "alias":
+			out.Values[i] = ec._ReferralInfo_alias(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		case "referrer":
 			out.Values[i] = ec._ReferralInfo_referrer(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -6044,6 +7443,11 @@ func (ec *executionContext) _ReferralInfo(ctx context.Context, sel ast.Selection
 			}
 		case "earnings":
 			out.Values[i] = ec._ReferralInfo_earnings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pending":
+			out.Values[i] = ec._ReferralInfo_pending(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -6513,6 +7917,34 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAntiSybilConfig2githubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfig(ctx context.Context, sel ast.SelectionSet, v AntiSybilConfig) graphql.Marshaler {
+	return ec._AntiSybilConfig(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAntiSybilConfig2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfig(ctx context.Context, sel ast.SelectionSet, v *AntiSybilConfig) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AntiSybilConfig(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAntiSybilConfigResult2githubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfigResult(ctx context.Context, sel ast.SelectionSet, v AntiSybilConfigResult) graphql.Marshaler {
+	return ec._AntiSybilConfigResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAntiSybilConfigResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐAntiSybilConfigResult(ctx context.Context, sel ast.SelectionSet, v *AntiSybilConfigResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AntiSybilConfigResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -6759,6 +8191,60 @@ func (ec *executionContext) marshalNQuizQuestion2ᚖgithubᚗcomᚋcomputeflux�
 		return graphql.Null
 	}
 	return ec._QuizQuestion(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNReferralBonus2ᚕᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonusᚄ(ctx context.Context, sel ast.SelectionSet, v []*ReferralBonus) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNReferralBonus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonus(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNReferralBonus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonus(ctx context.Context, sel ast.SelectionSet, v *ReferralBonus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReferralBonus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNReferralBonusResult2githubᚗcomᚋcomputefluxᚋactivesᚐReferralBonusResult(ctx context.Context, sel ast.SelectionSet, v ReferralBonusResult) graphql.Marshaler {
+	return ec._ReferralBonusResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNReferralBonusResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralBonusResult(ctx context.Context, sel ast.SelectionSet, v *ReferralBonusResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReferralBonusResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNReferralEligibilityResult2githubᚗcomᚋcomputefluxᚋactivesᚐReferralEligibilityResult(ctx context.Context, sel ast.SelectionSet, v ReferralEligibilityResult) graphql.Marshaler {
+	return ec._ReferralEligibilityResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNReferralEligibilityResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐReferralEligibilityResult(ctx context.Context, sel ast.SelectionSet, v *ReferralEligibilityResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ReferralEligibilityResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNReferralInfo2githubᚗcomᚋcomputefluxᚋactivesᚐReferralInfo(ctx context.Context, sel ast.SelectionSet, v ReferralInfo) graphql.Marshaler {
