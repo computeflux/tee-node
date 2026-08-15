@@ -68,3 +68,17 @@ type PointsAccount struct {
 	TotalRecharged uint64        `json:"totalRecharged"`
 	TotalSpent     uint64        `json:"totalSpent"`
 }
+
+// ── ERC20 ─────────────────────────────────────────────────
+
+// Erc20Token 是链上已注册的 ERC20 代币信息（含合约元数据），
+// 作为 GraphQL erc20List 接口的链层数据源。
+type Erc20Token struct {
+	Address  string // 代币合约地址 (0x...)
+	Active   bool   // 是否启用
+	Rate     string // 汇率（U256 十进制字符串）
+	Unit     string // 计价单位（U256 十进制字符串）
+	Name     string // 代币名称
+	Symbol   string // 代币符号
+	Decimals uint8  // 精度
+}

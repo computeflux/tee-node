@@ -210,6 +210,8 @@ func (r *mutationResolver) VerifyPassword(ctx context.Context, token string, pas
 		}
 		user.PasswordHash = passwordHash
 		types.PutAuthUser(user)
+		// 异步上链：同步密码字段，避免其他节点/本地缓存过期后读不到
+		persistAuthUserToChain(r.TeeChain, user)
 	} else if user.PasswordHash != passwordHash {
 		e := "wrong password"
 		return &model.SignSessionResult{Status: "error", Error: &e}, nil

@@ -52,6 +52,10 @@ type Gateway struct {
 	settledNonces         *store.StoreMapping[string, bool]                               `store:"keyPfx:settled_nonces"`          // hex(nonce) → true，防重放
 	withdrawNonces        *store.IndexedList[uint64, WithdrawApply]                       `store:"keyPfx:withdraw_nonces"`
 	withdrawByUser        *store.StoreList2D[store.UniAddr, uint32, uint64]               `store:"keyPfx:withdraw_by_user"`
+
+	// 连续全失败结算周期数（modelID → 次数）：每个周期无成功且有失败则 +1，有成功则清零；
+	// 达到阈值自动下架。独立存储，避免修改 ModelInfo 结构导致存量数据无法解码。
+	modelFailPeriods *store.StoreMapping[uint64, uint8] `store:"keyPfx:model_fail_periods"`
 }
 
 type GatewayQuery struct{ Gateway }

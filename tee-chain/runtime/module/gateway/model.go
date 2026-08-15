@@ -163,9 +163,13 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 }
 
 func (g GatewayMutation) ActiveModel(modelID uint64) error {
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
 		m.IsActive = true
-	})
+	}); err != nil {
+		return err
+	}
+	// 手动恢复后重置连续失败计数，避免旧计数导致再次下架
+	return g.modelFailPeriods.Set(g.api.GetTxn(), modelID, 0)
 }
 
 // UpdateModelLimits 更新模型的并发限制和余额（仅模型 Owner 或系统可调用）。

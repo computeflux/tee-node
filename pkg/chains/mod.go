@@ -29,6 +29,9 @@ type ChainApi interface {
 	GetLatestNonce() (uint64, error)
 	GetRelayEvents(from, to uint64) ([]chaintypes.RelayEvent, error)
 
+	// GetErc20List 返回链上已注册的 ERC20 代币列表（含 name/symbol/decimals 等合约元数据）。
+	GetErc20List() ([]*chaintypes.Erc20Token, error)
+
 	BatchCall(method string, calls []chaintypes.ChainCall) (*chaintypes.ChainCall, error)
 	PartialSign(signer ink.PartialSignerType, call chaintypes.ChainCall) ([]byte, error)
 	SignAndSubmit(signer ink.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error

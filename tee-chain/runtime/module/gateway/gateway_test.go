@@ -454,6 +454,82 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{record}))
 }
 
+func TestGateway_SettleUsage_ConsecutiveFailDelist(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.System = true
+	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	rt.System = false
+
+	// Settle must be called by node (T == 0)
+	rt.Caller.T = 0
+
+	// 每周期一条全失败记录（Count=0, FailCount=3），nonce 逐次递增
+	settle := func(nonce byte) {
+		err := m.SettleUsageWithRoute([]SettlementWithRoute{{
+			User:       user,
+			RouteID:    store.NewNone[uint64](),
+			ProviderID: 0,
+			ModelID:    0,
+			TokenIn:    1000,
+			TokenOut:   500,
+			FailCount:  3,
+			Nonce:      []byte{nonce},
+		}})
+		require.NoError(t, err)
+	}
+
+	// 前 2 个周期全失败：模型仍在线，连续失败计数递增
+	settle(0x01)
+	settle(0x02)
+
+	model, err := q.GetModel(0)
+	require.NoError(t, err)
+	assert.True(t, model.IsActive)
+	cnt, err := gw.modelFailPeriods.Get(rt.Txn, 0)
+	require.NoError(t, err)
+	require.NotNil(t, cnt)
+	assert.Equal(t, uint8(2), *cnt)
+
+	// 第 3 个周期全失败：达到阈值，自动下架
+	settle(0x03)
+
+	model, err = q.GetModel(0)
+	require.NoError(t, err)
+	assert.False(t, model.IsActive)
+	cnt, err = gw.modelFailPeriods.Get(rt.Txn, 0)
+	require.NoError(t, err)
+	require.NotNil(t, cnt)
+	assert.Equal(t, uint8(3), *cnt)
+
+	// 重新激活后（计数清零），有成功调用不再累计失败，不下架
+	require.NoError(t, m.ActiveModel(0))
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{{
+		User:       user,
+		RouteID:    store.NewNone[uint64](),
+		ProviderID: 0,
+		ModelID:    0,
+		TokenIn:    1000,
+		TokenOut:   500,
+		Count:      2,
+		Nonce:      []byte{0x04},
+	}}))
+
+	model, err = q.GetModel(0)
+	require.NoError(t, err)
+	assert.True(t, model.IsActive)
+	cnt, err = gw.modelFailPeriods.Get(rt.Txn, 0)
+	require.NoError(t, err)
+	require.NotNil(t, cnt)
+	assert.Equal(t, uint8(0), *cnt)
+}
+
 func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}

@@ -1102,6 +1102,7 @@ func NewGateway(api store.ContractApi) *Gateway {
 		settledNonces:         &store.StoreMapping[string, bool]{Namespace: "gateway", KeyPrefix: "settled_nonces_"},
 		withdrawNonces:        store.NewIndexedList[uint64, WithdrawApply]("gateway", "withdraw_nonces_next_id", "withdraw_nonces_"),
 		withdrawByUser:        store.NewStoreList2D[store.UniAddr, uint32, uint64]("gateway", "withdraw_by_user_k1_to_id_", "withdraw_by_user_k1_length_", "withdraw_by_user_k2_next_", "withdraw_by_user_store_"),
+		modelFailPeriods:      &store.StoreMapping[uint64, uint8]{Namespace: "gateway", KeyPrefix: "model_fail_periods_"},
 	}
 }
 

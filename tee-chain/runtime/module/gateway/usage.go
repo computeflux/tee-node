@@ -169,13 +169,32 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 		})
 	}
 
-	// 检查并下线连续失败的模型
+	// 检查并下线连续失败的模型：不因单个周期的偶发故障立即下架，
+	// 连续 N 个周期全失败（无任何成功）才判定模型不可用；有成功即清零。
+	// 计数存独立映射 modelFailPeriods（modelID → 次数），不修改 ModelInfo 结构。
+	const maxConsecutiveFailPeriods = 3
+	txn := g.api.GetTxn()
 	for mid, rp := range modelRep {
-		// 如果在这个结算周期没有任何一次成功，且有失败记录，则直接判定模型不可用
-		if rp.success == 0 && rp.fail > 0 {
-			_ = g.models.UpdateFn(g.api.GetTxn(), mid, func(m *ModelInfo) {
-				m.IsActive = false
-			})
+		if rp.success > 0 {
+			// 有成功调用：清零连续失败计数，不下架
+			_ = g.modelFailPeriods.Set(txn, mid, 0)
+		} else if rp.fail > 0 {
+			// 全失败：连续计数 +1，达到阈值才下架
+			cur, err := g.modelFailPeriods.Get(txn, mid)
+			if err != nil {
+				return fmt.Errorf("settle: read fail periods: %w", err)
+			}
+			n := uint8(0)
+			if cur != nil {
+				n = *cur
+			}
+			n++
+			if n >= maxConsecutiveFailPeriods {
+				_ = g.models.UpdateFn(txn, mid, func(m *ModelInfo) {
+					m.IsActive = false
+				})
+			}
+			_ = g.modelFailPeriods.Set(txn, mid, n)
 		}
 	}
 

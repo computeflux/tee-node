@@ -182,6 +182,9 @@ func verifyEIP191Signature(address, signatureHex, message string) bool {
 // getAuthUserFromContract 读取 AuthUser。
 // 链上合约为数据源，本地缓存仅在异步上链窗口期内回退。
 func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUser, error) {
+	// 本地缓存（异步上链窗口期内的数据源；key 按 HashEmailKey 哈希）
+	localUser, _ := types.DBGetJson[types.AuthUser](types.SECRET_DB, types.Web3AuthNamespace, "u:"+types.HashEmailKey(email))
+
 	// 1. 链上合约为数据源（ref 内部按 HashEmailKey 哈希，与 persistAuthUserToChain 写入侧一致）
 	if tc != nil {
 		ref := "auth_user:" + types.HashEmailKey(email)
@@ -189,13 +192,19 @@ func getAuthUserFromContract(tc *teechain.TeeChain, email string) (*types.AuthUs
 		if err == nil && rec != nil && len(rec.Ciphertext) > 0 {
 			var chainUser types.AuthUser
 			if json.Unmarshal(rec.Ciphertext, &chainUser) == nil {
+				// 链上记录缺少密码字段时（异步上链未完成或失败），若本地缓存
+				// 有完整密码数据则优先返回，避免 setPassword 后 getChallenge
+				// 误报 "password not set"。
+				if (chainUser.Salt == "" || chainUser.DKHash == "") &&
+					localUser != nil && localUser.Salt != "" && localUser.DKHash != "" {
+					return localUser, nil
+				}
 				return &chainUser, nil
 			}
 		}
 	}
 
-	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口；key 按 HashEmailKey 哈希）
-	localUser, _ := types.DBGetJson[types.AuthUser](types.SECRET_DB, types.Web3AuthNamespace, "u:"+types.HashEmailKey(email))
+	// 2. 回退到本地缓存（异步上链尚未完成的短暂窗口）
 	if localUser != nil {
 		return localUser, nil
 	}

@@ -62,6 +62,24 @@ type ChallengeResult struct {
 	Error     *string `json:"error,omitempty"`
 }
 
+// ERC20 代币信息
+type Erc20Item struct {
+	// 代币合约地址
+	Address string `json:"address"`
+	// 是否启用
+	Active bool `json:"active"`
+	// 汇率（十进制字符串）
+	Rate string `json:"rate"`
+	// 计价单位（十进制字符串）
+	Unit string `json:"unit"`
+	// 代币名称
+	Name string `json:"name"`
+	// 代币符号
+	Symbol string `json:"symbol"`
+	// 精度
+	Decimals int `json:"decimals"`
+}
+
 // 环境变量
 // Environments
 type Kvalue struct {

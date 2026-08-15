@@ -55,6 +55,7 @@ func NewSMTPEmailService(cfg *AuthConfig) *SMTPEmailService {
 }
 
 func (s *SMTPEmailService) SendOTP(to, otp string) error {
+	// fmt.Println("code", otp)
 	subject := "Your verification code"
 
 	body := fmt.Sprintf(

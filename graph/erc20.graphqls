@@ -1,0 +1,26 @@
+"""
+ERC20 代币信息
+"""
+type Erc20Item {
+  """代币合约地址"""
+  address: String!
+  """是否启用"""
+  active: Boolean!
+  """汇率（十进制字符串）"""
+  rate: String!
+  """计价单位（十进制字符串）"""
+  unit: String!
+  """代币名称"""
+  name: String!
+  """代币符号"""
+  symbol: String!
+  """精度"""
+  decimals: Int!
+}
+
+extend type Query {
+  """
+  获取指定链的 ERC20 代币列表（10 分钟缓存）
+  """
+  erc20List(chainId: Int!): [Erc20Item!]!
+}

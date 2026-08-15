@@ -31,6 +31,9 @@ func (f *fakeChain) GetLatestNonce() (uint64, error) { return 0, nil }
 func (f *fakeChain) GetRelayEvents(_, _ uint64) ([]chaintypes.RelayEvent, error) {
 	return nil, nil
 }
+func (f *fakeChain) GetErc20List() ([]*chaintypes.Erc20Token, error) {
+	return nil, nil
+}
 func (f *fakeChain) BatchCall(_ string, _ []chaintypes.ChainCall) (*chaintypes.ChainCall, error) {
 	return nil, errors.New("not implemented")
 }

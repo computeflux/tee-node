@@ -95,6 +95,16 @@ type ComplexityRoot struct {
 		Status    func(childComplexity int) int
 	}
 
+	Erc20Item struct {
+		Active   func(childComplexity int) int
+		Address  func(childComplexity int) int
+		Decimals func(childComplexity int) int
+		Name     func(childComplexity int) int
+		Rate     func(childComplexity int) int
+		Symbol   func(childComplexity int) int
+		Unit     func(childComplexity int) int
+	}
+
 	LenValue struct {
 		K func(childComplexity int) int
 		V func(childComplexity int) int
@@ -181,6 +191,7 @@ type ComplexityRoot struct {
 		ContractNonce          func(childComplexity int, caller string, callerType int) int
 		EdgeModelRunningStatus func(childComplexity int, providerID int, modelNames []string) int
 		EdgeModels             func(childComplexity int) int
+		Erc20List              func(childComplexity int, chainID int) int
 		GetChallenge           func(childComplexity int, token string) int
 		Models                 func(childComplexity int, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) int
 		OauthURL               func(childComplexity int, provider string, redirectURI *string) int
@@ -283,6 +294,7 @@ type QueryResolver interface {
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
 	Models(ctx context.Context, keyword *string, minContext *int, maxContext *int, minPrice *int, maxPrice *int, modalities *int, offset *int, limit *int) ([]*model.ModelInfoWithProvider, error)
 	EdgeModelRunningStatus(ctx context.Context, providerID int, modelNames []string) ([]*model.ModelRunningStatus, error)
+	Erc20List(ctx context.Context, chainID int) ([]*model.Erc20Item, error)
 	TeeReport(ctx context.Context, hash string) (string, error)
 	SecretRsa(ctx context.Context) (string, error)
 }
@@ -550,6 +562,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChallengeResult.Status(childComplexity), true
+
+	case "Erc20Item.active":
+		if e.complexity.Erc20Item.Active == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Active(childComplexity), true
+
+	case "Erc20Item.address":
+		if e.complexity.Erc20Item.Address == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Address(childComplexity), true
+
+	case "Erc20Item.decimals":
+		if e.complexity.Erc20Item.Decimals == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Decimals(childComplexity), true
+
+	case "Erc20Item.name":
+		if e.complexity.Erc20Item.Name == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Name(childComplexity), true
+
+	case "Erc20Item.rate":
+		if e.complexity.Erc20Item.Rate == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Rate(childComplexity), true
+
+	case "Erc20Item.symbol":
+		if e.complexity.Erc20Item.Symbol == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Symbol(childComplexity), true
+
+	case "Erc20Item.unit":
+		if e.complexity.Erc20Item.Unit == nil {
+			break
+		}
+
+		return e.complexity.Erc20Item.Unit(childComplexity), true
 
 	case "LenValue.k":
 		if e.complexity.LenValue.K == nil {
@@ -1114,6 +1175,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.EdgeModels(childComplexity), true
 
+	case "Query.erc20List":
+		if e.complexity.Query.Erc20List == nil {
+			break
+		}
+
+		args, err := ec.field_Query_erc20List_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Erc20List(childComplexity, args["chainId"].(int)), true
+
 	case "Query.getChallenge":
 		if e.complexity.Query.GetChallenge == nil {
 			break
@@ -1546,7 +1619,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "secret.graphqls"
+//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "erc20.graphqls" "secret.graphqls"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -1562,6 +1635,7 @@ var sources = []*ast.Source{
 	{Name: "chain.graphqls", Input: sourceData("chain.graphqls"), BuiltIn: false},
 	{Name: "contract.graphqls", Input: sourceData("contract.graphqls"), BuiltIn: false},
 	{Name: "edge.graphqls", Input: sourceData("edge.graphqls"), BuiltIn: false},
+	{Name: "erc20.graphqls", Input: sourceData("erc20.graphqls"), BuiltIn: false},
 	{Name: "secret.graphqls", Input: sourceData("secret.graphqls"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -3136,6 +3210,34 @@ func (ec *executionContext) field_Query_edge_model_running_status_argsModelNames
 	}
 
 	var zeroVal []string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_erc20List_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_erc20List_argsChainID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["chainId"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_erc20List_argsChainID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (int, error) {
+	if _, ok := rawArgs["chainId"]; !ok {
+		var zeroVal int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("chainId"))
+	if tmp, ok := rawArgs["chainId"]; ok {
+		return ec.unmarshalNInt2int(ctx, tmp)
+	}
+
+	var zeroVal int
 	return zeroVal, nil
 }
 
@@ -5137,6 +5239,314 @@ func (ec *executionContext) fieldContext_ChallengeResult_error(_ context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_address(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_address(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Address, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_address(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_active(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_active(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Active, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_active(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_rate(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_rate(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Rate, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_rate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_unit(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_unit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Unit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_unit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_name(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_symbol(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_symbol(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Symbol, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_symbol(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Erc20Item_decimals(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Erc20Item_decimals(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Decimals, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Erc20Item_decimals(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Erc20Item",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -8856,6 +9266,77 @@ func (ec *executionContext) fieldContext_Query_edge_model_running_status(ctx con
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_edge_model_running_status_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_erc20List(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_erc20List(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Erc20List(rctx, fc.Args["chainId"].(int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Erc20Item)
+	fc.Result = res
+	return ec.marshalNErc20Item2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐErc20Itemᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_erc20List(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_Erc20Item_address(ctx, field)
+			case "active":
+				return ec.fieldContext_Erc20Item_active(ctx, field)
+			case "rate":
+				return ec.fieldContext_Erc20Item_rate(ctx, field)
+			case "unit":
+				return ec.fieldContext_Erc20Item_unit(ctx, field)
+			case "name":
+				return ec.fieldContext_Erc20Item_name(ctx, field)
+			case "symbol":
+				return ec.fieldContext_Erc20Item_symbol(ctx, field)
+			case "decimals":
+				return ec.fieldContext_Erc20Item_decimals(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Erc20Item", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_erc20List_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13173,6 +13654,75 @@ func (ec *executionContext) _ChallengeResult(ctx context.Context, sel ast.Select
 	return out
 }
 
+var erc20ItemImplementors = []string{"Erc20Item"}
+
+func (ec *executionContext) _Erc20Item(ctx context.Context, sel ast.SelectionSet, obj *model.Erc20Item) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, erc20ItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Erc20Item")
+		case "address":
+			out.Values[i] = ec._Erc20Item_address(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "active":
+			out.Values[i] = ec._Erc20Item_active(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rate":
+			out.Values[i] = ec._Erc20Item_rate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unit":
+			out.Values[i] = ec._Erc20Item_unit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._Erc20Item_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "symbol":
+			out.Values[i] = ec._Erc20Item_symbol(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "decimals":
+			out.Values[i] = ec._Erc20Item_decimals(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var lenValueImplementors = []string{"LenValue"}
 
 func (ec *executionContext) _LenValue(ctx context.Context, sel ast.SelectionSet, obj *model.LenValue) graphql.Marshaler {
@@ -13998,6 +14548,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_edge_model_running_status(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "erc20List":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_erc20List(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -14887,6 +15459,60 @@ func (ec *executionContext) marshalNChallengeResult2ᚖgithubᚗcomᚋcomputeflu
 		return graphql.Null
 	}
 	return ec._ChallengeResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNErc20Item2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐErc20Itemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Erc20Item) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNErc20Item2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐErc20Item(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNErc20Item2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐErc20Item(ctx context.Context, sel ast.SelectionSet, v *model.Erc20Item) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Erc20Item(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
