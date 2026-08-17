@@ -17,15 +17,16 @@ import (
 var FluxChain = &fluxChain{}
 
 type fluxChain struct {
-	mu          sync.RWMutex
-	client      *ethclient.Client
-	token       *FluxTest
-	tokenAddr   common.Address
-	auth        *bind.TransactOpts
-	signerAddr  common.Address
-	chainID     *big.Int
-	initialized bool
-	privateKey  *ecdsa.PrivateKey
+	mu           sync.RWMutex
+	client       *ethclient.Client
+	token        *FluxTest
+	tokenAddr    common.Address
+	auth         *bind.TransactOpts
+	signerAddr   common.Address
+	chainID      *big.Int
+	initialized  bool
+	privateKey   *ecdsa.PrivateKey
+	syncDisabled bool // disable_sync: 临时关闭积分上链同步（合约数据迁移期间）
 }
 
 func InitFluxChain(configPath string) error {
@@ -79,6 +80,10 @@ func InitFluxChain(configPath string) error {
 	FluxChain.chainID = chainID
 	FluxChain.initialized = true
 	FluxChain.privateKey = privateKey
+	FluxChain.syncDisabled = cfg.DisableSync
+	if cfg.DisableSync {
+		fmt.Println("[flux] sync disabled (disable_sync=true), points will NOT be minted to chain")
+	}
 	fmt.Printf("[flux] ready signer=%s token=%s\n", FluxChain.signerAddr.Hex(), cfg.TokenAddress)
 	return nil
 }
@@ -99,14 +104,22 @@ func IsFluxChainReady() bool {
 	return FluxChain.initialized
 }
 
-// Distribute mints ERC20 tokens and sends 0.5 native token to each wallet.
-// Accepts 1 or many wallets. Token amounts are points × 1e18 (18 decimals).
-func Distribute(wallets []string, points []int64) error {
-	if !IsFluxChainReady() || len(wallets) == 0 {
-		return nil
-	}
+// IsFluxSyncDisabled 返回积分上链同步是否被临时关闭（合约数据迁移期间）。
+func IsFluxSyncDisabled() bool {
 	FluxChain.mu.RLock()
 	defer FluxChain.mu.RUnlock()
+	return FluxChain.syncDisabled
+}
+
+// Distribute mints ERC20 tokens and sends 0.5 native token to each wallet.
+// Accepts 1 or many wallets. Token amounts are points × 1e18 (18 decimals).
+// syncDisabled 时直接跳过，积分只累积在本地，不 mint 上链。
+func Distribute(wallets []string, points []int64) error {
+	FluxChain.mu.RLock()
+	defer FluxChain.mu.RUnlock()
+	if !FluxChain.initialized || FluxChain.syncDisabled || len(wallets) == 0 {
+		return nil
+	}
 
 	tos := make([]common.Address, len(wallets))
 	amts := make([]*big.Int, len(wallets))

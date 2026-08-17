@@ -1649,6 +1649,10 @@ func RunSyncMintHistory(batchSize int) (int, error) {
 	if !IsFluxChainReady() {
 		return 0, fmt.Errorf("FLUX chain not configured")
 	}
+	// 同步关闭期间不做任何扫描/打标，避免把未 mint 的钱包标记成已 mint。
+	if IsFluxSyncDisabled() {
+		return 0, nil
+	}
 	if batchSize <= 0 {
 		batchSize = 50
 	}
@@ -1724,6 +1728,10 @@ func StartMintWorker() {
 	go func() {
 		if !IsFluxChainReady() {
 			fmt.Println("[mint-worker] FLUX chain not ready, worker disabled")
+			return
+		}
+		if IsFluxSyncDisabled() {
+			fmt.Println("[mint-worker] sync disabled (disable_sync=true), worker stopped")
 			return
 		}
 		fmt.Println("[mint-worker] started (interval: 5s)")

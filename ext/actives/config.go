@@ -15,6 +15,7 @@ type FluxConfig struct {
 	PrivateKey    string `json:"private_key"`
 	TokenAddress  string `json:"token_address"`
 	AdminPassword string `json:"admin_password"`
+	DisableSync   bool   `json:"disable_sync"` // 临时关闭积分上链同步（合约数据迁移期间）
 }
 
 // LoadFluxConfig loads FLUX configuration from the given JSON file.
