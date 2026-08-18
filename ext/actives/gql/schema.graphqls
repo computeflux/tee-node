@@ -5,6 +5,11 @@ type EarlyAccessUser {
   referrer: String
   referralCode: String
   email: String
+  # 封禁状态（非正常使用行为检测到后由管理员一键封禁，积分作废）
+  banned: Boolean!
+  bannedAt: String
+  bannedReason: String
+  voidedPoints: String!
 }
 
 type EarlyAccessPoints {
@@ -134,6 +139,20 @@ type ReferralBonusResult {
   message: String!
 }
 
+# 用户封禁状态（前端 UI 用于提示用户存在非正常使用行为、积分作废）
+type UserBanStatus {
+  banned: Boolean!
+  bannedAt: String
+  bannedReason: String
+  voidedPoints: String!
+}
+
+# 封禁/解封操作结果
+type BanActionResult {
+  success: Boolean!
+  message: String!
+}
+
 # 加入前预检查：查询当前 IP 使用该邀请码加入是否可获得推荐奖励
 # （与 joinEarlyAccess 中的防女巫逻辑一致，供前端在提交加入前提示用户）
 type ReferralEligibilityResult {
@@ -160,6 +179,8 @@ type Query {
   referralBonusConfigs: [ReferralBonus!]!
   # wallet 可空：传入时额外检查是否已加入/是否使用自己的邀请码；为空时仅做同 IP 判断
   referralEligibility(wallet: String, referralCode: String!): ReferralEligibilityResult!
+  # 查询用户封禁状态（非正常使用行为检测提示）
+  userBanStatus(wallet: String!): UserBanStatus!
 }
 
 type Mutation {
@@ -173,4 +194,8 @@ type Mutation {
   submitQuizAnswer(wallet: String!, questionId: String!, answerIndex: Int!): QuizAnswerResult!
   updateAntiSybilConfig(wallet: String!, password: String!, ipCheckEnabled: Boolean!, deferredSettlementEnabled: Boolean!): AntiSybilConfigResult!
   setReferralBonus(wallet: String!, password: String!, code: String!, bonusPoints: Int!): ReferralBonusResult!
+  # 管理操作（需 admin_password）：一键封禁用户并作废积分 / 解除封禁
+  # amount: 要减少的积分数量；0 表示全部作废（原行为），>0 表示指定扣减数量（上限为用户余额）
+  banUser(wallet: String!, password: String!, reason: String!, amount: Int!): BanActionResult!
+  unbanUser(wallet: String!, password: String!): BanActionResult!
 }

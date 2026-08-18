@@ -48,6 +48,11 @@ type ComplexityRoot struct {
 		Success func(childComplexity int) int
 	}
 
+	BanActionResult struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+	}
+
 	CheckinConfig struct {
 		TestMode func(childComplexity int) int
 	}
@@ -86,11 +91,15 @@ type ComplexityRoot struct {
 	}
 
 	EarlyAccessUser struct {
+		Banned       func(childComplexity int) int
+		BannedAt     func(childComplexity int) int
+		BannedReason func(childComplexity int) int
 		Email        func(childComplexity int) int
 		IsUser       func(childComplexity int) int
 		JoinedAt     func(childComplexity int) int
 		ReferralCode func(childComplexity int) int
 		Referrer     func(childComplexity int) int
+		VoidedPoints func(childComplexity int) int
 		Wallet       func(childComplexity int) int
 	}
 
@@ -102,6 +111,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		BanUser               func(childComplexity int, wallet string, password string, reason string, amount int) int
 		ClaimEarlyAccessTask  func(childComplexity int, wallet string, task EarlyAccessTaskType) int
 		DailyCheckin          func(childComplexity int, wallet string, date *string) int
 		JoinDiscord           func(childComplexity int, wallet string, message string, signature string) int
@@ -109,6 +119,7 @@ type ComplexityRoot struct {
 		JoinTelegram          func(childComplexity int, wallet string, message string, signature string) int
 		SetReferralBonus      func(childComplexity int, wallet string, password string, code string, bonusPoints int) int
 		SubmitQuizAnswer      func(childComplexity int, wallet string, questionID string, answerIndex int) int
+		UnbanUser             func(childComplexity int, wallet string, password string) int
 		UpdateAntiSybilConfig func(childComplexity int, wallet string, password string, ipCheckEnabled bool, deferredSettlementEnabled bool) int
 		UpdateReferralAlias   func(childComplexity int, wallet string, alias string, signature string) int
 		UpdateReferralCode    func(childComplexity int, wallet string, referralCode string) int
@@ -145,6 +156,7 @@ type ComplexityRoot struct {
 		QuizQuestions                 func(childComplexity int, wallet string, day int) int
 		ReferralBonusConfigs          func(childComplexity int) int
 		ReferralEligibility           func(childComplexity int, wallet *string, referralCode string) int
+		UserBanStatus                 func(childComplexity int, wallet string) int
 	}
 
 	QuizAnswerResult struct {
@@ -200,6 +212,13 @@ type ComplexityRoot struct {
 		Completed func(childComplexity int) int
 		Task      func(childComplexity int) int
 	}
+
+	UserBanStatus struct {
+		Banned       func(childComplexity int) int
+		BannedAt     func(childComplexity int) int
+		BannedReason func(childComplexity int) int
+		VoidedPoints func(childComplexity int) int
+	}
 }
 
 // endregion ***************************** api!.gotpl *****************************
@@ -217,6 +236,8 @@ type MutationResolver interface {
 	SubmitQuizAnswer(ctx context.Context, wallet string, questionID string, answerIndex int) (*QuizAnswerResult, error)
 	UpdateAntiSybilConfig(ctx context.Context, wallet string, password string, ipCheckEnabled bool, deferredSettlementEnabled bool) (*AntiSybilConfigResult, error)
 	SetReferralBonus(ctx context.Context, wallet string, password string, code string, bonusPoints int) (*ReferralBonusResult, error)
+	BanUser(ctx context.Context, wallet string, password string, reason string, amount int) (*BanActionResult, error)
+	UnbanUser(ctx context.Context, wallet string, password string) (*BanActionResult, error)
 }
 type QueryResolver interface {
 	EarlyAccessUser(ctx context.Context, user string) (*EarlyAccessUser, error)
@@ -236,6 +257,7 @@ type QueryResolver interface {
 	AntiSybilConfig(ctx context.Context) (*AntiSybilConfig, error)
 	ReferralBonusConfigs(ctx context.Context) ([]*ReferralBonus, error)
 	ReferralEligibility(ctx context.Context, wallet *string, referralCode string) (*ReferralEligibilityResult, error)
+	UserBanStatus(ctx context.Context, wallet string) (*UserBanStatus, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -293,6 +315,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.AntiSybilConfigResult.Success(childComplexity), true
+
+	case "BanActionResult.message":
+		if e.ComplexityRoot.BanActionResult.Message == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BanActionResult.Message(childComplexity), true
+	case "BanActionResult.success":
+		if e.ComplexityRoot.BanActionResult.Success == nil {
+			break
+		}
+
+		return e.ComplexityRoot.BanActionResult.Success(childComplexity), true
 
 	case "CheckinConfig.testMode":
 		if e.ComplexityRoot.CheckinConfig.TestMode == nil {
@@ -414,6 +449,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.EarlyAccessStats.UserCount(childComplexity), true
 
+	case "EarlyAccessUser.banned":
+		if e.ComplexityRoot.EarlyAccessUser.Banned == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EarlyAccessUser.Banned(childComplexity), true
+	case "EarlyAccessUser.bannedAt":
+		if e.ComplexityRoot.EarlyAccessUser.BannedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EarlyAccessUser.BannedAt(childComplexity), true
+	case "EarlyAccessUser.bannedReason":
+		if e.ComplexityRoot.EarlyAccessUser.BannedReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EarlyAccessUser.BannedReason(childComplexity), true
 	case "EarlyAccessUser.email":
 		if e.ComplexityRoot.EarlyAccessUser.Email == nil {
 			break
@@ -444,6 +497,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.EarlyAccessUser.Referrer(childComplexity), true
+	case "EarlyAccessUser.voidedPoints":
+		if e.ComplexityRoot.EarlyAccessUser.VoidedPoints == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EarlyAccessUser.VoidedPoints(childComplexity), true
 	case "EarlyAccessUser.wallet":
 		if e.ComplexityRoot.EarlyAccessUser.Wallet == nil {
 			break
@@ -476,6 +535,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.JoinEarlyAccessResult.Warning(childComplexity), true
 
+	case "Mutation.banUser":
+		if e.ComplexityRoot.Mutation.BanUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_banUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.BanUser(childComplexity, args["wallet"].(string), args["password"].(string), args["reason"].(string), args["amount"].(int)), true
 	case "Mutation.claimEarlyAccessTask":
 		if e.ComplexityRoot.Mutation.ClaimEarlyAccessTask == nil {
 			break
@@ -553,6 +623,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.SubmitQuizAnswer(childComplexity, args["wallet"].(string), args["questionId"].(string), args["answerIndex"].(int)), true
+	case "Mutation.unbanUser":
+		if e.ComplexityRoot.Mutation.UnbanUser == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unbanUser_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UnbanUser(childComplexity, args["wallet"].(string), args["password"].(string)), true
 	case "Mutation.updateAntiSybilConfig":
 		if e.ComplexityRoot.Mutation.UpdateAntiSybilConfig == nil {
 			break
@@ -794,6 +875,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.ReferralEligibility(childComplexity, args["wallet"].(*string), args["referralCode"].(string)), true
+	case "Query.userBanStatus":
+		if e.ComplexityRoot.Query.UserBanStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userBanStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.UserBanStatus(childComplexity, args["wallet"].(string)), true
 
 	case "QuizAnswerResult.correct":
 		if e.ComplexityRoot.QuizAnswerResult.Correct == nil {
@@ -983,6 +1075,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.TaskStatus.Task(childComplexity), true
 
+	case "UserBanStatus.banned":
+		if e.ComplexityRoot.UserBanStatus.Banned == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserBanStatus.Banned(childComplexity), true
+	case "UserBanStatus.bannedAt":
+		if e.ComplexityRoot.UserBanStatus.BannedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserBanStatus.BannedAt(childComplexity), true
+	case "UserBanStatus.bannedReason":
+		if e.ComplexityRoot.UserBanStatus.BannedReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserBanStatus.BannedReason(childComplexity), true
+	case "UserBanStatus.voidedPoints":
+		if e.ComplexityRoot.UserBanStatus.VoidedPoints == nil {
+			break
+		}
+
+		return e.ComplexityRoot.UserBanStatus.VoidedPoints(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -1108,6 +1225,16 @@ func (ec *executionContext) childFields_AntiSybilConfigResult(ctx context.Contex
 	return nil, fmt.Errorf("no field named %q was found under type AntiSybilConfigResult", field.Name)
 }
 
+func (ec *executionContext) childFields_BanActionResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "success":
+		return ec.fieldContext_BanActionResult_success(ctx, field)
+	case "message":
+		return ec.fieldContext_BanActionResult_message(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type BanActionResult", field.Name)
+}
+
 func (ec *executionContext) childFields_CheckinConfig(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "testMode":
@@ -1196,6 +1323,14 @@ func (ec *executionContext) childFields_EarlyAccessUser(ctx context.Context, fie
 		return ec.fieldContext_EarlyAccessUser_referralCode(ctx, field)
 	case "email":
 		return ec.fieldContext_EarlyAccessUser_email(ctx, field)
+	case "banned":
+		return ec.fieldContext_EarlyAccessUser_banned(ctx, field)
+	case "bannedAt":
+		return ec.fieldContext_EarlyAccessUser_bannedAt(ctx, field)
+	case "bannedReason":
+		return ec.fieldContext_EarlyAccessUser_bannedReason(ctx, field)
+	case "voidedPoints":
+		return ec.fieldContext_EarlyAccessUser_voidedPoints(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type EarlyAccessUser", field.Name)
 }
@@ -1348,6 +1483,20 @@ func (ec *executionContext) childFields_TaskStatus(ctx context.Context, field gr
 	return nil, fmt.Errorf("no field named %q was found under type TaskStatus", field.Name)
 }
 
+func (ec *executionContext) childFields_UserBanStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "banned":
+		return ec.fieldContext_UserBanStatus_banned(ctx, field)
+	case "bannedAt":
+		return ec.fieldContext_UserBanStatus_bannedAt(ctx, field)
+	case "bannedReason":
+		return ec.fieldContext_UserBanStatus_bannedReason(ctx, field)
+	case "voidedPoints":
+		return ec.fieldContext_UserBanStatus_voidedPoints(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type UserBanStatus", field.Name)
+}
+
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "name":
@@ -1463,6 +1612,44 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 // endregion ************************** internal!.gotpl ***************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_banUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "password",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["password"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "reason",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["reason"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "amount",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["amount"] = arg3
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_claimEarlyAccessTask_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1663,6 +1850,28 @@ func (ec *executionContext) field_Mutation_submitQuizAnswer_args(ctx context.Con
 		return nil, err
 	}
 	args["answerIndex"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unbanUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "password",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["password"] = arg1
 	return args, nil
 }
 
@@ -1978,6 +2187,20 @@ func (ec *executionContext) field_Query_referralEligibility_args(ctx context.Con
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_userBanStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "wallet",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["wallet"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field___Directive_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2174,6 +2397,52 @@ func (ec *executionContext) _AntiSybilConfigResult_message(ctx context.Context, 
 }
 func (ec *executionContext) fieldContext_AntiSybilConfigResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("AntiSybilConfigResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _BanActionResult_success(ctx context.Context, field graphql.CollectedField, obj *BanActionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BanActionResult_success(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Success, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BanActionResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BanActionResult", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _BanActionResult_message(ctx context.Context, field graphql.CollectedField, obj *BanActionResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_BanActionResult_message(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Message, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_BanActionResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("BanActionResult", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _CheckinConfig_testMode(ctx context.Context, field graphql.CollectedField, obj *CheckinConfig) (ret graphql.Marshaler) {
@@ -2751,6 +3020,98 @@ func (ec *executionContext) fieldContext_EarlyAccessUser_email(_ context.Context
 	return graphql.NewScalarFieldContext("EarlyAccessUser", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _EarlyAccessUser_banned(ctx context.Context, field graphql.CollectedField, obj *EarlyAccessUser) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EarlyAccessUser_banned(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Banned, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_EarlyAccessUser_banned(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EarlyAccessUser", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _EarlyAccessUser_bannedAt(ctx context.Context, field graphql.CollectedField, obj *EarlyAccessUser) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EarlyAccessUser_bannedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BannedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_EarlyAccessUser_bannedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EarlyAccessUser", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EarlyAccessUser_bannedReason(ctx context.Context, field graphql.CollectedField, obj *EarlyAccessUser) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EarlyAccessUser_bannedReason(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BannedReason, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_EarlyAccessUser_bannedReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EarlyAccessUser", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EarlyAccessUser_voidedPoints(ctx context.Context, field graphql.CollectedField, obj *EarlyAccessUser) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EarlyAccessUser_voidedPoints(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VoidedPoints, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_EarlyAccessUser_voidedPoints(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EarlyAccessUser", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _JoinEarlyAccessResult_success(ctx context.Context, field graphql.CollectedField, obj *JoinEarlyAccessResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3277,6 +3638,94 @@ func (ec *executionContext) fieldContext_Mutation_setReferralBonus(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_setReferralBonus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_banUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_banUser(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().BanUser(ctx, fc.Args["wallet"].(string), fc.Args["password"].(string), fc.Args["reason"].(string), fc.Args["amount"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *BanActionResult) graphql.Marshaler {
+			return ec.marshalNBanActionResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐBanActionResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_banUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BanActionResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_banUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unbanUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_unbanUser(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UnbanUser(ctx, fc.Args["wallet"].(string), fc.Args["password"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *BanActionResult) graphql.Marshaler {
+			return ec.marshalNBanActionResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐBanActionResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_unbanUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_BanActionResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unbanUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4132,6 +4581,50 @@ func (ec *executionContext) fieldContext_Query_referralEligibility(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_userBanStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_userBanStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().UserBanStatus(ctx, fc.Args["wallet"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *UserBanStatus) graphql.Marshaler {
+			return ec.marshalNUserBanStatus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐUserBanStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_userBanStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_UserBanStatus(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userBanStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4896,6 +5389,98 @@ func (ec *executionContext) _TaskStatus_claimedAt(ctx context.Context, field gra
 }
 func (ec *executionContext) fieldContext_TaskStatus_claimedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("TaskStatus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _UserBanStatus_banned(ctx context.Context, field graphql.CollectedField, obj *UserBanStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserBanStatus_banned(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Banned, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserBanStatus_banned(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserBanStatus", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _UserBanStatus_bannedAt(ctx context.Context, field graphql.CollectedField, obj *UserBanStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserBanStatus_bannedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BannedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_UserBanStatus_bannedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserBanStatus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _UserBanStatus_bannedReason(ctx context.Context, field graphql.CollectedField, obj *UserBanStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserBanStatus_bannedReason(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BannedReason, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_UserBanStatus_bannedReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserBanStatus", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _UserBanStatus_voidedPoints(ctx context.Context, field graphql.CollectedField, obj *UserBanStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UserBanStatus_voidedPoints(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VoidedPoints, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UserBanStatus_voidedPoints(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("UserBanStatus", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -6061,6 +6646,49 @@ func (ec *executionContext) _AntiSybilConfigResult(ctx context.Context, sel ast.
 	return out
 }
 
+var banActionResultImplementors = []string{"BanActionResult"}
+
+func (ec *executionContext) _BanActionResult(ctx context.Context, sel ast.SelectionSet, obj *BanActionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, banActionResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BanActionResult")
+		case "success":
+			out.Values[i] = ec._BanActionResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._BanActionResult_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var checkinConfigImplementors = []string{"CheckinConfig"}
 
 func (ec *executionContext) _CheckinConfig(ctx context.Context, sel ast.SelectionSet, obj *CheckinConfig) graphql.Marshaler {
@@ -6396,6 +7024,26 @@ func (ec *executionContext) _EarlyAccessUser(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "banned":
+			out.Values[i] = ec._EarlyAccessUser_banned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bannedAt":
+			out.Values[i] = ec._EarlyAccessUser_bannedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "bannedReason":
+			out.Values[i] = ec._EarlyAccessUser_bannedReason(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "voidedPoints":
+			out.Values[i] = ec._EarlyAccessUser_voidedPoints(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6556,6 +7204,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "setReferralBonus":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_setReferralBonus(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "banUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_banUser(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unbanUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unbanUser(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -7076,6 +7738,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userBanStatus":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userBanStatus(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -7525,6 +8209,59 @@ func (ec *executionContext) _TaskStatus(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
+var userBanStatusImplementors = []string{"UserBanStatus"}
+
+func (ec *executionContext) _UserBanStatus(ctx context.Context, sel ast.SelectionSet, obj *UserBanStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userBanStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserBanStatus")
+		case "banned":
+			out.Values[i] = ec._UserBanStatus_banned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "bannedAt":
+			out.Values[i] = ec._UserBanStatus_bannedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "bannedReason":
+			out.Values[i] = ec._UserBanStatus_bannedReason(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "voidedPoints":
+			out.Values[i] = ec._UserBanStatus_voidedPoints(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
@@ -7945,6 +8682,20 @@ func (ec *executionContext) marshalNAntiSybilConfigResult2ᚖgithubᚗcomᚋcomp
 	return ec._AntiSybilConfigResult(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNBanActionResult2githubᚗcomᚋcomputefluxᚋactivesᚐBanActionResult(ctx context.Context, sel ast.SelectionSet, v BanActionResult) graphql.Marshaler {
+	return ec._BanActionResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBanActionResult2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐBanActionResult(ctx context.Context, sel ast.SelectionSet, v *BanActionResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BanActionResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8330,6 +9081,20 @@ func (ec *executionContext) marshalNTaskStatus2ᚖgithubᚗcomᚋcomputefluxᚋa
 		return graphql.Null
 	}
 	return ec._TaskStatus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserBanStatus2githubᚗcomᚋcomputefluxᚋactivesᚐUserBanStatus(ctx context.Context, sel ast.SelectionSet, v UserBanStatus) graphql.Marshaler {
+	return ec._UserBanStatus(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUserBanStatus2ᚖgithubᚗcomᚋcomputefluxᚋactivesᚐUserBanStatus(ctx context.Context, sel ast.SelectionSet, v *UserBanStatus) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserBanStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {

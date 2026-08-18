@@ -4,10 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -47,6 +49,8 @@ func clientIPMiddleware(next http.Handler) http.Handler {
 func main() {
 	port := flag.String("port", "9100", "listening port")
 	dbPath := flag.String("db", "./actives_data", "PebbleDB data path")
+	playgroundOn := flag.Bool("playground", false, "enable GraphQL playground (dev only; off in production)")
+	introspectionOn := flag.Bool("introspection", false, "enable GraphQL introspection (dev only; off in production)")
 	flag.Parse()
 
 	db, err := pebble.Open(*dbPath, &pebble.Options{})
@@ -82,7 +86,10 @@ func main() {
 	}))
 	router.Use(clientIPMiddleware)
 
-	router.Handle("/", playground.Handler("Actives", "/gql"))
+	// 生产环境不暴露 /gql 接口文档：默认关闭 playground 与 introspection（-playground/-introspection 仅开发调试用）
+	if *playgroundOn {
+		router.Handle("/", playground.Handler("Actives", "/gql"))
+	}
 
 	es := actives.NewExecutableSchema(actives.Config{
 		Resolvers: &actives.Resolver{},
@@ -96,14 +103,67 @@ func main() {
 	srv.AddTransport(transport.POST{})
 	srv.AddTransport(transport.MultipartForm{})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
-	srv.Use(extension.Introspection{})
+	if *introspectionOn {
+		srv.Use(extension.Introspection{})
+	}
 	srv.Use(extension.AutomaticPersistedQuery{
 		Cache: lru.New[string](100),
 	})
 	router.Handle("/gql", srv)
 
+	// 封禁状态页：/?wallet=0x... 或 /banned?wallet=0x...，向用户展示非正常使用提示与积分作废信息
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		wallet := strings.TrimSpace(r.URL.Query().Get("wallet"))
+		banned, bannedAt, reason, voided := actives.Store.GetBanStatus(wallet)
+		if wallet == "" {
+			fmt.Fprint(w, `<!doctype html><html lang="zh"><meta charset="utf-8"><title>Actives Status</title>
+<body style="font-family:system-ui;background:#0b0e14;color:#e6e6e6;display:flex;align-items:center;justify-content:center;min-height:100vh">
+<div style="max-width:420px;padding:32px;border:1px solid #2a2f3a;border-radius:8px">
+<h2>Actives Status Check</h2>
+<p style="color:#9aa4b2">Pass your wallet in the URL:</p>
+<code style="color:#7dd3fc">/?wallet=0x</code>
+</div></body></html>`)
+			return
+		}
+		if !banned {
+			fmt.Fprintf(w, `<!doctype html><html lang="zh"><meta charset="utf-8"><title>Actives Status</title>
+<body style="font-family:system-ui;background:#0b0e14;color:#e6e6e6;display:flex;align-items:center;justify-content:center;min-height:100vh">
+<div style="max-width:420px;padding:32px;border:1px solid #2a2f3a;border-radius:8px;text-align:center">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="#22c55e"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+<h2>Account Active</h2>
+<p style="color:#9aa4b2">No abnormal usage detected for this account.</p>
+<code style="font-size:12px;color:#7dd3fc;word-break:break-all">%s</code>
+</div></body></html>`, html.EscapeString(wallet))
+			return
+		}
+		fmt.Fprintf(w, `<!doctype html><html lang="zh"><meta charset="utf-8"><title>Account Restricted</title>
+<body style="font-family:system-ui;background:#0b0e14;color:#e6e6e6;display:flex;align-items:center;justify-content:center;min-height:100vh">
+<div style="max-width:420px;padding:32px;border:1px solid #7f1d1d;border-radius:8px;text-align:center">
+<svg width="48" height="48" viewBox="0 0 24 24" fill="#ef4444"><path d="M12 2 1 21h22zM11 10h2v5h-2zm0 7h2v2h-2z" transform="scale(0.9)"/></svg>
+<h2 style="color:#ef4444">Account Restricted</h2>
+<p>We detected abnormal usage behavior on this account.<br/>(检测到该账户存在非正常使用行为)</p>
+<p style="color:#fbbf24"><b>积分作废 / Points voided: %d</b></p>
+`, voided)
+		if reason != "" {
+			fmt.Fprintf(w, `<p style="color:#9aa4b2">Reason: %s</p>`, html.EscapeString(reason))
+		}
+		fmt.Fprintf(w, `<p style="color:#9aa4b2">Banned at: %s</p>
+<code style="font-size:12px;color:#7dd3fc;word-break:break-all">%s</code>
+</div></body></html>`, html.EscapeString(bannedAt), html.EscapeString(wallet))
+	})
+
+	// PII: 预检（GET /gql 返回健康检查，不暴露 schema）
 	logBlue("API", "  /gql        -> GraphQL (actives: early access)")
-	logBlue("API", "  /           -> Playground")
+	if *playgroundOn {
+		logBlue("API", "  /           -> Playground (dev)")
+	} else {
+		logBlue("API", "  /?wallet=0x -> status page")
+	}
 
 	server := &http.Server{
 		Addr:         ":" + *port,

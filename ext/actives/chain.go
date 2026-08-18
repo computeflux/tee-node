@@ -145,3 +145,26 @@ func Distribute(wallets []string, points []int64) error {
 func MintToken(to string, amount int64) error {
 	return Distribute([]string{to}, []int64{amount})
 }
+
+// BurnToken burns ERC20 FLUX_TEST tokens from an address on-chain (only the contract owner can call).
+// amount 为要销毁的代币数量（整数，0 表示跳过）。用于链上减少被惩罚（封禁）账户的余额。
+// 返回是否真正发起了 burn 交易（amount<=0 或链未初始化/同步关闭时返回 false, nil）。
+func BurnToken(user string, amount int64) (bool, error) {
+	FluxChain.mu.RLock()
+	defer FluxChain.mu.RUnlock()
+	if !FluxChain.initialized || FluxChain.syncDisabled {
+		return false, nil
+	}
+	if amount <= 0 {
+		return false, nil
+	}
+
+	addr := common.HexToAddress(user)
+	amt := new(big.Int).Mul(big.NewInt(amount), big.NewInt(1e18)) // 18 decimals
+	tx, err := FluxChain.token.Burn(FluxChain.auth, addr, amt)
+	if err != nil {
+		return false, fmt.Errorf("burn: %w", err)
+	}
+	fmt.Printf("[flux] burn user=%s amount=%d tx=%s\n", addr.Hex(), amount, tx.Hash().Hex())
+	return true, nil
+}

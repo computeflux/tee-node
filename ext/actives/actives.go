@@ -99,6 +99,10 @@ type DbUser struct {
 	ReferralCode string `json:"referralCode"`
 	Email        string `json:"email"`
 	Alias        string `json:"alias,omitempty"`
+	// 封禁（非正常使用行为检测）：管理员一键封禁后标记 + 积分作废
+	BannedAt     string `json:"bannedAt,omitempty"`
+	BannedReason string `json:"bannedReason,omitempty"`
+	VoidedPoints int64  `json:"voidedPoints,omitempty"` // 本次封禁作废的积分数量
 }
 
 type DbHistory struct {
@@ -146,6 +150,8 @@ type DbPendingRef struct {
 
 type UserRecord struct {
 	Wallet, JoinedAt, Referrer, ReferralCode, Email string
+	BannedAt, BannedReason                          string
+	VoidedPoints                                    int64
 }
 
 type HistoryRecord struct {
@@ -229,6 +235,11 @@ func (s *EarlyAccessStore) DailyCheckin(wallet, dateStr string) (int, int64, boo
 	defer s.mu.Unlock()
 
 	wallet = strings.ToLower(wallet)
+
+	// 封禁用户不允许签到获得积分
+	if s.Banned(wallet) {
+		return 0, 0, false, false, fmt.Errorf("account banned (abnormal usage)")
+	}
 
 	si, _ := s.loadStreak(wallet)
 	if si == nil {
@@ -490,6 +501,11 @@ func (s *EarlyAccessStore) SubmitQuizAnswer(wallet, questionID string, answerInd
 
 	wallet = strings.ToLower(wallet)
 
+	// 封禁用户不允许答题获得积分
+	if s.Banned(wallet) {
+		return false, 0, "", fmt.Errorf("account banned (abnormal usage)")
+	}
+
 	// Find question in compiled-in data
 	q, ok := Day3QuestionsData[questionID]
 	day := 3
@@ -637,8 +653,8 @@ func (s *EarlyAccessStore) Join(wallet, email, ip string, referralCode *string) 
 			if inv := s.GetUser(rw); inv != nil && inv.ReferralCode != "" {
 				inviterCode = inv.ReferralCode
 			}
-			// IP 防女巫：邀请人与被邀请人相同 IP → 不建立推荐关系、不发推荐奖励
-			if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+			// IP 防女巫：邀请人与被邀请人相同 IP，或该 IP 已被该邀请人的其他被邀请者使用 → 不建立推荐关系、不发推荐奖励
+			if cfg.IpCheckEnabled && ip != "" && (s.ipMatches(ip, rw) || s.ipUsedByInvitee(ip, rw, wallet)) {
 				warning = "Not eligible for referral reward, only base registration reward"
 			} else {
 				user.Referrer = rw
@@ -689,6 +705,9 @@ func (s *EarlyAccessStore) ClaimTask(wallet, task string) (bool, int64, int64, e
 	if u, _ := dbGetJson[DbUser]("user:" + wallet); u == nil {
 		return false, 0, 0, fmt.Errorf("user not joined")
 	}
+	if s.Banned(wallet) {
+		return false, 0, 0, fmt.Errorf("account banned (abnormal usage)")
+	}
 
 	pts, ok := taskPoints[task]
 	if !ok {
@@ -737,7 +756,7 @@ func (s *EarlyAccessStore) CheckReferralEligibility(wallet, ip, referralCode str
 		return false, "invalid code"
 	}
 	cfg := loadAntiSybilConfig()
-	if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+	if cfg.IpCheckEnabled && ip != "" && (s.ipMatches(ip, rw) || s.ipUsedByInvitee(ip, rw, wallet)) {
 		return false, "Not eligible for referral reward, only base registration reward"
 	}
 	return true, ""
@@ -751,6 +770,10 @@ func (s *EarlyAccessStore) UpdateReferralCode(wallet, ip, referralCode string) (
 	user, _ := dbGetJson[DbUser]("user:" + wallet)
 	if user == nil {
 		return false, "", false, fmt.Errorf("user not joined")
+	}
+	// 封禁用户不允许绑定推荐码获取积分
+	if user.BannedAt != "" {
+		return false, "", false, fmt.Errorf("account banned (abnormal usage)")
 	}
 	if user.Referrer != "" {
 		return false, "", false, fmt.Errorf("referral already set")
@@ -769,8 +792,8 @@ func (s *EarlyAccessStore) UpdateReferralCode(wallet, ip, referralCode string) (
 	referralAwarded := false
 	cfg := loadAntiSybilConfig()
 
-	// IP 防女巫：相同 IP 不建立推荐关系、不发推荐奖励
-	if cfg.IpCheckEnabled && ip != "" && s.ipMatches(ip, rw) {
+	// IP 防女巫：相同 IP，或该 IP 已被该邀请人的其他被邀请者使用 → 不建立推荐关系、不发推荐奖励
+	if cfg.IpCheckEnabled && ip != "" && (s.ipMatches(ip, rw) || s.ipUsedByInvitee(ip, rw, wallet)) {
 		warning = "Not eligible for referral reward, only base registration reward"
 	} else {
 		// 记录到邀请人当前 code 下：别名变更后老链接（旧码）仍可用，推荐记录不丢失
@@ -895,7 +918,10 @@ func (s *EarlyAccessStore) GetUser(wallet string) *UserRecord {
 	if v == nil {
 		return nil
 	}
-	return &UserRecord{Wallet: v.Wallet, JoinedAt: v.JoinedAt, Referrer: v.Referrer, ReferralCode: v.ReferralCode, Email: v.Email}
+	return &UserRecord{
+		Wallet: v.Wallet, JoinedAt: v.JoinedAt, Referrer: v.Referrer, ReferralCode: v.ReferralCode, Email: v.Email,
+		BannedAt: v.BannedAt, BannedReason: v.BannedReason, VoidedPoints: v.VoidedPoints,
+	}
 }
 
 func (s *EarlyAccessStore) GetUserByReferralCode(code string) *UserRecord {
@@ -1226,6 +1252,123 @@ func (s *EarlyAccessStore) SetReferralBonus(wallet, password, code string, bonus
 	return s.GetReferralBonusConfigs(), ""
 }
 
+// ── 封禁管理（非正常使用行为）──────────────────────────────
+
+// GetBanStatus 查询用户封禁状态：返回 (是否封禁, 封禁时间, 原因, 作废积分)。
+func (s *EarlyAccessStore) GetBanStatus(wallet string) (banned bool, bannedAt, reason string, voided int64) {
+	u, _ := dbGetJson[DbUser]("user:" + strings.ToLower(wallet))
+	if u == nil {
+		return false, "", "", 0
+	}
+	if u.BannedAt == "" {
+		return false, "", "", 0
+	}
+	return true, u.BannedAt, u.BannedReason, u.VoidedPoints
+}
+
+// Banned 判断用户是否处于封禁状态（不区分大小写，需调用方持有锁或对实时性要求不高时使用）。
+func (s *EarlyAccessStore) Banned(wallet string) bool {
+	u, _ := dbGetJson[DbUser]("user:" + strings.ToLower(wallet))
+	return u != nil && u.BannedAt != ""
+}
+
+// BanUser 一键封禁用户并扣减积分。敏感操作：必须传入配置文件中的管理密码。
+// amount<=0 时作废全部积分（原行为）；amount>0 时按指定数量扣减（上限为客户余额）。
+// 幂等：重复封禁不会重复扣减。返回 (成功, 消息)。
+func (s *EarlyAccessStore) BanUser(wallet, password, reason string, amount int64) (bool, string) {
+	if !checkAdminPassword(password) {
+		if loadAdminPassword() == "" {
+			return false, "admin password not configured"
+		}
+		return false, "invalid password"
+	}
+	if amount < 0 {
+		return false, "amount cannot be negative"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return false, "wallet required"
+	}
+	user, _ := dbGetJson[DbUser]("user:" + wallet)
+	if user == nil {
+		return false, "user not found"
+	}
+	if user.BannedAt != "" {
+		return true, "already banned"
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	user.BannedAt = now
+	user.BannedReason = strings.TrimSpace(reason)
+	user.VoidedPoints = 0
+	if err := dbSetJson("user:"+wallet, user); err != nil {
+		return false, err.Error()
+	}
+
+	// 扣减积分：amount<=0 扣全部；amount>0 按指定数量（上限为余额）
+	pts, _ := s.loadPoints(wallet)
+	reduce := pts
+	if amount > 0 && amount < pts {
+		reduce = amount
+	}
+	if reduce > 0 {
+		if err := dbSetJson("points:"+wallet, pts-reduce); err != nil {
+			return false, err.Error()
+		}
+		user.VoidedPoints = reduce
+		if err := dbSetJson("user:"+wallet, user); err != nil {
+			return false, err.Error()
+		}
+		s.appendHistory(wallet, fmt.Sprintf("-%d", reduce), "points_voided_ban", now, nil)
+	}
+
+	// 链上同步：销毁被惩罚账户对应数量的 FLUXT 代币（链不可用或同步关闭时跳过）
+	go func(w string, amt int64) {
+		if ok, err := BurnToken(w, amt); err != nil {
+			fmt.Printf("[ban] on-chain burn failed wallet=%s amount=%d err=%v\n", w, amt, err)
+		} else if ok {
+			fmt.Printf("[ban] on-chain burn wallet=%s amount=%d\n", w, amt)
+		}
+	}(wallet, reduce)
+	return true, ""
+}
+
+// UnbanUser 解除封禁。敏感操作：必须传入配置文件中的管理密码。
+// 幂等：未封禁用户解封直接成功。解除封禁不恢复已作废积分。
+func (s *EarlyAccessStore) UnbanUser(wallet, password string) (bool, string) {
+	if !checkAdminPassword(password) {
+		if loadAdminPassword() == "" {
+			return false, "admin password not configured"
+		}
+		return false, "invalid password"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return false, "wallet required"
+	}
+	user, _ := dbGetJson[DbUser]("user:" + wallet)
+	if user == nil {
+		return false, "user not found"
+	}
+	if user.BannedAt == "" {
+		return true, "not banned"
+	}
+	user.BannedAt = ""
+	user.BannedReason = ""
+	if err := dbSetJson("user:"+wallet, user); err != nil {
+		return false, err.Error()
+	}
+	return true, ""
+}
+
 // referralBonusFor 查询邀请码的额外积分（无配置返回 0）。
 func referralBonusFor(code string) int64 {
 	if v, ok := loadRefBonusConfig()[strings.ToLower(code)]; ok {
@@ -1329,6 +1472,30 @@ func (s *EarlyAccessStore) ipMatches(ip, wallet string) bool {
 	}
 	for _, x := range rec.LastIPs {
 		if x == ip {
+			return true
+		}
+	}
+	return false
+}
+
+// ipUsedByInvitee 判断 IP 是否已被该邀请人的其他被邀请者使用。
+// 防女巫：同一邀请人的被邀请者之间不能共用 IP（严格模式）。
+// exclude 用于排除当前正在处理的用户（如预约更新推荐码时排除自己）。
+func (s *EarlyAccessStore) ipUsedByInvitee(ip, inviter, exclude string) bool {
+	ip = normalizeIP(ip)
+	if ip == "" || inviter == "" {
+		return false
+	}
+	users, _ := dbGetJson[[]string]("ipidx:" + ip)
+	if users == nil {
+		return false
+	}
+	for _, w := range *users {
+		if w == exclude || w == inviter {
+			continue // 跳过自己与邀请人本人
+		}
+		u, _ := dbGetJson[DbUser]("user:" + w)
+		if u != nil && u.Referrer == inviter {
 			return true
 		}
 	}

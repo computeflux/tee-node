@@ -21,6 +21,11 @@ type AntiSybilConfigResult struct {
 	Message string `json:"message"`
 }
 
+type BanActionResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 type CheckinConfig struct {
 	TestMode bool `json:"testMode"`
 }
@@ -65,6 +70,10 @@ type EarlyAccessUser struct {
 	Referrer     *string `json:"referrer,omitempty"`
 	ReferralCode *string `json:"referralCode,omitempty"`
 	Email        *string `json:"email,omitempty"`
+	Banned       bool    `json:"banned"`
+	BannedAt     *string `json:"bannedAt,omitempty"`
+	BannedReason *string `json:"bannedReason,omitempty"`
+	VoidedPoints string  `json:"voidedPoints"`
 }
 
 type JoinEarlyAccessResult struct {
@@ -145,6 +154,13 @@ type TaskStatus struct {
 	Task      EarlyAccessTaskType `json:"task"`
 	Completed bool                `json:"completed"`
 	ClaimedAt *string             `json:"claimedAt,omitempty"`
+}
+
+type UserBanStatus struct {
+	Banned       bool    `json:"banned"`
+	BannedAt     *string `json:"bannedAt,omitempty"`
+	BannedReason *string `json:"bannedReason,omitempty"`
+	VoidedPoints string  `json:"voidedPoints"`
 }
 
 type EarlyAccessTaskType string

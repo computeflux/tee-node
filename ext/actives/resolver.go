@@ -30,10 +30,19 @@ func (r *queryResolver) EarlyAccessUser(ctx context.Context, user string) (*Earl
 	if u == nil {
 		return &EarlyAccessUser{IsUser: false}, nil
 	}
-	return &EarlyAccessUser{
+	res := &EarlyAccessUser{
 		IsUser: true, Wallet: strPtr(u.Wallet), JoinedAt: strPtr(u.JoinedAt),
 		Referrer: strPtr(u.Referrer), ReferralCode: strPtr(u.ReferralCode), Email: strPtr(u.Email),
-	}, nil
+		Banned: u.BannedAt != "", VoidedPoints: "0",
+	}
+	if u.BannedAt != "" {
+		res.BannedAt = strPtr(u.BannedAt)
+		res.VoidedPoints = fmt.Sprintf("%d", u.VoidedPoints)
+		if u.BannedReason != "" {
+			res.BannedReason = strPtr(u.BannedReason)
+		}
+	}
+	return res, nil
 }
 
 func (r *queryResolver) EarlyAccessUserByEmail(ctx context.Context, email string) (*EarlyAccessUser, error) {
@@ -171,6 +180,18 @@ func (r *queryResolver) ReferralEligibility(ctx context.Context, wallet *string,
 	return res, nil
 }
 
+func (r *queryResolver) UserBanStatus(ctx context.Context, wallet string) (*UserBanStatus, error) {
+	banned, bannedAt, reason, voided := Store.GetBanStatus(wallet)
+	res := &UserBanStatus{Banned: banned, VoidedPoints: fmt.Sprintf("%d", voided)}
+	if banned {
+		res.BannedAt = &bannedAt
+		if reason != "" {
+			res.BannedReason = &reason
+		}
+	}
+	return res, nil
+}
+
 func (r *queryResolver) CheckinConfig(ctx context.Context) (*CheckinConfig, error) {
 	return &CheckinConfig{
 		TestMode: CheckinTestMode,
@@ -289,6 +310,38 @@ func (r *mutationResolver) SetReferralBonus(ctx context.Context, wallet string, 
 	}
 	clearAdminFailures(ip)
 	return &ReferralBonusResult{Success: true, Message: "ok"}, nil
+}
+
+func (r *mutationResolver) BanUser(ctx context.Context, wallet string, password string, reason string, amount int) (*BanActionResult, error) {
+	ip := ClientIPFromContext(ctx)
+	if adminLocked(ip) {
+		return &BanActionResult{Success: false, Message: "too many failed attempts, try again later"}, nil
+	}
+	ok, msg := Store.BanUser(wallet, password, reason, int64(amount))
+	if !ok {
+		if isAdminAuthError(msg) {
+			recordAdminFailure(ip)
+		}
+		return &BanActionResult{Success: false, Message: msg}, nil
+	}
+	clearAdminFailures(ip)
+	return &BanActionResult{Success: true, Message: msg}, nil
+}
+
+func (r *mutationResolver) UnbanUser(ctx context.Context, wallet string, password string) (*BanActionResult, error) {
+	ip := ClientIPFromContext(ctx)
+	if adminLocked(ip) {
+		return &BanActionResult{Success: false, Message: "too many failed attempts, try again later"}, nil
+	}
+	ok, msg := Store.UnbanUser(wallet, password)
+	if !ok {
+		if isAdminAuthError(msg) {
+			recordAdminFailure(ip)
+		}
+		return &BanActionResult{Success: false, Message: msg}, nil
+	}
+	clearAdminFailures(ip)
+	return &BanActionResult{Success: true, Message: msg}, nil
 }
 
 func (r *mutationResolver) ClaimEarlyAccessTask(ctx context.Context, wallet string, task EarlyAccessTaskType) (*ClaimTaskResult, error) {

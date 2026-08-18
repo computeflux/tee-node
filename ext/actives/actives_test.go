@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -384,6 +385,75 @@ func TestUpdateReferralCode_SameIP_Blocked(t *testing.T) {
 	assert.Equal(t, "0xaaaa", u.Referrer)
 }
 
+// 严格模式：同一邀请人的被邀请者之间不能共用 IP。
+// B 已被 A 邀请并占用 5.6.7.8，C 从同一 IP 用 A 的码加入 → 不发推荐奖励。
+func TestJoin_InviteeSameIP_Blocked(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "testpass")
+	_, msg := s.UpdateAntiSybilConfig("0xadmin", "testpass", true, false) // ip 检查开、延迟结算关，积分即时发放
+	require.Empty(t, msg)
+
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil) // 邀请人 A
+	a := s.GetUser("0xaaaa")
+	require.NotNil(t, a)
+
+	// B 用 A 的码从 5.6.7.8 加入 → 正常获得推荐奖励
+	_, awarded := joinWithCode(t, s, "0xbbbb", "5.6.7.8", &a.ReferralCode)
+	assert.True(t, awarded)
+
+	// C 与 B 共用相同 IP 加入 A 的码 → 严格模式拦截（仅基础奖励）
+	ok, warning, awarded, err := s.Join("0xcccc", "", "5.6.7.8", &a.ReferralCode)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.False(t, awarded)
+	assert.Contains(t, warning, "Not eligible for referral reward")
+	assert.Equal(t, "100", s.GetPoints("0xcccc"))
+
+	// A 只获得 B 一份推荐奖励：100(基础) + 75(邀请) = 175
+	assert.Equal(t, "175", s.GetPoints("0xaaaa"))
+}
+
+func TestCheckReferralEligibility_InviteeSameIP_Blocked(t *testing.T) {
+	s := newTestStore(t)
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	a := s.GetUser("0xaaaa")
+	require.NotNil(t, a)
+
+	_, awarded := joinWithCode(t, s, "0xbbbb", "5.6.7.8", &a.ReferralCode)
+	assert.True(t, awarded)
+
+	// 已被 A 邀请的 B 占用了 5.6.7.8 → C 从该 IP 加入不可获得奖励
+	eligible, reason := s.CheckReferralEligibility("0xcccc", "5.6.7.8", a.ReferralCode)
+	assert.False(t, eligible)
+	assert.Contains(t, reason, "Not eligible for referral reward")
+
+	// 不同 IP → 仍可获得奖励
+	eligible, reason = s.CheckReferralEligibility("0xcccc", "9.9.9.9", a.ReferralCode)
+	assert.True(t, eligible)
+	assert.Empty(t, reason)
+}
+
+func TestUpdateReferralCode_InviteeSameIP_Blocked(t *testing.T) {
+	s := newTestStore(t)
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	a := s.GetUser("0xaaaa")
+	require.NotNil(t, a)
+
+	// B 已是 A 的被邀请者，占用 IP 5.6.7.8
+	_, awarded := joinWithCode(t, s, "0xbbbb", "5.6.7.8", &a.ReferralCode)
+	assert.True(t, awarded)
+
+	// C 已注册（无推荐人），试图从 B 的 IP 绑定 A 的码 → 拦截
+	joinWithCode(t, s, "0xcccc", "7.7.7.7", nil)
+	ok, warning, awarded, err := s.UpdateReferralCode("0xcccc", "5.6.7.8", a.ReferralCode)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.False(t, awarded)
+	assert.Contains(t, warning, "Not eligible for referral reward")
+	u := s.GetUser("0xcccc")
+	assert.Equal(t, "", u.Referrer)
+}
+
 func TestQuiz_CorrectAnswer_SettlesPendingReferral(t *testing.T) {
 	s := newTestStore(t)
 	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
@@ -480,7 +550,200 @@ func TestConfig_PasswordChangeRequiresCurrent(t *testing.T) {
 	assert.True(t, cfg.DeferredSettlementEnabled)
 }
 
+// ── 封禁（非正常使用行为检测）──────────────────────────────
+
+func TestBanUser_RequiresPassword(t *testing.T) {
+	s := newTestStore(t)
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	writeAdminPassword(t, "secret123")
+
+	// 未配置/错误密码 → 拒绝
+	_, msg := s.BanUser("0xaaaa", "", "abnormal usage", 0)
+	assert.Equal(t, "invalid password", msg)
+	_, msg = s.BanUser("0xaaaa", "wrong", "abnormal usage", 0)
+	assert.Equal(t, "invalid password", msg)
+
+	// 正确密码 → 成功
+	ok, msg := s.BanUser("0xaaaa", "secret123", "abnormal usage", 0)
+	require.True(t, ok)
+	assert.Empty(t, msg)
+
+	// 封禁状态查询
+	banned, bannedAt, reason, _ := s.GetBanStatus("0xaaaa")
+	assert.True(t, banned)
+	assert.NotEmpty(t, bannedAt)
+	assert.Equal(t, "abnormal usage", reason)
+	assert.True(t, s.Banned("0xaaaa"))
+}
+
+func TestBanUser_VoidsPoints(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	// 让用户有积分：签到得 5 分
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	_, _, _, _, err := s.DailyCheckin("0xaaaa", "")
+	require.NoError(t, err)
+	before := s.GetPoints("0xaaaa")
+	require.NotEqual(t, "0", before)
+
+	ok, msg := s.BanUser("0xaaaa", "secret123", "abnormal usage", 0)
+	require.True(t, ok)
+	require.Empty(t, msg)
+
+	// 积分作废 → 余额清零
+	assert.Equal(t, "0", s.GetPoints("0xaaaa"))
+
+	// 作废数量 = 封禁前余额
+	_, _, _, voided := s.GetBanStatus("0xaaaa")
+	beforeI, _ := strconv.ParseInt(before, 10, 64)
+	assert.Equal(t, beforeI, voided)
+
+	// 历史记录一条 points_voided_ban
+	items, _ := s.GetPointsHistory("0xaaaa", 0, 20)
+	found := false
+	for _, it := range items {
+		if it.Reason == "points_voided_ban" {
+			found = true
+		}
+	}
+	assert.True(t, found)
+}
+
+func TestBanUser_PartialAmount(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil) // 基础 100 分
+
+	// 指定扣减 30 分
+	ok, msg := s.BanUser("0xaaaa", "secret123", "specified amount", 30)
+	require.True(t, ok)
+	require.Empty(t, msg)
+	assert.Equal(t, "70", s.GetPoints("0xaaaa")) // 100 - 30
+
+	// 记录作废 30 分
+	_, _, _, voided := s.GetBanStatus("0xaaaa")
+	assert.Equal(t, int64(30), voided)
+
+	// 金额为负 → 拒绝
+	s2 := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	joinWithCode(t, s2, "0xbbbb", "1.2.3.4", nil)
+	ok, msg = s2.BanUser("0xbbbb", "secret123", "neg", -1)
+	assert.False(t, ok)
+	assert.Equal(t, "amount cannot be negative", msg)
+	assert.Equal(t, "100", s2.GetPoints("0xbbbb"))
+}
+
+func TestBanUser_Idempotent(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+
+	ok, msg := s.BanUser("0xaaaa", "secret123", "reason", 0)
+	require.True(t, ok)
+	require.Empty(t, msg)
+
+	// 重复封禁 → 成功但不重复作废
+	ok, msg = s.BanUser("0xaaaa", "secret123", "reason2", 0)
+	require.True(t, ok)
+	assert.Equal(t, "already banned", msg)
+	_, _, reason, _ := s.GetBanStatus("0xaaaa")
+	assert.Equal(t, "reason", reason) // 保留首次原因
+
+	// 未注册用户 → 拒绝
+	ok, msg = s.BanUser("0xdead", "secret123", "reason", 0)
+	assert.False(t, ok)
+	assert.Equal(t, "user not found", msg)
+}
+
+func TestUnbanUser_ClearsBan(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	ok, _ := s.BanUser("0xaaaa", "secret123", "abnormal usage", 0)
+	require.True(t, ok)
+
+	// 解封
+	ok, msg := s.UnbanUser("0xaaaa", "secret123")
+	require.True(t, ok)
+	assert.Empty(t, msg)
+	banned, _, _, _ := s.GetBanStatus("0xaaaa")
+	assert.False(t, banned)
+	assert.False(t, s.Banned("0xaaaa"))
+
+	// 未封禁用户解封 → 幂等成功
+	ok, msg = s.UnbanUser("0xaaaa", "secret123")
+	require.True(t, ok)
+	assert.Equal(t, "not banned", msg)
+}
+
+func TestBannedUser_CannotEarnPoints(t *testing.T) {
+	s := newTestStore(t)
+	writeAdminPassword(t, "secret123")
+	joinWithCode(t, s, "0xaaaa", "1.2.3.4", nil)
+	_, _ = s.BanUser("0xaaaa", "secret123", "abnormal usage", 0)
+
+	// 签到被拒
+	_, _, _, _, err := s.DailyCheckin("0xaaaa", "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "banned")
+
+	// 任务被拒
+	_, _, _, err = s.ClaimTask("0xaaaa", "JOIN_DISCORD")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "banned")
+
+	// 答题被拒
+	_, _, _, err = s.SubmitQuizAnswer("0xaaaa", "q1", 0)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "banned")
+
+	// 绑定推荐码被拒
+	b := s.GetUser("0xbbbb")
+	if b == nil {
+		joinWithCode(t, s, "0xbbbb", "1.2.3.4", nil)
+		b = s.GetUser("0xbbbb")
+	}
+	_, _, _, err = s.UpdateReferralCode("0xaaaa", "5.6.7.8", b.ReferralCode)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "banned")
+
+	// 积分仍为 0
+	assert.Equal(t, "0", s.GetPoints("0xaaaa"))
+}
+
+func TestBanStatus_NoUser(t *testing.T) {
+	s := newTestStore(t)
+	banned, _, _, voided := s.GetBanStatus("0xnone")
+	assert.False(t, banned)
+	assert.Equal(t, int64(0), voided)
+	assert.False(t, s.Banned("0xnone"))
+}
+
 // ── IP 新鲜度（刷新页面更新 IP）────────────────────────────
+
+func TestBurnToken_SafeWhenChainOff(t *testing.T) {
+	// 测试环境未初始化链：BurnToken 应安全跳过，不报错、不阻塞
+	ok, err := BurnToken("0xaaaa", 100)
+	assert.False(t, ok)
+	assert.NoError(t, err)
+
+	// 金额 <= 0 时即使链可用也直接跳过
+	FluxChain.mu.Lock()
+	FluxChain.initialized = true
+	FluxChain.syncDisabled = true // 同步关闭 → 跳过
+	FluxChain.mu.Unlock()
+	ok, err = BurnToken("0xaaaa", 0)
+	assert.False(t, ok)
+	assert.NoError(t, err)
+	ok, err = BurnToken("0xaaaa", -5)
+	assert.False(t, ok)
+	assert.NoError(t, err)
+	FluxChain.mu.Lock()
+	FluxChain.initialized = false
+	FluxChain.syncDisabled = false
+	FluxChain.mu.Unlock()
+}
 
 func TestRecordClientIp_RefreshKeepsIpFresh(t *testing.T) {
 	s := newTestStore(t)
