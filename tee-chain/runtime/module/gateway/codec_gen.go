@@ -460,6 +460,194 @@ func (v *ModelInfo) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
+// Encode SCALE 编码 ModelInfoV2。
+func (v *ModelInfoV2) Encode() ([]byte, error) {
+	var buf []byte
+	buf = store.EncodeCompact(buf, uint64(len(v.Name)))
+	buf = append(buf, v.Name...)
+	buf = binary.LittleEndian.AppendUint32(buf, v.Owner.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.Owner.V)))
+	buf = append(buf, v.Owner.V...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = append(buf, byte(v.InputModalities))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ContextLength))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.InPrice))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedPrice))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.OutPrice))
+	if v.Thinking {
+		buf = append(buf, 1)
+	} else {
+		buf = append(buf, 0)
+	}
+	buf = store.EncodeCompact(buf, uint64(len(v.Meta)))
+	buf = append(buf, v.Meta...)
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.ModelType))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.RouteID))
+	buf = store.EncodeCompact(buf, uint64(len(v.URIS)))
+	buf = append(buf, v.URIS...)
+	buf = store.EncodeCompact(buf, uint64(len(v.APIKeys)))
+	for i := range v.APIKeys {
+		buf = store.EncodeCompact(buf, uint64(len(v.APIKeys[i])))
+		buf = append(buf, v.APIKeys[i]...)
+	}
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.MaxConcurrency))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Balance))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ReputationScore))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TotalAudits))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.PassedAudits))
+	if v.IsActive {
+		buf = append(buf, 1)
+	} else {
+		buf = append(buf, 0)
+	}
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CreatedAt))
+	return buf, nil
+}
+
+// Decode SCALE 解码 ModelInfoV2。
+func (v *ModelInfoV2) Decode(data []byte) (int, error) {
+	off := 0
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Name")
+		}
+		v.Name = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading Owner.T")
+	}
+	v.Owner.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Owner.V")
+		}
+		v.Owner.V = make([]byte, n)
+		copy(v.Owner.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ProviderID")
+	}
+	v.ProviderID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading InputModalities")
+	}
+	v.InputModalities = uint8(data[off])
+	off++
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ContextLength")
+	}
+	v.ContextLength = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading InPrice")
+	}
+	v.InPrice = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CachedPrice")
+	}
+	v.CachedPrice = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading OutPrice")
+	}
+	v.OutPrice = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading Thinking")
+	}
+	v.Thinking = data[off] != 0
+	off++
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Meta")
+		}
+		v.Meta = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	if off+2 > len(data) {
+		return 0, fmt.Errorf("EOF reading ModelType")
+	}
+	v.ModelType = binary.LittleEndian.Uint16(data[off:])
+	off += 2
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading RouteID")
+	}
+	v.RouteID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading URIS")
+		}
+		v.URIS = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		v.APIKeys = make([]string, n)
+		for i := uint64(0); i < n; i++ {
+			{
+				n, sz := store.DecodeCompact(data[off:])
+				off += sz
+				if off+int(n) > len(data) {
+					return 0, fmt.Errorf("EOF reading ")
+				}
+				v.APIKeys[i] = string(data[off : off+int(n)])
+				off += int(n)
+			}
+		}
+	}
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading MaxConcurrency")
+	}
+	v.MaxConcurrency = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Balance")
+	}
+	v.Balance = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ReputationScore")
+	}
+	v.ReputationScore = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TotalAudits")
+	}
+	v.TotalAudits = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading PassedAudits")
+	}
+	v.PassedAudits = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off >= len(data) {
+		return 0, fmt.Errorf("EOF reading IsActive")
+	}
+	v.IsActive = data[off] != 0
+	off++
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CreatedAt")
+	}
+	v.CreatedAt = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
+
 // Encode SCALE 编码 ModelInfoWithID。
 func (v *ModelInfoWithID) Encode() ([]byte, error) {
 	var buf []byte

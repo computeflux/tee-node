@@ -116,7 +116,7 @@ func recordRelayFailure(token *types.GatewayTokenInfo, ep *scheduler.Endpoint) {
 	initUsageWriter()
 	model := &cgateway.ModelInfoWithID{
 		ID:   ep.ModelID,
-		Data: cgateway.ModelInfo{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
+		Data: cgateway.ModelInfoV2{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
 	}
 	util.LogError("[RelayFailure]", ep.ContractProviderID, ep.ModelName)
 	usageCh <- usageRecord{user: token.Addr, tokenID: token.ID, model: model, routeID: ep.RouteID, failCount: 1}

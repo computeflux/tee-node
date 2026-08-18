@@ -32,9 +32,10 @@ var (
 type Gateway struct {
 	api store.ContractApi
 
-	credits               *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:credits"`
-	credit_useds          *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:credit_useds"`
-	models                *store.IndexedList[uint64, ModelInfo]                           `store:"keyPfx:models"`
+	credits      *store.StoreMapping[store.UniAddr, uint64] `store:"keyPfx:credits"`
+	credit_useds *store.StoreMapping[store.UniAddr, uint64] `store:"keyPfx:credit_useds"`
+	// models                *store.IndexedList[uint64, ModelInfo]
+	modelsV2              *store.IndexedList[uint64, ModelInfoV2]                         `store:"keyPfx:models"`
 	providers             *store.IndexedList[uint64, ProviderInfo]                        `store:"keyPfx:providers"`
 	providerByOwner       *store.StoreMapping[store.UniAddr, uint64]                      `store:"keyPfx:provider_by_owner"` // owner → providerID（一人一 provider）
 	providerCredits       *store.StoreMapping[uint64, uint64]                             `store:"keyPfx:provider_credit"`   // providerID → accumulated credits

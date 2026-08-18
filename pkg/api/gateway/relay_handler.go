@@ -32,6 +32,8 @@ func RegisterGatewayRoutes(r chi.Router) {
 		r.Use(RateLimitMiddleware(60, time.Minute))
 		r.Use(CacheMiddleware)
 	}
+
+	// openai
 	r.Route("/v1", func(r chi.Router) {
 		common(r)
 		r.Get("/models", HandleListModels)
@@ -47,7 +49,18 @@ func RegisterGatewayRoutes(r chi.Router) {
 				r.Post("/audio/transcriptions", HandleRelay)
 			})
 		})
+		// OpenAI Responses API 入口
+		r.Group(func(r chi.Router) {
+			r.Use(protocol.OpenAIResponsesMiddleware)
+			r.Use(TokenAuthMiddleware)
+			r.Group(func(r chi.Router) {
+				r.Use(DistributeMiddleware)
+				r.Post("/responses", HandleRelay)
+			})
+		})
 	})
+
+	// anthropic
 	r.Route("/anthropic", func(r chi.Router) {
 		common(r)
 		r.Group(func(r chi.Router) {
@@ -117,7 +130,13 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		ep := res.Meta.Endpoint
-		prov := protocol.ProviderNativeProtocol(ep.ProviderType)
+
+		// 判断是否还需转换：endpoint 原生支持入口协议则直接调用，否则转换到 endpoint 的原生协议
+		inboundType := protocol.ToType(inbound)
+		prov := inbound
+		if !ep.SupportsProtocol(inboundType) {
+			prov = protocol.ProviderNativeProtocol(ep.NativeProtocol())
+		}
 
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -167,7 +186,13 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ep := res.Meta.Endpoint
-	prov := protocol.ProviderNativeProtocol(ep.ProviderType)
+
+	// 判断是否还需转换：endpoint 原生支持入口协议则直接调用，否则转换到 endpoint 的原生协议
+	inboundType := protocol.ToType(inbound)
+	prov := inbound
+	if !ep.SupportsProtocol(inboundType) {
+		prov = protocol.ProviderNativeProtocol(ep.NativeProtocol())
+	}
 
 	var (
 		outBody []byte
@@ -178,7 +203,7 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 		usage = parseNativeUsage(res.Body, prov)
 	} else {
 		var conv error
-		outBody, usage, conv = convertResponse(res.Body, inbound, prov, bodyBytes, ep.ProviderType)
+		outBody, usage, conv = convertResponse(res.Body, inbound, prov, bodyBytes, ep.NativeProtocol())
 		if conv != nil {
 			EmitProviderMetric(ep.ContractProviderID, false)
 			writeProtocolError(w, r, http.StatusInternalServerError, conv.Error(), "server_error")
@@ -263,7 +288,7 @@ func recordRelayUsage(token *types.GatewayTokenInfo, ep *scheduler.Endpoint, usa
 	}
 	model := &cgateway.ModelInfoWithID{
 		ID:   ep.ModelID,
-		Data: cgateway.ModelInfo{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
+		Data: cgateway.ModelInfoV2{ProviderID: ep.ContractProviderID, Name: ep.ModelName},
 	}
 	recordUsageAsyncFn(token.Addr, token.ID, model, ep.RouteID,
 		uint64(usage.PromptTokens), uint64(usage.CompletionTokens), uint64(usage.PromptTokensDetails.CachedTokens))
@@ -297,7 +322,15 @@ func mapScheduleError(err error) (status int, msg, errType string) {
 }
 
 func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, modelName string, providerType uint16) ([]byte, error) {
+	// 方向约束：Responses API → 其他格式不支持（不支持转出去）
+	if inbound == protocol.ProtocolOpenAIResponses {
+		return nil, fmt.Errorf("unsupported conversion: responses api -> %v", provider)
+	}
 	switch {
+	case provider == protocol.ProtocolOpenAIResponses && inbound == protocol.ProtocolOpenAI:
+		return protocol.ConvertOpenAIRequestToResponses(bodyBytes, providerType)
+	case provider == protocol.ProtocolOpenAIResponses && inbound == protocol.ProtocolAnthropic:
+		return protocol.ConvertAnthropicRequestToResponses(bodyBytes, providerType)
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
 		return protocol.ConvertAnthropicRequestToOpenAI(bodyBytes, providerType)
 	case inbound == protocol.ProtocolOpenAI && provider == protocol.ProtocolAnthropic:
@@ -311,7 +344,23 @@ func convertRequest(bodyBytes []byte, inbound, provider protocol.Protocol, model
 }
 
 func convertResponse(body []byte, inbound, provider protocol.Protocol, origBody []byte, providerType uint16) ([]byte, *relay.Usage, error) {
+	// 方向约束：Responses API → 其他格式不支持（不支持转出去）
+	if inbound == protocol.ProtocolOpenAIResponses {
+		return nil, nil, fmt.Errorf("unsupported conversion: responses api -> %v", provider)
+	}
 	switch {
+	case provider == protocol.ProtocolOpenAIResponses && inbound == protocol.ProtocolOpenAI:
+		out, usage, err := protocol.ConvertResponsesResponseToOpenAI(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
+	case provider == protocol.ProtocolOpenAIResponses && inbound == protocol.ProtocolAnthropic:
+		out, usage, err := protocol.ConvertResponsesResponseToAnthropic(body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return out, bifrostUsageToRelay(usage), nil
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
 		out, usage, err := protocol.ConvertOpenAIResponseToAnthropic(body)
 		if err != nil {
@@ -363,6 +412,10 @@ func bifrostUsageToRelay(u *schemas.BifrostLLMUsage) *relay.Usage {
 }
 
 func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol) (*relay.Usage, error) {
+	// 方向约束：Responses API → 其他格式不支持；Responses API 方向的流式转换暂未实现
+	if inbound == protocol.ProtocolOpenAIResponses || provider == protocol.ProtocolOpenAIResponses {
+		return nil, fmt.Errorf("stream conversion with responses api not supported (inbound=%v provider=%v)", inbound, provider)
+	}
 	switch {
 	case inbound == protocol.ProtocolAnthropic && provider == protocol.ProtocolOpenAI:
 		usage, err := protocol.StreamOpenAIResponseToAnthropic(r, w)

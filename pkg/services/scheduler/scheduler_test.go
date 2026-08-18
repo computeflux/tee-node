@@ -111,9 +111,9 @@ func newTestScheduler(t *testing.T, maxConc int) (*Scheduler, *Registry, *mockCl
 			Model:          "gpt-4o",
 			MaxConcurrency: maxConc,
 			Endpoints: []*Endpoint{
-				{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-				{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-				{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 			FallbackModels: []ModelKey{"claude-3-5"},
 		},
@@ -121,7 +121,7 @@ func newTestScheduler(t *testing.T, maxConc int) (*Scheduler, *Registry, *mockCl
 			Model:          "claude-3-5",
 			MaxConcurrency: maxConc,
 			Endpoints: []*Endpoint{
-				{Provider: "anthropic", Protocol: "anthropic", KeyID: "key-x", KeyValue: "v-x", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "anthropic", ModelUrls: map[uint16]string{2: "https://u.test"}, KeyID: "key-x", KeyValue: "v-x", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 		},
 	}
@@ -182,9 +182,9 @@ func TestSchedule_AuthError_DeadKey(t *testing.T) {
 	reg.Replace([]*ModelRoute{{
 		Model: "no-fallback",
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-a", KeyValue: "v-a", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-b", KeyValue: "v-b", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "key-c", KeyValue: "v-c", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}})
 	_, err := sch.Schedule(context.Background(), Invoke{Model: "no-fallback", Body: []byte(`{}`)})
@@ -312,7 +312,7 @@ func TestCircuitBreaker_OpensOnHighFailureRate(t *testing.T) {
 	reg.Replace([]*ModelRoute{{
 		Model: "m",
 		Endpoints: []*Endpoint{
-			{Provider: "p", Protocol: "p", KeyID: "k", Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, Weight: 1.0},
+			{Provider: "p", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "k", Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, Weight: 1.0},
 		},
 	}})
 	obs := NoopObservability()
@@ -345,7 +345,7 @@ func TestCircuitBreaker_OpensOnHighFailureRate(t *testing.T) {
 func TestRegistry_HotReplace(t *testing.T) {
 	reg := NewRegistry()
 	reg.Replace([]*ModelRoute{{Model: "m1", Endpoints: []*Endpoint{
-		{Provider: "p", Protocol: "p", KeyID: "k1", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
+		{Provider: "p", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "k1", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
 	}}})
 	if reg.LookupModel("m1") == nil {
 		t.Fatal("expected m1")
@@ -355,7 +355,7 @@ func TestRegistry_HotReplace(t *testing.T) {
 	}
 
 	reg.Replace([]*ModelRoute{{Model: "m2", Endpoints: []*Endpoint{
-		{Provider: "p", Protocol: "p", KeyID: "k2", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
+		{Provider: "p", ModelUrls: map[uint16]string{1: "https://u.test"}, KeyID: "k2", Enabled: true, Models: []ModelKey{"*"}, Weight: 1.0},
 	}}})
 	if reg.LookupModel("m1") != nil {
 		t.Fatal("expected m1 to be gone after replace")
@@ -445,13 +445,13 @@ func TestScale_ThousandsOfEndpoints(t *testing.T) {
 		for j := 0; j < endpointsPerModel; j++ {
 			providerName := ProviderID(fmt.Sprintf("provider-%d", j%5))
 			eps = append(eps, &Endpoint{
-				Provider: ProviderID(providerName),
-				Protocol: ProviderID(providerName),
-				KeyID:    fmt.Sprintf("key-%d-%d", i, j),
-				KeyValue: "v",
-				Weight:   1.0,
-				Enabled:  true,
-				Models:   []ModelKey{"*"},
+				Provider:  ProviderID(providerName),
+				KeyID:     fmt.Sprintf("key-%d-%d", i, j),
+				KeyValue:  "v",
+				Weight:    1.0,
+				Enabled:   true,
+				Models:    []ModelKey{"*"},
+				ModelUrls: map[uint16]string{uint16(j%5) + 1: "https://u.test"},
 			})
 		}
 		routes = append(routes, &ModelRoute{

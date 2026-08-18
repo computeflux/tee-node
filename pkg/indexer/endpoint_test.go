@@ -21,11 +21,12 @@ func TestGatewayEndpointIndex_ResolveProviderModel(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 1,
-			Model: cgateway.ModelInfo{
-				Name:           "MiniMax-M2.7",
-				ModelID:        "mini-max-m27",
+			Model: cgateway.ModelInfoV2{
+				Name: "MiniMax-M2.7",
+				// ModelType 用非 EdgeRoute 的路由类型(共用的协议类型 OpenAI=1 恰好等于 EdgeRoute=1, 会误判为本地模型)
+				ModelType:      cgateway.MiningPoolRoute,
+				URIS:           `{"1":"https://api.minimax.test"}`,
 				ProviderID:     100,
-				ProviderType:   cgateway.ProviderOpenAI,
 				APIKeys:        []string{"key1"},
 				IsActive:       true,
 				MaxConcurrency: 5,
@@ -34,11 +35,11 @@ func TestGatewayEndpointIndex_ResolveProviderModel(t *testing.T) {
 		},
 		{
 			ID: 2,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "MiniMax-M2.7",
-				ModelID:        "mini-max-m27",
+				ModelType:      cgateway.MiningPoolRoute,
+				URIS:           `{"1":"https://api.minimax.test"}`,
 				ProviderID:     200,
-				ProviderType:   cgateway.ProviderOpenAI,
 				APIKeys:        []string{"key2", "key3"},
 				IsActive:       true,
 				MaxConcurrency: 8,
@@ -65,10 +66,10 @@ func TestGatewayEndpointIndex_ResolveBareModel_NotSupported(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 1,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "gpt-4",
 				ProviderID:     100,
-				ProviderType:   cgateway.ProviderOpenAI,
+				ModelType:      cgateway.MiningPoolRoute,
 				APIKeys:        []string{"a"},
 				IsActive:       true,
 				MaxConcurrency: 1,
@@ -87,10 +88,10 @@ func TestGatewayEndpointIndex_ResolveRoute(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 10,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "route-member",
 				ProviderID:     1,
-				ProviderType:   cgateway.ProviderOpenAI,
+				ModelType:      cgateway.MiningPoolRoute,
 				APIKeys:        []string{"k1"},
 				IsActive:       true,
 				MaxConcurrency: 3,
@@ -122,10 +123,10 @@ func TestGatewayEndpointIndex_ResolveRoute_CaseInsensitive(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 10,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "route-member",
 				ProviderID:     1,
-				ProviderType:   cgateway.ProviderOpenAI,
+				ModelType:      cgateway.MiningPoolRoute,
 				APIKeys:        []string{"k1"},
 				IsActive:       true,
 				MaxConcurrency: 3,
@@ -158,10 +159,10 @@ func TestGatewayEndpointIndex_ResolveRoute_NameWithPrefix(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 10,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "route-member",
 				ProviderID:     1,
-				ProviderType:   cgateway.ProviderOpenAI,
+				ModelType:      cgateway.MiningPoolRoute,
 				APIKeys:        []string{"k1"},
 				IsActive:       true,
 				MaxConcurrency: 3,
@@ -193,10 +194,10 @@ func TestGatewayEndpointIndex_RouteEndpointHasRouteID(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 10,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name:           "route-member",
 				ProviderID:     1,
-				ProviderType:   cgateway.ProviderOpenAI,
+				ModelType:      cgateway.MiningPoolRoute,
 				APIKeys:        []string{"k1"},
 				IsActive:       true,
 				MaxConcurrency: 3,
@@ -228,12 +229,12 @@ func TestGatewayEndpointIndex_InactiveSkipped(t *testing.T) {
 	models := []cgateway.ModelInfoWithProvider{
 		{
 			ID: 1,
-			Model: cgateway.ModelInfo{
-				Name:         "off",
-				ProviderID:   1,
-				ProviderType: cgateway.ProviderOpenAI,
-				APIKeys:      []string{"k"},
-				IsActive:     false,
+			Model: cgateway.ModelInfoV2{
+				Name:       "off",
+				ProviderID: 1,
+				ModelType:  cgateway.MiningPoolRoute,
+				APIKeys:    []string{"k"},
+				IsActive:   false,
 			},
 			Provider: cgateway.ProviderInfo{Name: "p1", IsActive: true},
 		},

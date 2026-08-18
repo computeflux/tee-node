@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // GeminiAdaptor 以 Gemini 原生格式与上游通信：请求体由 scheduler.ResolveRequest
@@ -33,7 +34,7 @@ func (a *GeminiAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []b
 	if err != nil {
 		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, ep.ModelName, false)
+	url := a.requestURL(ep.ModelUrls[gateway.Gemini], ep.ModelName, false)
 	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-goog-api-key", ep.KeyValue)
 	})
@@ -44,7 +45,7 @@ func (a *GeminiAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body
 	if err != nil {
 		return nil, &scheduler.UpstreamError{Status: http.StatusBadRequest, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, ep.ModelName, true)
+	url := a.requestURL(ep.ModelUrls[gateway.Gemini], ep.ModelName, true)
 	return httpStream(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-goog-api-key", ep.KeyValue)
 	})

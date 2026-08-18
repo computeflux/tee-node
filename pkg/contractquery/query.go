@@ -48,7 +48,7 @@ func GatewaySecretListActiveModelsWithinProvider(chain *teechain.TeeChain) ([]cg
 
 	out := make([]cgateway.ModelInfoWithProvider, 0, len(models))
 	for _, m := range models {
-		secret, err := runGatewaySecret(chain, func(s cgateway.GatewaySecret) (*cgateway.ModelInfo, error) {
+		secret, err := runGatewaySecret(chain, func(s cgateway.GatewaySecret) (*cgateway.ModelInfoV2, error) {
 			return s.GetModel(m.ID)
 		})
 		if err != nil || secret == nil {

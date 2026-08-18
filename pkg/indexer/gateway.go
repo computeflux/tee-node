@@ -80,7 +80,6 @@ func (g *GatewayModelIndex) BuildFromModels(models []cgateway.ModelInfoWithProvi
 
 		doc := map[string]any{
 			"name":              m.Model.Name,
-			"providerType":      m.Model.ProviderType,
 			"contextLength":     m.Model.ContextLength,
 			"inPrice":           m.Model.InPrice,
 			"cachedPrice":       m.Model.CachedPrice,

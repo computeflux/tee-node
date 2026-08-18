@@ -35,7 +35,7 @@ func TestHandleRelay_MatchingAnthropicProtocol(t *testing.T) {
 	fake := &fakeAdaptor{
 		respBody: `{"id":"msg_1","type":"message","role":"assistant","content":[{"type":"text","text":"Hi"}],"model":"claude-3","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}`,
 	}
-	installScheduler(t, "anthropic", "claude-3", "claude-3", cgateway.ProviderClaude, fake)
+	installScheduler(t, "anthropic", "claude-3", "claude-3", cgateway.Anthropic, fake)
 
 	body := `{"model":"anthropic/claude-3","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`
 	req := relayRequest(body, "anthropic/claude-3", "/anthropic/v1/messages", protocol.ProtocolAnthropic)
@@ -61,7 +61,7 @@ func TestHandleRelay_MatchingOpenAIProtocol(t *testing.T) {
 	fake := &fakeAdaptor{
 		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`,
 	}
-	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, fake)
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.OpenAI, fake)
 
 	body := `{"model":"openai/gpt-4","messages":[{"role":"user","content":"hello"}]}`
 	req := relayRequest(body, "openai/gpt-4", "/v1/chat/completions", "")
@@ -87,7 +87,7 @@ func TestHandleRelay_AnthropicToOpenAI(t *testing.T) {
 	fake := &fakeAdaptor{
 		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`,
 	}
-	installScheduler(t, "openai", "claude-proxy", "gpt-4", cgateway.ProviderOpenAI, fake)
+	installScheduler(t, "openai", "claude-proxy", "gpt-4", cgateway.OpenAI, fake)
 
 	body := `{"model":"openai/claude-proxy","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`
 	req := relayRequest(body, "openai/claude-proxy", "/anthropic/v1/messages", protocol.ProtocolAnthropic)

@@ -54,17 +54,17 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 		return nil, err
 	}
 
-	// 过滤 providerType == 9999 的本地模型
+	// 过滤本地模型（ModelType == EdgeRoute，历史 9999 哨兵已并入）
 	result := make([]*model.ModelInfo, 0, len(models))
 	for _, mid := range models {
 		m := mid.Data
-		if m.ProviderType == 9999 {
+		if m.ModelType == gateway.EdgeRoute {
 			result = append(result, &model.ModelInfo{
 				Name:            m.Name,
 				ProviderID:      int(m.ProviderID),
-				ProviderType:    int(m.ProviderType),
-				ModelID:         m.ModelID,
-				URI:             m.URI,
+				ProviderType:    int(m.ModelType),
+				ModelID:         "",
+				URI:             m.URIS,
 				InputModalities: int(m.InputModalities),
 				ContextLength:   int(m.ContextLength),
 				InPrice:         int(m.InPrice),
@@ -139,9 +139,9 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 			Model: &model.ModelInfo{
 				Name:            m.Name,
 				ProviderID:      int(m.ProviderID),
-				ProviderType:    int(m.ProviderType),
-				ModelID:         m.ModelID,
-				URI:             m.URI,
+				ProviderType:    int(m.ModelType),
+				ModelID:         "",
+				URI:             m.URIS,
 				InputModalities: int(m.InputModalities),
 				ContextLength:   int(m.ContextLength),
 				InPrice:         int(m.InPrice),

@@ -25,6 +25,10 @@ type ModelKey string
 // 它只是路由分类,不影响 HTTP 调用细节。
 type ProviderID string
 
+// EdgeProviderType 本地/个人算力模型的协议哨兵值(历史值 9999)。
+// 新模型用 ModelType==EdgeRoute 标识本地模型,但旧的按协议分发的客户端注册/过滤仍需要该哨兵。
+const EdgeProviderType uint16 = 9999
+
 // EndpointKey 在 registry 内全局唯一。
 type EndpointKey struct {
 	Provider ProviderID
@@ -37,13 +41,11 @@ func (k EndpointKey) String() string { return string(k.Provider) + "/" + k.KeyID
 // 同一供应商可以有多个 Endpoint(多个 key),分别参与负载均衡。
 type Endpoint struct {
 	Provider ProviderID `json:"provider"` // provider 节点名（如 "node-7f3a"）
-	Protocol ProviderID `json:"protocol"` // 协议类型（如 "openai"/"anthropic"/"gemini"）
 	KeyID    string     `json:"key_id"`
 	// KeyValue 是上游 API Key 明文，绝不应被默认 JSON 序列化带出。
-	KeyValue string     `json:"-"`
-	BaseURL  string     `json:"base_url,omitempty"`
-	Weight   float64    `json:"weight"`
-	Enabled  bool       `json:"enabled"`
+	KeyValue string  `json:"-"`
+	Weight   float64 `json:"weight"`
+	Enabled  bool    `json:"enabled"`
 
 	// Models 限定该端点能服务的模型列表(白名单)。
 	// 空切片 = deny-all;"*" 通配 = allow-all。
@@ -61,10 +63,10 @@ type Endpoint struct {
 	//   - provider client 发上游请求(模型名 / provider id / provider type)
 	//   - 上报 provider 指标(EmitProviderMetric)
 	//   - 记录用量计费(recordUsageAsync 需要 ModelID + ContractProviderID)
-	ModelID            uint64 `json:"model_id,omitempty"`             // 合约 model id(计费 key)
-	ContractProviderID uint64 `json:"contract_provider_id,omitempty"` // 合约 provider id
-	ModelName          string `json:"model_name,omitempty"`           // 上游真实 model name
-	ProviderType       uint16 `json:"provider_type,omitempty"`        // 合约 ProviderType(选 client / 转换用)
+	ModelID            uint64            `json:"model_id,omitempty"`             // 合约 model id(计费 key)
+	ContractProviderID uint64            `json:"contract_provider_id,omitempty"` // 合约 provider id
+	ModelName          string            `json:"model_name,omitempty"`           // 上游真实 model name
+	ModelUrls          map[uint16]string `json:"provider_type,omitempty"`        // 合约 ProviderType(选 client / 转换用)
 
 	// Route identity for route-based settlement.
 	RouteID uint64 `json:"route_id,omitempty"`
@@ -77,6 +79,31 @@ type Endpoint struct {
 // EffectiveScore 返回端点的当前评分,供 selector 使用。
 func (e *Endpoint) EffectiveScore(coldStartThreshold int) float64 {
 	return computeScore(e.Weight, e.metrics, coldStartThreshold)
+}
+
+// NativeProtocol 返回端点的原生协议(用于适配器选择/转换目标)。
+// 端点支持的协议见 ModelUrls 的 key；多协议时按确定性的最小 key 选取。
+func (e *Endpoint) NativeProtocol() uint16 {
+	if len(e.ModelUrls) == 0 {
+		return 0
+	}
+	// 确定性地选择最小的协议 key
+	min := uint16(^uint16(0))
+	for pt := range e.ModelUrls {
+		if pt < min {
+			min = pt
+		}
+	}
+	return min
+}
+
+// SupportsProtocol 判断端点是否原生支持指定协议。
+func (e *Endpoint) SupportsProtocol(pt uint16) bool {
+	if pt == 0 {
+		return false
+	}
+	_, ok := e.ModelUrls[pt]
+	return ok
 }
 
 // InFlight 当前正在处理的请求数。
@@ -188,4 +215,3 @@ func (r *Registry) Resolve(ctx context.Context, model ModelKey, provider Provide
 		FallbackModels: route.FallbackModels,
 	}, nil
 }
-

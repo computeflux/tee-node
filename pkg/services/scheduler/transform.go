@@ -28,8 +28,8 @@ type RequestTransformFunc func(
 ) (outBody []byte, upstreamPath string, err error)
 
 var (
-	requestTransform     RequestTransformFunc
-	requestTransformMu   sync.RWMutex
+	requestTransform   RequestTransformFunc
+	requestTransformMu sync.RWMutex
 )
 
 // SetRequestTransform 注入请求转换实现（gateway 层在启动时调用一次）。
@@ -83,9 +83,10 @@ func ResolveRequest(ctx context.Context, ep *Endpoint, body []byte) (outBody []b
 	if !ok || ri.Inbound == "" {
 		return nil, "", fmt.Errorf("scheduler: inbound protocol missing in ctx")
 	}
-	outBody, upstreamPath, err = loadRequestTransform()(ri.Inbound, string(ep.Protocol), ri.Path, ep.ProviderType, body)
+	providerProto := ClientTypeName(ep.NativeProtocol())
+	outBody, upstreamPath, err = loadRequestTransform()(ri.Inbound, providerProto, ri.Path, ep.NativeProtocol(), body)
 	if err != nil {
-		return nil, "", fmt.Errorf("scheduler: transform inbound=%s providerProto=%s path=%s: %w", ri.Inbound, ep.Protocol, ri.Path, err)
+		return nil, "", fmt.Errorf("scheduler: transform inbound=%s providerProto=%s path=%s: %w", ri.Inbound, providerProto, ri.Path, err)
 	}
 	return outBody, upstreamPath, nil
 }

@@ -639,6 +639,26 @@
               ],
               "type": 3
             }
+          },
+          {
+            "docs": [],
+            "label": "thinking",
+            "type": {
+              "displayName": [
+                "bool"
+              ],
+              "type": 6
+            }
+          },
+          {
+            "docs": [],
+            "label": "meta",
+            "type": {
+              "displayName": [
+                "string"
+              ],
+              "type": 14
+            }
           }
         ],
         "default": false,
@@ -3205,19 +3225,23 @@
                 "type": 3
               },
               {
+                "name": "Thinking",
+                "type": 6
+              },
+              {
+                "name": "Meta",
+                "type": 14
+              },
+              {
+                "name": "ModelType",
+                "type": 1
+              },
+              {
                 "name": "RouteID",
                 "type": 3
               },
               {
-                "name": "ProviderType",
-                "type": 1
-              },
-              {
-                "name": "ModelID",
-                "type": 14
-              },
-              {
-                "name": "URI",
+                "name": "URIS",
                 "type": 14
               },
               {
@@ -3256,7 +3280,7 @@
           }
         },
         "path": [
-          "ModelInfo"
+          "ModelInfoV2"
         ]
       }
     },

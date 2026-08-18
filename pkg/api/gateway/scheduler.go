@@ -24,12 +24,13 @@ func InitScheduler(ctx context.Context, chain *teechain.TeeChain, resolver sched
 		return nil, err
 	}
 
-	// 协议 adaptor 命名必须与 scheduler.providerTypeName 输出一致。
+	// 协议 adaptor 命名必须与 scheduler.ClientTypeName 输出一致。
 	gw.RegisterProviders(map[string]scheduler.ProviderClient{
-		"openai":    relay.GetProviderClient(cgateway.ProviderOpenAI),
-		"anthropic": relay.GetProviderClient(cgateway.ProviderClaude),
-		"gemini":    relay.GetProviderClient(cgateway.ProviderGemini),
-		"personal":  relay.GetProviderClient(cgateway.ProviderPersonal),
+		"openai":               relay.GetProviderClient(cgateway.OpenAI),
+		"anthropic":            relay.GetProviderClient(cgateway.Anthropic),
+		"gemini":               relay.GetProviderClient(cgateway.Gemini),
+		"openai-responses-api": relay.GetProviderClient(cgateway.OpenAIResponsesApi),
+		"personal":             relay.GetProviderClient(scheduler.EdgeProviderType),
 	})
 
 	scheduler.SetRequestTransform(schedulerRequestTransform)

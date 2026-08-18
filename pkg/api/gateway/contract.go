@@ -130,8 +130,8 @@ func FindProviderByModelAPIKey(modelName, apiKey string) (uint64, bool) {
 		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s not found or inactive under provider=%d", modelName, providerID)
 		return 0, false
 	}
-	if model.Data.ProviderType != cgateway.ProviderPersonal {
-		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s provider=%d providerType=%d is not local", modelName, providerID, model.Data.ProviderType)
+	if model.Data.ModelType != cgateway.EdgeRoute {
+		GATEWAYLOG().Printf("[LOCAL-TUNNEL] model=%s provider=%d ModelType=%d is not local", modelName, providerID, model.Data.ModelType)
 		return 0, false
 	}
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 func TestAnthropicAdaptor_GetRequestURL_Dedup(t *testing.T) {
@@ -53,7 +54,7 @@ func TestAnthropicAdaptor_Do_ForwardsBodyAndHeaders(t *testing.T) {
 
 	body := []byte(`{"model":"claude-3","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`)
 	a := &AnthropicAdaptor{}
-	ep := &scheduler.Endpoint{BaseURL: upstream.URL, KeyValue: "sk-test"}
+	ep := &scheduler.Endpoint{ModelUrls: map[uint16]string{gateway.Anthropic: upstream.URL}, KeyValue: "sk-test"}
 	ctx := scheduler.WithRequest(context.Background(), "anthropic", "/v1/messages")
 
 	resp, err := a.Do(ctx, ep, body)

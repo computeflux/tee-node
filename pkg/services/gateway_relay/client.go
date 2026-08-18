@@ -23,13 +23,15 @@ import (
 // 命名与 reloader.providerTypeName 输出保持一致(由调用方注册到 scheduler)。
 func GetProviderClient(providerType uint16) scheduler.ProviderClient {
 	switch providerType {
-	case cgateway.ProviderClaude:
+	case cgateway.Anthropic:
 		return &AnthropicAdaptor{}
-	case cgateway.ProviderGemini:
+	case cgateway.Gemini:
 		return &GeminiAdaptor{}
-	case cgateway.ProviderPersonal:
+	case cgateway.OpenAIResponsesApi:
+		return &OpenAIResponsesApiAdaptor{}
+	case scheduler.EdgeProviderType:
 		return &LocalAdaptor{}
-	case cgateway.ProviderOpenAI:
+	case cgateway.OpenAI:
 		return &OpenAIAdaptor{}
 	default:
 		// 未知 ProviderType 不再静默兜底到 OpenAI，返回 nil 让调用方/调度器拒绝该端点，
@@ -240,8 +242,8 @@ func endpointLabel(ep *scheduler.Endpoint) string {
 	if ep == nil {
 		return "endpoint=nil"
 	}
-	return fmt.Sprintf("provider=%s provider_id=%d model_id=%d key=%s route=%d proto=%s base=%s",
-		ep.Provider, ep.ContractProviderID, ep.ModelID, ep.KeyID, ep.RouteID, ep.Protocol, ep.BaseURL)
+	return fmt.Sprintf("provider=%s provider_id=%d model_id=%d key=%s route=%d proto=%s urls=%v",
+		ep.Provider, ep.ContractProviderID, ep.ModelID, ep.KeyID, ep.RouteID, scheduler.ClientTypeName(ep.NativeProtocol()), ep.ModelUrls)
 }
 
 // truncateLog 截断过长的日志字段，防止上游异常响应撑爆单行日志。

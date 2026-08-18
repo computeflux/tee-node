@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // OpenAIAdaptor 直接实现 scheduler.ProviderClient：以 OpenAI 兼容格式与上游通信。
@@ -41,7 +42,7 @@ func (a *OpenAIAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []b
 		}
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, upstreamPath)
+	url := a.requestURL(ep.ModelUrls[gateway.OpenAI], upstreamPath)
 	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("Authorization", "Bearer "+ep.KeyValue)
 		for k, v := range ep.ExtraHeaders {
@@ -59,9 +60,9 @@ func (a *OpenAIAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body
 		}
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, upstreamPath)
+	url := a.requestURL(ep.ModelUrls[gateway.OpenAI], upstreamPath)
 	out := sendBody
-	if ep.Protocol == scheduler.ProviderID("openai") {
+	if ep.NativeProtocol() == gateway.OpenAI {
 		out = injectStreamUsage(sendBody)
 	}
 	return httpStream(ctx, ep, url, out, func(req *http.Request) {

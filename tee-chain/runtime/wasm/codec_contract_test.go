@@ -392,7 +392,7 @@ func TestCodec_Gateway_ModelInfo(t *testing.T) {
 		Name: "gpt-4", Owner: store.UniAddr{T: 1, V: []byte("openai")},
 		ProviderID: 1, InputModalities: gateway.ModalityText,
 		ContextLength: 128000, InPrice: 100, CachedPrice: 50, OutPrice: 200,
-		ProviderType: gateway.ProviderOpenAI, ModelID: "gpt-4-turbo",
+		ProviderType: gateway.OpenAI, ModelID: "gpt-4-turbo",
 		URI: "https://api.openai.com", APIKeys: []string{"sk-xxx"},
 		IsActive: true, CreatedAt: 1234567890,
 	}
@@ -404,7 +404,7 @@ func TestCodec_Gateway_ModelInfo_MultiModality(t *testing.T) {
 		Name: "gemini-pro", Owner: store.UniAddr{T: 1, V: []byte("google")},
 		ProviderID:      2,
 		InputModalities: gateway.ModalityText | gateway.ModalityImage | gateway.ModalityAudio,
-		ProviderType:    gateway.ProviderGemini,
+		ProviderType:    gateway.Gemini,
 		APIKeys:         []string{"key1", "key2", "key3"},
 		IsActive:        true,
 	}
@@ -414,11 +414,10 @@ func TestCodec_Gateway_ModelInfo_MultiModality(t *testing.T) {
 func TestCodec_Gateway_ModelInfoWithID(t *testing.T) {
 	v := gateway.ModelInfoWithID{
 		ID: 99,
-		Data: gateway.ModelInfo{
+		Data: gateway.ModelInfoV2{
 			Name: "llama", ProviderID: 3,
-			ProviderType: gateway.ProviderOpenAI,
-			ModelID:      "llama-3-70b",
-			IsActive:     true,
+			ModelType: gateway.OpenAI,
+			IsActive:  true,
 		},
 	}
 	testRoundTrip(t, &v)
@@ -427,10 +426,10 @@ func TestCodec_Gateway_ModelInfoWithID(t *testing.T) {
 func TestCodec_Gateway_ModelInfoWithProvider(t *testing.T) {
 	v := gateway.ModelInfoWithProvider{
 		ID: 10,
-		Model: gateway.ModelInfo{
+		Model: gateway.ModelInfoV2{
 			Name: "claude", ProviderID: 2,
-			ProviderType: gateway.ProviderClaude,
-			IsActive:     true,
+			ModelType: gateway.Anthropic,
+			IsActive:  true,
 		},
 		Provider: gateway.ProviderInfo{
 			Name: "anthropic", Owner: store.UniAddr{T: 1, V: []byte("anthropic")},
@@ -850,8 +849,8 @@ func TestCodec_SliceOfSpend(t *testing.T) {
 
 func TestCodec_SliceOfModelInfoWithID(t *testing.T) {
 	v := []gateway.ModelInfoWithID{
-		{ID: 1, Data: gateway.ModelInfo{Name: "gpt-4"}},
-		{ID: 2, Data: gateway.ModelInfo{Name: "claude"}},
+		{ID: 1, Data: gateway.ModelInfoV2{Name: "gpt-4"}},
+		{ID: 2, Data: gateway.ModelInfoV2{Name: "claude"}},
 	}
 	testRoundTrip(t, &v)
 }
@@ -1256,13 +1255,13 @@ func randAPIKeyInfo(rng *rand.Rand) *gateway.APIKeyInfo {
 	}
 }
 
-func randModelInfo(rng *rand.Rand) *gateway.ModelInfo {
-	n := rng.Intn(5)
-	keys := make([]string, n)
-	for j := 0; j < n; j++ {
-		keys[j] = randString(rng, 48)
+func randModelInfo(rng *rand.Rand) *gateway.ModelInfoV2 {
+	keys := make([]string, rng.Intn(4))
+	for i := range keys {
+		keys[i] = randString(rng, 24)
 	}
-	return &gateway.ModelInfo{
+
+	return &gateway.ModelInfoV2{
 		Name:            randString(rng, 32),
 		Owner:           *randUniAddr(rng),
 		ProviderID:      rng.Uint64(),
@@ -1271,9 +1270,10 @@ func randModelInfo(rng *rand.Rand) *gateway.ModelInfo {
 		InPrice:         rng.Uint64(),
 		CachedPrice:     rng.Uint64(),
 		OutPrice:        rng.Uint64(),
-		ProviderType:    uint16(rng.Intn(65536)),
-		ModelID:         randString(rng, 32),
-		URI:             randString(rng, 128),
+		Thinking:        rng.Intn(2) == 1,
+		Meta:            randString(rng, 32),
+		ModelType:       uint16(rng.Intn(65536)),
+		URIS:            randString(rng, 128),
 		APIKeys:         keys,
 		IsActive:        rng.Intn(2) == 1,
 		CreatedAt:       rng.Uint64(),

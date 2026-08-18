@@ -19,7 +19,7 @@ func (g GatewayMutation) ReportModel(modelID uint64, reason string) error {
 	txn := g.api.GetTxn()
 
 	// 校验模型存在
-	model, err := g.models.Get(txn, modelID)
+	model, err := g.modelsV2.Get(txn, modelID)
 	if err != nil || model == nil {
 		return fmt.Errorf("model %d not found", modelID)
 	}
@@ -84,7 +84,7 @@ func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool
 	txn := g.api.GetTxn()
 
 	// 校验模型存在，避免产生孤儿审计记录
-	if m, err := g.models.Get(txn, modelID); err != nil || m == nil {
+	if m, err := g.modelsV2.Get(txn, modelID); err != nil || m == nil {
 		return store.NewErr[uint64, error](fmt.Errorf("AuditModel: model %d not found", modelID))
 	}
 
@@ -101,7 +101,7 @@ func (g GatewayMutation) AuditModel(modelID uint64, triggerBy uint8, passed bool
 	}
 
 	// 更新模型信誉分（EMA，最近 100 次权重主导）
-	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+	if err := g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 		m.TotalAudits++
 		if passed {
 			m.PassedAudits++

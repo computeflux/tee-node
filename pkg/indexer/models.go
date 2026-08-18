@@ -29,12 +29,12 @@ func (idx *Indexer) ListModels(ctx context.Context, req GatewayModelSearchReques
 	for _, item := range models {
 		m := item.Model
 		// 个人算力（ProviderType 9999）必须存在可用本地隧道连接才展示
-		if m.ProviderType == cgateway.ProviderPersonal && !pool.HasEntry(m.ProviderID, m.Name) {
+		if m.ModelType == cgateway.EdgeRoute && !pool.HasEntry(m.ProviderID, m.Name) {
 			continue
 		}
 
 		// 跳过没有服务的模型
-		if m.ProviderType != cgateway.ProviderPersonal && len(m.APIKeys) == 0 {
+		if m.ModelType != cgateway.EdgeRoute && len(m.APIKeys) == 0 {
 			continue
 		}
 

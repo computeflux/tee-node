@@ -36,7 +36,7 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 		}
 
 		// 校验模型存在
-		m, err := g.models.Get(g.api.GetTxn(), r.ModelID)
+		m, err := g.modelsV2.Get(g.api.GetTxn(), r.ModelID)
 		if err != nil || m == nil {
 			return fmt.Errorf("settle: %w", ErrModelNotFound)
 		}
@@ -190,7 +190,7 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 			}
 			n++
 			if n >= maxConsecutiveFailPeriods {
-				_ = g.models.UpdateFn(txn, mid, func(m *ModelInfo) {
+				_ = g.modelsV2.UpdateFn(txn, mid, func(m *ModelInfoV2) {
 					m.IsActive = false
 				})
 			}

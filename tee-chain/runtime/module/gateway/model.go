@@ -21,6 +21,8 @@ func (g GatewayMutation) RegisterModel(
 	apiKeys []string,
 	maxConcurrency uint32,
 	balance uint64,
+	thinking bool,
+	meta string,
 ) error {
 	owner := g.api.GetCaller()
 
@@ -32,7 +34,7 @@ func (g GatewayMutation) RegisterModel(
 
 	// ProviderID + Name 唯一性检查
 	txn := g.api.GetTxn()
-	existing, err := g.models.Query(txn, store.QueryAND{
+	existing, err := g.modelsV2.Query(txn, store.QueryAND{
 		store.QueryCond{Field: "ProviderID", Val: *provID},
 		store.QueryCond{Field: "Name", Val: name},
 	})
@@ -52,7 +54,7 @@ func (g GatewayMutation) RegisterModel(
 		}
 	}
 
-	id, err := g.models.Insert(txn, ModelInfo{
+	id, err := g.modelsV2.Insert(txn, ModelInfoV2{
 		Name:            name,
 		Owner:           owner,
 		ProviderID:      *provID,
@@ -63,8 +65,10 @@ func (g GatewayMutation) RegisterModel(
 		InPrice:         inPrice,
 		CachedPrice:     cachedPrice,
 		OutPrice:        outPrice,
-		ProviderType:    providerType,
-		URI:             uri,
+		ModelType:       RouterTypeOfModel(providerType),
+		URIS:            uri,
+		Thinking:        thinking,
+		Meta:            meta,
 		APIKeys:         keys,
 		MaxConcurrency:  maxConcurrency,
 		Balance:         balance,
@@ -89,19 +93,18 @@ func (g GatewayMutation) UpdateModel(
 	maxConcurrency uint32,
 	balance uint64,
 ) error {
-	cur, err := g.models.Get(g.api.GetTxn(), ID)
+	cur, err := g.modelsV2.Get(g.api.GetTxn(), ID)
 	if err != nil || cur == nil {
 		return err
 	}
 
-	if err := g.models.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfo) {
+	if err := g.modelsV2.UpdateFn(g.api.GetTxn(), ID, func(m *ModelInfoV2) {
 		m.InputModalities = inputModalities
 		m.ContextLength = contextLength
 		m.InPrice = inPrice
 		m.CachedPrice = cachedPrice
 		m.OutPrice = outPrice
-		m.ProviderType = providerType
-		m.URI = uri
+		m.URIS = uri
 		m.MaxConcurrency = maxConcurrency
 		m.Balance = balance
 	}); err != nil {
@@ -112,7 +115,7 @@ func (g GatewayMutation) UpdateModel(
 }
 
 func (g GatewayMutation) AddModelAPIKeyRef(modelID uint64, apiKey string) error {
-	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	cur, err := g.modelsV2.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
 		return err
 	}
@@ -120,13 +123,13 @@ func (g GatewayMutation) AddModelAPIKeyRef(modelID uint64, apiKey string) error 
 		return errors.New("api key cannot be empty")
 	}
 
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	return g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.APIKeys = append(m.APIKeys, apiKey)
 	})
 }
 
 func (g GatewayMutation) DeleteModelAPIKeyRef(modelID uint64, index int) error {
-	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	cur, err := g.modelsV2.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
 		return err
 	}
@@ -134,13 +137,13 @@ func (g GatewayMutation) DeleteModelAPIKeyRef(modelID uint64, index int) error {
 		return errors.New("index out of range")
 	}
 
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	return g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.APIKeys = append(m.APIKeys[:index], m.APIKeys[index+1:]...)
 	})
 }
 
 func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, index int, newApiKey string) error {
-	cur, err := g.models.Get(g.api.GetTxn(), modelID)
+	cur, err := g.modelsV2.Get(g.api.GetTxn(), modelID)
 	if err != nil || cur == nil {
 		return err
 	}
@@ -151,19 +154,19 @@ func (g GatewayMutation) UpdateModelAPIKeyRef(modelID uint64, index int, newApiK
 		return errors.New("api key cannot be empty")
 	}
 
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	return g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.APIKeys[index] = newApiKey
 	})
 }
 
 func (g GatewayMutation) DeactivateModel(modelID uint64) error {
-	return g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	return g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.IsActive = false
 	})
 }
 
 func (g GatewayMutation) ActiveModel(modelID uint64) error {
-	if err := g.models.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfo) {
+	if err := g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.IsActive = true
 	}); err != nil {
 		return err
@@ -177,7 +180,7 @@ func (g GatewayMutation) UpdateModelLimits(modelID uint64, maxConcurrency uint32
 	txn := g.api.GetTxn()
 	caller := g.api.GetCaller()
 
-	model, err := g.models.Get(txn, modelID)
+	model, err := g.modelsV2.Get(txn, modelID)
 	if err != nil || model == nil {
 		return ErrModelNotFound
 	}
@@ -185,7 +188,7 @@ func (g GatewayMutation) UpdateModelLimits(modelID uint64, maxConcurrency uint32
 	if caller.T != 0 && !bytes.Equal(model.Owner.V, caller.V) {
 		return ErrNotOwner
 	}
-	return g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+	return g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 		m.MaxConcurrency = maxConcurrency
 		m.Balance = balance
 	})
@@ -207,7 +210,7 @@ func (g GatewaySecret) DeductBalance(modelID uint64, amount uint64) (remaining u
 		newBalance uint64
 		success    bool
 	)
-	err = g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+	err = g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 		if m.Balance == 0 {
 			success = false
 			newBalance = 0
@@ -231,8 +234,8 @@ func (g GatewaySecret) DeductBalance(modelID uint64, amount uint64) (remaining u
 	return newBalance, success, nil
 }
 
-func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
-	m, err := g.models.Get(g.api.GetTxn(), modelID)
+func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfoV2, error) {
+	m, err := g.modelsV2.Get(g.api.GetTxn(), modelID)
 	if err != nil || m == nil {
 		return nil, err
 	}
@@ -241,9 +244,9 @@ func (g GatewayQuery) GetModel(modelID uint64) (*ModelInfo, error) {
 }
 
 func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
-	models := make([]ModelInfo, 0, len(IDs))
+	models := make([]ModelInfoV2, 0, len(IDs))
 	for _, id := range IDs {
-		m, err := g.models.Get(g.api.GetTxn(), id)
+		m, err := g.modelsV2.Get(g.api.GetTxn(), id)
 		if err != nil || m == nil {
 			continue
 		}
@@ -266,8 +269,8 @@ func (g GatewayQuery) GetModels(IDs []uint64) ([]ModelInfoWithProvider, error) {
 	return out, nil
 }
 
-func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfo, error) {
-	_, vals, err := g.models.List(g.api.GetTxn(), offset, limit)
+func (g GatewayQuery) ListModels(offset uint64, limit uint32) ([]ModelInfoV2, error) {
+	_, vals, err := g.modelsV2.List(g.api.GetTxn(), offset, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +291,7 @@ func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32)
 	txn := g.api.GetTxn()
 	out := make([]ModelInfoWithID, 0, end-offset)
 	for _, id := range ids[offset:end] {
-		m, err := g.models.Get(txn, id)
+		m, err := g.modelsV2.Get(txn, id)
 		if err != nil || m == nil {
 			continue
 		}
@@ -301,7 +304,7 @@ func (g GatewayQuery) listModelsByIDs(ids []uint64, offset uint64, limit uint32)
 }
 
 func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfoWithID, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
+	ids, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +319,7 @@ func (g GatewayQuery) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo
 }
 
 func (g GatewayQuery) ListProviderModels(providerID uint64) ([]ModelInfoWithID, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
+	ids, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +345,7 @@ func (g GatewayQuery) ListActiveModelsWithinProvider(
 		exprs = append(exprs, store.QueryCond{Field: "InPrice", Val: store.Range{Min: minPrice, Max: maxPrice}})
 	}
 
-	ids, err := g.models.Query(g.api.GetTxn(), exprs)
+	ids, err := g.modelsV2.Query(g.api.GetTxn(), exprs)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +371,7 @@ func (g GatewayQuery) ListActiveModelsWithinProvider(
 }
 
 func (g GatewayQuery) GetModelCount() (uint64, error) {
-	return g.models.Len(g.api.GetTxn())
+	return g.modelsV2.Len(g.api.GetTxn())
 }
 
 func (g GatewayQuery) QueryModels(
@@ -388,7 +391,7 @@ func (g GatewayQuery) QueryModels(
 		exprs = append(exprs, store.QueryCond{Field: "InPrice", Val: store.Range{Min: 0, Max: maxPrice}})
 	}
 
-	ids, err := g.models.Query(txn, exprs)
+	ids, err := g.modelsV2.Query(txn, exprs)
 	if err != nil {
 		return nil, err
 	}
@@ -422,14 +425,14 @@ func (g GatewayQuery) QueryModels(
 	return models, nil
 }
 
-func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error) {
-	keys, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
+func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfoV2, error) {
+	keys, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryCond{Field: "ProviderID", Val: providerID})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ModelInfo, 0, len(keys))
+	out := make([]ModelInfoV2, 0, len(keys))
 	for _, k := range keys {
-		m, err := g.models.Get(g.api.GetTxn(), k)
+		m, err := g.modelsV2.Get(g.api.GetTxn(), k)
 		if err != nil || m == nil {
 			continue
 		}
@@ -440,7 +443,7 @@ func (g GatewayQuery) GetModelsByProvider(providerID uint64) ([]ModelInfo, error
 }
 
 func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
-	keys, err := g.models.Query(g.api.GetTxn(), store.QueryAND{
+	keys, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryAND{
 		store.QueryCond{Field: "ProviderID", Val: pid},
 		store.QueryCond{Field: "Name", Val: name},
 	})
@@ -452,7 +455,7 @@ func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID,
 		return nil, errors.New("model not found")
 	}
 
-	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	m, err := g.modelsV2.Get(g.api.GetTxn(), keys[0])
 	if err != nil || m == nil {
 		return nil, errors.New("model not found")
 	}
@@ -467,12 +470,12 @@ func (g GatewayQuery) GetModelByName(pid uint64, name string) (*ModelInfoWithID,
 // ── GatewaySecret ──────────────────────────────────────────
 // 节点内部使用，返回未脱敏的完整数据
 
-func (g GatewaySecret) GetModel(modelID uint64) (*ModelInfo, error) {
-	return g.models.Get(g.api.GetTxn(), modelID)
+func (g GatewaySecret) GetModel(modelID uint64) (*ModelInfoV2, error) {
+	return g.modelsV2.Get(g.api.GetTxn(), modelID)
 }
 
 func (g GatewaySecret) GetModelByName(pid uint64, name string) (*ModelInfoWithID, error) {
-	keys, err := g.models.Query(g.api.GetTxn(), store.QueryAND{
+	keys, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryAND{
 		store.QueryCond{Field: "ProviderID", Val: pid},
 		store.QueryCond{Field: "Name", Val: name},
 	})
@@ -484,7 +487,7 @@ func (g GatewaySecret) GetModelByName(pid uint64, name string) (*ModelInfoWithID
 		return nil, errors.New("model not found")
 	}
 
-	m, err := g.models.Get(g.api.GetTxn(), keys[0])
+	m, err := g.modelsV2.Get(g.api.GetTxn(), keys[0])
 	if err != nil || m == nil {
 		return nil, errors.New("model not found")
 	}
@@ -495,10 +498,10 @@ func (g GatewaySecret) GetModelByName(pid uint64, name string) (*ModelInfoWithID
 	}, nil
 }
 
-func (g GatewaySecret) GetModels(IDs []uint64) ([]ModelInfo, error) {
-	out := make([]ModelInfo, 0, len(IDs))
+func (g GatewaySecret) GetModels(IDs []uint64) ([]ModelInfoV2, error) {
+	out := make([]ModelInfoV2, 0, len(IDs))
 	for _, id := range IDs {
-		m, err := g.models.Get(g.api.GetTxn(), id)
+		m, err := g.modelsV2.Get(g.api.GetTxn(), id)
 		if err != nil || m == nil {
 			continue
 		}
@@ -507,8 +510,8 @@ func (g GatewaySecret) GetModels(IDs []uint64) ([]ModelInfo, error) {
 	return out, nil
 }
 
-func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInfo, error) {
-	ids, err := g.models.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
+func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInfoV2, error) {
+	ids, err := g.modelsV2.Query(g.api.GetTxn(), store.QueryCond{Field: "IsActive", Val: uint64(1)})
 	if err != nil {
 		return nil, err
 	}
@@ -520,9 +523,9 @@ func (g GatewaySecret) ListActiveModels(offset uint64, limit uint32) ([]ModelInf
 		end = uint64(len(ids))
 	}
 	txn := g.api.GetTxn()
-	out := make([]ModelInfo, 0, end-offset)
+	out := make([]ModelInfoV2, 0, end-offset)
 	for _, id := range ids[offset:end] {
-		m, err := g.models.Get(txn, id)
+		m, err := g.modelsV2.Get(txn, id)
 		if err != nil || m == nil {
 			continue
 		}

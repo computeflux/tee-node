@@ -109,7 +109,7 @@ func TestGateway_RegisterModel_Success(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", []string{"sk-abc"}, 0, 0)
+	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", []string{"sk-abc"}, 0, 0, false, "")
 	require.NoError(t, err)
 
 	count, err := q.GetModelCount()
@@ -129,7 +129,7 @@ func TestGateway_RegisterModel_WithoutProvider(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	// Without provider, RegisterModel returns nil (not an error) in current implementation
-	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", nil, 0, 0)
+	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, "")
 	assert.NoError(t, err)
 }
 
@@ -138,9 +138,9 @@ func TestGateway_RegisterModel_DuplicateName(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
-	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", nil, 0, 0)
+	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, "")
 	assert.ErrorContains(t, err, "already exists")
 }
 
@@ -150,7 +150,7 @@ func TestGateway_DeactivateAndActiveModel(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
 	active, err := q.ListActiveModels(0, 10)
 	require.NoError(t, err)
@@ -175,7 +175,7 @@ func TestGateway_GetModelByName(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
 	provOpt, _ := q.GetProviderByOwner()
 	pid, _ := provOpt.UnWrap()
@@ -386,7 +386,7 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 
 	// Setup: create provider + model + recharge user
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
@@ -427,7 +427,7 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
@@ -460,7 +460,7 @@ func TestGateway_SettleUsage_ConsecutiveFailDelist(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
@@ -537,7 +537,7 @@ func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
 
 	// Setup: create provider + model
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	// Create route with different prices and join model 0
 	rt.System = true
@@ -596,7 +596,7 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 	// ApplyWithdraw requires caller.T == 2 and matching provider owner
 	rt.Caller.T = 2
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
@@ -636,7 +636,7 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 	// ApplyWithdraw requires caller.T == 2 and matching provider owner
 	rt.Caller.T = 2
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, ProviderOpenAI, "", nil, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
@@ -667,7 +667,7 @@ func TestGateway_JoinRoute_OnlyOwner(t *testing.T) {
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, OpenAI, "", []string{"sk-1"}, 0, 0, false, ""))
 	models, err := q.ListProviderModels(provID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
@@ -699,7 +699,7 @@ func TestGateway_LeaveRoute_OnlyOwner(t *testing.T) {
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, OpenAI, "", []string{"sk-1"}, 0, 0, false, ""))
 	models, err := q.ListProviderModels(provID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
@@ -735,9 +735,9 @@ func TestGateway_JoinRoute_ModelIds(t *testing.T) {
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}, 0, 0))
-	require.NoError(t, m.RegisterModel("gpt-4o", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-2"}, 0, 0))
-	require.NoError(t, m.RegisterModel("claude-3", ModalityText, 128000, 1, 1, 1, ProviderClaude, "", []string{"sk-3"}, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, OpenAI, "", []string{"sk-1"}, 0, 0, false, ""))
+	require.NoError(t, m.RegisterModel("gpt-4o", ModalityText, 128000, 1, 1, 1, OpenAI, "", []string{"sk-2"}, 0, 0, false, ""))
+	require.NoError(t, m.RegisterModel("claude-3", ModalityText, 128000, 1, 1, 1, Anthropic, "", []string{"sk-3"}, 0, 0, false, ""))
 
 	models, err := q.ListProviderModels(provID)
 	require.NoError(t, err)
@@ -782,7 +782,7 @@ func TestGateway_JoinRoute_PersonalToEdge(t *testing.T) {
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
-	require.NoError(t, m.RegisterModel("local-llm", ModalityText, 128000, 1, 1, 1, ProviderPersonal, "", []string{"local"}, 0, 0))
+	require.NoError(t, m.RegisterModel("local-llm", ModalityText, 128000, 1, 1, 1, 9999, "", []string{"local"}, 0, 0, false, ""))
 	models, err := q.ListProviderModels(provID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
@@ -812,7 +812,7 @@ func TestGateway_JoinRoute_MismatchedTypeFails(t *testing.T) {
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
-	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, ProviderOpenAI, "", []string{"sk-1"}, 0, 0))
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1, 1, 1, OpenAI, "", []string{"sk-1"}, 0, 0, false, ""))
 	models, err := q.ListProviderModels(provID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)

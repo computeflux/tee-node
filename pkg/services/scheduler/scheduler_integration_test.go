@@ -68,7 +68,7 @@ func TestIntegration_HappyPath(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-1", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", KeyID: "key-1", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
 		},
 	}}
 	reg.Replace(routes)
@@ -111,9 +111,9 @@ func TestIntegration_SessionAffinity(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
+			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
+			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
 		},
 	}}
 	reg.Replace(routes)
@@ -178,7 +178,7 @@ func TestIntegration_ConcurrencyHardLimit(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 2, // 硬限制 2
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -227,7 +227,7 @@ func TestIntegration_SoftLimit(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 2, // 硬限制 2，软限制 3
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -275,7 +275,7 @@ func TestIntegration_CircuitBreaker(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -354,14 +354,14 @@ func TestIntegration_RetryAndFallback(t *testing.T) {
 		{
 			Model: "gpt-4o", MaxConcurrency: 10,
 			Endpoints: []*Endpoint{
-				{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 			FallbackModels: []ModelKey{"claude-3-5"},
 		},
 		{
 			Model: "claude-3-5", MaxConcurrency: 10,
 			Endpoints: []*Endpoint{
-				{Provider: "anthropic", Protocol: "anthropic", KeyID: "key-x", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+				{Provider: "anthropic", ModelUrls: map[uint16]string{2: "https://upstream.test"}, KeyID: "key-x", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 			},
 		},
 	}
@@ -405,9 +405,9 @@ func TestIntegration_RateLimit429(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
+			{Provider: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
+			{Provider: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100, ModelUrls: map[uint16]string{1: "https://upstream.test"}},
 		},
 	}}
 	reg.Replace(routes)
@@ -452,9 +452,9 @@ func TestIntegration_AuthDeadKey(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
-			{Provider: "openai", Protocol: "openai", KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-b", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-c", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)
@@ -493,7 +493,7 @@ func TestIntegration_LogLevels(t *testing.T) {
 	routes := []*ModelRoute{{
 		Model: "gpt-4o", MaxConcurrency: 10,
 		Endpoints: []*Endpoint{
-			{Provider: "openai", Protocol: "openai", KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
+			{Provider: "openai", ModelUrls: map[uint16]string{1: "https://upstream.test"}, KeyID: "key-a", KeyValue: "v", Weight: 1.0, Enabled: true, Models: []ModelKey{"*"}, Concurrency: 100},
 		},
 	}}
 	reg.Replace(routes)

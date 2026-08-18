@@ -12,11 +12,11 @@ import (
 func sampleModel(id uint64, name string, providerType uint16, contextLength, inPrice uint64) cgateway.ModelInfoWithProvider {
 	return cgateway.ModelInfoWithProvider{
 		ID: id,
-		Model: cgateway.ModelInfo{
+		Model: cgateway.ModelInfoV2{
 			Name:            name,
 			ProviderID:      1,
-			ProviderType:    providerType,
-			URI:             "http://localhost",
+			ModelType:       providerType,
+			URIS:            `{"3":"http://localhost"}`,
 			InputModalities: 1,
 			ContextLength:   contextLength,
 			InPrice:         inPrice,
@@ -109,9 +109,9 @@ func TestGatewayModelIndex_Pagination(t *testing.T) {
 func TestGatewayModelIndex_ModalityFilter(t *testing.T) {
 	idx := NewGatewayModelIndex()
 	models := []cgateway.ModelInfoWithProvider{
-		{ID: 1, Model: cgateway.ModelInfo{Name: "text-only", ProviderID: 1, ProviderType: 1, URI: "http://localhost", InputModalities: cgateway.ModalityText, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
-		{ID: 2, Model: cgateway.ModelInfo{Name: "text-image", ProviderID: 1, ProviderType: 1, URI: "http://localhost", InputModalities: cgateway.ModalityText | cgateway.ModalityImage, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
-		{ID: 3, Model: cgateway.ModelInfo{Name: "audio-video", ProviderID: 1, ProviderType: 1, URI: "http://localhost", InputModalities: cgateway.ModalityAudio | cgateway.ModalityVideo, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+		{ID: 1, Model: cgateway.ModelInfoV2{Name: "text-only", ProviderID: 1, ModelType: 1, URIS: `{"1":"http://localhost"}`, InputModalities: cgateway.ModalityText, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+		{ID: 2, Model: cgateway.ModelInfoV2{Name: "text-image", ProviderID: 1, ModelType: 1, URIS: `{"1":"http://localhost"}`, InputModalities: cgateway.ModalityText | cgateway.ModalityImage, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
+		{ID: 3, Model: cgateway.ModelInfoV2{Name: "audio-video", ProviderID: 1, ModelType: 1, URIS: `{"1":"http://localhost"}`, InputModalities: cgateway.ModalityAudio | cgateway.ModalityVideo, ContextLength: 1000, InPrice: 100, IsActive: true}, Provider: cgateway.ProviderInfo{Name: "p1"}},
 	}
 	require.NoError(t, idx.BuildFromModels(models))
 

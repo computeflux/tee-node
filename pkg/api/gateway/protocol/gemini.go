@@ -14,7 +14,7 @@ import (
 // ConvertOpenAIRequestToGemini 把 OpenAI Chat Completions 请求转换为 Gemini 原生请求。
 // 复用 Bifrost 的 Gemini 转换器，自动覆盖 tools、多模态内容块、response_format 等。
 func ConvertOpenAIRequestToGemini(body []byte, targetProvider uint16) ([]byte, error) {
-	if targetProvider != cgateway.ProviderGemini {
+	if targetProvider != cgateway.Gemini {
 		return nil, fmt.Errorf("ConvertOpenAIRequestToGemini called with provider type %d", targetProvider)
 	}
 

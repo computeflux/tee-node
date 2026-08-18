@@ -120,7 +120,7 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 	}
 
 	// 校验模型存在且发起者是模型拥有者
-	model, err := g.models.Get(txn, modelID)
+	model, err := g.modelsV2.Get(txn, modelID)
 	if err != nil || model == nil {
 		return fmt.Errorf("model %d not found", modelID)
 	}
@@ -129,13 +129,13 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 		return errors.New("only model owner can join route")
 	}
 
-	// 校验路由类型与模型 ProviderType 一致
-	if getRouterTypeOfModel(model.ProviderType) != route.RouteType {
-		return fmt.Errorf("model providerType %d does not match route type %d", model.ProviderType, route.RouteType)
+	// 校验路由类型与模型 ModelType 一致（ModelType 本身就是路由类型）
+	if model.ModelType != route.RouteType {
+		return fmt.Errorf("model modelType %d does not match route type %d", model.ModelType, route.RouteType)
 	}
 
 	// 更新模型的 RouteID，价格由路由统一
-	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+	if err := g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 		m.RouteID = routeID
 	}); err != nil {
 		return err
@@ -154,7 +154,7 @@ func (g GatewayMutation) JoinRoute(modelID, routeID uint64) error {
 func (g GatewayMutation) LeaveRoute(modelID uint64, routeID uint64) error {
 	txn := g.api.GetTxn()
 
-	model, err := g.models.Get(txn, modelID)
+	model, err := g.modelsV2.Get(txn, modelID)
 	if err != nil || model == nil {
 		return fmt.Errorf("model %d not found", modelID)
 	}
@@ -165,7 +165,7 @@ func (g GatewayMutation) LeaveRoute(modelID uint64, routeID uint64) error {
 	}
 
 	// 清除模型的 RouteID
-	if err := g.models.UpdateFn(txn, modelID, func(m *ModelInfo) {
+	if err := g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 		m.RouteID = 0
 	}); err != nil {
 		return err
@@ -243,7 +243,10 @@ func (g GatewayQuery) ListActiveRoutesByType(routeType uint16, offset uint64, li
 	return out, nil
 }
 
-func getRouterTypeOfModel(providerType uint16) uint16 {
+// RouterTypeOfModel 把 ProviderType(协议类型) 映射为路由类型(ModelType)。
+// 协议 1-4(OpenAI/Anthropic/Gemini/ResponsesAPI)<9999 → MiningPoolRoute;
+// 9999(本地/个人算力) → EdgeRoute; >9999 → TEERoute。
+func RouterTypeOfModel(providerType uint16) uint16 {
 	if providerType < 9999 {
 		return MiningPoolRoute
 	}

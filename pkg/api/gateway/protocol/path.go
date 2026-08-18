@@ -20,6 +20,25 @@ func ResolveUpstreamPath(inboundProto, providerProto Protocol, requestPath strin
 	if inboundProto == providerProto {
 		return requestPath, nil
 	}
+	// 方向约束：仅支持「其他格式 → Responses API」；Responses API → 其他格式一律不支持。
+	if inboundProto == ProtocolOpenAIResponses {
+		return "", errUnsupportedConversion
+	}
+	if providerProto == ProtocolOpenAIResponses {
+		if inboundProto == ProtocolOpenAI {
+			if requestPath != "/v1/chat/completions" && requestPath != "/v1/completions" && requestPath != "/v1/responses" {
+				return "", errUnsupportedConversion
+			}
+			return "/v1/responses", nil
+		}
+		if inboundProto == ProtocolAnthropic {
+			if requestPath != "/v1/messages" {
+				return "", errUnsupportedConversion
+			}
+			return "/v1/responses", nil
+		}
+		return "", errUnsupportedConversion
+	}
 	if inboundProto == ProtocolAnthropic && providerProto == ProtocolOpenAI {
 		if requestPath != "/v1/messages" {
 			return "", errUnsupportedConversion

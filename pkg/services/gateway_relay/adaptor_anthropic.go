@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 // AnthropicAdaptor 以 Anthropic 原生格式与上游通信：请求体由
@@ -37,7 +38,7 @@ func (a *AnthropicAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body 
 		}
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, upstreamPath)
+	url := a.requestURL(ep.ModelUrls[gateway.Anthropic], upstreamPath)
 	return httpDo(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-api-key", ep.KeyValue)
 		req.Header.Set("anthropic-version", "2023-06-01")
@@ -53,7 +54,7 @@ func (a *AnthropicAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, b
 		}
 		return nil, &scheduler.UpstreamError{Status: http.StatusInternalServerError, Message: err.Error()}
 	}
-	url := a.requestURL(ep.BaseURL, upstreamPath)
+	url := a.requestURL(ep.ModelUrls[gateway.Anthropic], upstreamPath)
 	return httpStream(ctx, ep, url, sendBody, func(req *http.Request) {
 		req.Header.Set("x-api-key", ep.KeyValue)
 		req.Header.Set("anthropic-version", "2023-06-01")

@@ -9,7 +9,7 @@ import (
 )
 
 // NativeVersion is the version number for native (non-WASM) contract execution.
-const NativeVersion = uint32(19)
+const NativeVersion = uint32(20)
 
 // nativeMutation 原生 Go 合约状态变更路由。
 func Mutation(call store.ContractCall, runtime store.ContractApi) error {

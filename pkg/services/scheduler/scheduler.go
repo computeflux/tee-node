@@ -392,30 +392,32 @@ func (s *Scheduler) tryOneModel(
 		ep.metrics.TotalRequests.Add(1)
 		start := time.Now()
 
+		clientProto := ProviderID(ClientTypeName(ep.NativeProtocol()))
+
 		s.log.Debug("endpoint selected",
 			"model", model,
 			"provider", ep.Provider,
 			"key_id", ep.KeyID,
-			"protocol", ep.Protocol,
+			"protocol", clientProto,
 			"score", ep.EffectiveScore(s.cfg.ColdStartSamples),
 			"attempt", attempt,
 			"inflight", ep.InFlight(),
 		)
 
-		client := s.getClient(ep.Protocol)
+		client := s.getClient(clientProto)
 		if client == nil {
 			ep.metrics.InFlight.Add(-1)
 			span.End()
-			s.log.Error("no client for protocol", "model", model, "protocol", ep.Protocol, "provider", ep.Provider)
-			return nil, fmt.Errorf("no client for protocol %s", ep.Protocol)
+			s.log.Error("no client for protocol", "model", model, "protocol", clientProto, "provider", ep.Provider)
+			return nil, fmt.Errorf("no client for protocol %s", clientProto)
 		}
 
 		s.log.Debug("calling provider client",
 			"model", model,
 			"provider", ep.Provider,
 			"key_id", ep.KeyID,
-			"protocol", ep.Protocol,
-			"provider_type", ep.ProviderType,
+			"protocol", clientProto,
+			"provider_type", ep.NativeProtocol(),
 			"model_name", ep.ModelName,
 			"stream", stream,
 			"attempt", attempt,

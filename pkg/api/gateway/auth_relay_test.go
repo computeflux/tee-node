@@ -131,17 +131,15 @@ func installScheduler(t *testing.T, providerName, modelKey, upstreamModel string
 			Endpoints: []*scheduler.Endpoint{
 				{
 					Provider:           scheduler.ProviderID(providerName),
-					Protocol:           scheduler.ProviderID(providerName),
 					KeyID:              "k1",
 					KeyValue:           "sk-test",
-					BaseURL:            "https://upstream.test",
 					Weight:             1,
 					Enabled:            true,
 					Models:             []scheduler.ModelKey{scheduler.ModelKey(modelKey), "*"},
 					ModelID:            1,
 					ContractProviderID: 1,
 					ModelName:          upstreamModel,
-					ProviderType:       providerType,
+					ModelUrls:          map[uint16]string{providerType: "https://upstream.test"},
 				},
 			},
 		},
@@ -382,18 +380,20 @@ func TestHandleListModels_WithModels(t *testing.T) {
 	installModelsIndex(t, []cgateway.ModelInfoWithProvider{
 		{
 			ID: 1,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name: "gpt-4", Owner: cstore.UniAddr{T: 0, V: []byte{0x01}},
-				ProviderType: cgateway.ProviderOpenAI, APIKeys: []string{"sk-1"}, IsActive: true,
+				// OpenAI=1 恰好等于 EdgeRoute=1, 用 MiningPoolRoute 避免被当成无隧道不可用的本地模型
+				ModelType: cgateway.MiningPoolRoute, URIS: `{"1":"https://api.openai.test"}`, APIKeys: []string{"sk-1"}, IsActive: true,
 				CreatedAt: 1700000000,
 			},
 			Provider: cgateway.ProviderInfo{Name: "openai", Owner: cstore.UniAddr{T: 0, V: []byte{0xaa}}},
 		},
 		{
 			ID: 2,
-			Model: cgateway.ModelInfo{
+			Model: cgateway.ModelInfoV2{
 				Name: "claude-3", Owner: cstore.UniAddr{T: 0, V: []byte{0x02}},
-				ProviderType: cgateway.ProviderClaude, APIKeys: []string{"sk-2"}, IsActive: true,
+				// ModelType 是路由类型；协议由 URIS 表示(Anthropic=2)
+				ModelType: cgateway.MiningPoolRoute, URIS: `{"2":"https://api.anthropic.test"}`, APIKeys: []string{"sk-2"}, IsActive: true,
 				CreatedAt: 1700000001,
 			},
 			Provider: cgateway.ProviderInfo{Name: "anthropic", Owner: cstore.UniAddr{T: 0, V: []byte{0xbb}}},
@@ -457,7 +457,7 @@ func TestHandleRelay_ModelNotConfigured(t *testing.T) {
 	cleanup := setupMockFns(t)
 	defer cleanup()
 
-	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, &fakeAdaptor{respBody: `{}`})
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.OpenAI, &fakeAdaptor{respBody: `{}`})
 
 	w := httptest.NewRecorder()
 	body := `{"model":"openai/unknown-model"}`
@@ -483,7 +483,7 @@ func TestHandleRelay_Success(t *testing.T) {
 	fake := &fakeAdaptor{
 		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`,
 	}
-	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, fake)
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.OpenAI, fake)
 
 	w := httptest.NewRecorder()
 	body := `{"model":"openai/gpt-4","messages":[{"role":"user","content":"hello"}]}`
@@ -505,7 +505,7 @@ func TestHandleRelay_UpstreamError(t *testing.T) {
 	defer cleanup()
 
 	fake := &fakeAdaptor{respStatus: http.StatusBadRequest, respBody: `{"error":{"message":"bad request"}}`}
-	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, fake)
+	installScheduler(t, "openai", "gpt-4", "gpt-4", cgateway.OpenAI, fake)
 
 	w := httptest.NewRecorder()
 	body := `{"model":"openai/gpt-4"}`
@@ -530,17 +530,15 @@ func installSchedulerWithRoute(t *testing.T, providerName, modelKey, upstreamMod
 			Endpoints: []*scheduler.Endpoint{
 				{
 					Provider:           scheduler.ProviderID(providerName),
-					Protocol:           scheduler.ProviderID(providerName),
 					KeyID:              "k1",
 					KeyValue:           "sk-test",
-					BaseURL:            "https://upstream.test",
 					Weight:             1,
 					Enabled:            true,
 					Models:             []scheduler.ModelKey{scheduler.ModelKey(modelKey), "*"},
 					ModelID:            1,
 					ContractProviderID: 1,
 					ModelName:          upstreamModel,
-					ProviderType:       providerType,
+					ModelUrls:          map[uint16]string{providerType: "https://upstream.test"},
 					RouteID:            routeID,
 				},
 			},
@@ -569,7 +567,7 @@ func TestHandleRelay_RouteEndpointRecordsRouteID(t *testing.T) {
 	fake := &fakeAdaptor{
 		respBody: `{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}`,
 	}
-	installSchedulerWithRoute(t, "openai", "gpt-4", "gpt-4", cgateway.ProviderOpenAI, 7, fake)
+	installSchedulerWithRoute(t, "openai", "gpt-4", "gpt-4", cgateway.OpenAI, 7, fake)
 
 	w := httptest.NewRecorder()
 	body := `{"model":"openai/gpt-4","messages":[{"role":"user","content":"hello"}]}`

@@ -234,7 +234,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.RegisterAPIKey(keyHash, prefix, rateLimit)
 	case [4]byte{0x32, 0x25, 0x3e, 0x95}:
-		if err := store.RequireArgLen(args, 11, "register_model"); err != nil {
+		if err := store.RequireArgLen(args, 13, "register_model"); err != nil {
 			return err
 		}
 		name, err := store.DecodeScaleArgBytes[string](args[0])
@@ -281,7 +281,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("register_model: balance: %w", err)
 		}
-		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys, maxConcurrency, balance)
+		thinking, err := store.DecodeScaleArgBytes[bool](args[11])
+		if err != nil {
+			return fmt.Errorf("register_model: thinking: %w", err)
+		}
+		meta, err := store.DecodeScaleArgBytes[string](args[12])
+		if err != nil {
+			return fmt.Errorf("register_model: meta: %w", err)
+		}
+		return m.RegisterModel(name, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, apiKeys, maxConcurrency, balance, thinking, meta)
 	case [4]byte{0x46, 0x7f, 0x5d, 0xb4}:
 		if err := store.RequireArgLen(args, 2, "report_model"); err != nil {
 			return err
@@ -1084,7 +1092,7 @@ func NewGateway(api store.ContractApi) *Gateway {
 		api:                   api,
 		credits:               &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credits_"},
 		credit_useds:          &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "credit_useds_"},
-		models:                store.NewIndexedList[uint64, ModelInfo]("gateway", "models_next_id", "models_"),
+		modelsV2:              store.NewIndexedList[uint64, ModelInfoV2]("gateway", "models_next_id", "models_"),
 		providers:             store.NewIndexedList[uint64, ProviderInfo]("gateway", "providers_next_id", "providers_"),
 		providerByOwner:       &store.StoreMapping[store.UniAddr, uint64]{Namespace: "gateway", KeyPrefix: "provider_by_owner_"},
 		providerCredits:       &store.StoreMapping[uint64, uint64]{Namespace: "gateway", KeyPrefix: "provider_credit_"},

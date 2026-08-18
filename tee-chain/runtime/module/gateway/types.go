@@ -26,13 +26,12 @@ const (
 	RegionOceania                        // 0x80 大洋洲
 )
 
-// ── Provider Type / Route Type ────────────────────────────
+// ── LLM api Type / Route Type ────────────────────────────
 const (
-	ProviderOpenAI uint16 = iota + 1 // 1
-	ProviderClaude                   // 2
-	ProviderGemini                   // 3
-	// ProviderPersonal 是个人算力（本地隧道）的 ProviderType 取值，
-	ProviderPersonal uint16 = 9999
+	OpenAI             uint16 = iota + 1 // 1
+	Anthropic                            // 2
+	Gemini                               // 3
+	OpenAIResponsesApi                   // 4
 )
 
 // RouteType 路由类型（与模型 ProviderType 一致语义）
@@ -101,11 +100,47 @@ type ModelInfo struct {
 	CreatedAt uint64 `json:"createdAt"`
 }
 
+// ModelInfo 独立注册的模型
+// scale-codec-gen:generate
+type ModelInfoV2 struct {
+	Name            string        `json:"name" idx:"exact"`
+	Owner           store.UniAddr `json:"owner"`
+	ProviderID      uint64        `json:"providerId" idx:"exact"`
+	InputModalities uint8         `json:"inputModalities" idx:"exact"`
+	ContextLength   uint64        `json:"contextLength"   idx:"range"`
+	InPrice         uint64        `json:"inPrice"   idx:"range"`
+	CachedPrice     uint64        `json:"cachedPrice"`
+	OutPrice        uint64        `json:"outPrice"`
+	Thinking        bool          `json:"thinking"`
+	Meta            string        `json:"meta"`
+
+	ModelType uint16 `json:"modelType"`
+
+	// 路由归属（0 = 独立定价，>0 = 加入路由后价格由路由统一决定）
+	RouteID uint64 `json:"routeId" idx:"exact"`
+
+	// 供应商配置
+	URIS    string   `json:"uri,omitempty"`     // 自定义端点，为空则用供应商官方地址
+	APIKeys []string `json:"apiKeys,omitempty"` // API Key 列表
+
+	// 流控
+	MaxConcurrency uint32 `json:"maxConcurrency"` // 最大并发数，0=不限制
+	Balance        uint64 `json:"balance"`        // 调用余额，0=已耗尽
+
+	// 信誉（来源：用户举报 + 系统抽检）
+	ReputationScore uint32 `json:"reputationScore"` // 信誉分 0-10000（10000=完美）
+	TotalAudits     uint64 `json:"totalAudits"`     // 累计检查次数
+	PassedAudits    uint64 `json:"passedAudits"`    // 通过检查次数
+
+	IsActive  bool   `json:"isActive" idx:"exact"`
+	CreatedAt uint64 `json:"createdAt"`
+}
+
 // ModelInfoWithID 是 DataWithID[ModelInfo] 的非泛型版本，用于合约 metadata 兼容。
 // scale-codec-gen:generate
 type ModelInfoWithID struct {
-	ID   uint64    `json:"id"`
-	Data ModelInfo `json:"data"`
+	ID   uint64      `json:"id"`
+	Data ModelInfoV2 `json:"data"`
 }
 
 // ProviderInfoWithID 是 DataWithID[ProviderInfo] 的非泛型版本，用于合约 metadata 兼容。
@@ -118,7 +153,7 @@ type ProviderInfoWithID struct {
 // scale-codec-gen:generate
 type ModelInfoWithProvider struct {
 	ID       uint64 `json:"id"`
-	Model    ModelInfo
+	Model    ModelInfoV2
 	Provider ProviderInfo
 }
 

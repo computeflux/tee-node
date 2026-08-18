@@ -8,16 +8,18 @@ import (
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
-// providerTypeName 把合约的 ProviderType 转成调度器用的协议字符串名。
-func providerTypeName(pt uint16) string {
+// ClientTypeName 把合约的 ProviderType 转成调度器用的协议字符串名。
+func ClientTypeName(pt uint16) string {
 	switch pt {
-	case cgateway.ProviderOpenAI:
+	case cgateway.OpenAI:
 		return "openai"
-	case cgateway.ProviderClaude:
+	case cgateway.Anthropic:
 		return "anthropic"
-	case cgateway.ProviderGemini:
+	case cgateway.Gemini:
 		return "gemini"
-	case cgateway.ProviderPersonal:
+	case cgateway.OpenAIResponsesApi:
+		return "openai-responses-api"
+	case EdgeProviderType:
 		return "personal"
 	default:
 		return fmt.Sprintf("provider-%d", pt)
@@ -26,7 +28,7 @@ func providerTypeName(pt uint16) string {
 
 // BuildEndpointsFromModelInfo 把单个 ModelInfoWithProvider 转成一组 Endpoint（每个 APIKey 一个）。
 // modelID 是合约里的 uint64 model id，用于计费。
-func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfo, provider *cgateway.ProviderInfo) []*Endpoint {
+func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfoV2, provider *cgateway.ProviderInfo) []*Endpoint {
 	if model == nil || provider == nil {
 		return nil
 	}
@@ -35,26 +37,24 @@ func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfo, prov
 	if providerName == "" {
 		providerName = fmt.Sprintf("provider-%x", provider.Owner)
 	}
-	protocol := providerTypeName(model.ProviderType)
 
-	baseURL := model.URI
+	urls := map[uint16]string{}
+	json.Unmarshal([]byte(model.URIS), &urls)
 
 	// 本地模型(个人算力)走反向隧道,不需要 APIKey,单端点即可。
-	if model.ProviderType == cgateway.ProviderPersonal {
+	if model.ModelType == cgateway.EdgeRoute {
 		return []*Endpoint{{
 			Provider:           ProviderID(providerName),
-			Protocol:           ProviderID(protocol),
 			KeyID:              fmt.Sprintf("local-model-%d", modelID),
 			KeyValue:           "",
-			BaseURL:            baseURL,
 			Weight:             1.0,
 			Enabled:            model.IsActive,
-			Models:             []ModelKey{ModelKey(model.Name), ModelKey(model.ModelID)},
+			Models:             []ModelKey{ModelKey(model.Name)},
 			Concurrency:        int(model.MaxConcurrency),
 			ModelID:            modelID,
 			ContractProviderID: model.ProviderID,
 			ModelName:          model.Name,
-			ProviderType:       model.ProviderType,
+			ModelUrls:          urls,
 		}}
 	}
 
@@ -65,23 +65,21 @@ func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfo, prov
 		}
 		endpoints = append(endpoints, &Endpoint{
 			Provider:           ProviderID(providerName),
-			Protocol:           ProviderID(protocol),
 			KeyID:              fmt.Sprintf("%d-%d", modelID, i),
 			KeyValue:           key,
-			BaseURL:            baseURL,
 			Weight:             1.0, // 合约暂无权重，均分
 			Enabled:            model.IsActive,
-			Models:             []ModelKey{ModelKey(model.Name), ModelKey(model.ModelID)},
+			Models:             []ModelKey{ModelKey(model.Name)},
 			Concurrency:        int(model.MaxConcurrency),
 			ModelID:            modelID,
 			ContractProviderID: model.ProviderID,
 			ModelName:          model.Name,
-			ProviderType:       model.ProviderType,
+			ModelUrls:          urls,
 		})
 	}
 
-	if len(endpoints) == 0 && model.ProviderType != cgateway.ProviderPersonal {
-		util.LogWarnf("[scheduler] model %s (provider=%s type=%d) has no usable API keys, endpoint_count=0", model.Name, providerName, model.ProviderType)
+	if len(endpoints) == 0 && model.ModelType != cgateway.EdgeRoute {
+		util.LogWarnf("[scheduler] model %s (provider=%s type=%d) has no usable API keys, endpoint_count=0", model.Name, providerName, model.ModelType)
 	}
 	return endpoints
 }
