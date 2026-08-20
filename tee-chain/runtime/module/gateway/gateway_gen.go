@@ -149,6 +149,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("deactivate_model: modelID: %w", err)
 		}
 		return m.DeactivateModel(modelID)
+	case [4]byte{0x7e, 0x5d, 0xe5, 0xc0}:
+		if err := store.RequireArgLen(args, 1, "delete_model"); err != nil {
+			return err
+		}
+		modelID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("delete_model: modelID: %w", err)
+		}
+		return m.DeleteModel(modelID)
 	case [4]byte{0x31, 0xdf, 0x1b, 0xb3}:
 		if err := store.RequireArgLen(args, 2, "delete_model_a_p_i_key_ref"); err != nil {
 			return err
@@ -382,7 +391,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.UpdateAPIKey(keyHash, rateLimit)
 	case [4]byte{0x1e, 0x9a, 0x0f, 0x5e}:
-		if err := store.RequireArgLen(args, 10, "update_model"); err != nil {
+		if err := store.RequireArgLen(args, 12, "update_model"); err != nil {
 			return err
 		}
 		ID, err := store.DecodeScaleArgBytes[uint64](args[0])
@@ -425,7 +434,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("update_model: balance: %w", err)
 		}
-		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, maxConcurrency, balance)
+		thinking, err := store.DecodeScaleArgBytes[bool](args[10])
+		if err != nil {
+			return fmt.Errorf("update_model: thinking: %w", err)
+		}
+		meta, err := store.DecodeScaleArgBytes[string](args[11])
+		if err != nil {
+			return fmt.Errorf("update_model: meta: %w", err)
+		}
+		return m.UpdateModel(ID, inputModalities, contextLength, inPrice, cachedPrice, outPrice, providerType, uri, maxConcurrency, balance, thinking, meta)
 	case [4]byte{0x09, 0xb8, 0x76, 0x88}:
 		if err := store.RequireArgLen(args, 3, "update_model_a_p_i_key_ref"); err != nil {
 			return err

@@ -171,14 +171,14 @@ func (r *Runtime) Query(target store.UniAddr, call store.ContractCall) ([]byte, 
 // 返回:
 //   - []byte: 执行结果的字节切片（暂未使用）
 //   - error: 错误信息，当合约不存在或执行失败时返回
-func (r *Runtime) Call(target store.UniAddr, call store.ContractCall) ([]byte, error) {
+func (r *Runtime) Call(caller store.UniAddr, call store.ContractCall) ([]byte, error) {
 	// 创建新的运行时上下文，保持当前区块高度和交易，但切换调用者
 	newRuntime := &Runtime{
 		unix:    r.unix,
 		height:  r.height,
 		version: r.version,
 		txn:     r.txn,
-		caller:  r.caller, // 保持原始调用者
+		caller:  caller,
 		sudo:    r.sudo,
 	}
 	err := Mutation(r.version, call, newRuntime)

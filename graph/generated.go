@@ -118,11 +118,12 @@ type ComplexityRoot struct {
 		InputModalities func(childComplexity int) int
 		IsActive        func(childComplexity int) int
 		ModelID         func(childComplexity int) int
+		ModelType       func(childComplexity int) int
 		Name            func(childComplexity int) int
 		OutPrice        func(childComplexity int) int
 		ProviderID      func(childComplexity int) int
-		ProviderType    func(childComplexity int) int
-		URI             func(childComplexity int) int
+		Thinking        func(childComplexity int) int
+		Urls            func(childComplexity int) int
 	}
 
 	ModelInfoWithProvider struct {
@@ -675,6 +676,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ModelInfo.ModelID(childComplexity), true
 
+	case "ModelInfo.modelType":
+		if e.complexity.ModelInfo.ModelType == nil {
+			break
+		}
+
+		return e.complexity.ModelInfo.ModelType(childComplexity), true
+
 	case "ModelInfo.name":
 		if e.complexity.ModelInfo.Name == nil {
 			break
@@ -696,19 +704,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ModelInfo.ProviderID(childComplexity), true
 
-	case "ModelInfo.providerType":
-		if e.complexity.ModelInfo.ProviderType == nil {
+	case "ModelInfo.thinking":
+		if e.complexity.ModelInfo.Thinking == nil {
 			break
 		}
 
-		return e.complexity.ModelInfo.ProviderType(childComplexity), true
+		return e.complexity.ModelInfo.Thinking(childComplexity), true
 
-	case "ModelInfo.uri":
-		if e.complexity.ModelInfo.URI == nil {
+	case "ModelInfo.urls":
+		if e.complexity.ModelInfo.Urls == nil {
 			break
 		}
 
-		return e.complexity.ModelInfo.URI(childComplexity), true
+		return e.complexity.ModelInfo.Urls(childComplexity), true
 
 	case "ModelInfoWithProvider.id":
 		if e.complexity.ModelInfoWithProvider.ID == nil {
@@ -5728,8 +5736,8 @@ func (ec *executionContext) fieldContext_ModelInfo_providerId(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _ModelInfo_providerType(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfo) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ModelInfo_providerType(ctx, field)
+func (ec *executionContext) _ModelInfo_modelType(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfo_modelType(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5742,7 +5750,7 @@ func (ec *executionContext) _ModelInfo_providerType(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ProviderType, nil
+		return obj.ModelType, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5759,7 +5767,7 @@ func (ec *executionContext) _ModelInfo_providerType(ctx context.Context, field g
 	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_ModelInfo_providerType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ModelInfo_modelType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ModelInfo",
 		Field:      field,
@@ -5767,6 +5775,94 @@ func (ec *executionContext) fieldContext_ModelInfo_providerType(_ context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelInfo_urls(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfo_urls(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Urls, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfo_urls(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModelInfo_thinking(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ModelInfo_thinking(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Thinking, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ModelInfo_thinking(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModelInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5804,50 +5900,6 @@ func (ec *executionContext) _ModelInfo_modelId(ctx context.Context, field graphq
 }
 
 func (ec *executionContext) fieldContext_ModelInfo_modelId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ModelInfo",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ModelInfo_uri(ctx context.Context, field graphql.CollectedField, obj *model.ModelInfo) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ModelInfo_uri(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.URI, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ModelInfo_uri(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ModelInfo",
 		Field:      field,
@@ -6252,12 +6304,14 @@ func (ec *executionContext) fieldContext_ModelInfoWithProvider_model(_ context.C
 				return ec.fieldContext_ModelInfo_name(ctx, field)
 			case "providerId":
 				return ec.fieldContext_ModelInfo_providerId(ctx, field)
-			case "providerType":
-				return ec.fieldContext_ModelInfo_providerType(ctx, field)
+			case "modelType":
+				return ec.fieldContext_ModelInfo_modelType(ctx, field)
+			case "urls":
+				return ec.fieldContext_ModelInfo_urls(ctx, field)
+			case "thinking":
+				return ec.fieldContext_ModelInfo_thinking(ctx, field)
 			case "modelId":
 				return ec.fieldContext_ModelInfo_modelId(ctx, field)
-			case "uri":
-				return ec.fieldContext_ModelInfo_uri(ctx, field)
 			case "inputModalities":
 				return ec.fieldContext_ModelInfo_inputModalities(ctx, field)
 			case "contextLength":
@@ -9119,12 +9173,14 @@ func (ec *executionContext) fieldContext_Query_edge_models(_ context.Context, fi
 				return ec.fieldContext_ModelInfo_name(ctx, field)
 			case "providerId":
 				return ec.fieldContext_ModelInfo_providerId(ctx, field)
-			case "providerType":
-				return ec.fieldContext_ModelInfo_providerType(ctx, field)
+			case "modelType":
+				return ec.fieldContext_ModelInfo_modelType(ctx, field)
+			case "urls":
+				return ec.fieldContext_ModelInfo_urls(ctx, field)
+			case "thinking":
+				return ec.fieldContext_ModelInfo_thinking(ctx, field)
 			case "modelId":
 				return ec.fieldContext_ModelInfo_modelId(ctx, field)
-			case "uri":
-				return ec.fieldContext_ModelInfo_uri(ctx, field)
 			case "inputModalities":
 				return ec.fieldContext_ModelInfo_inputModalities(ctx, field)
 			case "contextLength":
@@ -13788,18 +13844,23 @@ func (ec *executionContext) _ModelInfo(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "providerType":
-			out.Values[i] = ec._ModelInfo_providerType(ctx, field, obj)
+		case "modelType":
+			out.Values[i] = ec._ModelInfo_modelType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "urls":
+			out.Values[i] = ec._ModelInfo_urls(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "thinking":
+			out.Values[i] = ec._ModelInfo_thinking(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "modelId":
 			out.Values[i] = ec._ModelInfo_modelId(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "uri":
-			out.Values[i] = ec._ModelInfo_uri(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

@@ -59,6 +59,7 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 	if len(call.GetMethod()) < 4 {
 		return fmt.Errorf("invalid method selector length: %d", len(call.GetMethod()))
 	}
+
 	selector := [4]byte(call.GetMethod()[:4])
 	if selector == store.MethodToSelector("Init") && IsContractIsInited(runtime.GetTxn(), string(call.GetName())) {
 		return nil

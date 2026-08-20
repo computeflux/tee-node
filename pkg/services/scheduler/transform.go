@@ -83,8 +83,12 @@ func ResolveRequest(ctx context.Context, ep *Endpoint, body []byte) (outBody []b
 	if !ok || ri.Inbound == "" {
 		return nil, "", fmt.Errorf("scheduler: inbound protocol missing in ctx")
 	}
-	providerProto := ClientTypeName(ep.NativeProtocol())
-	outBody, upstreamPath, err = loadRequestTransform()(ri.Inbound, providerProto, ri.Path, ep.NativeProtocol(), body)
+	// 按入口协议选 endpoint 的协议类型(多协议 endpoint 优先匹配入口);
+	// 这样 transform 内部 ProviderNativeProtocol(providerType) 得到正确的目标协议,
+	// 而非固定取最小 key 导致 Responses 请求被当成 openai 转换。
+	epProto := ep.ProtocolForClient(ri.Inbound)
+	providerProto := ClientTypeName(epProto)
+	outBody, upstreamPath, err = loadRequestTransform()(ri.Inbound, providerProto, ri.Path, epProto, body)
 	if err != nil {
 		return nil, "", fmt.Errorf("scheduler: transform inbound=%s providerProto=%s path=%s: %w", ri.Inbound, providerProto, ri.Path, err)
 	}

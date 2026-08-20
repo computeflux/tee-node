@@ -211,10 +211,7 @@ func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, lim
 	if err != nil {
 		return nil, err
 	}
-	if int(offset) >= len(records) {
-		return []ProviderSettlementRecord{}, nil
-	}
-	return records[offset:], nil
+	return records, nil
 }
 
 // GetUserSettlementHistory 查询用户的结算历史（按时间倒序）

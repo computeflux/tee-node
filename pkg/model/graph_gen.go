@@ -97,9 +97,10 @@ type LenValue struct {
 type ModelInfo struct {
 	Name            string `json:"name"`
 	ProviderID      int    `json:"providerId"`
-	ProviderType    int    `json:"providerType"`
+	ModelType       int    `json:"modelType"`
+	Urls            string `json:"urls"`
+	Thinking        bool   `json:"thinking"`
 	ModelID         string `json:"modelId"`
-	URI             string `json:"uri"`
 	InputModalities int    `json:"inputModalities"`
 	ContextLength   int    `json:"contextLength"`
 	InPrice         int    `json:"inPrice"`

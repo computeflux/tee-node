@@ -106,6 +106,18 @@ func (e *Endpoint) SupportsProtocol(pt uint16) bool {
 	return ok
 }
 
+// ProtocolForClient 根据入口协议名(调度器 client 名,如 "openai"/"anthropic"/"openai-responses-api")，
+// 返回该端点用于该入口请求的协议类型。
+// 若端点原生支持该入口协议则返回对应类型(直接透传,无需转换)；否则回退到 NativeProtocol(最小 key)。
+func (e *Endpoint) ProtocolForClient(inbound string) uint16 {
+	for pt := range e.ModelUrls {
+		if ClientTypeName(pt) == inbound {
+			return pt
+		}
+	}
+	return e.NativeProtocol()
+}
+
 // InFlight 当前正在处理的请求数。
 func (e *Endpoint) InFlight() int64 { return e.metrics.InFlight.Load() }
 

@@ -518,3 +518,61 @@ func TestRateLimitKeysCanReuse(t *testing.T) {
 		t.Errorf("key-a called %d times, expected at most 3 (rate-limited key should be reusable per request)", callsA)
 	}
 }
+
+// --- 多协议 endpoint: 按入口协议选 client ---
+
+func TestEndpoint_ProtocolForClient(t *testing.T) {
+	// 同时支持 OpenAI(1) 与 ResponsesApi(4)
+	ep := &Endpoint{ModelUrls: map[uint16]string{1: "https://oai.test", 4: "https://resp.test"}}
+	if got := ep.ProtocolForClient("openai"); got != 1 {
+		t.Errorf("ProtocolForClient(openai) = %d, want 1", got)
+	}
+	if got := ep.ProtocolForClient("openai-responses-api"); got != 4 {
+		t.Errorf("ProtocolForClient(openai-responses-api) = %d, want 4", got)
+	}
+	// endpoint 不支持 anthropic → 回退到最小 key(NativeProtocol)
+	if got := ep.ProtocolForClient("anthropic"); got != 1 {
+		t.Errorf("ProtocolForClient(anthropic) = %d, want fallback 1", got)
+	}
+}
+
+func TestIntegration_MultiProtocol_ResponsesInbound(t *testing.T) {
+	reg := NewRegistry()
+	reg.Replace([]*ModelRoute{{ //nolint:staticcheck // 单个路由即可
+		Model: "gpt-5.6-terra",
+		Endpoints: []*Endpoint{{
+			Provider: "MetaMaskBail", KeyID: "26-0", KeyValue: "v",
+			Weight: 1, Enabled: true, Models: []ModelKey{"*"},
+			ModelName: "gpt-5.6-terra",
+			// endpoint 同时支持 OpenAI 与 Responses
+			ModelUrls: map[uint16]string{1: "https://oai.test", 4: "https://resp.test"},
+		}},
+	}})
+
+	cfg := DefaultConfig()
+	sch := New(cfg, reg, NoopObservability())
+
+	oaiClient := newMockClient()
+	respClient := newMockClient()
+	sch.RegisterClients(map[ProviderID]ProviderClient{
+		"openai":               oaiClient,
+		"openai-responses-api": respClient,
+	})
+
+	// Responses 入口请求：ctx 注入 inbound=openai-responses-api
+	ctx := WithRequest(context.Background(), "openai-responses-api", "/v1/responses")
+	res, err := sch.Schedule(ctx, Invoke{Model: "gpt-5.6-terra", Body: []byte(`{}`)})
+	if err != nil {
+		t.Fatalf("schedule: %v", err)
+	}
+	if res.Meta.Endpoint.KeyID != "26-0" {
+		t.Fatalf("unexpected endpoint: %s", res.Meta.Endpoint.KeyID)
+	}
+	// Responses inbound 应命中 responses client, 而不是 openai client
+	if respClient.callCount("26-0") != 1 {
+		t.Errorf("openai-responses-api client not used, calls=%d", respClient.callCount("26-0"))
+	}
+	if oaiClient.callCount("26-0") != 0 {
+		t.Errorf("openai client wrongly used, calls=%d", oaiClient.callCount("26-0"))
+	}
+}

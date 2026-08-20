@@ -49,6 +49,7 @@ func RegisterGatewayRoutes(r chi.Router) {
 				r.Post("/audio/transcriptions", HandleRelay)
 			})
 		})
+
 		// OpenAI Responses API 入口
 		r.Group(func(r chi.Router) {
 			r.Use(protocol.OpenAIResponsesMiddleware)

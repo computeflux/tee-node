@@ -1,9 +1,10 @@
 type ModelInfo {
   name: String!
   providerId: Int!
-  providerType: Int!
+  modelType: Int!
+  urls: String!
+  thinking: Boolean!
   modelId: String!
-  uri: String!
   inputModalities: Int!
   contextLength: Int!
   inPrice: Int!

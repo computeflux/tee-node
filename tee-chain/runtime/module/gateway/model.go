@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -92,6 +93,8 @@ func (g GatewayMutation) UpdateModel(
 	uri string,
 	maxConcurrency uint32,
 	balance uint64,
+	thinking bool,
+	meta string,
 ) error {
 	cur, err := g.modelsV2.Get(g.api.GetTxn(), ID)
 	if err != nil || cur == nil {
@@ -107,6 +110,8 @@ func (g GatewayMutation) UpdateModel(
 		m.URIS = uri
 		m.MaxConcurrency = maxConcurrency
 		m.Balance = balance
+		m.Thinking = thinking
+		m.Meta = meta
 	}); err != nil {
 		return err
 	}
@@ -163,6 +168,77 @@ func (g GatewayMutation) DeactivateModel(modelID uint64) error {
 	return g.modelsV2.UpdateFn(g.api.GetTxn(), modelID, func(m *ModelInfoV2) {
 		m.IsActive = false
 	})
+}
+
+// DeleteModel 完全删除模型（仅模型 Owner 或系统账户可调用）。
+// 会同步清理所有与该模型关联的数据，确保删除后不影响其他功能：
+//   - 从 owning Provider 的 ModelIds 中移除
+//   - 从所有包含该模型的路由 ModelIds 中移除
+//   - 删除连续失败计数 modelFailPeriods
+//   - 删除该模型的举报(modelReports)与审计(modelAudits)记录
+//   - 删除模型本体(modelsV2)
+//
+// 注意：历史结算记录(settlementHistory/userSettlementHistory)与已使用 Nonce 保留，
+// 以便 SettleUsageWithRoute 对删除前的迟到结算跳过记账但不阻塞整批(见 usage.go)。
+func (g GatewayMutation) DeleteModel(modelID uint64) error {
+	txn := g.api.GetTxn()
+	caller := g.api.GetCaller()
+
+	model, err := g.modelsV2.Get(txn, modelID)
+	if err != nil || model == nil {
+		return ErrModelNotFound
+	}
+	// 权限：系统账户(T==0) 或模型 Owner
+	if caller.T != 0 && !bytes.Equal(model.Owner.V, caller.V) {
+		return ErrNotOwner
+	}
+
+	// 1. 从 owning Provider 的 ModelIds 移除
+	_ = g.providers.UpdateFn(txn, model.ProviderID, func(p *ProviderInfo) {
+		p.ModelIds = removeUint64(p.ModelIds, modelID)
+	})
+
+	// 2. 从所有包含该模型的路由中移除
+	rkeys, _, err := g.routes.ListAll(txn)
+	if err == nil {
+		for _, rid := range rkeys {
+			r, rerr := g.routes.Get(txn, rid)
+			if rerr != nil || r == nil || !slices.Contains(r.ModelIds, modelID) {
+				continue
+			}
+			_ = g.routes.UpdateFn(txn, rid, func(rt *ModelRoute) {
+				rt.ModelIds = removeUint64(rt.ModelIds, modelID)
+			})
+		}
+	}
+
+	// 3. 删除连续失败计数
+	_ = g.modelFailPeriods.Delete(txn, modelID)
+
+	// 4. 删除该模型的举报与审计记录(通过 ModelID 索引查询所有 id 后逐个删除)
+	if repIDs, err := g.modelReports.Query(txn, store.QueryCond{Field: "ModelID", Val: modelID}); err == nil {
+		for _, id := range repIDs {
+			_ = g.modelReports.Delete(txn, id)
+		}
+	}
+	if audIDs, err := g.modelAudits.Query(txn, store.QueryCond{Field: "ModelID", Val: modelID}); err == nil {
+		for _, id := range audIDs {
+			_ = g.modelAudits.Delete(txn, id)
+		}
+	}
+
+	// 5. 删除模型本体(同时清理其索引)
+	return g.modelsV2.Delete(txn, modelID)
+}
+
+// removeUint64 从切片中移除第一个匹配元素(keep-order)。
+func removeUint64(s []uint64, v uint64) []uint64 {
+	for i, x := range s {
+		if x == v {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
 }
 
 func (g GatewayMutation) ActiveModel(modelID uint64) error {

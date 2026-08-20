@@ -392,13 +392,25 @@ func (s *Scheduler) tryOneModel(
 		ep.metrics.TotalRequests.Add(1)
 		start := time.Now()
 
-		clientProto := ProviderID(ClientTypeName(ep.NativeProtocol()))
+		// 根据入口协议选择匹配的 client：endpoint 多协议时按请求的 inbound 协议选取，
+		// 而非固定最小 key(NativeProtocol)。endpoint 原生支持入口协议则直接透传，
+		// 否则回退到原生协议走转换。
+		inboundProto := ""
+		if ri, ok := reqInfoFrom(ctx); ok {
+			inboundProto = ri.Inbound
+		}
+		epProto := ep.NativeProtocol()
+		if inboundProto != "" {
+			epProto = ep.ProtocolForClient(inboundProto)
+		}
+		clientProto := ProviderID(ClientTypeName(epProto))
 
 		s.log.Debug("endpoint selected",
 			"model", model,
 			"provider", ep.Provider,
 			"key_id", ep.KeyID,
 			"protocol", clientProto,
+			"inbound", inboundProto,
 			"score", ep.EffectiveScore(s.cfg.ColdStartSamples),
 			"attempt", attempt,
 			"inflight", ep.InFlight(),
@@ -417,7 +429,7 @@ func (s *Scheduler) tryOneModel(
 			"provider", ep.Provider,
 			"key_id", ep.KeyID,
 			"protocol", clientProto,
-			"provider_type", ep.NativeProtocol(),
+			"provider_type", epProto,
 			"model_name", ep.ModelName,
 			"stream", stream,
 			"attempt", attempt,
