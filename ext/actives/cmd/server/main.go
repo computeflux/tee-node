@@ -166,10 +166,13 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:         ":" + *port,
-		Handler:      router,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:        ":" + *port,
+		Handler:     router,
+		ReadTimeout: 10 * time.Second,
+		// earlyAccessExport 全量导出生成耗时可能超过 30s,
+		// 过小的 WriteTimeout 会在响应写回前掐断连接(HTTP/2: stream error INTERNAL_ERROR / HTTP/1.1: unexpected EOF)。
+		// 调大到 5 分钟, 给大导出留足余量。
+		WriteTimeout: 300 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
 
