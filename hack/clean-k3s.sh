@@ -3,9 +3,12 @@
 # 需要 root 执行: sudo bash hack/clean-k3s.sh
 set -e
 
-K3S_CONTAINERD_SOCK=/run/k3s/containerd/containerd.sock
-K3S_DATA=/var/lib/rancher/k3s
-K3S_ETC=/etc/rancher/k3s
+# k3s 安装路径(可覆盖,默认标准安装位置)
+K3S_CONTAINERD_SOCK="${K3S_CONTAINERD_SOCK:-/run/k3s/containerd/containerd.sock}"
+K3S_DATA="${K3S_DATA:-/var/lib/rancher/k3s}"
+K3S_ETC="${K3S_ETC:-/etc/rancher/k3s}"
+# 用户级 kubeconfig 路径(可覆盖)
+K3S_USER_KUBECONFIG="${K3S_USER_KUBECONFIG:-/home/wetee/.k3s.yaml}"
 
 echo "==================================================="
 echo " 清理 k3s 残留"
@@ -65,7 +68,7 @@ echo "== [4/6] 清理残留进程 =="
 # 所有 k3s 的 containerd-shim 孤儿进程
 pkill -f "$K3S_DATA/data/.*/bin/containerd-shim" 2>/dev/null || true
 # 残留的 kube-explorer（k3s-ui 的进程）
-pkill -f "kube-explorer --kubeconfig=/home/wetee/.k3s.yaml" 2>/dev/null || true
+pkill -f "kube-explorer --kubeconfig=$K3S_USER_KUBECONFIG" 2>/dev/null || true
 # k3s 的 containerd 主进程
 pkill -f "$K3S_DATA/data/.*/bin/containerd" 2>/dev/null || true
 sleep 2
@@ -86,9 +89,9 @@ if [ -d "$K3S_ETC" ]; then
     echo "  已备份: $K3S_ETC -> /etc/rancher/$BAK"
 fi
 rm -rf /run/k3s
-if [ -f /home/wetee/.k3s.yaml ]; then
-    mv /home/wetee/.k3s.yaml /home/wetee/.k3s.yaml.bak
-    echo "  已备份: /home/wetee/.k3s.yaml -> /home/wetee/.k3s.yaml.bak"
+if [ -f "$K3S_USER_KUBECONFIG" ]; then
+    mv "$K3S_USER_KUBECONFIG" "$K3S_USER_KUBECONFIG.bak"
+    echo "  已备份: $K3S_USER_KUBECONFIG -> $K3S_USER_KUBECONFIG.bak"
 fi
 if [ -f /etc/systemd/system/k3s.service ]; then
     mv /etc/systemd/system/k3s.service /etc/systemd/system/k3s.service.bak
@@ -110,10 +113,10 @@ echo " k3s 清理完成（所有内容已备份，未删除）"
 echo " 备份位置:"
 echo "   /var/lib/rancher/$BAK"
 echo "   /etc/rancher/$BAK"
-echo "   /home/wetee/.k3s.yaml.bak"
+echo "   $K3S_USER_KUBECONFIG.bak"
 echo "   /etc/systemd/system/k3s*.service.bak"
 echo ""
 echo " 确认一切正常后，彻底删除备份:"
 echo "   sudo rm -rf /var/lib/rancher/$BAK /etc/rancher/$BAK \\"
-echo "            /home/wetee/.k3s.yaml.bak /etc/systemd/system/k3s*.service.bak"
+echo "            $K3S_USER_KUBECONFIG.bak /etc/systemd/system/k3s*.service.bak"
 echo "==================================================="

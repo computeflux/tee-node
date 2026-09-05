@@ -19,6 +19,7 @@ DIRS=(
     "./tee-chain/runtime/module/auth"
     "./tee-chain/runtime/module/gateway"
     "./tee-chain/runtime/module/batch"
+    "./tee-chain/runtime/module/c2c"
     "./pkg/chaintypes"
 )
 
@@ -30,6 +31,7 @@ if [ $# -gt 0 ]; then
         auth)    DIRS=("./tee-chain/runtime/module/auth") ;;
         gateway) DIRS=("./tee-chain/runtime/module/gateway") ;;
         batch)   DIRS=("./tee-chain/runtime/module/batch") ;;
+        c2c)     DIRS=("./tee-chain/runtime/module/c2c") ;;
         all)     ;; # 使用默认全部
         *)       echo "unknown: $1 (use: store gov auth gateway batch all)"; exit 1 ;;
     esac

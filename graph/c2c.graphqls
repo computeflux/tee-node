@@ -1,0 +1,21 @@
+# C2C 经济策略查询（供 web2 c2c 服务读取合约中的汇率/费率/限额）
+# 合约是汇率/费率/限额的唯一可信来源；web2 侧按缩放因子解读。
+extend type Query {
+  """
+  c2c 合约中的经济策略配置（整数缩放，web2 侧自行除以缩放因子）：
+    - cnyPerPoint / maxCnyPerPoint：×10000（1 积分 = 该币数）
+    - platformFeePct：×100（平台佣金百分比）
+    - minOrderUsdCents / maxOrderUsdCents / buyerDailyLimitUsd：USD 分（×100）
+  全零表示合约尚未配置经济策略，web2 侧按「无链上策略」降级处理。
+  """
+  c2cFxConfig: C2CFxConfig!
+}
+
+type C2CFxConfig {
+  cnyPerPoint: Int!
+  maxCnyPerPoint: Int!
+  platformFeePct: Int!
+  minOrderUsdCents: Int!
+  maxOrderUsdCents: Int!
+  buyerDailyLimitUsd: Int!
+}

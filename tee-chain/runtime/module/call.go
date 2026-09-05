@@ -3,6 +3,7 @@ package module
 import (
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/auth"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/c2c"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gov"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -31,6 +32,10 @@ func Mutation(call store.ContractCall, runtime store.ContractApi) error {
 		ins := batch.NewBatch(runtime)
 		mutation := batch.BatchMutation{Batch: *ins}
 		err = mutation.ExecCall(call)
+	case "c2c":
+		ins := c2c.NewC2C(runtime)
+		mutation := c2c.C2CMutation{C2C: *ins}
+		err = mutation.ExecCall(call)
 	default:
 		// 未知合约：静默忽略，保持与旧版 dispatchMutation 行为一致
 		return nil
@@ -53,6 +58,9 @@ func Query(call store.ContractCall, runtime store.ContractApi) (data []byte, err
 	case "batch":
 		ins := batch.NewBatch(runtime)
 		return batch.BatchQuery{Batch: *ins}.ExecQuery(call)
+	case "c2c":
+		ins := c2c.NewC2C(runtime)
+		return c2c.C2CQuery{C2C: *ins}.ExecQuery(call)
 	default:
 		// 未知合约：返回空结果，保持与旧版 dispatchQuery 行为一致
 		return nil, nil

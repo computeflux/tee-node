@@ -43,6 +43,15 @@ type AuthConfigInput struct {
 	TwitterRedirectURL  string `json:"twitterRedirectURL"`
 }
 
+type C2CFxConfig struct {
+	CnyPerPoint        int `json:"cnyPerPoint"`
+	MaxCnyPerPoint     int `json:"maxCnyPerPoint"`
+	PlatformFeePct     int `json:"platformFeePct"`
+	MinOrderUsdCents   int `json:"minOrderUsdCents"`
+	MaxOrderUsdCents   int `json:"maxOrderUsdCents"`
+	BuyerDailyLimitUsd int `json:"buyerDailyLimitUsd"`
+}
+
 type ChainInfo struct {
 	IsMain         bool   `json:"is_main"`
 	SubnetContract string `json:"subnet_contract"`

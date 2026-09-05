@@ -253,7 +253,7 @@ require (
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
 
-replace github.com/wetee-dao/ink.go => ../../wetee/ink.go
+replace github.com/wetee-dao/ink.go => /home/wetee/work/wetee/ink.go
 
 // Local overrides for development.
 replace github.com/cometbft/cometbft => /home/wetee/work/Query-Web3/cometbft

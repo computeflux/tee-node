@@ -79,6 +79,15 @@ type ComplexityRoot struct {
 		UserInfo     func(childComplexity int) int
 	}
 
+	C2CFxConfig struct {
+		BuyerDailyLimitUsd func(childComplexity int) int
+		CnyPerPoint        func(childComplexity int) int
+		MaxCnyPerPoint     func(childComplexity int) int
+		MaxOrderUsdCents   func(childComplexity int) int
+		MinOrderUsdCents   func(childComplexity int) int
+		PlatformFeePct     func(childComplexity int) int
+	}
+
 	ChainInfo struct {
 		ChainType      func(childComplexity int) int
 		IsMain         func(childComplexity int) int
@@ -186,6 +195,7 @@ type ComplexityRoot struct {
 	Query struct {
 		AuthConfig             func(childComplexity int) int
 		AuthHealth             func(childComplexity int) int
+		C2cFxConfig            func(childComplexity int) int
 		ChainInfo              func(childComplexity int) int
 		CheckSession           func(childComplexity int, token string) int
 		ContractDryRun         func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
@@ -288,6 +298,7 @@ type QueryResolver interface {
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
 	AuthConfig(ctx context.Context) (*model.AuthConfig, error)
 	CheckSession(ctx context.Context, token string) (*AuthResponse, error)
+	C2cFxConfig(ctx context.Context) (*model.C2CFxConfig, error)
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
@@ -493,6 +504,48 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AuthResponse.UserInfo(childComplexity), true
+
+	case "C2CFxConfig.buyerDailyLimitUsd":
+		if e.complexity.C2CFxConfig.BuyerDailyLimitUsd == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.BuyerDailyLimitUsd(childComplexity), true
+
+	case "C2CFxConfig.cnyPerPoint":
+		if e.complexity.C2CFxConfig.CnyPerPoint == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.CnyPerPoint(childComplexity), true
+
+	case "C2CFxConfig.maxCnyPerPoint":
+		if e.complexity.C2CFxConfig.MaxCnyPerPoint == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.MaxCnyPerPoint(childComplexity), true
+
+	case "C2CFxConfig.maxOrderUsdCents":
+		if e.complexity.C2CFxConfig.MaxOrderUsdCents == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.MaxOrderUsdCents(childComplexity), true
+
+	case "C2CFxConfig.minOrderUsdCents":
+		if e.complexity.C2CFxConfig.MinOrderUsdCents == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.MinOrderUsdCents(childComplexity), true
+
+	case "C2CFxConfig.platformFeePct":
+		if e.complexity.C2CFxConfig.PlatformFeePct == nil {
+			break
+		}
+
+		return e.complexity.C2CFxConfig.PlatformFeePct(childComplexity), true
 
 	case "ChainInfo.chain_type":
 		if e.complexity.ChainInfo.ChainType == nil {
@@ -1121,6 +1174,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Query.AuthHealth(childComplexity), true
 
+	case "Query.c2cFxConfig":
+		if e.complexity.Query.C2cFxConfig == nil {
+			break
+		}
+
+		return e.complexity.Query.C2cFxConfig(childComplexity), true
+
 	case "Query.chain_info":
 		if e.complexity.Query.ChainInfo == nil {
 			break
@@ -1627,7 +1687,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "erc20.graphqls" "secret.graphqls"
+//go:embed "auth.graphqls" "c2c.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "erc20.graphqls" "secret.graphqls"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -1640,6 +1700,7 @@ func sourceData(filename string) string {
 
 var sources = []*ast.Source{
 	{Name: "auth.graphqls", Input: sourceData("auth.graphqls"), BuiltIn: false},
+	{Name: "c2c.graphqls", Input: sourceData("c2c.graphqls"), BuiltIn: false},
 	{Name: "chain.graphqls", Input: sourceData("chain.graphqls"), BuiltIn: false},
 	{Name: "contract.graphqls", Input: sourceData("contract.graphqls"), BuiltIn: false},
 	{Name: "edge.graphqls", Input: sourceData("edge.graphqls"), BuiltIn: false},
@@ -4819,6 +4880,270 @@ func (ec *executionContext) fieldContext_AuthResponse_error(_ context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_cnyPerPoint(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_cnyPerPoint(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CnyPerPoint, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_cnyPerPoint(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_maxCnyPerPoint(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_maxCnyPerPoint(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MaxCnyPerPoint, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_maxCnyPerPoint(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_platformFeePct(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_platformFeePct(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PlatformFeePct, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_platformFeePct(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_minOrderUsdCents(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_minOrderUsdCents(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MinOrderUsdCents, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_minOrderUsdCents(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_maxOrderUsdCents(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_maxOrderUsdCents(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MaxOrderUsdCents, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_maxOrderUsdCents(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _C2CFxConfig_buyerDailyLimitUsd(ctx context.Context, field graphql.CollectedField, obj *model.C2CFxConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_C2CFxConfig_buyerDailyLimitUsd(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BuyerDailyLimitUsd, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_C2CFxConfig_buyerDailyLimitUsd(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "C2CFxConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -8894,6 +9219,64 @@ func (ec *executionContext) fieldContext_Query_checkSession(ctx context.Context,
 	if fc.Args, err = ec.field_Query_checkSession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_c2cFxConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_c2cFxConfig(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().C2cFxConfig(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.C2CFxConfig)
+	fc.Result = res
+	return ec.marshalNC2CFxConfig2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐC2CFxConfig(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_c2cFxConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cnyPerPoint":
+				return ec.fieldContext_C2CFxConfig_cnyPerPoint(ctx, field)
+			case "maxCnyPerPoint":
+				return ec.fieldContext_C2CFxConfig_maxCnyPerPoint(ctx, field)
+			case "platformFeePct":
+				return ec.fieldContext_C2CFxConfig_platformFeePct(ctx, field)
+			case "minOrderUsdCents":
+				return ec.fieldContext_C2CFxConfig_minOrderUsdCents(ctx, field)
+			case "maxOrderUsdCents":
+				return ec.fieldContext_C2CFxConfig_maxOrderUsdCents(ctx, field)
+			case "buyerDailyLimitUsd":
+				return ec.fieldContext_C2CFxConfig_buyerDailyLimitUsd(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type C2CFxConfig", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -13604,6 +13987,70 @@ func (ec *executionContext) _AuthResponse(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var c2CFxConfigImplementors = []string{"C2CFxConfig"}
+
+func (ec *executionContext) _C2CFxConfig(ctx context.Context, sel ast.SelectionSet, obj *model.C2CFxConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, c2CFxConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("C2CFxConfig")
+		case "cnyPerPoint":
+			out.Values[i] = ec._C2CFxConfig_cnyPerPoint(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxCnyPerPoint":
+			out.Values[i] = ec._C2CFxConfig_maxCnyPerPoint(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "platformFeePct":
+			out.Values[i] = ec._C2CFxConfig_platformFeePct(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "minOrderUsdCents":
+			out.Values[i] = ec._C2CFxConfig_minOrderUsdCents(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxOrderUsdCents":
+			out.Values[i] = ec._C2CFxConfig_maxOrderUsdCents(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "buyerDailyLimitUsd":
+			out.Values[i] = ec._C2CFxConfig_buyerDailyLimitUsd(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var chainInfoImplementors = []string{"ChainInfo"}
 
 func (ec *executionContext) _ChainInfo(ctx context.Context, sel ast.SelectionSet, obj *model.ChainInfo) graphql.Marshaler {
@@ -14455,6 +14902,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_checkSession(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "c2cFxConfig":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_c2cFxConfig(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15452,6 +15921,20 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNC2CFxConfig2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐC2CFxConfig(ctx context.Context, sel ast.SelectionSet, v model.C2CFxConfig) graphql.Marshaler {
+	return ec._C2CFxConfig(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNC2CFxConfig2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐC2CFxConfig(ctx context.Context, sel ast.SelectionSet, v *model.C2CFxConfig) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._C2CFxConfig(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNChainInfo2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainInfoᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChainInfo) graphql.Marshaler {
