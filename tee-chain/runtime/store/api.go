@@ -34,6 +34,7 @@ type ContractApi interface {
 	GetCaller() UniAddr
 	GetSystemAccount() UniAddr
 	CallbySystem() bool
+	VerifyTEE([]byte) error
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
 }

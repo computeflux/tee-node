@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"unsafe"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
@@ -97,6 +98,24 @@ func (r *wasmRuntime) GetSystemAccount() store.UniAddr {
 }
 
 func (r *wasmRuntime) CallbySystem() bool { return isSystem() != 0 }
+
+// VerifyTEE 通过 host verify_tee 函数校验客户端 TEE 报告。
+func (r *wasmRuntime) VerifyTEE(report []byte) error {
+	return verifyTEEResult(report)
+}
+
+// verifyTEEResult 调用 host verify_tee，校验 report（protoio 序列化的 model.TeeCall）。
+// report 必须位于本模块的线性内存中，其底层地址作为指针传给 host 读取。
+func verifyTEEResult(report []byte) error {
+	var reportPtr int32
+	if len(report) > 0 {
+		reportPtr = int32(uintptr(unsafe.Pointer(&report[0])))
+	}
+	if verifyTEE(reportPtr, int32(len(report))) == 0 {
+		return errors.New("TEE report verify failed")
+	}
+	return nil
+}
 
 func (r *wasmRuntime) Query(target store.UniAddr, call store.ContractCall) ([]byte, error) {
 	return module.Query(call, r)

@@ -34,19 +34,20 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 	gov := c2cAddr(0xAA)
 	code := []byte("c2c-code-v1")
 
-	// Init
-	call := &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("init"), Args: [][]byte{c2cScale(t, gov)}}
+	// Init（无参占位；治理统一走系统账户 / gov 合约）
+	call := &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("init"), Args: nil}
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
 
-	// RegisterCode
+	// RegisterCode / RegisterNode（系统账户 = gov 治理）
 	call = &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("register_code"), Args: [][]byte{c2cScale(t, code), c2cScale(t, "1.0.0")}}
-	rt.Caller = gov
+	rt.System = true
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
 
-	// RegisterNode（治理注册节点 0x10）
 	call = &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("register_node"), Args: [][]byte{c2cScale(t, c2cAddr(0x10)), c2cScale(t, code)}}
-	rt.Caller = gov
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
+	rt.System = false
+
+	_ = gov
 
 	// Deposit
 	call = &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("deposit"), Args: [][]byte{c2cScale(t, store.NewU256(big.NewInt(1000)))}}
@@ -67,13 +68,14 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 	rt.Caller = c2cAddr(0x10)
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
 
-	// 查询买方可用余额（ExecQuery → SCALE 编码 → 解码）。
+	// 查询买方余额：Release 后放款直接进 gateway credits（跨合约 mock 调用），
+	// c2c buyerBalance 不再增加。
 	qCall := &store.InContractCall{Name: []byte("c2c"), Method: qSel("get_buyer_balance"), Args: [][]byte{c2cScale(t, c2cAddr(0x40))}}
 	data, err := Query(module.NativeVersion, qCall, rt)
 	require.NoError(t, err)
 	bal, err := store.DecodeScaleArgBytes[store.Amount](data)
 	require.NoError(t, err)
-	assert.Equal(t, 0, bal.Cmp(store.NewU256(big.NewInt(400))))
+	assert.Equal(t, 0, bal.Cmp(store.NewU256(big.NewInt(0))))
 
 	// 查询商户 escrow。
 	qCall = &store.InContractCall{Name: []byte("c2c"), Method: qSel("get_merchant_escrow"), Args: [][]byte{c2cScale(t, c2cAddr(0x30))}}

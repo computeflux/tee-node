@@ -75,6 +75,7 @@ func instantiateHostModule(ctx context.Context, rt wazero.Runtime, s *hostState)
 	registerStorage(b, s)
 	registerContext(b, s)
 	registerIdentity(b, s)
+	registerVerifyTEE(b, s)
 	return b.Instantiate(ctx)
 }
 
@@ -266,4 +267,23 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 		}),
 		nil, []wazapi.ValueType{i32},
 	).Export("is_system")
+}
+
+// ── TEE signature / TEE 签名校验 ────────────────────────
+
+// registerVerifyTEE 注册 verify_tee：校验从 WASM 模块线性内存读取的 TEE 报告。
+// 参数: reportPtr(i32)、reportLen(i32)。返回 1 表示验证通过，0 表示失败。
+func registerVerifyTEE(b wazero.HostModuleBuilder, s *hostState) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			report, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if s.api.VerifyTEE(report) == nil {
+				stack[0] = 1
+			} else {
+				stack[0] = 0
+			}
+		}),
+		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+	).Export("verify_tee")
 }

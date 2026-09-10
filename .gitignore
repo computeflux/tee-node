@@ -64,3 +64,4 @@ node0.log
 **.wasm.gz
 
 local-client
+sdkgen

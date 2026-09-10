@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/model"
+	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
@@ -98,6 +101,18 @@ func (r *Runtime) CallbySystem() bool {
 	}
 
 	return bytes.Equal(r.sudo.V, r.caller.V)
+}
+
+// VerifyTEE 校验客户端传入的 TEE 报告：report 为 protoio 序列化的 model.TeeCall，
+// 按 TeeType 交给 teetypes.VerifyReport 完成 SGX/SNP 等验证。返回验证错误（nil 表示有效）。
+func (r *Runtime) VerifyTEE(report []byte) error {
+	call := new(model.TeeCall)
+	if err := protoio.Unmarshal(report, call); err != nil {
+		return err
+	}
+
+	_, err := teetypes.VerifyReport(call)
+	return err
 }
 
 // IsContractIsInited 检查合约是否已初始化。

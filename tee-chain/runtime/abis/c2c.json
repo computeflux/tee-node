@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 27
+        "type": 26
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 28
+        "type": 27
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -77,7 +77,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 24
+          "type": 23
         },
         "selector": "0x00dab4d6"
       },
@@ -272,7 +272,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 23
+          "type": 22
         },
         "selector": "0x36ed9e8c"
       },
@@ -314,18 +314,7 @@
         "selector": "0x45a67cc6"
       },
       {
-        "args": [
-          {
-            "docs": [],
-            "label": "governance",
-            "type": {
-              "displayName": [
-                "UniAddr"
-              ],
-              "type": 13
-            }
-          }
-        ],
+        "args": [],
         "default": false,
         "docs": [],
         "label": "init",
@@ -383,19 +372,41 @@
         "selector": "0x66687968"
       },
       {
-        "args": [],
+        "args": [
+          {
+            "docs": [],
+            "label": "merchant",
+            "type": {
+              "displayName": [
+                "UniAddr"
+              ],
+              "type": 13
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "U256"
+              ],
+              "type": 8
+            }
+          }
+        ],
         "default": false,
         "docs": [],
-        "label": "get_governance",
-        "mutates": false,
+        "label": "deposit_for",
+        "mutates": true,
         "payable": false,
         "returnType": {
           "displayName": [
-            "Result"
+            "ink",
+            "MessageResult"
           ],
-          "type": 21
+          "type": 11
         },
-        "selector": "0x7319338f"
+        "selector": "0x70e57379"
       },
       {
         "args": [
@@ -462,7 +473,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 26
+          "type": 25
         },
         "selector": "0x9aa598ec"
       },
@@ -732,56 +743,46 @@
               {
                 "fields": [],
                 "index": 7,
-                "name": "GovernanceSet"
-              },
-              {
-                "fields": [],
-                "index": 8,
                 "name": "InsufficientBalance"
               },
               {
                 "fields": [],
-                "index": 9,
+                "index": 8,
                 "name": "InsufficientEscrow"
               },
               {
                 "fields": [],
-                "index": 10,
+                "index": 9,
                 "name": "NodeExists"
               },
               {
                 "fields": [],
-                "index": 11,
-                "name": "NotGovernance"
-              },
-              {
-                "fields": [],
-                "index": 12,
+                "index": 10,
                 "name": "NotNode"
               },
               {
                 "fields": [],
-                "index": 13,
+                "index": 11,
                 "name": "OrderLimitExceeded"
               },
               {
                 "fields": [],
-                "index": 14,
+                "index": 12,
                 "name": "RateExceedsCap"
               },
               {
                 "fields": [],
-                "index": 15,
+                "index": 13,
                 "name": "UnsupportedCurrency"
               },
               {
                 "fields": [],
-                "index": 16,
+                "index": 14,
                 "name": "ZeroAmount"
               },
               {
                 "fields": [],
-                "index": 17,
+                "index": 15,
                 "name": "ZeroRate"
               }
             ]
@@ -1114,48 +1115,6 @@
       "id": 21,
       "type": {
         "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
-                    "type": 13
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 13
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 22,
-      "type": {
-        "def": {
           "composite": {
             "fields": [
               {
@@ -1179,7 +1138,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 22,
       "type": {
         "def": {
           "variant": {
@@ -1187,7 +1146,7 @@
               {
                 "fields": [
                   {
-                    "type": 22
+                    "type": 21
                   }
                 ],
                 "index": 0,
@@ -1208,7 +1167,7 @@
         "params": [
           {
             "name": "T",
-            "type": 22
+            "type": 21
           },
           {
             "name": "E",
@@ -1221,7 +1180,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 23,
       "type": {
         "def": {
           "variant": {
@@ -1263,17 +1222,17 @@
       }
     },
     {
-      "id": 25,
+      "id": 24,
       "type": {
         "def": {
           "sequence": {
-            "type": 22
+            "type": 21
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 22
+            "type": 21
           }
         ],
         "path": [
@@ -1282,7 +1241,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 25,
       "type": {
         "def": {
           "variant": {
@@ -1290,7 +1249,7 @@
               {
                 "fields": [
                   {
-                    "type": 25
+                    "type": 24
                   }
                 ],
                 "index": 0,
@@ -1311,7 +1270,7 @@
         "params": [
           {
             "name": "T",
-            "type": 25
+            "type": 24
           },
           {
             "name": "E",
@@ -1324,7 +1283,7 @@
       }
     },
     {
-      "id": 27,
+      "id": 26,
       "type": {
         "def": {
           "primitive": "u128"
@@ -1335,7 +1294,7 @@
       }
     },
     {
-      "id": 28,
+      "id": 27,
       "type": {
         "def": {
           "composite": {

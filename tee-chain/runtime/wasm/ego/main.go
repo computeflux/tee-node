@@ -175,6 +175,7 @@ func (r *testRuntime) Query(store.UniAddr, store.ContractCall) ([]byte, error) {
 	return nil, nil
 }
 func (r *testRuntime) Call(store.UniAddr, store.ContractCall) ([]byte, error) { return nil, nil }
+func (r *testRuntime) VerifyTEE([]byte) error                                 { return nil }
 
 // 兜底（避免 _ import）
 var _ = context.Background

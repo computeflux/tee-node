@@ -26,6 +26,7 @@ var (
 	ErrAPIKeyNotFound   = errors.New("api key not found")
 	ErrNotOwner         = errors.New("not owner")
 	ErrDuplicateNonce   = errors.New("duplicate settlement nonce")
+	ErrZeroAmount       = errors.New("amount must be > 0")
 )
 
 // Gateway API 网关合约

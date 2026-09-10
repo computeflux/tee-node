@@ -120,6 +120,7 @@ func (m *mockAPI) GetVersion() uint32               { return 0 }
 func (m *mockAPI) GetCaller() cstore.UniAddr        { return cstore.UniAddr{} }
 func (m *mockAPI) GetSystemAccount() cstore.UniAddr { return cstore.UniAddr{} }
 func (m *mockAPI) CallbySystem() bool               { return false }
+func (m *mockAPI) VerifyTEE([]byte) error           { return nil }
 
 func (m *mockAPI) Call(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error) {
 	return nil, nil

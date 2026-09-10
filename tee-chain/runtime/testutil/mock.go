@@ -55,13 +55,14 @@ func (m *MockStoreTx) Rollback() error { return nil }
 
 // MockRuntime is a configurable implementation of store.ContractApi.
 type MockRuntime struct {
-	Txn      store.StoreTx
-	Height   int64
-	Time     int64
-	Caller   store.UniAddr
-	Sudo     store.UniAddr
-	System   bool
-	CallFunc func(store.UniAddr, store.ContractCall) ([]byte, error)
+	Txn           store.StoreTx
+	Height        int64
+	Time          int64
+	Caller        store.UniAddr
+	Sudo          store.UniAddr
+	System        bool
+	CallFunc      func(store.UniAddr, store.ContractCall) ([]byte, error)
+	VerifyTEEFunc func([]byte) error
 }
 
 var _ store.ContractApi = (*MockRuntime)(nil)
@@ -81,6 +82,12 @@ func (r *MockRuntime) Call(target store.UniAddr, call store.ContractCall) ([]byt
 		return r.CallFunc(target, call)
 	}
 	return nil, nil
+}
+func (r *MockRuntime) VerifyTEE(report []byte) error {
+	if r.VerifyTEEFunc != nil {
+		return r.VerifyTEEFunc(report)
+	}
+	return nil
 }
 
 // NewMockRuntime creates a MockRuntime with defaults.

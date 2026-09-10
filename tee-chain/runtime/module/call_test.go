@@ -45,5 +45,5 @@ func TestMutation_KnownContract_UnknownMethod(t *testing.T) {
 
 func TestNativeVersion(t *testing.T) {
 	// NativeVersion 必须与当前二进制的原生版本一致（WASM 路径选择依据）
-	assert.Equal(t, uint32(21), NativeVersion)
+	assert.Equal(t, uint32(22), NativeVersion)
 }

@@ -34,15 +34,21 @@ func (d C2CMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("deposit: amount: %w", err)
 		}
 		return m.Deposit(amount)
-	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
-		if err := store.RequireArgLen(args, 1, "init"); err != nil {
+	case [4]byte{0x70, 0xe5, 0x73, 0x79}:
+		if err := store.RequireArgLen(args, 2, "deposit_for"); err != nil {
 			return err
 		}
-		governance, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
+		merchant, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
-			return fmt.Errorf("init: governance: %w", err)
+			return fmt.Errorf("deposit_for: merchant: %w", err)
 		}
-		return m.Init(governance)
+		amount, err := store.DecodeScaleArgBytes[store.Amount](args[1])
+		if err != nil {
+			return fmt.Errorf("deposit_for: amount: %w", err)
+		}
+		return m.DepositFor(merchant, amount)
+	case [4]byte{0x53, 0xe3, 0x90, 0x03}:
+		return m.Init()
 	case [4]byte{0x27, 0xdb, 0xde, 0x64}:
 		if err := store.RequireArgLen(args, 2, "register_code"); err != nil {
 			return err
@@ -181,12 +187,6 @@ func (q C2CQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
-	case [4]byte{0x73, 0x19, 0x33, 0x8f}:
-		out, err := q.GetGovernance()
-		if err != nil {
-			return nil, err
-		}
-		return store.ScaleEncode(out)
 	case [4]byte{0xee, 0x68, 0xcb, 0xc2}:
 		if err := store.RequireArgLen(args, 1, "get_merchant_escrow"); err != nil {
 			return nil, err
@@ -246,7 +246,6 @@ func (q C2CQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 func NewC2C(api store.ContractApi) *C2C {
 	return &C2C{
 		api:             api,
-		governance:      &store.StoreValue[store.UniAddr]{Namespace: "c2c", Key: "governance"},
 		authorizedCodes: &store.StoreMapping[string, bool]{Namespace: "c2c", KeyPrefix: "authorized_code_"},
 		nodes:           &store.StoreMapping[store.UniAddr, NodeRecord]{Namespace: "c2c", KeyPrefix: "node_"},
 		merchantEscrow:  &store.StoreMapping[store.UniAddr, store.Amount]{Namespace: "c2c", KeyPrefix: "merchant_escrow_"},
@@ -264,7 +263,6 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x23, 0xa3, 0x33, 0x1f}: "fiat_to_points",
 	[4]byte{0xe7, 0x5f, 0xf3, 0x67}: "get_buyer_balance",
 	[4]byte{0x0b, 0x8c, 0xef, 0xa6}: "get_fx_config",
-	[4]byte{0x73, 0x19, 0x33, 0x8f}: "get_governance",
 	[4]byte{0xee, 0x68, 0xcb, 0xc2}: "get_merchant_escrow",
 	[4]byte{0x36, 0xed, 0x9e, 0x8c}: "get_node",
 	[4]byte{0x66, 0x68, 0x79, 0x68}: "get_platform_commission",

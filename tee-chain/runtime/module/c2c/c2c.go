@@ -19,15 +19,15 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 var (
-	ErrNotGovernance       = errors.New("c2c: not governance")
-	ErrGovernanceSet       = errors.New("c2c: governance already set")
 	ErrZeroAmount          = errors.New("c2c: amount must be > 0")
 	ErrCodeEmpty           = errors.New("c2c: code version empty")
 	ErrCodeNotAuthorized   = errors.New("c2c: code version not authorized")
@@ -47,11 +47,11 @@ var (
 )
 
 // C2C C2C 积分兑换链上结算合约。
+// 治理复用 gov 合约：白名单/节点注册/经济策略的写操作仅接受系统账户调用
+// （由 gov.CallAsSudo 以系统身份批量执行），不再单独维护治理地址。
 type C2C struct {
 	api store.ContractApi
 
-	// governance 治理多签地址：维护代码白名单与节点注册表。
-	governance *store.StoreValue[store.UniAddr]
 	// authorizedCodes 代码签名版本白名单：hex(codeHash) → true。
 	authorizedCodes *store.StoreMapping[string, bool]
 	// nodes 验证节点注册表：节点地址 → NodeRecord。
@@ -76,29 +76,15 @@ type C2CQuery struct{ C2C }
 // C2CMutation 状态变更接口。
 type C2CMutation struct{ C2C }
 
-// Init 初始化：设置治理多签地址（仅可调用一次，由运行时 ContractInited 保证）。
-func (m C2CMutation) Init(governance store.UniAddr) error {
-	if governance.T == 0 && len(governance.V) == 0 {
-		return errors.New("c2c: invalid governance address")
-	}
-	return m.governance.Set(m.api.GetTxn(), governance)
-}
+// Init 初始化占位（治理由 gov 合约提供，无独立初始化状态）。
+func (m C2CMutation) Init() error { return nil }
 
-// isGovernance 判断调用方是否为治理多签。
-func (m C2CMutation) isGovernance() bool {
-	g, err := m.governance.Get(m.api.GetTxn())
-	if err != nil || g == nil {
-		return false
-	}
-	return addrEqual(*g, m.api.GetCaller())
-}
-
-// ── ① 代码签名版本白名单（治理） ─────────────────────────────
+// ── ① 代码签名版本白名单（系统账户 / gov 治理） ──────────────
 
 // RegisterCode 授权一个新的 c2c 代码签名版本。
 func (m C2CMutation) RegisterCode(codeHash []byte, version string) error {
-	if !m.isGovernance() {
-		return ErrNotGovernance
+	if !m.api.CallbySystem() {
+		return errors.New("c2c: not authorized (system account required)")
 	}
 	if len(codeHash) == 0 {
 		return ErrCodeEmpty
@@ -113,8 +99,8 @@ func (m C2CMutation) RegisterCode(codeHash []byte, version string) error {
 
 // RevokeCode 取消授权一个代码版本。
 func (m C2CMutation) RevokeCode(codeHash []byte) error {
-	if !m.isGovernance() {
-		return ErrNotGovernance
+	if !m.api.CallbySystem() {
+		return errors.New("c2c: not authorized (system account required)")
 	}
 	if len(codeHash) == 0 {
 		return ErrCodeEmpty
@@ -122,13 +108,13 @@ func (m C2CMutation) RevokeCode(codeHash []byte) error {
 	return m.authorizedCodes.Delete(m.api.GetTxn(), hexKey(codeHash))
 }
 
-// ── ② 验证节点注册表（治理） ─────────────────────────────────
+// ── ② 验证节点注册表（系统账户 / gov 治理） ───────────────────
 
 // RegisterNode 由治理注册一个验证节点地址，并将其绑定到指定的代码版本。
 // 被注册的代码版本必须已在白名单内，保证“节点运行的代码 ∈ 白名单”。
 func (m C2CMutation) RegisterNode(node store.UniAddr, codeHash []byte) error {
-	if !m.isGovernance() {
-		return ErrNotGovernance
+	if !m.api.CallbySystem() {
+		return errors.New("c2c: not authorized (system account required)")
 	}
 	if existed, _ := m.nodes.Contains(m.api.GetTxn(), node); existed {
 		return ErrNodeExists
@@ -143,10 +129,10 @@ func (m C2CMutation) RegisterNode(node store.UniAddr, codeHash []byte) error {
 	})
 }
 
-// RemoveNode 删除一个验证节点（治理操作；也允许节点自行注销）。
+// RemoveNode 删除一个验证节点（系统账户管理；也允许节点自行注销）。
 func (m C2CMutation) RemoveNode(node store.UniAddr) error {
-	if !m.isGovernance() && !addrEqual(node, m.api.GetCaller()) {
-		return ErrNotGovernance
+	if !m.api.CallbySystem() && !addrEqual(node, m.api.GetCaller()) {
+		return errors.New("c2c: not authorized (system account or node self)")
 	}
 	return m.nodes.Delete(m.api.GetTxn(), node)
 }
@@ -159,6 +145,38 @@ func (m C2CMutation) Deposit(amount store.Amount) error {
 		return ErrZeroAmount
 	}
 	merchant := m.api.GetCaller()
+	cur, err := m.merchantEscrow.Get(m.api.GetTxn(), merchant)
+	if err != nil || cur == nil {
+		zero := store.ZeroAmount
+		cur = &zero
+	}
+	*cur = store.AmountAdd(*cur, amount)
+	return m.merchantEscrow.Set(m.api.GetTxn(), merchant, *cur)
+}
+
+// ── ③.5 商户盈利入 escrow（验证节点代商家操作）────────────────
+
+// DepositFor 由注册验证节点发起：从 gateway 扣减 merchant 的 provider 盈利
+// （GatewaySecret.WithdrawToC2C），并记入 c2c 合约 merchant escrow（同一 txn）。
+// 供 web2 c2c 服务（节点身份）在商家挂单/补库存时调用。
+func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) error {
+	if amount.Cmp(store.ZeroAmount) == 0 {
+		return ErrZeroAmount
+	}
+	// 调用方必须是已注册的验证节点。
+	if existed, _ := m.nodes.Contains(m.api.GetTxn(), m.api.GetCaller()); !existed {
+		return ErrNotNode
+	}
+	units := amountInt64(amount)
+	if units <= 0 {
+		return ErrZeroAmount
+	}
+	// 扣减 gateway providerCredits（Secret 构造调用，同 txn 原子）。
+	gwSecret := gateway.GatewaySecret{Gateway: *gateway.NewGateway(m.api)}
+	if err := gwSecret.WithdrawToC2C(merchant, uint64(units)); err != nil {
+		return err
+	}
+	// 记入 c2c escrow。
 	cur, err := m.merchantEscrow.Get(m.api.GetTxn(), merchant)
 	if err != nil || cur == nil {
 		zero := store.ZeroAmount
@@ -248,16 +266,12 @@ func (m C2CMutation) Release(r Release) error {
 	if err := m.merchantEscrow.Set(m.api.GetTxn(), r.Merchant, *escrow); err != nil {
 		return err
 	}
-	// ⑬ 增加买方可用余额（已扣佣金）。
-	buyerGetAmt := store.NewU256(big.NewInt(buyerGet))
-	cur, err := m.buyerBalance.Get(m.api.GetTxn(), r.Buyer)
-	if err != nil || cur == nil {
-		zero := store.ZeroAmount
-		cur = &zero
-	}
-	*cur = store.AmountAdd(*cur, buyerGetAmt)
-	if err := m.buyerBalance.Set(m.api.GetTxn(), r.Buyer, *cur); err != nil {
-		return err
+	// ⑬ 买方获得（已扣佣金）→ 入 gateway credits（买家消费积分的真源）。
+	// 包内构造 GatewaySecret 直接调用（同一 txn、失败回滚）；AddCredit 为 Secret
+	// 方法，不进 ABI / dispatch，外部交易无法触达。
+	gwSecret := gateway.GatewaySecret{Gateway: *gateway.NewGateway(m.api)}
+	if err := gwSecret.AddCredit(r.Buyer, uint64(buyerGet)); err != nil {
+		return fmt.Errorf("c2c: credit buyer via gateway: %w", err)
 	}
 	// ⑭ 平台累积佣金。
 	if commission > 0 {
@@ -289,12 +303,13 @@ func (m C2CMutation) BuyerWithdraw(amount store.Amount) error {
 	return m.buyerBalance.Set(m.api.GetTxn(), buyer, *cur)
 }
 
-// ── ⑤ 经济策略配置（治理）────────────────────────────────────
+// ── ⑤ 经济策略配置（系统账户 / gov 治理）────────────────────
 
-// SetFxConfig 治理更新经济策略（汇率/佣金/限额）。仅治理可写。
+// SetFxConfig 治理更新经济策略（汇率/佣金/限额）。仅系统账户可写
+// （由 gov.CallAsSudo 以系统身份发起）。
 func (m C2CMutation) SetFxConfig(cfg FxConfig) error {
-	if !m.isGovernance() {
-		return ErrNotGovernance
+	if !m.api.CallbySystem() {
+		return errors.New("c2c: not authorized (system account required)")
 	}
 	if cfg.CnyPerPoint <= 0 {
 		return ErrZeroRate
@@ -361,17 +376,7 @@ func (q C2CQuery) GetBuyerBalance(buyer store.UniAddr) (store.Amount, error) {
 	return *v, nil
 }
 
-// GetGovernance 读取治理多签地址。
-func (q C2CQuery) GetGovernance() (store.UniAddr, error) {
-	v, err := q.governance.Get(q.api.GetTxn())
-	if err != nil {
-		return store.UniAddr{}, err
-	}
-	if v == nil {
-		return store.UniAddr{}, nil
-	}
-	return *v, nil
-}
+// ── 查询 ──────────────────────────────────────────────────────
 
 // GetFxConfig 读取当前经济策略配置（未配置返回全 0）。
 func (q C2CQuery) GetFxConfig() (FxConfig, error) {

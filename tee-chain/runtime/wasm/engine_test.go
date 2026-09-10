@@ -84,6 +84,7 @@ func (r *testRuntime) GetSystemAccount() store.UniAddr                         {
 func (r *testRuntime) CallbySystem() bool                                      { return false }
 func (r *testRuntime) Query(store.UniAddr, store.ContractCall) ([]byte, error) { return nil, nil }
 func (r *testRuntime) Call(store.UniAddr, store.ContractCall) ([]byte, error)  { return nil, nil }
+func (r *testRuntime) VerifyTEE([]byte) error                                  { return nil }
 
 // ── 辅助函数 ──────────────────────────────────────────────
 
