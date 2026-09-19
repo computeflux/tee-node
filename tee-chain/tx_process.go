@@ -66,7 +66,7 @@ func (app *TeeChain) ProcessTx(txs [][]byte, height int64, time time.Time) abci.
 			}
 
 			// 额外：合约 DryRun 预执行，确保合约逻辑不会失败，避免浪费区块空间
-			err = app.ContractMutation(caller, callerType, txn, time, height, p.Contract)
+			err = app.ContractMutation(caller, callerType, txn, time, height, p.Contract, txbt)
 			if err != nil {
 				fmt.Println("ProcessTx ContractMutation err:", err.Error())
 				return abci.ResponseProcessProposal_REJECT

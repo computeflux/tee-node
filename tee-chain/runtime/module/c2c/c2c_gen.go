@@ -16,15 +16,6 @@ func (d C2CMutation) ExecCall(call store.ContractCall) error {
 	methodSel := [4]byte(call.GetMethod()[:4])
 	args := call.GetArgs()
 	switch methodSel {
-	case [4]byte{0x12, 0xa4, 0xbf, 0x6e}:
-		if err := store.RequireArgLen(args, 1, "buyer_withdraw"); err != nil {
-			return err
-		}
-		amount, err := store.DecodeScaleArgBytes[store.Amount](args[0])
-		if err != nil {
-			return fmt.Errorf("buyer_withdraw: amount: %w", err)
-		}
-		return m.BuyerWithdraw(amount)
 	case [4]byte{0x81, 0x8b, 0xfc, 0xb4}:
 		if err := store.RequireArgLen(args, 1, "deposit"); err != nil {
 			return err
@@ -79,11 +70,11 @@ func (d C2CMutation) ExecCall(call store.ContractCall) error {
 		if err := store.RequireArgLen(args, 1, "release"); err != nil {
 			return err
 		}
-		r, err := store.DecodeScaleArgBytes[Release](args[0])
+		sig, err := store.DecodeScaleArgBytes[ReleaseWithSig](args[0])
 		if err != nil {
-			return fmt.Errorf("release: r: %w", err)
+			return fmt.Errorf("release: sig: %w", err)
 		}
-		return m.Release(r)
+		return m.Release(sig)
 	case [4]byte{0x34, 0x6f, 0xf5, 0x26}:
 		if err := store.RequireArgLen(args, 1, "remove_node"); err != nil {
 			return err
@@ -168,19 +159,6 @@ func (q C2CQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
-	case [4]byte{0xe7, 0x5f, 0xf3, 0x67}:
-		if err := store.RequireArgLen(args, 1, "get_buyer_balance"); err != nil {
-			return nil, err
-		}
-		buyer, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
-		if err != nil {
-			return nil, fmt.Errorf("get_buyer_balance: buyer: %w", err)
-		}
-		out, err := q.GetBuyerBalance(buyer)
-		if err != nil {
-			return nil, err
-		}
-		return store.ScaleEncode(out)
 	case [4]byte{0x0b, 0x8c, 0xef, 0xa6}:
 		out, err := q.GetFxConfig()
 		if err != nil {
@@ -249,7 +227,6 @@ func NewC2C(api store.ContractApi) *C2C {
 		authorizedCodes: &store.StoreMapping[string, bool]{Namespace: "c2c", KeyPrefix: "authorized_code_"},
 		nodes:           &store.StoreMapping[store.UniAddr, NodeRecord]{Namespace: "c2c", KeyPrefix: "node_"},
 		merchantEscrow:  &store.StoreMapping[store.UniAddr, store.Amount]{Namespace: "c2c", KeyPrefix: "merchant_escrow_"},
-		buyerBalance:    &store.StoreMapping[store.UniAddr, store.Amount]{Namespace: "c2c", KeyPrefix: "buyer_balance_"},
 		releasedNonces:  &store.StoreMapping[string, bool]{Namespace: "c2c", KeyPrefix: "released_nonce_"},
 		fxConfig:        &store.StoreValue[FxConfig]{Namespace: "c2c", Key: "fx_config"},
 		buyerDaily:      &store.StoreMapping[store.UniAddr, BuyerDaily]{Namespace: "c2c", KeyPrefix: "buyer_daily_"},
@@ -261,7 +238,6 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0xdc, 0xc0, 0xbf, 0xb3}: "buyer_spent_today",
 	[4]byte{0xc3, 0x6e, 0xc1, 0x0d}: "convert",
 	[4]byte{0x23, 0xa3, 0x33, 0x1f}: "fiat_to_points",
-	[4]byte{0xe7, 0x5f, 0xf3, 0x67}: "get_buyer_balance",
 	[4]byte{0x0b, 0x8c, 0xef, 0xa6}: "get_fx_config",
 	[4]byte{0xee, 0x68, 0xcb, 0xc2}: "get_merchant_escrow",
 	[4]byte{0x36, 0xed, 0x9e, 0x8c}: "get_node",

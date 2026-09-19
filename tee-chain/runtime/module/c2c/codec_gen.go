@@ -5,6 +5,7 @@ package c2c
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
@@ -141,8 +142,6 @@ func (v *Release) Encode() ([]byte, error) {
 		}
 		buf = append(buf, b...)
 	}
-	buf = store.EncodeCompact(buf, uint64(len(v.CodeVersion)))
-	buf = append(buf, v.CodeVersion...)
 	buf = store.EncodeCompact(buf, uint64(len(v.OrderNo)))
 	buf = append(buf, v.OrderNo...)
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.FiatCents))
@@ -151,6 +150,56 @@ func (v *Release) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.LockedRate))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.FeePct))
 	return buf, nil
+}
+
+// Encode SCALE 编码 ReleaseWithSig。
+func (v *ReleaseWithSig) Encode() ([]byte, error) {
+	var buf []byte
+	{
+		b, err := v.Data.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+	}
+	buf = store.EncodeCompact(buf, uint64(len(v.TeeReport)))
+	buf = append(buf, v.TeeReport...)
+	buf = store.EncodeCompact(buf, uint64(len(v.CodeSignature)))
+	buf = append(buf, v.CodeSignature...)
+	return buf, nil
+}
+
+// Decode SCALE 解码 ReleaseWithSig。
+func (v *ReleaseWithSig) Decode(data []byte) (int, error) {
+	off := 0
+	{
+		n, err := v.Data.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading TeeReport")
+		}
+		v.TeeReport = make([]byte, n)
+		copy(v.TeeReport, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeSignature")
+		}
+		v.CodeSignature = make([]byte, n)
+		copy(v.CodeSignature, data[off:off+int(n)])
+		off += int(n)
+	}
+	return off, nil
 }
 
 // Decode SCALE 解码 Release。
@@ -188,20 +237,11 @@ func (v *Release) Decode(data []byte) (int, error) {
 	}
 	{
 		n, err := v.Amount.Decode(data[off:])
+		v.Amount.Decode(data[off:])
 		if err != nil {
 			return 0, err
 		}
 		off += n
-	}
-	{
-		n, sz := store.DecodeCompact(data[off:])
-		off += sz
-		if off+int(n) > len(data) {
-			return 0, fmt.Errorf("EOF reading CodeVersion")
-		}
-		v.CodeVersion = make([]byte, n)
-		copy(v.CodeVersion, data[off:off+int(n)])
-		off += int(n)
 	}
 	{
 		n, sz := store.DecodeCompact(data[off:])

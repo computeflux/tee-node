@@ -1,6 +1,9 @@
 package c2c
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -20,22 +23,74 @@ func addr(b byte) store.UniAddr { return store.UniAddr{T: 1, V: []byte{b}} }
 
 // 预置：以系统账户（gov 治理）授权代码 + 注册验证节点(0x10)。
 // 治理统一走系统账户（CallbySystem，由 gov.CallAsSudo 发起），不再单独治理地址。
-func setupGovernance(t *testing.T) (*C2C, *testutil.MockRuntime, store.UniAddr, []byte) {
+// 同时生成“TEE 代码密钥”（ed25519）并配置 MockRuntime.VerifyTEEFunc：
+// 对任意 TEE 报告返回 TEE 证明的代码三要素（CodeSigner=代码公钥、CodeSignature=代码指纹 code），
+// 模拟验证节点链下 quote 验签后的返回。
+func setupGovernance(t *testing.T) (*C2C, *testutil.MockRuntime, []byte, ed25519.PrivateKey) {
 	t.Helper()
 	c, rt := newTestC2C()
 	m := C2CMutation{*c}
-	gov := addr(0xAA) // 仅作占位返回，治理已统一走系统账户
 	code := []byte("c2c-code-v1")
+	_, codePriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	codePub := codePriv.Public().(ed25519.PublicKey)
+	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
+			TeeType:       1,
+			CodeSigner:    codePub,
+			CodeSignature: code,
+		})
+	}
 	rt.System = true
 	require.NoError(t, m.RegisterCode(code, "1.0.0"))
 	require.NoError(t, m.RegisterNode(addr(0x10), code))
 	rt.System = false
-	return c, rt, gov, code
+	return c, rt, code, codePriv
+}
+
+// signRelease 用代码私钥对放款数据的 SCALE 编码签名，生成用户的 CodeSignature
+// （与合约侧 verifyCodeSig 的验证算法一致：ed25519 RFC 8032；测试数据远小于 256 字节，不触发 blake2b 预哈希）。
+func signRelease(t *testing.T, priv ed25519.PrivateKey, r Release) []byte {
+	t.Helper()
+	payload, err := store.ScaleEncode(r)
+	require.NoError(t, err)
+	return ed25519.Sign(priv, payload)
+}
+
+// releaseWithSig 把放款数据包装为携带 TEE 证明的放款请求。
+func releaseWithSig(t *testing.T, priv ed25519.PrivateKey, r Release) ReleaseWithSig {
+	t.Helper()
+	return ReleaseWithSig{
+		Data:          r,
+		TeeReport:     []byte("tee-report"),
+		CodeSignature: signRelease(t, priv, r),
+	}
 }
 
 func cmpInt(a store.Amount, i int64) int { return a.Cmp(store.NewU256(big.NewInt(i))) }
 
 func amt(i int64) store.Amount { return store.NewU256(big.NewInt(i)) }
+
+// seedProviderCredits 通过 gateway 公开接口为 merchant 铺 provider 盈利（积分）：
+// merchant 名下注册 provider + model（inPrice=1e6、outPrice=0），再以节点身份结算
+// credits 个 input token，恰好使 provider credits 增加 credits（cost = tokens×1e6/1e6）。
+func seedProviderCredits(t *testing.T, rt *testutil.MockRuntime, gw *gateway.Gateway, merchant store.UniAddr, credits uint64) {
+	t.Helper()
+	gm := gateway.GatewayMutation{Gateway: *gw}
+	rt.Caller = merchant
+	require.NoError(t, gm.CreateProvider(fmt.Sprintf("shop-%02x", merchant.V[0]), "", "", gateway.RegionAsiaEast, 0))
+	require.NoError(t, gm.RegisterModel("m", gateway.ModalityText, 128000, 1_000_000, 0, 0, gateway.OpenAI, "", nil, 0, 0, false, ""))
+	// 结算必须节点（T == 0）发起。
+	rt.Caller = store.UniAddr{T: 0}
+	require.NoError(t, gm.SettleUsageWithRoute([]gateway.SettlementWithRoute{{
+		User:       merchant,
+		RouteID:    store.NewNone[uint64](),
+		ProviderID: 0,
+		ModelID:    0,
+		TokenIn:    credits,
+		Nonce:      []byte{0xAB},
+	}}))
+}
 
 // ── Init / 治理 ──────────────────────────────────────────────
 
@@ -55,7 +110,7 @@ func TestGovernanceRequiresSystem(t *testing.T) {
 // ── ① 代码白名单 ─────────────────────────────────────────────
 
 func TestRegisterCode_AuthorizeAndRevoke(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, code, _ := setupGovernance(t)
 	ok, err := C2CQuery{*c}.IsCodeAuthorized(code)
 	require.NoError(t, err)
 	require.True(t, ok)
@@ -69,7 +124,7 @@ func TestRegisterCode_AuthorizeAndRevoke(t *testing.T) {
 }
 
 func TestRegisterCode_Duplicate(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, code, _ := setupGovernance(t)
 	rt.System = true
 	assert.ErrorIs(t, C2CMutation{*c}.RegisterCode(code, "1.0.1"), ErrCodeExists)
 	rt.System = false
@@ -100,14 +155,14 @@ func TestRegisterNode_RequiresAuthorizedCode(t *testing.T) {
 }
 
 func TestRegisterNode_Duplicate(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, code, _ := setupGovernance(t)
 	rt.System = true
 	assert.ErrorIs(t, C2CMutation{*c}.RegisterNode(addr(0x10), code), ErrNodeExists)
 	rt.System = false
 }
 
 func TestRemoveNode_SelfAndGovernance(t *testing.T) {
-	c, rt, _, _ := setupGovernance(t)
+	c, rt, code, _ := setupGovernance(t)
 
 	// 节点自行注销。
 	rt.Caller = addr(0x10)
@@ -117,7 +172,7 @@ func TestRemoveNode_SelfAndGovernance(t *testing.T) {
 
 	// 系统账户重新注册后再移除。
 	rt.System = true
-	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x10), []byte("c2c-code-v1")))
+	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x10), code))
 	require.NoError(t, C2CMutation{*c}.RemoveNode(addr(0x10)))
 	rt.System = false
 }
@@ -129,7 +184,7 @@ func TestRemoveNode_OnlyGovernanceOrSelf(t *testing.T) {
 }
 
 func TestListNodes(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, code, _ := setupGovernance(t)
 	rt.System = true
 	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x20), code))
 	rt.System = false
@@ -165,10 +220,59 @@ func TestDeposit_ZeroAmount(t *testing.T) {
 	assert.ErrorIs(t, C2CMutation{*c}.Deposit(amt(0)), ErrZeroAmount)
 }
 
-// ── ④ 受控放款 ───────────────────────────────────────────────
+// ── ③.5 商户盈利入 escrow（验证节点代商家操作）────────────────
+
+func TestDepositFor_Success(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
+	merchant := addr(0x30)
+	gw := gateway.NewGateway(rt)
+	seedProviderCredits(t, rt, gw, merchant, 200)
+
+	rt.Caller = addr(0x10) // 注册验证节点
+	require.NoError(t, C2CMutation{*c}.DepositFor(merchant, amt(120)))
+
+	escrow, err := C2CQuery{*c}.GetMerchantEscrow(merchant)
+	require.NoError(t, err)
+	assert.Equal(t, 0, cmpInt(escrow, 120))
+	// provider 盈利被扣减 120（200 → 80）。
+	gq := gateway.GatewayQuery{Gateway: *gw}
+	pc, err := gq.GetProviderCredit(0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(80), pc)
+}
+
+func TestDepositFor_NotNode(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
+	rt.Caller = addr(0x50) // 未注册节点
+	assert.ErrorIs(t, C2CMutation{*c}.DepositFor(addr(0x30), amt(10)), ErrNotNode)
+}
+
+func TestDepositFor_NoProvider(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
+	rt.Caller = addr(0x10) // 节点
+	// merchant 名下无 provider → gateway ErrProviderNotFound。
+	assert.ErrorIs(t, C2CMutation{*c}.DepositFor(addr(0x60), amt(10)), gateway.ErrProviderNotFound)
+}
+
+func TestDepositFor_InsufficientProviderCredit(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
+	gw := gateway.NewGateway(rt)
+	seedProviderCredits(t, rt, gw, addr(0x30), 50)
+	rt.Caller = addr(0x10)
+	// provider 盈利 50 < 100 → gateway ErrLowCredit。
+	assert.ErrorIs(t, C2CMutation{*c}.DepositFor(addr(0x30), amt(100)), gateway.ErrLowCredit)
+}
+
+func TestDepositFor_ZeroAmount(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
+	rt.Caller = addr(0x10)
+	assert.ErrorIs(t, C2CMutation{*c}.DepositFor(addr(0x30), amt(0)), ErrZeroAmount)
+}
+
+// ── ④ 受控放款（TEE 证明 + 链上 CodeSignature 验证）────────────
 
 func TestRelease_FullCycle(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, _, priv := setupGovernance(t)
 	merchant := addr(0x30)
 	buyer := addr(0x40)
 
@@ -176,19 +280,15 @@ func TestRelease_FullCycle(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 
 	rt.Caller = addr(0x10) // 节点
-	require.NoError(t, C2CMutation{*c}.Release(Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(400),
-		CodeVersion: code, OrderNo: []byte("order-1"),
+		OrderNo:   []byte("order-1"),
 		FiatCents: 40000, Currency: "USD",
-	}))
+	})))
 
 	escrow, _ := C2CQuery{*c}.GetMerchantEscrow(merchant)
-	bal, _ := C2CQuery{*c}.GetBuyerBalance(buyer)
 	assert.Equal(t, 0, cmpInt(escrow, 600))
-	// Release 不再记 c2c buyerBalance，放款直接进 gateway credits。
-	assert.Equal(t, 0, cmpInt(bal, 0))
-
-	// 放款已入 gateway credits（包内构造 GatewaySecret 调用，共享 txn）。
+	// 放款直接进 gateway credits（c2c 合约不再维护 buyerBalance）。
 	gw := gateway.NewGateway(rt)
 	cred, err := gateway.GatewayQuery{Gateway: *gw}.GetCredit(buyer)
 	require.NoError(t, err)
@@ -196,62 +296,165 @@ func TestRelease_FullCycle(t *testing.T) {
 }
 
 func TestRelease_NotNode(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, _, _ := setupGovernance(t)
 	rt.Caller = addr(0x50) // 未注册节点
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
-	assert.ErrorIs(t, C2CMutation{*c}.Release(Release{
-		Merchant: addr(0x50), Buyer: addr(0x40), Amount: amt(10),
-		CodeVersion: code, OrderNo: []byte("o1"),
+	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
+		Data: Release{
+			Merchant: addr(0x50), Buyer: addr(0x40), Amount: amt(10),
+			OrderNo: []byte("o1"),
+		},
 	}), ErrNotNode)
 }
 
-func TestRelease_CodeMismatch(t *testing.T) {
-	c, rt, _, _ := setupGovernance(t)
+func TestRelease_MissingTeeReport(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
 	rt.Caller = addr(0x30)
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10) // 节点
-	assert.ErrorIs(t, C2CMutation{*c}.Release(Release{
-		Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10),
-		CodeVersion: []byte("other"), OrderNo: []byte("o1"),
+	// 未携带 TEE 报告 → 拒绝（代码版本必须由 TEE 硬件证明，不接受用户声称）。
+	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
+		Data:          Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")},
+		CodeSignature: signRelease(t, priv, Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}),
+	}), ErrTeeReportMissing)
+}
+
+func TestRelease_TeeVerifyFailed(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	rt.Caller = addr(0x30)
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
+	rt.Caller = addr(0x10) // 节点
+	// 验证节点 quote 验签失败（如报告伪造/过期）→ 拒绝。
+	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+		return store.NewErr[store.TeeVerifyInfo, string]("invalid report sign")
+	}
+	rel := Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}
+	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
+		Data:          rel,
+		TeeReport:     []byte("forged-report"),
+		CodeSignature: signRelease(t, priv, rel),
+	}), ErrTeeVerifyFailed)
+}
+
+func TestRelease_CodeMismatch(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	rt.Caller = addr(0x30)
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
+	rt.Caller = addr(0x10) // 节点
+	// TEE 证明的代码指纹与节点注册值不一致（节点只能为其自身代码背书）→ 拒绝。
+	codePub := priv.Public().(ed25519.PublicKey)
+	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
+			TeeType:       1,
+			CodeSigner:    codePub,
+			CodeSignature: []byte("other"),
+		})
+	}
+	rel := Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}
+	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
+		Data:          rel,
+		TeeReport:     []byte("tee-report"),
+		CodeSignature: signRelease(t, priv, rel),
 	}), ErrCodeMismatch)
 }
 
-func TestRelease_UnauthorizedCode(t *testing.T) {
-	c, rt, _, _ := setupGovernance(t)
-	// 系统账户用未授权代码注册节点 → 拒绝。
-	rt.System = true
-	assert.ErrorIs(t, C2CMutation{*c}.RegisterNode(addr(0x11), []byte("rogue")), ErrCodeNotAuthorized)
-	rt.System = false
-}
-
-func TestRelease_InsufficientEscrow(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
-	rt.Caller = addr(0x30)
+func TestRelease_CodeRevoked(t *testing.T) {
+	c, rt, code, priv := setupGovernance(t)
+	merchant := addr(0x30)
+	rt.Caller = merchant
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100)))
+	// 治理撤销代码版本授权后，节点不得再以其放款。
+	rt.System = true
+	require.NoError(t, C2CMutation{*c}.RevokeCode(code))
+	rt.System = false
 	rt.Caller = addr(0x10)
-	assert.ErrorIs(t, C2CMutation{*c}.Release(Release{
-		Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(1000),
-		CodeVersion: code, OrderNo: []byte("o1"),
-		FiatCents: 100000, Currency: "USD",
-	}), ErrInsufficientEscrow)
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: addr(0x40), Amount: amt(10),
+		OrderNo: []byte("r1"), FiatCents: 1000, Currency: "USD",
+	})), ErrCodeNotAuthorized)
 }
 
-func TestRelease_DuplicateOrder(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+func TestRelease_InvalidCodeSignature(t *testing.T) {
+	c, rt, _, _ := setupGovernance(t)
 	merchant := addr(0x30)
 	rt.Caller = merchant
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10)
-	r := Release{Merchant: merchant, Buyer: addr(0x40), Amount: amt(100), CodeVersion: code, OrderNo: []byte("dup"), FiatCents: 10000, Currency: "USD"}
-	require.NoError(t, C2CMutation{*c}.Release(r))
-	assert.ErrorIs(t, C2CMutation{*c}.Release(r), ErrDuplicateRelease)
+	rel := Release{Merchant: merchant, Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("s1")}
+	// 用错误密钥签名（伪造用户 CodeSignature）→ 链上验证不通过。
+	_, otherPriv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
+		Data:          rel,
+		TeeReport:     []byte("tee-report"),
+		CodeSignature: signRelease(t, otherPriv, rel),
+	}), ErrCodeSigInvalid)
 }
 
-func TestBuyerWithdraw_Insufficient(t *testing.T) {
-	c, rt, _, _ := setupGovernance(t)
-	rt.Caller = addr(0x40)
-	assert.ErrorIs(t, C2CMutation{*c}.BuyerWithdraw(amt(10)), ErrInsufficientBalance)
-	assert.ErrorIs(t, C2CMutation{*c}.BuyerWithdraw(amt(0)), ErrZeroAmount)
+func TestRelease_InsufficientEscrow(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	rt.Caller = addr(0x30)
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(100)))
+	rt.Caller = addr(0x10)
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(1000),
+		OrderNo:   []byte("o1"),
+		FiatCents: 100000, Currency: "USD",
+	})), ErrInsufficientEscrow)
+}
+
+func TestRelease_DuplicateOrder(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	merchant := addr(0x30)
+	rt.Caller = merchant
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
+	rt.Caller = addr(0x10)
+	r := Release{Merchant: merchant, Buyer: addr(0x40), Amount: amt(100), OrderNo: []byte("dup"), FiatCents: 10000, Currency: "USD"}
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, r)))
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, r)), ErrDuplicateRelease)
+}
+
+// ── ④.5 折算校验（按下单锁定汇率 LockedRate）──────────────────
+
+func TestRelease_ConversionByLockedRate(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	merchant := addr(0x30)
+	buyer := addr(0x40)
+	// config 汇率 8.0 CNY/积分，但订单锁定 7.2：折算须以 LockedRate 为准，不受 config 变动影响。
+	rt.System = true
+	require.NoError(t, C2CMutation{*c}.SetFxConfig(FxConfig{CnyPerPoint: 80000}))
+	rt.System = false
+	rt.Caller = merchant
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
+	rt.Caller = addr(0x10)
+
+	// CNY 锁价 7.2：100 积分 × 72000 / 100 = 72000 分 ✓（若按 config 8.0 算为 80000，会误拒）。
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(100),
+		OrderNo: []byte("l1"), FiatCents: 72000, Currency: "CNY", LockedRate: 72000,
+	})))
+}
+
+func TestRelease_ConversionMismatch(t *testing.T) {
+	c, rt, _, priv := setupGovernance(t)
+	merchant := addr(0x30)
+	buyer := addr(0x40)
+	rt.Caller = merchant
+	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
+	rt.Caller = addr(0x10)
+	rel := func(order string, r Release) error {
+		r.Merchant, r.Buyer, r.Amount, r.OrderNo = merchant, buyer, amt(100), []byte(order)
+		return C2CMutation{*c}.Release(releaseWithSig(t, priv, r))
+	}
+
+	// USD 报假 fiat（应为 100000，报 99999）。
+	assert.ErrorIs(t, rel("m1", Release{FiatCents: 99999, Currency: "USD"}), ErrConversionMismatch)
+	// CNY 报假 fiat（锁价 7.2 下应为 72000，报 71999）。
+	assert.ErrorIs(t, rel("m2", Release{FiatCents: 71999, Currency: "CNY", LockedRate: 72000}), ErrConversionMismatch)
+	// CNY 未锁价（LockedRate=0）→ 折算不通过。
+	assert.ErrorIs(t, rel("m3", Release{FiatCents: 72000, Currency: "CNY"}), ErrConversionMismatch)
+	// 不支持的币种。
+	assert.ErrorIs(t, rel("m4", Release{FiatCents: 72000, Currency: "EUR"}), ErrConversionMismatch)
 }
 
 // ── ⑤ 经济策略 / 汇率 / 限额 / 佣金 ──────────────────────────
@@ -272,7 +475,7 @@ func mustFiatToPoints(t *testing.T, q C2CQuery, fiatCents int64, currency string
 
 func TestSetFxConfig_GovernanceOnly(t *testing.T) {
 	c, rt, _, _ := setupGovernance(t)
-	// 非系统账户拒绝。
+	// 非系统账户拒绝（节点也不行）。
 	rt.System = false
 	rt.Caller = addr(0x10) // 节点
 	assert.Error(t, C2CMutation{*c}.SetFxConfig(FxConfig{CnyPerPoint: 72000}))
@@ -326,7 +529,7 @@ func TestFiatToPoints(t *testing.T) {
 }
 
 func TestRelease_DailyLimitEnforced(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, _, priv := setupGovernance(t)
 	merchant := addr(0x30)
 	buyer := addr(0x40)
 	rt.Time = 86400 * 7 // 固定某日
@@ -339,28 +542,28 @@ func TestRelease_DailyLimitEnforced(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100000)))
 	rt.Caller = addr(0x10) // 节点
 	// 第一单 2000 USD：当日累计 200000 ≤ 300000 ✓。
-	require.NoError(t, C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(2000), CodeVersion: code,
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d1"), FiatCents: 200000, Currency: "USD",
-	}))
+	})))
 	spent, _ := C2CQuery{*c}.BuyerSpentToday(buyer)
 	assert.Equal(t, int64(200000), spent)
 	// 第二单 2000 USD：累计将达 400000 > 300000 ✗。
-	err := C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(2000), CodeVersion: code,
+	err := C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d2"), FiatCents: 200000, Currency: "USD",
-	})
+	}))
 	assert.ErrorIs(t, err, ErrDailyLimitExceeded)
 	// 跨日后重置：当日累计归零，可再下。
 	rt.Time = 86400 * 8
-	require.NoError(t, C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(2000), CodeVersion: code,
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d3"), FiatCents: 200000, Currency: "USD",
-	}))
+	})))
 }
 
 func TestRelease_PerOrderLimit(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, _, priv := setupGovernance(t)
 	merchant := addr(0x30)
 	buyer := addr(0x40)
 	rt.System = true
@@ -372,18 +575,19 @@ func TestRelease_PerOrderLimit(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100000)))
 	rt.Caller = addr(0x10)
 	// 2000 积分 = 2000 USD > 1000 USD 上限 ✗。
-	err := C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(2000), CodeVersion: code,
+	err := C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("p1"), FiatCents: 200000, Currency: "USD",
-	})
+	}))
 	assert.ErrorIs(t, err, ErrOrderLimitExceeded)
 }
 
 func TestRelease_Commission(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
+	c, rt, _, priv := setupGovernance(t)
 	merchant := addr(0x30)
 	buyer := addr(0x40)
 	rt.System = true
+	// 当前 config 费率 4%（400）——但订单快照费率是 5%（500），合约须用快照值（不受 config 变更影响）。
 	require.NoError(t, C2CMutation{*c}.SetFxConfig(FxConfig{
 		CnyPerPoint: 72000, PlatformFeePct: 400,
 	}))
@@ -391,34 +595,17 @@ func TestRelease_Commission(t *testing.T) {
 	rt.Caller = merchant
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10)
-	// 放款 1000 积分：佣金 = floor(1000 × 400 / 10000) = 40；买家得 960。
-	require.NoError(t, C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(1000), CodeVersion: code,
-		OrderNo: []byte("c1"), FiatCents: 100000, Currency: "USD",
-	}))
-	bal, _ := C2CQuery{*c}.GetBuyerBalance(buyer)
+	// 放款 1000 积分：佣金 = floor(1000 × 500 / 10000) = 50（用订单快照费率 5%，非 config 4%）；买家得 950。
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+		Merchant: merchant, Buyer: buyer, Amount: amt(1000),
+		OrderNo: []byte("c1"), FiatCents: 100000, Currency: "USD", FeePct: 500,
+	})))
 	esc, _ := C2CQuery{*c}.GetMerchantEscrow(merchant)
 	pc, _ := C2CQuery{*c}.GetPlatformCommission()
-	assert.Equal(t, 0, cmpInt(bal, 0)) // 放款直接进 gateway credits
 	assert.Equal(t, 0, cmpInt(esc, 0)) // escrow 全额扣 1000
-	assert.Equal(t, 0, cmpInt(pc, 40))
+	assert.Equal(t, 0, cmpInt(pc, 50)) // 佣金 50（快照费率 5%，非 config 4%）
 	gw := gateway.NewGateway(rt)
 	cred, err := gateway.GatewayQuery{Gateway: *gw}.GetCredit(buyer)
 	require.NoError(t, err)
-	assert.Equal(t, int64(960), cred) // 买家得 960
-}
-
-func TestRelease_ConversionMismatch(t *testing.T) {
-	c, rt, _, code := setupGovernance(t)
-	merchant := addr(0x30)
-	buyer := addr(0x40)
-	rt.Caller = merchant
-	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
-	rt.Caller = addr(0x10)
-	// 报假 fiat（应为 100000，报 99999）。
-	err := C2CMutation{*c}.Release(Release{
-		Merchant: merchant, Buyer: buyer, Amount: amt(1000), CodeVersion: code,
-		OrderNo: []byte("m1"), FiatCents: 99999, Currency: "USD",
-	})
-	assert.ErrorIs(t, err, ErrConversionMismatch)
+	assert.Equal(t, int64(950), cred) // 买家得 950（放款直接进 gateway credits）
 }

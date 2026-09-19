@@ -271,19 +271,28 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 
 // ── TEE signature / TEE 签名校验 ────────────────────────
 
-// registerVerifyTEE 注册 verify_tee：校验从 WASM 模块线性内存读取的 TEE 报告。
-// 参数: reportPtr(i32)、reportLen(i32)。返回 1 表示验证通过，0 表示失败。
+// registerVerifyTEE 注册 verify_tee：校验从 WASM 模块线性内存读取的 TEE 报告，
+// 并把验证结果 Result[TeeVerifyInfo, string]（SCALE 编码）写入输出缓冲区。
+// 参数: reportPtr(i32)、reportLen(i32)、outPtr(i32)、outLen(i32)。
+// 返回: 成功为编码结果字节长度，失败为错误码。
 func registerVerifyTEE(b wazero.HostModuleBuilder, s *hostState) {
 	b.NewFunctionBuilder().WithGoModuleFunction(
 		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
 			mem := mod.Memory()
 			report, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
-			if s.api.VerifyTEE(report) == nil {
-				stack[0] = 1
-			} else {
-				stack[0] = 0
+			res := s.api.VerifyTEE(report)
+			encoded, err := res.Encode()
+			if err != nil {
+				stack[0] = errStorage
+				return
 			}
+			if uint32(stack[3]) < uint32(len(encoded)) {
+				stack[0] = errBufTooSmall
+				return
+			}
+			mem.Write(uint32(stack[2]), encoded)
+			stack[0] = uint64(len(encoded))
 		}),
-		[]wazapi.ValueType{i32, i32}, []wazapi.ValueType{i32},
+		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
 	).Export("verify_tee")
 }

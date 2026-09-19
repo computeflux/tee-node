@@ -30,7 +30,7 @@ func (r *queryResolver) EdgeModels(ctx context.Context) ([]*model.ModelInfo, err
 	defer txn.Rollback()
 
 	// 使用当前用户地址作为 caller 创建 runtime，以便 GetProviderByOwner 能正确识别
-	runtime := runtime.NewRuntimeWithVersion(0, time.Now(), txn, token.Addr, chaintypes.UniAddr{}, module.NativeVersion)
+	runtime := runtime.NewRuntimeWithVersion(0, time.Now(), txn, token.Addr, chaintypes.UniAddr{}, module.NativeVersion, nil)
 
 	ins := gateway.NewGateway(runtime)
 	query := gateway.GatewayQuery{Gateway: *ins}

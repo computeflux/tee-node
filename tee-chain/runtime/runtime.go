@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/model"
-	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -24,6 +23,7 @@ type Runtime struct {
 	txn     store.StoreTx // 当前交易对象，包含交易的签名和原始数据
 	caller  store.UniAddr // 调用者地址，标识合约方法的调用发起方
 	sudo    store.UniAddr // 超级管理员账户地址，用于执行特权操作
+	rawTx   []byte        // 当前原始交易字节（model.Tx 序列化）：用于组装 TEE 证明的被证明交易（TeeCall.Tx）
 }
 
 // NewRuntime 创建一个新的合约运行时实例。
@@ -32,16 +32,17 @@ type Runtime struct {
 //   - txn: 交易对象，包含交易的完整信息
 //   - caller: 调用者的区块链地址
 //   - sudo: 超级管理员账户地址
+//   - txbt: 当前原始交易字节（model.Tx 序列化）；无交易上下文（查询/干跑）时传 nil
 //
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
-func NewRuntime(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr) *Runtime {
-	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo}
+func NewRuntime(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr, txbt []byte) *Runtime {
+	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo, rawTx: txbt}
 }
 
 // NewRuntimeWithVersion 创建带指定版本的合约运行时实例。
-func NewRuntimeWithVersion(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32) *Runtime {
-	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo}
+func NewRuntimeWithVersion(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32, txbt []byte) *Runtime {
+	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo, rawTx: txbt}
 }
 
 // GetHeight 获取当前区块高度。
@@ -75,6 +76,13 @@ func (r *Runtime) GetTxn() store.StoreTx {
 	return r.txn
 }
 
+// GetRawTx 获取当前执行的原始交易字节（model.Tx 序列化）。
+// 供 TEE 证明组装 TeeCall.Tx（验证节点签发报告时所证明的交易内容）；
+// 查询/干跑等无交易上下文的运行时返回 nil。
+func (r *Runtime) GetRawTx() []byte {
+	return r.rawTx
+}
+
 // GetCaller 获取合约调用者的地址。
 // 该地址用于权限验证和身份识别，确保只有授权的调用者能执行特定操作。
 // 返回:
@@ -103,16 +111,43 @@ func (r *Runtime) CallbySystem() bool {
 	return bytes.Equal(r.sudo.V, r.caller.V)
 }
 
-// VerifyTEE 校验客户端传入的 TEE 报告：report 为 protoio 序列化的 model.TeeCall，
-// 按 TeeType 交给 teetypes.VerifyReport 完成 SGX/SNP 等验证。返回验证错误（nil 表示有效）。
-func (r *Runtime) VerifyTEE(report []byte) error {
-	call := new(model.TeeCall)
-	if err := protoio.Unmarshal(report, call); err != nil {
-		return err
+// VerifyTEE 校验客户端传入的 TEE quote。
+// report 参数仅为 quote 字节（model.TeeCall 的 Report 字段，非整个 TeeCall）；
+// 完整的 model.TeeCall 由合约运行时用执行上下文补齐（用户不可伪造）：
+//
+//	Tx:      当前原始交易（TeeCall_Text，Text=rawTx）——节点签发报告时所证明的交易内容
+//	Caller:  当前交易调用方（验证节点公钥，即报告签发者）
+//	Time:    当前区块时间（节点执行期间签发报告的时间）
+//	TeeType: 本节点 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE）
+//
+// 节点侧签发报告须与上述参数对齐：用与交易签名相同的密钥，以当前区块时间为 Time，
+// 对 [Time || Caller || marshal(TeeCall_Text{Text: 原始交易字节})] 签名后生成 quote。
+// 成功返回 Ok，携带 TEE 证明的代码三要素（TeeType/CodeSigner/CodeSignature），供合约验证用户的 CodeSignature；
+// 失败返回 Err，携带验证错误信息。
+func (r *Runtime) VerifyTEE(report []byte) store.Result[store.TeeVerifyInfo, string] {
+	call := &model.TeeCall{
+		Caller:  r.caller.V,
+		Time:    r.unix,
+		TeeType: uint32(teetypes.TeeType),
+		Report:  report,
+	}
+	if len(r.rawTx) > 0 {
+		call.Tx = &model.TeeCall_Text{Text: r.rawTx}
 	}
 
-	_, err := teetypes.VerifyReport(call)
-	return err
+	res, err := teetypes.VerifyReport(call)
+	if err != nil {
+		return store.NewErr[store.TeeVerifyInfo, string](err.Error())
+	}
+	if res == nil {
+		return store.NewErr[store.TeeVerifyInfo, string]("tee verify: nil result")
+	}
+
+	return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
+		TeeType:       res.TeeType,
+		CodeSigner:    res.CodeSigner,
+		CodeSignature: res.CodeSignature,
+	})
 }
 
 // IsContractIsInited 检查合约是否已初始化。

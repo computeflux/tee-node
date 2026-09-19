@@ -84,7 +84,9 @@ func (r *testRuntime) GetSystemAccount() store.UniAddr                         {
 func (r *testRuntime) CallbySystem() bool                                      { return false }
 func (r *testRuntime) Query(store.UniAddr, store.ContractCall) ([]byte, error) { return nil, nil }
 func (r *testRuntime) Call(store.UniAddr, store.ContractCall) ([]byte, error)  { return nil, nil }
-func (r *testRuntime) VerifyTEE([]byte) error                                  { return nil }
+func (r *testRuntime) VerifyTEE([]byte) store.Result[store.TeeVerifyInfo, string] {
+	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not available in test")
+}
 
 // ── 辅助函数 ──────────────────────────────────────────────
 

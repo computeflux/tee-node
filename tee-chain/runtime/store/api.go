@@ -34,7 +34,9 @@ type ContractApi interface {
 	GetCaller() UniAddr
 	GetSystemAccount() UniAddr
 	CallbySystem() bool
-	VerifyTEE([]byte) error
+	// VerifyTEE 校验客户端传入的 TEE 报告（protoio 序列化的 model.TeeCall），
+	// 成功返回 Ok 携带 TEE 证明代码三要素（TeeType/CodeSigner/CodeSignature），失败返回 Err 携带错误信息。
+	VerifyTEE([]byte) Result[TeeVerifyInfo, string]
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
 }

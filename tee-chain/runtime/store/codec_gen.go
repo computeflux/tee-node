@@ -63,6 +63,48 @@ func (v *InContractCall) Decode(data []byte) (int, error) {
 	return off, nil
 }
 
+// Encode SCALE 编码 TeeVerifyInfo。
+func (v *TeeVerifyInfo) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, v.TeeType)
+	buf = EncodeCompact(buf, uint64(len(v.CodeSigner)))
+	buf = append(buf, v.CodeSigner...)
+	buf = EncodeCompact(buf, uint64(len(v.CodeSignature)))
+	buf = append(buf, v.CodeSignature...)
+	return buf, nil
+}
+
+// Decode SCALE 解码 TeeVerifyInfo。
+func (v *TeeVerifyInfo) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading TeeType")
+	}
+	v.TeeType = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeSigner")
+		}
+		v.CodeSigner = make([]byte, n)
+		copy(v.CodeSigner, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeSignature")
+		}
+		v.CodeSignature = make([]byte, n)
+		copy(v.CodeSignature, data[off:off+int(n)])
+		off += int(n)
+	}
+	return off, nil
+}
+
 // Encode SCALE 编码 UniAddr。
 func (v *UniAddr) Encode() ([]byte, error) {
 	var buf []byte

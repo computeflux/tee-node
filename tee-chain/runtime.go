@@ -53,7 +53,7 @@ func createGenesis(wasmBytes []byte, sudoAddr cstore.UniAddr) error {
 	txn := dbstore.SECRET_DB.NewTransaction()
 
 	// 创世时以 sudo 自身作为 caller，确保 CallbySystem() 为 true
-	runtime := contracts.NewRuntime(0, time.Time{}, txn, sudoAddr, sudoAddr)
+	runtime := contracts.NewRuntime(0, time.Time{}, txn, sudoAddr, sudoAddr, nil)
 	gm := gov.GovMutation{Gov: *gov.NewGov(runtime)}
 
 	// 1. 设置 gov 合约的 sudo 账户
@@ -79,7 +79,7 @@ func createGenesis(wasmBytes []byte, sudoAddr cstore.UniAddr) error {
 
 // getGovQuery 创建一个 GovQuery 用于读取合约存储（不受 caller 影响）。
 func getGovQuery(txn *dbstore.Txn) gov.GovQuery {
-	runtime := contracts.NewRuntime(0, time.Time{}, txn, cstore.UniAddr{}, cstore.UniAddr{})
+	runtime := contracts.NewRuntime(0, time.Time{}, txn, cstore.UniAddr{}, cstore.UniAddr{}, nil)
 	return gov.GovQuery{Gov: *gov.NewGov(runtime)}
 }
 

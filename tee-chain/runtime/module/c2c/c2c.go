@@ -8,15 +8,17 @@
 //  2. 验证节点注册表：所有发起/验证 web2 交易状态、并调用合约放款节点的地址，
 //     由治理注册与删除。节点只能为其自身注册的代码版本背书。
 //  3. 收款（挂单托管）：商户把挂单 AI 金额存入合约 escrow。
-//  4. 受控放款：注册验证节点在“代码版本 ∈ 白名单 + 订单未重复”后，
+//  4. 受控放款：注册验证节点在“TEE 证明代码 ∈ 节点注册值 + 白名单 + 订单未重复”后，
 //     把 AI 从商户 escrow 转给买方。
 //
-// TEE 证书的真实密码学验证（quote 验签）在链下完成（节点注册时证明其运行白名单代码、
-// 放款时以 CodeVersion 背书）；合约层只做策略级强制，避免昂贵的链下 quote 验签上链。
+// TEE 证书的真实密码学验证（quote 验签）在链下由验证节点完成（VerifyTEE 返回 TEE 证明的
+// 代码三要素 TeeType/CodeSigner/CodeSignature）；合约层基于 TEE 证明在链上验证用户
+// CodeSignature（证明放款数据出自被 TEE 证明的代码），并强制白名单策略。
 package c2c
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -25,6 +27,7 @@ import (
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
+	"golang.org/x/crypto/blake2b"
 )
 
 var (
@@ -35,6 +38,9 @@ var (
 	ErrNotNode             = errors.New("c2c: caller is not a registered node")
 	ErrNodeExists          = errors.New("c2c: node already registered")
 	ErrCodeMismatch        = errors.New("c2c: release code version does not match node")
+	ErrTeeReportMissing    = errors.New("c2c: tee report missing")
+	ErrTeeVerifyFailed     = errors.New("c2c: tee report verify failed")
+	ErrCodeSigInvalid      = errors.New("c2c: code signature invalid")
 	ErrInsufficientEscrow  = errors.New("c2c: insufficient merchant escrow")
 	ErrDuplicateRelease    = errors.New("c2c: order already released")
 	ErrInsufficientBalance = errors.New("c2c: insufficient buyer balance")
@@ -58,8 +64,6 @@ type C2C struct {
 	nodes *store.StoreMapping[store.UniAddr, NodeRecord]
 	// merchantEscrow 商户挂单托管余额：商户 → 已锁定 AI。
 	merchantEscrow *store.StoreMapping[store.UniAddr, store.Amount]
-	// buyerBalance 买方可用余额：买方 → 已放款 AI。
-	buyerBalance *store.StoreMapping[store.UniAddr, store.Amount]
 	// releasedNonces 放款去重：orderNo → true。
 	releasedNonces *store.StoreMapping[string, bool]
 	// fxConfig 经济策略配置（治理写入，单值）。
@@ -188,41 +192,78 @@ func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) err
 
 // ── ④ 受控放款 ────────────────────────────────────────────────
 
-// Release 由注册验证节点发起：在“代码版本 ∈ 白名单 + 订单未重复”后，
+// Release 由注册验证节点发起：在“TEE 证明代码 = 节点注册值 + 白名单 + 订单未重复”后，
 // 把 AI 从商户 escrow 转给买方。
-func (m C2CMutation) Release(r Release) error {
+// 安全模型：用户须携带 TEE 报告（TeeReport）与代码对放款数据的签名（CodeSignature）；
+// 验证节点链下完成 quote 验签（VerifyTEE），返回 TEE 证明的代码三要素，
+// 合约据此在链上验证用户 CodeSignature——代码版本由 TEE 硬件证明，用户无法伪造。
+func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	// ① 调用方必须是已注册的验证节点。
 	node, err := m.nodes.Get(m.api.GetTxn(), m.api.GetCaller())
 	if err != nil || node == nil {
 		return ErrNotNode
 	}
-	// ② 放款代码版本必须与节点注册值一致（节点只能为其自身代码背书）。
-	if len(r.CodeVersion) == 0 || !bytesEqual(node.CodeVersion, r.CodeVersion) {
+
+	r := sig.Data
+
+	// ② TEE 证明：用户必须携带 TEE quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）。
+	// 完整 TeeCall 由运行时用执行上下文补齐（Caller/Time/Tx 均为用户不可伪造），
+	// 节点侧 VerifyTEE 完成真实 quote 验签，返回 TEE 证明的代码三要素（TeeType/CodeSigner/CodeSignature）——
+	// 代码版本由 TEE 硬件证明确定，而非用户声称。
+	if len(sig.TeeReport) == 0 {
+		return ErrTeeReportMissing
+	}
+	tee, err := m.api.VerifyTEE(sig.TeeReport).UnWrap()
+	if err != nil {
+		return ErrTeeVerifyFailed
+	}
+
+	// ③ TEE 证明的代码版本必须与节点注册值一致（节点只能为其自身代码背书）。
+	if len(tee.CodeSignature) == 0 || !bytesEqual(node.CodeVersion, tee.CodeSignature) {
 		return ErrCodeMismatch
 	}
-	// ③ 该代码版本必须在白名单内（链上信任锚）。
-	if !m.isCodeAuthorized(r.CodeVersion) {
+
+	// ④ 该代码版本必须在白名单内（链上信任锚）。
+	if !m.isCodeAuthorized(tee.CodeSignature) {
 		return ErrCodeNotAuthorized
 	}
-	// ④ 订单去重。
+
+	// ⑤ 链上验证用户的 CodeSignature：证明放款数据出自 TEE 证明的代码
+	// （代码私钥在 TEE 飞地内，用户无法伪造；签名内容为 Data 的 SCALE 编码，与 TEE 侧签名算法一致）。
+	if len(sig.CodeSignature) == 0 {
+		return ErrCodeSigInvalid
+	}
+	payload, err := store.ScaleEncode(r)
+	if err != nil {
+		return err
+	}
+	if !verifyCodeSig(tee.CodeSigner, payload, sig.CodeSignature) {
+		return ErrCodeSigInvalid
+	}
+
+	// ⑥ 订单去重。
 	if existed, _ := m.releasedNonces.Contains(m.api.GetTxn(), hexOrder(r.OrderNo)); existed {
 		return ErrDuplicateRelease
 	}
-	// ⑤ 积分须为正。
+
+	// ⑦ 积分须为正。
 	if r.Amount.Cmp(store.ZeroAmount) == 0 {
 		return ErrZeroAmount
 	}
 	pt := amountInt64(r.Amount)
-	// ⑥ 折算校验：用下单时锁定的 LockedRate 复核 fiat，防止节点报假金额。
+
+	// ⑧ 折算校验：用下单时锁定的 LockedRate 复核 fiat，防止节点报假金额。
 	if convertCents(pt, r.Currency, r.LockedRate) != r.FiatCents {
 		return ErrConversionMismatch
 	}
-	// ⑦ 读经济策略配置（未由治理配置时为全 0，限额/佣金降级不强制）。
+
+	// ⑨ 读经济策略配置（未由治理配置时为全 0，限额/佣金降级不强制）。
 	cfg, err := m.getFxConfigTxn()
 	if err != nil {
 		return err
 	}
-	// ⑧ 单笔限额（USD 口径恒为 pt×100）：仅配置时强制。
+
+	// ⑩ 单笔限额（USD 口径恒为 pt×100）：仅配置时强制。
 	usdCents := pt * 100
 	if cfg.MinOrderUsdCents > 0 && usdCents < cfg.MinOrderUsdCents {
 		return ErrOrderLimitExceeded
@@ -230,7 +271,8 @@ func (m C2CMutation) Release(r Release) error {
 	if cfg.MaxOrderUsdCents > 0 && usdCents > cfg.MaxOrderUsdCents {
 		return ErrOrderLimitExceeded
 	}
-	// ⑨ 日累计限额：仅配置时强制；通过则累加当日（跨日自动重置）。
+
+	// ⑪ 日累计限额：仅配置时强制；通过则累加当日（跨日自动重置）。
 	if cfg.BuyerDailyLimitUsd > 0 {
 		day := utcDay(m.api)
 		spent, _ := m.buyerDaily.Get(m.api.GetTxn(), r.Buyer)
@@ -250,30 +292,36 @@ func (m C2CMutation) Release(r Release) error {
 			return err
 		}
 	}
-	// ⑩ 佣金：platform = floor(pt × FeePct / 10000)；buyer = pt − commission（仅配置时）。
+
+	// ⑫ 佣金：platform = floor(pt × FeePct / 10000)；buyer = pt − commission。
+	// 用订单快照费率 r.FeePct（下单时锁定），与 web2 侧一致，不受后续 config 变更影响。
 	commission := int64(0)
-	if cfg.PlatformFeePct > 0 {
-		commission = pt * cfg.PlatformFeePct / 10000
+	if r.FeePct > 0 {
+		commission = pt * r.FeePct / 10000
 	}
 	buyerGet := pt - commission
-	// ⑪ 商户 escrow 余额充足。
+
+	// ⑬ 商户 escrow 余额充足。
 	escrow, err := m.merchantEscrow.Get(m.api.GetTxn(), r.Merchant)
 	if err != nil || escrow == nil || escrow.Cmp(r.Amount) < 0 {
 		return ErrInsufficientEscrow
 	}
-	// ⑫ 扣减商户 escrow。
+
+	// ⑭ 扣减商户 escrow。
 	*escrow = store.AmountSub(*escrow, r.Amount)
 	if err := m.merchantEscrow.Set(m.api.GetTxn(), r.Merchant, *escrow); err != nil {
 		return err
 	}
-	// ⑬ 买方获得（已扣佣金）→ 入 gateway credits（买家消费积分的真源）。
+
+	// ⑮ 买方获得（已扣佣金）→ 入 gateway credits（买家消费积分的真源）。
 	// 包内构造 GatewaySecret 直接调用（同一 txn、失败回滚）；AddCredit 为 Secret
 	// 方法，不进 ABI / dispatch，外部交易无法触达。
 	gwSecret := gateway.GatewaySecret{Gateway: *gateway.NewGateway(m.api)}
 	if err := gwSecret.AddCredit(r.Buyer, uint64(buyerGet)); err != nil {
 		return fmt.Errorf("c2c: credit buyer via gateway: %w", err)
 	}
-	// ⑭ 平台累积佣金。
+
+	// ⑯ 平台累积佣金。
 	if commission > 0 {
 		pb, err := m.platformBalance.Get(m.api.GetTxn())
 		if err != nil || pb == nil {
@@ -285,22 +333,9 @@ func (m C2CMutation) Release(r Release) error {
 			return err
 		}
 	}
-	// ⑮ 去重。
-	return m.releasedNonces.Set(m.api.GetTxn(), hexOrder(r.OrderNo), true)
-}
 
-// BuyerWithdraw 买方取回其可用 AI 余额（放款周期的收尾，使 escrow 闭环可测）。
-func (m C2CMutation) BuyerWithdraw(amount store.Amount) error {
-	if amount.Cmp(store.ZeroAmount) == 0 {
-		return ErrZeroAmount
-	}
-	buyer := m.api.GetCaller()
-	cur, err := m.buyerBalance.Get(m.api.GetTxn(), buyer)
-	if err != nil || cur == nil || cur.Cmp(amount) < 0 {
-		return ErrInsufficientBalance
-	}
-	*cur = store.AmountSub(*cur, amount)
-	return m.buyerBalance.Set(m.api.GetTxn(), buyer, *cur)
+	// ⑰ 去重。
+	return m.releasedNonces.Set(m.api.GetTxn(), hexOrder(r.OrderNo), true)
 }
 
 // ── ⑤ 经济策略配置（系统账户 / gov 治理）────────────────────
@@ -355,18 +390,6 @@ func (q C2CQuery) ListNodes() ([]NodeRecord, error) {
 // GetMerchantEscrow 读取商户当前 escrow 余额。
 func (q C2CQuery) GetMerchantEscrow(merchant store.UniAddr) (store.Amount, error) {
 	v, err := q.merchantEscrow.Get(q.api.GetTxn(), merchant)
-	if err != nil {
-		return store.ZeroAmount, err
-	}
-	if v == nil {
-		return store.ZeroAmount, nil
-	}
-	return *v, nil
-}
-
-// GetBuyerBalance 读取买方可用 AI 余额。
-func (q C2CQuery) GetBuyerBalance(buyer store.UniAddr) (store.Amount, error) {
-	v, err := q.buyerBalance.Get(q.api.GetTxn(), buyer)
 	if err != nil {
 		return store.ZeroAmount, err
 	}
@@ -466,6 +489,7 @@ func (m C2C) isCodeAuthorized(codeHash []byte) bool {
 	if len(codeHash) == 0 {
 		return false
 	}
+
 	v, _ := m.authorizedCodes.Contains(m.api.GetTxn(), hexKey(codeHash))
 	return v
 }
@@ -493,6 +517,23 @@ func bytesEqual(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+// verifyCodeSig 链上验证代码签名（ed25519，RFC 8032）。
+// 算法与 TEE 侧 model.Ed25519SignVerify 完全一致：32 字节公钥长度校验（不可信输入防 panic）
+// + 消息 >256 字节时 blake2b-256 预哈希 + ed25519 验签。
+// 合约层用标准库直接实现（不 import pkg/model），避免其依赖链（pkg/types/crypto → ego cgo）
+// 进入 WASM/TinyGo 构建。
+func verifyCodeSig(codeSigner, payload, codeSignature []byte) bool {
+	if len(codeSigner) != ed25519.PublicKeySize {
+		return false
+	}
+	msg := payload
+	if len(msg) > 256 {
+		h := blake2b.Sum256(msg)
+		msg = h[:]
+	}
+	return ed25519.Verify(codeSigner, msg, codeSignature)
 }
 
 // getFxConfigTxn 读取 FxConfig（未配置返回全 0，不报错）。

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/computeflux/tee-provider/pkg/indexer"
+	relay "github.com/computeflux/tee-provider/pkg/services/gateway_relay"
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
@@ -66,13 +67,14 @@ func requestWithToken(token *types.GatewayTokenInfo, body string) *http.Request 
 // ── fake scheduler plumbing ────────────────────────────────
 
 // fakeAdaptor 实现 scheduler.ProviderClient，回放预置的上游响应，
-// 并记录收到的 body / 是否流式，供断言。
+// 并记录收到的 body / 是否流式 / ctx 中的上游会话标识，供断言。
 type fakeAdaptor struct {
-	respBody   string
-	respStatus int
-	gotBody    []byte
-	gotPath    string
-	gotStream  bool
+	respBody           string
+	respStatus         int
+	gotBody            []byte
+	gotPath            string
+	gotStream          bool
+	gotUpstreamSession string
 }
 
 func (f *fakeAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byte) ([]byte, error) {
@@ -83,6 +85,7 @@ func (f *fakeAdaptor) Do(ctx context.Context, ep *scheduler.Endpoint, body []byt
 	f.gotBody = sendBody
 	f.gotPath = upstreamPath
 	f.gotStream = false
+	f.gotUpstreamSession = relay.UpstreamSession(ctx)
 	if f.respStatus >= 400 {
 		return nil, &scheduler.UpstreamError{Status: f.respStatus, Message: f.respBody}
 	}
@@ -97,6 +100,7 @@ func (f *fakeAdaptor) Stream(ctx context.Context, ep *scheduler.Endpoint, body [
 	f.gotBody = sendBody
 	f.gotPath = upstreamPath
 	f.gotStream = true
+	f.gotUpstreamSession = relay.UpstreamSession(ctx)
 	if f.respStatus >= 400 {
 		return nil, &scheduler.UpstreamError{Status: f.respStatus, Message: f.respBody}
 	}

@@ -159,6 +159,19 @@ func (o *Option[T]) Decode(data []byte) (int, error) {
 	return len(data), nil
 }
 
+// TeeVerifyInfo TEE 报告验证结果（验证节点完成 quote 验签后返回的 TEE 证明代码三要素）。
+//
+//	TeeType       TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE）
+//	CodeSigner    TEE 证明代码的 ed25519 公钥（32 字节），供合约验证用户 CodeSignature
+//	CodeSignature TEE 证明代码的签名/指纹（白名单信任锚，须与节点注册值一致）
+//
+// scale-codec-gen:generate
+type TeeVerifyInfo struct {
+	TeeType       uint32
+	CodeSigner    []byte
+	CodeSignature []byte
+}
+
 // Result 类似 Rust Result<T, E>，用于可恢复错误的 SCALE 编解码。
 type Result[T, Err any] struct {
 	isErr bool

@@ -89,12 +89,9 @@ const sseMaxLineBytes = 1 << 20 // 1 MiB
 // httpDo 构造 POST 请求、发送、读取非流式响应。
 // >=400 的响应转成 *scheduler.UpstreamError 供调度器分类重试。
 func httpDo(ctx context.Context, ep *scheduler.Endpoint, url string, body []byte, setHeaders func(*http.Request)) ([]byte, error) {
-	req, err := newPostRequest(ctx, url, body)
+	req, err := prepareUpstreamRequest(ctx, url, body, setHeaders)
 	if err != nil {
 		return nil, err
-	}
-	if setHeaders != nil {
-		setHeaders(req)
 	}
 
 	resp, err := doHTTPClient.Do(req)
@@ -108,12 +105,9 @@ func httpDo(ctx context.Context, ep *scheduler.Endpoint, url string, body []byte
 // httpStream 构造 POST 请求、发送、打开 SSE 流。
 // >=400 的响应转成 *scheduler.UpstreamError。
 func httpStream(ctx context.Context, ep *scheduler.Endpoint, url string, body []byte, setHeaders func(*http.Request)) (scheduler.Stream, error) {
-	req, err := newPostRequest(ctx, url, body)
+	req, err := prepareUpstreamRequest(ctx, url, body, setHeaders)
 	if err != nil {
 		return nil, err
-	}
-	if setHeaders != nil {
-		setHeaders(req)
 	}
 
 	resp, err := streamHTTPClient.Do(req)
@@ -122,6 +116,21 @@ func httpStream(ctx context.Context, ep *scheduler.Endpoint, url string, body []
 		return nil, err
 	}
 	return openStream(ctx, resp, ep)
+}
+
+// prepareUpstreamRequest 构造上游 POST 请求：基础头 → adaptor 注入的鉴权/业务头 →
+// OpenCode 会话头(ctx 携带会话标识且上游为 OpenCode 时)。
+// 两个 adaptor 入口(httpDo/httpStream)共用，保证注入行为一致。
+func prepareUpstreamRequest(ctx context.Context, url string, body []byte, setHeaders func(*http.Request)) (*http.Request, error) {
+	req, err := newPostRequest(ctx, url, body)
+	if err != nil {
+		return nil, err
+	}
+	if setHeaders != nil {
+		setHeaders(req)
+	}
+	applyOpenCodeSession(req, url, UpstreamSession(ctx))
+	return req, nil
 }
 
 // newPostRequest 构造一个 POST 请求(JSON body)。

@@ -119,36 +119,9 @@
           "displayName": [
             "Result"
           ],
-          "type": 20
+          "type": 19
         },
         "selector": "0x0b8cefa6"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
-            "label": "amount",
-            "type": {
-              "displayName": [
-                "U256"
-              ],
-              "type": 8
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "buyer_withdraw",
-        "mutates": true,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "ink",
-            "MessageResult"
-          ],
-          "type": 11
-        },
-        "selector": "0x12a4bf6e"
       },
       {
         "args": [
@@ -367,7 +340,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 19
+          "type": 20
         },
         "selector": "0x66687968"
       },
@@ -439,12 +412,12 @@
         "args": [
           {
             "docs": [],
-            "label": "r",
+            "label": "sig",
             "type": {
               "displayName": [
-                "Release"
+                "ReleaseWithSig"
               ],
-              "type": 16
+              "type": 28
             }
           }
         ],
@@ -543,32 +516,6 @@
         "args": [
           {
             "docs": [],
-            "label": "buyer",
-            "type": {
-              "displayName": [
-                "UniAddr"
-              ],
-              "type": 13
-            }
-          }
-        ],
-        "default": false,
-        "docs": [],
-        "label": "get_buyer_balance",
-        "mutates": false,
-        "payable": false,
-        "returnType": {
-          "displayName": [
-            "Result"
-          ],
-          "type": 19
-        },
-        "selector": "0xe75ff367"
-      },
-      {
-        "args": [
-          {
-            "docs": [],
             "label": "merchant",
             "type": {
               "displayName": [
@@ -587,7 +534,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 19
+          "type": 20
         },
         "selector": "0xee68cbc2"
       }
@@ -916,10 +863,6 @@
                 "type": 8
               },
               {
-                "name": "CodeVersion",
-                "type": 14
-              },
-              {
                 "name": "OrderNo",
                 "type": 14
               },
@@ -1036,48 +979,6 @@
               {
                 "fields": [
                   {
-                    "type": 8
-                  }
-                ],
-                "index": 0,
-                "name": "Ok"
-              },
-              {
-                "fields": [
-                  {
-                    "type": 9
-                  }
-                ],
-                "index": 1,
-                "name": "Err"
-              }
-            ]
-          }
-        },
-        "params": [
-          {
-            "name": "T",
-            "type": 8
-          },
-          {
-            "name": "E",
-            "type": 9
-          }
-        ],
-        "path": [
-          "Result"
-        ]
-      }
-    },
-    {
-      "id": 20,
-      "type": {
-        "def": {
-          "variant": {
-            "variants": [
-              {
-                "fields": [
-                  {
                     "type": 17
                   }
                 ],
@@ -1100,6 +1001,48 @@
           {
             "name": "T",
             "type": 17
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 8
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 8
           },
           {
             "name": "E",
@@ -1308,6 +1251,32 @@
         },
         "path": [
           "Hash"
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "type": {
+        "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "Data",
+                "type": 16
+              },
+              {
+                "name": "TeeReport",
+                "type": 14
+              },
+              {
+                "name": "CodeSignature",
+                "type": 14
+              }
+            ]
+          }
+        },
+        "path": [
+          "ReleaseWithSig"
         ]
       }
     }

@@ -112,14 +112,17 @@ func HandleRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// session 亲和:同一会话+模型优先复用上次端点(命中上游 KV cache)。
-	// 优先级:请求体里的 session_id > 按入口协议解析首条消息哈希 > token.Owner+model。
+	// 优先级:请求体里的 session_id > 按入口协议解析首条消息哈希 > token.Owner。
+	sid := extractSessionID(bodyBytes, inbound)
 	sessionID := token.Owner
-	if sid := extractSessionID(bodyBytes, inbound); sid != "" {
+	if sid != "" {
 		sessionID = token.Owner + ":" + sid
 	}
 
 	// 把入口协议 + 请求路径塞进 ctx,scheduler 选完端点后由 provider client 据此转换请求体。
+	// 同时带上会话标识:发往 OpenCode 的请求会以 x-opencode-session 透出。
 	ctx := scheduler.WithRequest(r.Context(), string(inbound), requestPath)
+	ctx = relay.WithUpstreamSession(ctx, upstreamSessionID(token.Owner, sid))
 
 	if reqBody.Stream {
 		res, err := gw.ScheduleStream(ctx, provider, modelKey, bodyBytes, sessionID)
@@ -447,7 +450,17 @@ func streamConvert(r io.Reader, w io.Writer, inbound, provider protocol.Protocol
 	}
 }
 
-// extractSessionID 按入口协议解析请求体,提取会话 ID。
+// upstreamSessionID 计算发往 OpenCode(x-opencode-session)的会话标识。
+// 优先用请求体解析出的真实会话 ID;解析不到时退化为 owner 的不可逆哈希——
+// 保持稳定且不把用户身份(邮箱/地址)直接发给上游。始终非空。
+func upstreamSessionID(owner, sid string) string {
+	if sid != "" {
+		return sid
+	}
+	h := sha256.Sum256([]byte("opencode-owner:" + owner))
+	return "acct-" + hex.EncodeToString(h[:16])
+}
+
 // extractSessionID 按入口协议解析请求体,提取会话 ID。
 // 约定:客户端统一传 session_id(唯一标准字段,不猜别名);
 // 没传就用首条消息哈希(同一对话稳定)。

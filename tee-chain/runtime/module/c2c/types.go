@@ -9,18 +9,20 @@ import (
 // release 时节点只能为其自身注册的 CodeVersion 背书，确保“节点运行的代码 ∈ 白名单”。
 // scale-codec-gen:generate
 type NodeRecord struct {
-	CodeVersion []byte
+	CodeVersion  []byte
 	RegisteredAt uint64
 	Active       bool
 }
 
 // FxConfig 经济策略配置（治理写入，链上权威源）。所有数值整数缩放（ABI 不支持 float）。
-//   CnyPerPoint        : 1 积分 = 多少 CNY，×10000（4 位小数）。7.20 → 72000。
-//   MaxCnyPerPoint     : CNY 汇率上限，×10000。50.00 → 500000。
-//   PlatformFeePct     : 平台佣金百分比，×100（2 位小数）。4.00 → 400。
-//   MinOrderUsdCents   : 单笔最小额度（USD 分）。5 USD → 500。
-//   MaxOrderUsdCents   : 单笔最大额度（USD 分）。1000 USD → 100000。
-//   BuyerDailyLimitUsd : 买家日累计额度（USD 分）。3000 USD → 300000。
+//
+//	CnyPerPoint        : 1 积分 = 多少 CNY，×10000（4 位小数）。7.20 → 72000。
+//	MaxCnyPerPoint     : CNY 汇率上限，×10000。50.00 → 500000。
+//	PlatformFeePct     : 平台佣金百分比，×100（2 位小数）。4.00 → 400。
+//	MinOrderUsdCents   : 单笔最小额度（USD 分）。5 USD → 500。
+//	MaxOrderUsdCents   : 单笔最大额度（USD 分）。1000 USD → 100000。
+//	BuyerDailyLimitUsd : 买家日累计额度（USD 分）。3000 USD → 300000。
+//
 // scale-codec-gen:generate
 type FxConfig struct {
 	CnyPerPoint        int64
@@ -50,15 +52,33 @@ type BuyerDaily struct {
 //	Currency     币种 USD/CNY
 //	LockedRate   下单时锁定的汇率（×10000）：合约据此校验折算（保留锁价，不受汇率变动影响）
 //	FeePct       下单时锁定的佣金百分比（×100）：合约据此计算佣金并归平台
+//
 // scale-codec-gen:generate
 type Release struct {
-	Merchant    store.UniAddr
-	Buyer       store.UniAddr
-	Amount      store.Amount
-	CodeVersion []byte
-	OrderNo     []byte
-	FiatCents   int64
-	Currency    string
-	LockedRate  int64
-	FeePct      int64
+	Merchant   store.UniAddr
+	Buyer      store.UniAddr
+	Amount     store.Amount
+	OrderNo    []byte
+	FiatCents  int64
+	Currency   string
+	LockedRate int64
+	FeePct     int64
+}
+
+// ReleaseWithSig 携带 TEE 证明的放款请求：
+//
+//	Data          放款数据（由 TEE 内代码签名）
+//	TeeReport     验证节点签发的 TEE quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）：
+//	              完整 model.TeeCall 由合约运行时用执行上下文补齐（Caller/Time/Tx/TeeType 均为用户不可伪造），
+//	              节点侧 VerifyTEE 完成真实 quote 验签后，返回 TEE 证明的代码三要素
+//	              （TeeType/CodeSigner/CodeSignature）——代码版本不再由用户口头声称，而由 TEE 硬件证明
+//	CodeSignature  TEE 证明代码对 Data 的 SCALE 编码的 ed25519 签名：
+//	              合约用 VerifyTEE 返回的 CodeSigner 验证，证明放款数据出自被 TEE 证明的代码
+//	              （私钥在 TEE 飞地内，用户无法伪造）
+//
+// scale-codec-gen:generate
+type ReleaseWithSig struct {
+	Data          Release
+	TeeReport     []byte
+	CodeSignature []byte
 }
