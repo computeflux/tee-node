@@ -99,15 +99,18 @@ func (r *wasmRuntime) GetSystemAccount() store.UniAddr {
 
 func (r *wasmRuntime) CallbySystem() bool { return isSystem() != 0 }
 
-// VerifyTEE 通过 host verify_tee 函数校验客户端 TEE 报告，
-// 返回 host 写回的 Result[TeeVerifyInfo, string]（SCALE 解码）。
-func (r *wasmRuntime) VerifyTEE(report []byte) store.Result[store.TeeVerifyInfo, string] {
-	var reportPtr int32
+// VerifyTEE 通过 host verify_tee 函数校验客户端 TEE quote（report）、被证明的数据（data）
+// 与节点签发时间（t），返回 host 写回的 Result[TeeVerifyInfo, string]（SCALE 解码）。
+func (r *wasmRuntime) VerifyTEE(report, data []byte, t int64) store.Result[store.TeeVerifyInfo, string] {
+	var reportPtr, dataPtr int32
 	if len(report) > 0 {
 		reportPtr = int32(uintptr(unsafe.Pointer(&report[0])))
 	}
+	if len(data) > 0 {
+		dataPtr = int32(uintptr(unsafe.Pointer(&data[0])))
+	}
 	bp := txnBufPtr()
-	n := verifyTEE(reportPtr, int32(len(report)), bp, int32(len(txnBuf)))
+	n := verifyTEE(reportPtr, int32(len(report)), dataPtr, int32(len(data)), t, bp, int32(len(txnBuf)))
 	if n <= 0 {
 		return store.NewErr[store.TeeVerifyInfo, string](fmt.Sprintf("verify_tee: host returned %d", n))
 	}

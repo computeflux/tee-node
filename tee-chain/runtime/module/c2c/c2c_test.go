@@ -34,7 +34,7 @@ func setupGovernance(t *testing.T) (*C2C, *testutil.MockRuntime, []byte, ed25519
 	_, codePriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	codePub := codePriv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
 			TeeType:       1,
 			CodeSigner:    codePub,
@@ -58,12 +58,14 @@ func signRelease(t *testing.T, priv ed25519.PrivateKey, r Release) []byte {
 }
 
 // releaseWithSig 把放款数据包装为携带 TEE 证明的放款请求。
-func releaseWithSig(t *testing.T, priv ed25519.PrivateKey, r Release) ReleaseWithSig {
+// rt.Time 作为 TeeTime（与 MockRuntime 的区块时间一致，通过时间窗校验）。
+func releaseWithSig(t *testing.T, rt *testutil.MockRuntime, priv ed25519.PrivateKey, r Release) ReleaseWithSig {
 	t.Helper()
 	return ReleaseWithSig{
 		Data:          r,
 		TeeReport:     []byte("tee-report"),
 		CodeSignature: signRelease(t, priv, r),
+		TeeTime:       rt.Time,
 	}
 }
 
@@ -280,7 +282,7 @@ func TestRelease_FullCycle(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 
 	rt.Caller = addr(0x10) // 节点
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(400),
 		OrderNo:   []byte("order-1"),
 		FiatCents: 40000, Currency: "USD",
@@ -325,7 +327,7 @@ func TestRelease_TeeVerifyFailed(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10) // 节点
 	// 验证节点 quote 验签失败（如报告伪造/过期）→ 拒绝。
-	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewErr[store.TeeVerifyInfo, string]("invalid report sign")
 	}
 	rel := Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}
@@ -343,7 +345,7 @@ func TestRelease_CodeMismatch(t *testing.T) {
 	rt.Caller = addr(0x10) // 节点
 	// TEE 证明的代码指纹与节点注册值不一致（节点只能为其自身代码背书）→ 拒绝。
 	codePub := priv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
 			TeeType:       1,
 			CodeSigner:    codePub,
@@ -368,7 +370,7 @@ func TestRelease_CodeRevoked(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.RevokeCode(code))
 	rt.System = false
 	rt.Caller = addr(0x10)
-	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: addr(0x40), Amount: amt(10),
 		OrderNo: []byte("r1"), FiatCents: 1000, Currency: "USD",
 	})), ErrCodeNotAuthorized)
@@ -396,7 +398,7 @@ func TestRelease_InsufficientEscrow(t *testing.T) {
 	rt.Caller = addr(0x30)
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100)))
 	rt.Caller = addr(0x10)
-	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(1000),
 		OrderNo:   []byte("o1"),
 		FiatCents: 100000, Currency: "USD",
@@ -410,8 +412,8 @@ func TestRelease_DuplicateOrder(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10)
 	r := Release{Merchant: merchant, Buyer: addr(0x40), Amount: amt(100), OrderNo: []byte("dup"), FiatCents: 10000, Currency: "USD"}
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, r)))
-	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, r)), ErrDuplicateRelease)
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, r)))
+	assert.ErrorIs(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, r)), ErrDuplicateRelease)
 }
 
 // ── ④.5 折算校验（按下单锁定汇率 LockedRate）──────────────────
@@ -429,7 +431,7 @@ func TestRelease_ConversionByLockedRate(t *testing.T) {
 	rt.Caller = addr(0x10)
 
 	// CNY 锁价 7.2：100 积分 × 72000 / 100 = 72000 分 ✓（若按 config 8.0 算为 80000，会误拒）。
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(100),
 		OrderNo: []byte("l1"), FiatCents: 72000, Currency: "CNY", LockedRate: 72000,
 	})))
@@ -444,7 +446,7 @@ func TestRelease_ConversionMismatch(t *testing.T) {
 	rt.Caller = addr(0x10)
 	rel := func(order string, r Release) error {
 		r.Merchant, r.Buyer, r.Amount, r.OrderNo = merchant, buyer, amt(100), []byte(order)
-		return C2CMutation{*c}.Release(releaseWithSig(t, priv, r))
+		return C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, r))
 	}
 
 	// USD 报假 fiat（应为 100000，报 99999）。
@@ -542,21 +544,21 @@ func TestRelease_DailyLimitEnforced(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100000)))
 	rt.Caller = addr(0x10) // 节点
 	// 第一单 2000 USD：当日累计 200000 ≤ 300000 ✓。
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d1"), FiatCents: 200000, Currency: "USD",
 	})))
 	spent, _ := C2CQuery{*c}.BuyerSpentToday(buyer)
 	assert.Equal(t, int64(200000), spent)
 	// 第二单 2000 USD：累计将达 400000 > 300000 ✗。
-	err := C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	err := C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d2"), FiatCents: 200000, Currency: "USD",
 	}))
 	assert.ErrorIs(t, err, ErrDailyLimitExceeded)
 	// 跨日后重置：当日累计归零，可再下。
 	rt.Time = 86400 * 8
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("d3"), FiatCents: 200000, Currency: "USD",
 	})))
@@ -575,7 +577,7 @@ func TestRelease_PerOrderLimit(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(100000)))
 	rt.Caller = addr(0x10)
 	// 2000 积分 = 2000 USD > 1000 USD 上限 ✗。
-	err := C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	err := C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(2000),
 		OrderNo: []byte("p1"), FiatCents: 200000, Currency: "USD",
 	}))
@@ -596,7 +598,7 @@ func TestRelease_Commission(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10)
 	// 放款 1000 积分：佣金 = floor(1000 × 500 / 10000) = 50（用订单快照费率 5%，非 config 4%）；买家得 950。
-	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, priv, Release{
+	require.NoError(t, C2CMutation{*c}.Release(releaseWithSig(t, rt, priv, Release{
 		Merchant: merchant, Buyer: buyer, Amount: amt(1000),
 		OrderNo: []byte("c1"), FiatCents: 100000, Currency: "USD", FeePct: 500,
 	})))

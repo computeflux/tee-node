@@ -30,7 +30,7 @@ func (app *TeeChain) sendPartialSignByIds(chainId uint32, ids []uint64, proposer
 		return errors.Wrap(err, "getChain error")
 	}
 
-	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion, nil)
+	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion)
 	bq := batch.BatchQuery{Batch: *batch.NewBatch(runtime)}
 
 	hubCalls := make([]*batch.HubCallIndex, 0, len(ids))

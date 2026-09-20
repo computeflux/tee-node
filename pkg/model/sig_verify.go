@@ -66,6 +66,14 @@ func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signatur
 		if err := SideContractPolkadotVerify(caller, sigBytes, signature); err != nil {
 			return errors.Wrap(err, "contract")
 		}
+	case 3: // polkadot signature of ed5519
+		sigBytes, err := call.BytesForSig()
+		if err != nil {
+			return errors.Wrap(err, "marshal syscall for sig")
+		}
+		if err := SideContractPolkadotEd25519Verify(caller, sigBytes, signature); err != nil {
+			return errors.Wrap(err, "contract")
+		}
 	case 2: // EVM Wallet signature of secp256k1
 		sigBytes, err := call.BytesForSig()
 		if err != nil {
@@ -94,6 +102,22 @@ func SideSysCallVerify(caller []byte, callerType uint32, call *SysCall, signatur
 func SideContractPolkadotVerify(caller []byte, call []byte, signature []byte) error {
 	// 解析公钥
 	pubkey, err := sr25519.Scheme{}.FromPublicKey(caller)
+	if err != nil {
+		return fmt.Errorf("invalid sr25519 public key: %w", err)
+	}
+
+	// 验证签名
+	ok := pubkey.Verify(call, signature)
+	if !ok {
+		return errors.New("invalid signature")
+	}
+
+	return nil
+}
+
+func SideContractPolkadotEd25519Verify(caller []byte, call []byte, signature []byte) error {
+	// 解析公钥
+	pubkey, err := ed25519.Scheme{}.FromPublicKey(caller)
 	if err != nil {
 		return fmt.Errorf("invalid sr25519 public key: %w", err)
 	}

@@ -84,7 +84,7 @@ func Mutation(version uint32, call store.ContractCall, runtime store.ContractApi
 func QueryWithdrawApply(id uint64) (*gateway.WithdrawApply, error) {
 	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
-	runtime := NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion, nil)
+	runtime := NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion)
 
 	ins := gateway.NewGateway(runtime)
 	query := gateway.GatewayQuery{Gateway: *ins}

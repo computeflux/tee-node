@@ -38,7 +38,7 @@ func (app *TeeChain) ContractRuntimeWithCaller(caller chaintypes.UniAddr) (*cont
 		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
 
-	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, caller, sudo, version, nil), nil
+	return contracts.NewRuntimeWithVersion(app.state.Height, time.Now(), txn, caller, sudo, version), nil
 }
 
 // WithRuntime 在只读合约 runtime 上执行 fn，并统一处理创建与回滚。
@@ -58,8 +58,7 @@ func WithRuntimeCaller[T any](chain *TeeChain, caller chaintypes.UniAddr, fn fun
 }
 
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。
-// txbt 为当前原始交易字节（model.Tx 序列化），传入运行时供 TEE 证明使用。
-func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall, txbt []byte) error {
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall) error {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -87,7 +86,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbs
 
 	runtime := contracts.NewRuntimeWithVersion(height, t, txn, address, chaintypes.UniAddr{
 		V: pub.ToBytes(),
-	}, version, txbt)
+	}, version)
 
 	err = contracts.Mutation(version, call, runtime)
 	return err
@@ -118,7 +117,7 @@ func (app *TeeChain) ContractQuery(caller []byte, callerType uint32, contract st
 
 	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
-	}, version, nil)
+	}, version)
 
 	data, err = contracts.Query(version, &model.ContractCall{
 		Name:   []byte(contract),
@@ -154,7 +153,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 
 	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
-	}, version, nil)
+	}, version)
 
 	err = contracts.Mutation(version, call, runtime)
 	return err

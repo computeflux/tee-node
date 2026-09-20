@@ -194,9 +194,10 @@ func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) err
 
 // Release 由注册验证节点发起：在“TEE 证明代码 = 节点注册值 + 白名单 + 订单未重复”后，
 // 把 AI 从商户 escrow 转给买方。
-// 安全模型：用户须携带 TEE 报告（TeeReport）与代码对放款数据的签名（CodeSignature）；
-// 验证节点链下完成 quote 验签（VerifyTEE），返回 TEE 证明的代码三要素，
-// 合约据此在链上验证用户 CodeSignature——代码版本由 TEE 硬件证明，用户无法伪造。
+// 安全模型：用户须携带 TEE quote（TeeReport）、签发时间（TeeTime）与代码对放款数据的签名（CodeSignature）；
+// quote 绑定 [签发时间 || 节点 || SCALE(放款数据)]，由验证节点在 TEE 内签发（TeeTime 与节点签名内容中的 Time 同值）；
+// 合约用运行时上下文（Caller/TeeType 用户不可伪造）+ 放款数据 + TeeTime 完成 VerifyTEE 验签（含时间窗防重放），
+// 返回 TEE 证明的代码三要素，再链上验证用户 CodeSignature——代码版本由 TEE 硬件证明，用户无法伪造。
 func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	// ① 调用方必须是已注册的验证节点。
 	node, err := m.nodes.Get(m.api.GetTxn(), m.api.GetCaller())
@@ -207,13 +208,20 @@ func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	r := sig.Data
 
 	// ② TEE 证明：用户必须携带 TEE quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）。
-	// 完整 TeeCall 由运行时用执行上下文补齐（Caller/Time/Tx 均为用户不可伪造），
+	// 被证明的数据 Text 为放款数据 r 的 SCALE 编码（节点签发 quote 时绑定同一份数据）；
+	// TeeTime 为节点签发时间（节点签名内容中的 Time，伪造需持有 TEE 内私钥）；
+	// 完整 TeeCall 由运行时用执行上下文补齐（Caller/TeeType 均为用户不可伪造），
+	// 并校验 TeeTime 与区块时间在窗口内（防旧 quote 重放）；
 	// 节点侧 VerifyTEE 完成真实 quote 验签，返回 TEE 证明的代码三要素（TeeType/CodeSigner/CodeSignature）——
 	// 代码版本由 TEE 硬件证明确定，而非用户声称。
 	if len(sig.TeeReport) == 0 {
 		return ErrTeeReportMissing
 	}
-	tee, err := m.api.VerifyTEE(sig.TeeReport).UnWrap()
+	payload, err := store.ScaleEncode(r)
+	if err != nil {
+		return err
+	}
+	tee, err := m.api.VerifyTEE(sig.TeeReport, payload, sig.TeeTime).UnWrap()
 	if err != nil {
 		return ErrTeeVerifyFailed
 	}
@@ -232,10 +240,6 @@ func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	// （代码私钥在 TEE 飞地内，用户无法伪造；签名内容为 Data 的 SCALE 编码，与 TEE 侧签名算法一致）。
 	if len(sig.CodeSignature) == 0 {
 		return ErrCodeSigInvalid
-	}
-	payload, err := store.ScaleEncode(r)
-	if err != nil {
-		return err
 	}
 	if !verifyCodeSig(tee.CodeSigner, payload, sig.CodeSignature) {
 		return ErrCodeSigInvalid

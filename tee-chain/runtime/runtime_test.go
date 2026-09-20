@@ -27,7 +27,7 @@ func TestRuntimeGetters(t *testing.T) {
 	sudo := store.UniAddr{T: 1, V: []byte{0x02}}
 	txn := newTestTxn(t)
 
-	r := NewRuntime(42, ts, txn, caller, sudo, nil)
+	r := NewRuntime(42, ts, txn, caller, sudo)
 
 	assert.Equal(t, int64(42), r.GetHeight())
 	assert.Equal(t, int64(1700000000), r.GetBlockTime())
@@ -39,7 +39,7 @@ func TestRuntimeGetters(t *testing.T) {
 
 func TestNewRuntimeWithVersion(t *testing.T) {
 	txn := newTestTxn(t)
-	r := NewRuntimeWithVersion(10, time.Unix(100, 0), txn, store.UniAddr{}, store.UniAddr{}, 18, nil)
+	r := NewRuntimeWithVersion(10, time.Unix(100, 0), txn, store.UniAddr{}, store.UniAddr{}, 18)
 	assert.Equal(t, uint32(18), r.GetVersion())
 }
 
@@ -48,17 +48,17 @@ func TestCallbySystem(t *testing.T) {
 	txn := newTestTxn(t)
 
 	t.Run("matching", func(t *testing.T) {
-		r := NewRuntimeWithVersion(0, time.Now(), txn, sudo, sudo, 0, nil)
+		r := NewRuntimeWithVersion(0, time.Now(), txn, sudo, sudo, 0)
 		assert.True(t, r.CallbySystem())
 	})
 
 	t.Run("different_value", func(t *testing.T) {
-		r := NewRuntimeWithVersion(0, time.Now(), txn, store.UniAddr{T: 2, V: []byte{0xbb}}, sudo, 0, nil)
+		r := NewRuntimeWithVersion(0, time.Now(), txn, store.UniAddr{T: 2, V: []byte{0xbb}}, sudo, 0)
 		assert.False(t, r.CallbySystem())
 	})
 
 	t.Run("different_type", func(t *testing.T) {
-		r := NewRuntimeWithVersion(0, time.Now(), txn, store.UniAddr{T: 3, V: []byte{0xaa}}, sudo, 0, nil)
+		r := NewRuntimeWithVersion(0, time.Now(), txn, store.UniAddr{T: 3, V: []byte{0xaa}}, sudo, 0)
 		assert.False(t, r.CallbySystem())
 	})
 }
@@ -134,7 +134,7 @@ func TestRuntime_QueryAndCall_Delegate(t *testing.T) {
 	// 未知合约应静默返回空结果而不是报错。
 	txn := newTestTxn(t)
 	caller := store.UniAddr{T: 1, V: []byte{0x01}}
-	r := NewRuntimeWithVersion(1, time.Now(), txn, caller, caller, module.NativeVersion, nil)
+	r := NewRuntimeWithVersion(1, time.Now(), txn, caller, caller, module.NativeVersion)
 
 	data, err := r.Query(caller, &store.InContractCall{Name: []byte("nope"), Method: store.MethodToSelectorBytes("x")})
 	require.NoError(t, err)

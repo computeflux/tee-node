@@ -109,7 +109,7 @@ func buildBatchCallFromIDs(dkgInst *dkg.DKG, chainId uint32, ids []uint64) (*cha
 	txn := dbstore.SECRET_DB.NewTransaction()
 	defer txn.Rollback()
 
-	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion, nil)
+	runtime := contracts.NewRuntimeWithVersion(0, time.Now(), txn, chaintypes.UniAddr{}, chaintypes.UniAddr{}, module.NativeVersion)
 	bq := batch.BatchQuery{Batch: *batch.NewBatch(runtime)}
 
 	var dkgKey []byte
@@ -235,7 +235,7 @@ func (app *TeeChain) targetSyncRelay() bool {
 		V: []byte{},
 	}, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),
-	}, module.NativeVersion, nil)
+	}, module.NativeVersion)
 
 	ins := batch.NewBatch(runtime)
 	hubBatch, err := batch.BatchQuery{Batch: *ins}.PackCallToSunc()

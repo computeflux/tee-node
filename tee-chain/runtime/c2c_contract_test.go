@@ -56,7 +56,7 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 	_, codePriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	codePub := codePriv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func([]byte) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
 			TeeType:       1,
 			CodeSigner:    codePub,

@@ -89,7 +89,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 
 			// 批量更新 batch 中 hub call 的状态
 			if p.SyncTxEnd.IsSeccseed {
-				runtime, err := app.buildContractRuntime(txn, height, ts, txbt)
+				runtime, err := app.buildContractRuntime(txn, height, ts)
 				if err != nil {
 					util.LogWithRed("FinalizeTx", "buildContractRuntime error:", err)
 				} else {
@@ -115,7 +115,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 		case *model.SysCall_RelaySync:
 			ev := relay.FromRelaySysCall(p.RelaySync)
 			if app.relay != nil {
-				runtime, err := app.buildContractRuntime(txn, height, ts, txbt)
+				runtime, err := app.buildContractRuntime(txn, height, ts)
 				if err != nil {
 					util.LogWithRed("Finalize TX", "buildContractRuntime error:", err)
 				} else if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
@@ -141,7 +141,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				)
 			}
 
-			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract, txbt)
+			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
 			if err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
 				return nil, errors.Wrap(err, "contract mutation error")
@@ -177,7 +177,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				Method: []byte{0xa6, 0x2c, 0x84, 0xf8}, // migration 方法选择器
 				Args:   [][]byte{versionBytes},
 			}
-			if err := app.ContractMutation(pub.ToBytes(), 0, txn, ts, height, migrationCall, nil); err != nil {
+			if err := app.ContractMutation(pub.ToBytes(), 0, txn, ts, height, migrationCall); err != nil {
 				util.LogError("FinalizeTx migration", err)
 			} else {
 				util.LogOk("FinalizeTx migration", "success")
@@ -188,9 +188,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 	return res, nil
 }
 
-// buildContractRuntime 为 relay / batch 等系统路径构造合约运行时。
-// txbt 为当前原始交易字节（model.Tx 序列化）；无交易上下文时传 nil。
-func (app *TeeChain) buildContractRuntime(txn *dbstore.Txn, height int64, ts time.Time, txbt []byte) (*contracts.Runtime, error) {
+func (app *TeeChain) buildContractRuntime(txn *dbstore.Txn, height int64, ts time.Time) (*contracts.Runtime, error) {
 	pub, err := app.GetDkgPubkey()
 	if err != nil {
 		return nil, errors.Wrap(err, "get dkg pubkey for relay sync")
@@ -208,7 +206,7 @@ func (app *TeeChain) buildContractRuntime(txn *dbstore.Txn, height int64, ts tim
 		V: pub.ToBytes(),
 	}, chaintypes.UniAddr{
 		V: pub.ToBytes(),
-	}, version, txbt)
+	}, version)
 
 	return runtime, nil
 }

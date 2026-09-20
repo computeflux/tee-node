@@ -34,9 +34,15 @@ type ContractApi interface {
 	GetCaller() UniAddr
 	GetSystemAccount() UniAddr
 	CallbySystem() bool
-	// VerifyTEE 校验客户端传入的 TEE 报告（protoio 序列化的 model.TeeCall），
+	// VerifyTEE 校验客户端传入的 TEE quote。
+	// report 为 quote 字节（model.TeeCall 的 Report 字段，非整个 TeeCall）；
+	// data 为被证明的数据字节（绑定为 model.TeeCall.Tx = TeeCall_Text{Text: data}，
+	// 如放款数据 Release 的 SCALE 编码）——quote 绑定 [Time || Caller || marshal(Tx)]；
+	// t 为节点签发 quote 时的时间戳（与节点签名内容中的 Time 同值，用户无法伪造——
+	// 伪造需持有 TEE 内私钥），运行时校验其与区块时间的偏差在窗口内（防旧 quote 重放）。
+	// Caller/TeeType 由运行时从执行上下文补齐（用户不可伪造）。
 	// 成功返回 Ok 携带 TEE 证明代码三要素（TeeType/CodeSigner/CodeSignature），失败返回 Err 携带错误信息。
-	VerifyTEE([]byte) Result[TeeVerifyInfo, string]
+	VerifyTEE(report, data []byte, t int64) Result[TeeVerifyInfo, string]
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
 }

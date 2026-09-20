@@ -120,7 +120,7 @@ func (m *mockAPI) GetVersion() uint32               { return 0 }
 func (m *mockAPI) GetCaller() cstore.UniAddr        { return cstore.UniAddr{} }
 func (m *mockAPI) GetSystemAccount() cstore.UniAddr { return cstore.UniAddr{} }
 func (m *mockAPI) CallbySystem() bool               { return false }
-func (m *mockAPI) VerifyTEE([]byte) cstore.Result[cstore.TeeVerifyInfo, string] {
+func (m *mockAPI) VerifyTEE(_, _ []byte, _ int64) cstore.Result[cstore.TeeVerifyInfo, string] {
 	return cstore.NewErr[cstore.TeeVerifyInfo, string]("verify_tee: mock")
 }
 

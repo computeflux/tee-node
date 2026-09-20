@@ -68,17 +68,21 @@ type Release struct {
 // ReleaseWithSig 携带 TEE 证明的放款请求：
 //
 //	Data          放款数据（由 TEE 内代码签名）
-//	TeeReport     验证节点签发的 TEE quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）：
-//	              完整 model.TeeCall 由合约运行时用执行上下文补齐（Caller/Time/Tx/TeeType 均为用户不可伪造），
+//	TeeReport     验证节点在 TEE 内签发的 quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）：
+//	              quote 绑定 [Time || Caller || marshal(TeeCall_Text{Text: SCALE(Data)})]（节点用交易签名同一密钥签发），
+//	              完整 model.TeeCall 由合约运行时用执行上下文补齐（Caller/Time/TeeType 均为用户不可伪造），
 //	              节点侧 VerifyTEE 完成真实 quote 验签后，返回 TEE 证明的代码三要素
 //	              （TeeType/CodeSigner/CodeSignature）——代码版本不再由用户口头声称，而由 TEE 硬件证明
 //	CodeSignature  TEE 证明代码对 Data 的 SCALE 编码的 ed25519 签名：
 //	              合约用 VerifyTEE 返回的 CodeSigner 验证，证明放款数据出自被 TEE 证明的代码
 //	              （私钥在 TEE 飞地内，用户无法伪造）
+//	TeeTime       节点签发 quote 时的时间戳（秒），即节点对 [Time || Caller || Text] 签名中的 Time：
+//	              节点侧与 quote 内嵌时间戳同值；合约校验其与区块时间的偏差在窗口内（防旧 quote 重放）
 //
 // scale-codec-gen:generate
 type ReleaseWithSig struct {
 	Data          Release
 	TeeReport     []byte
 	CodeSignature []byte
+	TeeTime       int64
 }

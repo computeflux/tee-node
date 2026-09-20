@@ -166,6 +166,7 @@ func (v *ReleaseWithSig) Encode() ([]byte, error) {
 	buf = append(buf, v.TeeReport...)
 	buf = store.EncodeCompact(buf, uint64(len(v.CodeSignature)))
 	buf = append(buf, v.CodeSignature...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TeeTime))
 	return buf, nil
 }
 
@@ -199,6 +200,11 @@ func (v *ReleaseWithSig) Decode(data []byte) (int, error) {
 		copy(v.CodeSignature, data[off:off+int(n)])
 		off += int(n)
 	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TeeTime")
+	}
+	v.TeeTime = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
 	return off, nil
 }
 

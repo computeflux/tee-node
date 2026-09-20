@@ -175,7 +175,7 @@ func (r *testRuntime) Query(store.UniAddr, store.ContractCall) ([]byte, error) {
 	return nil, nil
 }
 func (r *testRuntime) Call(store.UniAddr, store.ContractCall) ([]byte, error) { return nil, nil }
-func (r *testRuntime) VerifyTEE([]byte) store.Result[store.TeeVerifyInfo, string] {
+func (r *testRuntime) VerifyTEE(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
 	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not available in ego test")
 }
 
