@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/binary"
 
+	"github.com/computeflux/tee-provider/pkg/types/teetypes"
 	"github.com/tetratelabs/wazero"
 	wazapi "github.com/tetratelabs/wazero/api"
 )
@@ -271,12 +272,13 @@ func registerIdentity(b wazero.HostModuleBuilder, s *hostState) {
 
 // ── TEE signature / TEE 签名校验 ────────────────────────
 
-// registerVerifyTEE 注册 verify_tee：校验从 WASM 模块线性内存读取的 TEE quote
-// （report）与被证明的数据（data，绑定为 TeeCall.Tx=Text），
-// 并把验证结果 Result[TeeVerifyInfo, string]（SCALE 编码）写入输出缓冲区。
-// 参数: reportPtr(i32)、reportLen(i32)、dataPtr(i32)、dataLen(i32)、
-//
-//	t(i64 节点签发时间戳)、outPtr(i32)、outLen(i32)。
+// registerVerifyTEE 注册 TEE 验签 host 函数，双导出（保持向后兼容）：
+//   - verify_tee（旧 7 参）: reportPtr, reportLen, dataPtr, dataLen, t(i64), outPtr, outLen
+//     Caller/TeeType 由宿主从执行上下文补齐（当前调用方 / 本机 TEE 类型），
+//     链上已部署的旧版 wasm（import 旧 7 参签名）继续可用——
+//     wazero 在 instantiate 时校验 import 签名，改签名会直接导致旧 wasm 无法实例化；
+//   - verify_tee_v2（新 10 参）: 在 t 之后、outPtr 之前插入 callerPtr, callerLen, teeType(i32)，
+//     由合约显式传入报告签发者公钥与 TEE 类型（新版 wasm import 此签名）。
 //
 // 返回: 成功为编码结果字节长度，失败为错误码。
 func registerVerifyTEE(b wazero.HostModuleBuilder, s *hostState) {
@@ -285,19 +287,47 @@ func registerVerifyTEE(b wazero.HostModuleBuilder, s *hostState) {
 			mem := mod.Memory()
 			report, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
 			data, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
-			res := s.api.VerifyTEE(report, data, int64(stack[4]))
-			encoded, err := res.Encode()
-			if err != nil {
-				stack[0] = errStorage
+			n, code := doVerifyTEE(s, mod, report, data, s.api.GetCaller().V,
+				int64(stack[4]), uint32(teetypes.TeeType), uint32(stack[5]), uint32(stack[6]))
+			stack[0] = n
+			if code != errOK {
+				stack[0] = code
 				return
 			}
-			if uint32(stack[6]) < uint32(len(encoded)) {
-				stack[0] = errBufTooSmall
-				return
-			}
-			mem.Write(uint32(stack[5]), encoded)
-			stack[0] = uint64(len(encoded))
 		}),
 		[]wazapi.ValueType{i32, i32, i32, i32, i64, i32, i32}, []wazapi.ValueType{i32},
 	).Export("verify_tee")
+
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			report, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			data, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
+			caller, _ := mem.Read(uint32(stack[5]), uint32(stack[6]))
+			n, code := doVerifyTEE(s, mod, report, data, caller,
+				int64(stack[4]), uint32(stack[7]), uint32(stack[8]), uint32(stack[9]))
+			stack[0] = n
+			if code != errOK {
+				stack[0] = code
+				return
+			}
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32, i64, i32, i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("verify_tee_v2")
+}
+
+// doVerifyTEE verify_tee / verify_tee_v2 的共享核心：校验 TEE quote，
+// 把验证结果 Result[TeeVerifyInfo, string]（SCALE 编码）写入输出缓冲区（outPtr, outLen）。
+// 返回 (编码结果字节长度, errOK)；失败返回 (0, 错误码)。
+func doVerifyTEE(s *hostState, mod wazapi.Module, report, data, caller []byte, t int64, teeType uint32, outPtr, outLen uint32) (uint64, uint64) {
+	res := s.api.VerifyTEE(report, data, t, caller, teeType)
+	encoded, err := res.Encode()
+	if err != nil {
+		return 0, errStorage
+	}
+	if outLen < uint32(len(encoded)) {
+		return 0, errBufTooSmall
+	}
+	mod.Memory().Write(outPtr, encoded)
+	return uint64(len(encoded)), errOK
 }

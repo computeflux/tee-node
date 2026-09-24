@@ -48,8 +48,8 @@ func getSystemAccount(outPtr, outLen int32) int32
 //go:wasmimport runtime is_system
 func isSystem() int32
 
-//go:wasmimport runtime verify_tee
-func verifyTEE(reportPtr, reportLen, dataPtr, dataLen int32, t int64, outPtr, outLen int32) int32
+//go:wasmimport runtime verify_tee_v2
+func verifyTEEV2(reportPtr, reportLen, dataPtr, dataLen int32, t int64, callerPtr, callerLen int32, teeType int32, outPtr, outLen int32) int32
 
 // Shared buffer for interop with host functions.
 // Layout: first 64KB for keys/prefix, last 64KB for values.

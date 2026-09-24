@@ -7,14 +7,14 @@
 
 `Release` 的"代码版本"校验从**用户口头声称**（`CodeVersion` 参数可任意伪造）改为 **TEE 硬件证明**：
 
-| 步骤 | 旧逻辑（已删除） | 新逻辑 |
+| 步骤（旧→新） | 旧逻辑（已删除） | 新逻辑 |
 |---|---|---|
-| ② | —（无） | 用户必须携带 TEE quote（`TeeReport`）+ 签发时间（`TeeTime`），`VerifyTEE` 在 TEE 内做真实 quote 验签 |
-| ③ | `CodeVersion`（用户传）== 节点注册值 | `VerifyTEE` 返回的 TEE 证明代码指纹（`tee.CodeSignature`）== 节点注册值 |
-| ④ | 用户传的 `CodeVersion` 在白名单内 | TEE 证明的代码指纹在白名单内（链上信任锚） |
-| ⑤ | —（无） | 链上用 TEE 证明的代码公钥（`tee.CodeSigner`）验证用户携带的 `CodeSignature`，证明放款数据出自被 TEE 证明的代码 |
+| ②→② | —（无） | 用户必须携带 TEE quote（`TeeReport`）+ 签发时间（`TeeTime`），`VerifyTEE` 在 TEE 内做真实 quote 验签 |
+| ③→— | `CodeVersion`（用户传）== 节点注册值 | **已删除**：节点注册（`RegisterNode`）不再绑定代码版本，Release 流程无“节点注册值”校验 |
+| ④→③ | 用户传的 `CodeVersion` 在白名单内 | TEE 证明的代码指纹（`tee.CodeSignature`）在白名单内（链上信任锚） |
+| ⑤→④ | —（无） | 链上用 TEE 证明的代码公钥（`tee.CodeSigner`）验证用户携带的 `CodeSignature`，证明放款数据出自被 TEE 证明的代码 |
 
-`ReleaseWithSig` 结构（`c2c/types.go`，SCALE 编码，`TeeTime` 为新增末字段 u64LE）：
+`ReleaseWithSig` 结构（`c2c/types.go`，SCALE 编码，`TeeTime`/`TeeType` 为新增末字段 u64LE/u32LE）：
 
 ```go
 type ReleaseWithSig struct {
@@ -22,6 +22,7 @@ type ReleaseWithSig struct {
     TeeReport     []byte    // TEE quote 字节（model.TeeCall 的 Report 字段，非整个 TeeCall）
     CodeSignature []byte    // TEE 代码对 SCALE(Data) 的 ed25519 签名
     TeeTime       int64     // 节点签发 quote 的时间戳（秒），即签名内容中的 Time
+    TeeType       uint32    // 报告签发节点的 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE）
 }
 ```
 
@@ -36,21 +37,20 @@ web2 c2c 服务（节点身份）                     TEE 节点（TEE 内代码
      │                                            │  sig = ed25519_sign(节点私钥, msg)      (64B)
      │                                            │  quote = TEE 硬件报告(report data = sig)
      │ ◀────────── {TeeReport: quote,              │
-     │              TeeTime: t}                    │
+     │              TeeTime: t, TeeType: 本机 TEE 类型} │
      │
-     │  用节点私钥签名交易，提交 c2c Release(ReleaseWithSig{Data, TeeReport, CodeSignature, TeeTime})
+     │  用节点私钥签名交易，提交 c2c Release(ReleaseWithSig{Data, TeeReport, CodeSignature, TeeTime, TeeType})
      ▼
 合约（任一 TEE 节点执行区块时）:
   ① caller 是已注册验证节点
-  ② VerifyTEE(TeeReport, SCALE(Data), TeeTime):
+  ② VerifyTEE(TeeReport, SCALE(Data), TeeTime, caller, TeeType):
      a. 时间窗：|区块时间 − TeeTime| ≤ 10s，否则 ErrTeeVerifyFailed（防旧 quote 重放）
      b. quote 硬件验签（SGX: VerifyRemoteReport/sgx-verify；SNP: verify.SnpAttestation）
      c. 节点签名验签：ed25519_verify(caller, [Int64ToBytes(TeeTime) || caller || marshal(Tx)], quote.ReportData)
      d. 返回 {TeeType, CodeSigner, CodeSignature}
-  ③ tee.CodeSignature == node.CodeVersion        否则 ErrCodeMismatch
-  ④ 白名单 contains(tee.CodeSignature)            否则 ErrCodeNotAuthorized
-  ⑤ verifyCodeSig(tee.CodeSigner, SCALE(Data), CodeSignature)  否则 ErrCodeSigInvalid
-  ⑥ 订单去重 ⑦ 金额>0 ⑧ 折算复核 ⑩⑪ 限额 ⑫ 佣金 ⑬⑭ escrow 扣减/买方入账
+  ③ 白名单 contains(tee.CodeSignature)            否则 ErrCodeNotAuthorized
+  ④ verifyCodeSig(tee.CodeSigner, SCALE(Data), CodeSignature)  否则 ErrCodeSigInvalid
+  ⑤ 订单去重 ⑥ 金额>0 ⑦ 折算复核 ⑨⑩ 限额 ⑪ 佣金 ⑫⑬ escrow 扣减/买方入账
 ```
 
 ## 3. 节点侧对接要求（必须逐条对齐）
@@ -77,9 +77,9 @@ msg = Int64ToBytes(t) || 节点公钥 || protoio.MarshalVT(&model.TeeCall_Text{T
 | SGX (TeeType=0) | `enclave.GetRemoteReport(sig)`（ego） | 1024 字节原始 report（sig 在 report data 字段） |
 | SNP (TeeType=1) | `client.GetExtendedReport(device, sig64)`（go-sev-guest） | `proto.Marshal(sevsnp.Attestation)`（sig 在 Report.ReportData） |
 | TDX (TeeType=2) | 未实现（`TdxIssue` 报错） | — |
-| 非 TEE (9999) | 无 quote | 验证 fail-closed（③ 必失败） |
+| 非 TEE (9999) | 无 quote | 验证 fail-closed（③ 必失败：CodeSignature 为空，不在白名单） |
 
-quote 类型必须与执行合约的节点 TEE 类型一致（运行时以本机 `teetypes.TeeType` 组装 TeeCall 后走对应 `VerifyReport` 分支）。
+quote 类型必须与交易携带的 `TeeType` 字段一致（`VerifyReport` 按 `TeeType` 分发到对应验签分支；类型与 quote 实际类型不符 → 硬件验签失败，fail-closed 无法伪造）。
 
 ### 3.3 SCALE(Data) 字节布局（payload，须与合约端逐字节一致）
 
@@ -121,16 +121,15 @@ ed25519_verify(tee.CodeSigner, msg, CodeSignature)
 
 ## 5. "代码版本"标识的对齐（⚠️ 当前唯一未闭环点）
 
-`VerifyReport` 返回的三要素必须与链上两处注册值对齐：
+`VerifyReport` 返回的三要素必须与链上唯一注册值（白名单）对齐（节点注册不绑定代码版本）：
 
 | 位置 | 值 |
 |---|---|
 | `RegisterCode(codeHash, ...)` 白名单 | 代码版本标识 |
-| `RegisterNode(node, codeHash)` 节点注册 | 同上（节点只能为其自身代码背书） |
-| `VerifyReport` 返回的 `CodeSignature` | 必须 == 上面两处 |
+| `VerifyReport` 返回的 `CodeSignature` | 必须 == 上面 |
 
-- **SGX**：当前 `SgxVerify` 返回 `CodeSigner = MRSIGNER`、`CodeSignature = MRENCLAVE`（32B）。即"代码版本" = MRENCLAVE，白名单/节点注册须填同一 MRENCLAVE。
-- **SNP**：当前返回空 → ③ 必失败（fail-closed）。**需补实现**：从 SNP 报告中取代码度量值（如 measured 的 code hash）作为 CodeSignature，并定义对应的 CodeSigner。
+- **SGX**：当前 `SgxVerify` 返回 `CodeSigner = MRSIGNER`、`CodeSignature = MRENCLAVE`（32B）。即“代码版本” = MRENCLAVE，白名单须填同一 MRENCLAVE。
+- **SNP**：当前返回空 → ③ 必失败（fail-closed，CodeSignature 为空不在白名单）。**需补实现**：从 SNP 报告中取代码度量值（如 measured 的 code hash）作为 CodeSignature，并定义对应的 CodeSigner。
 - 若希望"代码版本"是自定义 hash（如代码文件 sha256）而非硬件度量值，需节点侧维护 `硬件度量值 → 自定义 hash` 映射，并在 `VerifyReport` 中做转换。
 
 ## 6. 错误码速查
@@ -140,15 +139,14 @@ ed25519_verify(tee.CodeSigner, msg, CodeSignature)
 | `ErrNotNode` | ① caller 未注册为节点 |
 | `ErrTeeReportMissing` | ② TeeReport 为空 |
 | `ErrTeeVerifyFailed` | ② 时间窗超界 / quote 硬件验签失败 / 节点签名验签失败 / TEE 类型未知 / debug 模式 |
-| `ErrCodeMismatch` | ③ TEE 证明代码指纹 ≠ 节点注册值（含非 TEE 节点 CodeSignature 为空） |
-| `ErrCodeNotAuthorized` | ④ 代码指纹不在白名单（含被 RevokeCode 撤销） |
-| `ErrCodeSigInvalid` | ⑤ CodeSigner 非 32B / ed25519 验签失败 |
-| `ErrDuplicateRelease` | ⑥ 订单号已放款 |
+| `ErrCodeNotAuthorized` | ③ 代码指纹不在白名单（含被 RevokeCode 撤销；含非 TEE 节点 CodeSignature 为空） |
+| `ErrCodeSigInvalid` | ④ CodeSigner 非 32B / ed25519 验签失败 |
+| `ErrDuplicateRelease` | ⑤ 订单号已放款 |
 
 ## 7. 涉及文件
 
-- 合约：`tee-chain/runtime/module/c2c/c2c.go`（Release ①-⑤）、`types.go`（ReleaseWithSig）、`codec_gen.go`（SCALE 布局）
+- 合约：`tee-chain/runtime/module/c2c/c2c.go`（Release ①-④）、`types.go`（ReleaseWithSig）、`codec_gen.go`（SCALE 布局）
 - 运行时：`tee-chain/runtime/runtime.go`（`VerifyTEE` + `teeTimeDrift`）、`store/api.go`（接口）、`store/types.go`（TeeVerifyInfo）
 - TEE 验签：`pkg/types/teetypes/{tee,tee_sgx,tee_snp,tee_tdx}.go`
-- WASM 路径：`tee-chain/runtime/wasm/host.go`（verify_tee host 函数，7 参）、`wasm/runtime/{host,main}.go`
-- ABI：`tee-chain/runtime/abis/c2c.json`（ReleaseWithSig 增加 TeeTime: i64）
+- WASM 路径：`tee-chain/runtime/wasm/host.go`（verify_tee 7 参向后兼容 + verify_tee_v2 10 参双导出）、`wasm/runtime/{host,main}.go`（import verify_tee_v2）
+- ABI：`tee-chain/runtime/abis/c2c.json`（ReleaseWithSig 增加 TeeTime: i64、TeeType: u32）

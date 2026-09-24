@@ -31,10 +31,18 @@ func Marshal(pb VTMarshaler) ([]byte, error) {
 	return buf, nil
 }
 
+// VTMarshaler VT（vtproto）序列化的最小接口。
+//
+// 注意：这里不要求 MarshalVT() 方法——protoc-gen-go-vtproto 对 oneof 包装消息
+// （如 model.TeeCall_Text）只生成 SizeVT + MarshalToVT（+ MarshalToSizedBufferVT），
+// 不生成 MarshalVT()；若接口要求它，这些类型会断言失败，
+// 导致 SgxIssue/SgxVerify/SnpIssue/SnpVerify 等对 call.Tx 的 MarshalVT 报
+// "unsupported tee tx type"。本仓库所有接口调用点（WriteMessage/Marshal/MarshalVT/
+// DBSetProtoMessage 等）只使用 SizeVT/MarshalToVT；直接调 .MarshalVT() 的代码
+// 都是针对具体消息类型（其自身有该方法），不经过此接口。
 type VTMarshaler interface {
 	SizeVT() int
 	MarshalToVT([]byte) (int, error)
-	MarshalVT() ([]byte, error)
 }
 
 type VTUnmarshaler interface {

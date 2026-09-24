@@ -23,7 +23,7 @@
         "displayName": [
           "Balance"
         ],
-        "type": 27
+        "type": 30
       },
       "blockNumber": {
         "displayName": [
@@ -35,7 +35,7 @@
         "displayName": [
           "Hash"
         ],
-        "type": 28
+        "type": 31
       },
       "nativeToEthRatio": 100000000,
       "staticBufferSize": 16384,
@@ -260,16 +260,6 @@
               ],
               "type": 13
             }
-          },
-          {
-            "docs": [],
-            "label": "code_hash",
-            "type": {
-              "displayName": [
-                "Vec"
-              ],
-              "type": 14
-            }
           }
         ],
         "default": false,
@@ -285,6 +275,21 @@
           "type": 11
         },
         "selector": "0x45a67cc6"
+      },
+      {
+        "args": [],
+        "default": false,
+        "docs": [],
+        "label": "list_authorized_codes",
+        "mutates": false,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "Result"
+          ],
+          "type": 27
+        },
+        "selector": "0x4a0cc917"
       },
       {
         "args": [],
@@ -446,7 +451,7 @@
           "displayName": [
             "Result"
           ],
-          "type": 26
+          "type": 29
         },
         "selector": "0x9aa598ec"
       },
@@ -665,86 +670,81 @@
               {
                 "fields": [],
                 "index": 2,
-                "name": "CodeMismatch"
-              },
-              {
-                "fields": [],
-                "index": 3,
                 "name": "CodeNotAuthorized"
               },
               {
                 "fields": [],
-                "index": 4,
+                "index": 3,
                 "name": "CodeSigInvalid"
               },
               {
                 "fields": [],
-                "index": 5,
+                "index": 4,
                 "name": "ConversionMismatch"
               },
               {
                 "fields": [],
-                "index": 6,
+                "index": 5,
                 "name": "DailyLimitExceeded"
               },
               {
                 "fields": [],
-                "index": 7,
+                "index": 6,
                 "name": "DuplicateRelease"
               },
               {
                 "fields": [],
-                "index": 8,
+                "index": 7,
                 "name": "InsufficientBalance"
               },
               {
                 "fields": [],
-                "index": 9,
+                "index": 8,
                 "name": "InsufficientEscrow"
               },
               {
                 "fields": [],
-                "index": 10,
+                "index": 9,
                 "name": "NodeExists"
               },
               {
                 "fields": [],
-                "index": 11,
+                "index": 10,
                 "name": "NotNode"
               },
               {
                 "fields": [],
-                "index": 12,
+                "index": 11,
                 "name": "OrderLimitExceeded"
               },
               {
                 "fields": [],
-                "index": 13,
+                "index": 12,
                 "name": "RateExceedsCap"
               },
               {
                 "fields": [],
-                "index": 14,
+                "index": 13,
                 "name": "TeeReportMissing"
               },
               {
                 "fields": [],
-                "index": 15,
+                "index": 14,
                 "name": "TeeVerifyFailed"
               },
               {
                 "fields": [],
-                "index": 16,
+                "index": 15,
                 "name": "UnsupportedCurrency"
               },
               {
                 "fields": [],
-                "index": 17,
+                "index": 16,
                 "name": "ZeroAmount"
               },
               {
                 "fields": [],
-                "index": 18,
+                "index": 17,
                 "name": "ZeroRate"
               }
             ]
@@ -880,6 +880,10 @@
               {
                 "name": "TeeTime",
                 "type": 4
+              },
+              {
+                "name": "TeeType",
+                "type": 2
               }
             ]
           }
@@ -1106,10 +1110,6 @@
           "composite": {
             "fields": [
               {
-                "name": "CodeVersion",
-                "type": 14
-              },
-              {
                 "name": "RegisteredAt",
                 "type": 3
               },
@@ -1213,14 +1213,40 @@
       "id": 25,
       "type": {
         "def": {
+          "composite": {
+            "fields": [
+              {
+                "name": "CodeHash",
+                "type": 14
+              },
+              {
+                "name": "Version",
+                "type": 15
+              },
+              {
+                "name": "RegisteredAt",
+                "type": 3
+              }
+            ]
+          }
+        },
+        "path": [
+          "AuthorizedCode"
+        ]
+      }
+    },
+    {
+      "id": 26,
+      "type": {
+        "def": {
           "sequence": {
-            "type": 22
+            "type": 25
           }
         },
         "params": [
           {
             "name": "T",
-            "type": 22
+            "type": 25
           }
         ],
         "path": [
@@ -1229,7 +1255,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 27,
       "type": {
         "def": {
           "variant": {
@@ -1237,7 +1263,7 @@
               {
                 "fields": [
                   {
-                    "type": 25
+                    "type": 26
                   }
                 ],
                 "index": 0,
@@ -1258,7 +1284,7 @@
         "params": [
           {
             "name": "T",
-            "type": 25
+            "type": 26
           },
           {
             "name": "E",
@@ -1271,7 +1297,68 @@
       }
     },
     {
-      "id": 27,
+      "id": 28,
+      "type": {
+        "def": {
+          "sequence": {
+            "type": 22
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 22
+          }
+        ],
+        "path": [
+          "Vec"
+        ]
+      }
+    },
+    {
+      "id": 29,
+      "type": {
+        "def": {
+          "variant": {
+            "variants": [
+              {
+                "fields": [
+                  {
+                    "type": 28
+                  }
+                ],
+                "index": 0,
+                "name": "Ok"
+              },
+              {
+                "fields": [
+                  {
+                    "type": 9
+                  }
+                ],
+                "index": 1,
+                "name": "Err"
+              }
+            ]
+          }
+        },
+        "params": [
+          {
+            "name": "T",
+            "type": 28
+          },
+          {
+            "name": "E",
+            "type": 9
+          }
+        ],
+        "path": [
+          "Result"
+        ]
+      }
+    },
+    {
+      "id": 30,
       "type": {
         "def": {
           "primitive": "u128"
@@ -1282,7 +1369,7 @@
       }
     },
     {
-      "id": 28,
+      "id": 31,
       "type": {
         "def": {
           "composite": {

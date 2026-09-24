@@ -12,7 +12,14 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
 # build binary
-ego-go build -o ./hack/build/dsecret ./main.go
+# 注意: ego-go 自带一套 patch 过的 Go 工具链（/opt/ego/go，当前 go1.26.1），
+# 与系统 go（如 1.26.6）共用同一个 build cache 时会混入不兼容的目标文件，
+# 链接时报 "invalid relocation ... not in [0,N)"。这里用独立 GOCACHE 隔离。
+GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
+
+# build sgx verify service (cgo: 静态链接 /opt/ego/lib 的 liboehostverify；
+# 随 sync_build 同步到 test 机 /srv/token_node1/build/ 并在那里本机运行)
+CGO_CFLAGS=-I/opt/ego/include CGO_LDFLAGS=-L/opt/ego/lib go build -o ./hack/build/sgx-verify-service ./tools/sgx-verify-service/
 
 # sign binary
 cd ./hack/build/
@@ -22,6 +29,9 @@ cd $DIR/../
 
 ROOT_DIR="$(pwd)"
 REMOTE_HOST="computefluxtest"
+# sgx-verify-service 统一用本地服务器的公网地址（服务监听 0.0.0.0:8004）；
+# 可能需要 DNS/DDNS + 路由器端口映射 8004 才能通，可用环境变量覆盖: SVS_HOST=1.2.3.4 $0 deploy
+SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
 REMOTE_NODE_DIR="/srv/token_node1"
 REMOTE_CHAIN_DIR="$REMOTE_NODE_DIR/token_chain_data"
 REMOTE_BUILD_DIR="$REMOTE_NODE_DIR/build"
@@ -126,15 +136,41 @@ SyslogIdentifier=dsecret-node1
 WantedBy=multi-user.target
 EOF
 
+    # sgx 验证服务在 test 机本机运行（二进制由 sync_build 同步到 $REMOTE_BUILD_DIR）：
+    # 纯软件验证不需要 SGX 硬件，服务地址用 127.0.0.1。
+    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/sgx-verify-service.service" > /dev/null << EOF
+[Unit]
+Description=SGX verify service (ego eclient)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$REMOTE_BUILD_DIR/sgx-verify-service -addr 127.0.0.1:8004
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # dsecret 通过 SGX_VERIFY_SERVICE_URL 调用本机服务。用 drop-in 注入，不改原单元文件。
+    remote_exec "sudo mkdir -p /etc/systemd/system/$SERVICE_NAME.d"
+    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/$SERVICE_NAME.d/svs.conf" > /dev/null << EOF
+[Service]
+Environment="SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004"
+EOF
+
     remote_exec "sudo systemctl daemon-reload"
     remote_exec "sudo systemctl enable $SERVICE_NAME"
+    remote_exec "sudo systemctl enable sgx-verify-service"
 }
 
 # -------------------------------------------------
 # 4. Start service and tail logs
 # -------------------------------------------------
 start_and_tail_logs() {
-    echo "[remote] Starting $SERVICE_NAME ..."
+    echo "[remote] Starting sgx-verify-service and $SERVICE_NAME ..."
+    remote_exec "sudo systemctl restart sgx-verify-service"
     remote_exec "sudo systemctl restart $SERVICE_NAME"
     sleep 1
     remote_exec "sudo systemctl status $SERVICE_NAME --no-pager"

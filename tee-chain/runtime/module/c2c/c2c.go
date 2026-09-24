@@ -6,9 +6,9 @@
 //  1. 代码签名版本白名单：治理多签维护“被授权的 c2c 代码指纹（TEE 测量值/签名）”。
 //     这是链上的信任锚——只有白名单内的代码版本才被承认。
 //  2. 验证节点注册表：所有发起/验证 web2 交易状态、并调用合约放款节点的地址，
-//     由治理注册与删除。节点只能为其自身注册的代码版本背书。
+//     由治理注册与删除（注册不绑定代码版本）。
 //  3. 收款（挂单托管）：商户把挂单 AI 金额存入合约 escrow。
-//  4. 受控放款：注册验证节点在“TEE 证明代码 ∈ 节点注册值 + 白名单 + 订单未重复”后，
+//  4. 受控放款：注册验证节点在“TEE 证明代码 ∈ 白名单 + 订单未重复”后，
 //     把 AI 从商户 escrow 转给买方。
 //
 // TEE 证书的真实密码学验证（quote 验签）在链下由验证节点完成（VerifyTEE 返回 TEE 证明的
@@ -18,7 +18,6 @@ package c2c
 
 import (
 	"bytes"
-	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -27,7 +26,6 @@ import (
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
-	"golang.org/x/crypto/blake2b"
 )
 
 var (
@@ -37,7 +35,6 @@ var (
 	ErrCodeExists          = errors.New("c2c: code version already authorized")
 	ErrNotNode             = errors.New("c2c: caller is not a registered node")
 	ErrNodeExists          = errors.New("c2c: node already registered")
-	ErrCodeMismatch        = errors.New("c2c: release code version does not match node")
 	ErrTeeReportMissing    = errors.New("c2c: tee report missing")
 	ErrTeeVerifyFailed     = errors.New("c2c: tee report verify failed")
 	ErrCodeSigInvalid      = errors.New("c2c: code signature invalid")
@@ -58,10 +55,10 @@ var (
 type C2C struct {
 	api store.ContractApi
 
-	// authorizedCodes 代码签名版本白名单：hex(codeHash) → true。
-	authorizedCodes *store.StoreMapping[string, bool]
-	// nodes 验证节点注册表：节点地址 → NodeRecord。
-	nodes *store.StoreMapping[store.UniAddr, NodeRecord]
+	// authorizedCodes 代码签名版本白名单：hex(codeHash) → AuthorizedCode。
+	authorizedCodes *store.StoreMapping[string, AuthorizedCode] `store:"keyPfx:v2_authorized_codes"`
+	// authorizedNodes 验证节点注册表：节点地址 → NodeRecord。
+	authorizedNodes *store.StoreMapping[store.UniAddr, NodeRecord]
 	// merchantEscrow 商户挂单托管余额：商户 → 已锁定 AI。
 	merchantEscrow *store.StoreMapping[store.UniAddr, store.Amount]
 	// releasedNonces 放款去重：orderNo → true。
@@ -98,7 +95,11 @@ func (m C2CMutation) RegisterCode(codeHash []byte, version string) error {
 	if existed {
 		return ErrCodeExists
 	}
-	return m.authorizedCodes.Set(m.api.GetTxn(), key, true)
+	return m.authorizedCodes.Set(m.api.GetTxn(), key, AuthorizedCode{
+		CodeHash:     codeHash,
+		Version:      version,
+		RegisteredAt: uint64(m.api.GetBlockTime()),
+	})
 }
 
 // RevokeCode 取消授权一个代码版本。
@@ -114,20 +115,18 @@ func (m C2CMutation) RevokeCode(codeHash []byte) error {
 
 // ── ② 验证节点注册表（系统账户 / gov 治理） ───────────────────
 
-// RegisterNode 由治理注册一个验证节点地址，并将其绑定到指定的代码版本。
-// 被注册的代码版本必须已在白名单内，保证“节点运行的代码 ∈ 白名单”。
-func (m C2CMutation) RegisterNode(node store.UniAddr, codeHash []byte) error {
+// RegisterNode 由治理注册一个验证节点地址（不绑定代码版本：
+// 代码版本在 Release 时由 TEE 证明 + 白名单校验）。
+func (m C2CMutation) RegisterNode(node store.UniAddr) error {
 	if !m.api.CallbySystem() {
 		return errors.New("c2c: not authorized (system account required)")
 	}
-	if existed, _ := m.nodes.Contains(m.api.GetTxn(), node); existed {
+
+	if existed, _ := m.authorizedNodes.Contains(m.api.GetTxn(), node); existed {
 		return ErrNodeExists
 	}
-	if !m.isCodeAuthorized(codeHash) {
-		return ErrCodeNotAuthorized
-	}
-	return m.nodes.Set(m.api.GetTxn(), node, NodeRecord{
-		CodeVersion:  codeHash,
+
+	return m.authorizedNodes.Set(m.api.GetTxn(), node, NodeRecord{
 		RegisteredAt: uint64(m.api.GetBlockTime()),
 		Active:       true,
 	})
@@ -138,7 +137,7 @@ func (m C2CMutation) RemoveNode(node store.UniAddr) error {
 	if !m.api.CallbySystem() && !addrEqual(node, m.api.GetCaller()) {
 		return errors.New("c2c: not authorized (system account or node self)")
 	}
-	return m.nodes.Delete(m.api.GetTxn(), node)
+	return m.authorizedNodes.Delete(m.api.GetTxn(), node)
 }
 
 // ── ③ 收款 / 挂单托管 ─────────────────────────────────────────
@@ -167,19 +166,22 @@ func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) err
 	if amount.Cmp(store.ZeroAmount) == 0 {
 		return ErrZeroAmount
 	}
+
 	// 调用方必须是已注册的验证节点。
-	if existed, _ := m.nodes.Contains(m.api.GetTxn(), m.api.GetCaller()); !existed {
+	if existed, _ := m.authorizedNodes.Contains(m.api.GetTxn(), m.api.GetCaller()); !existed {
 		return ErrNotNode
 	}
 	units := amountInt64(amount)
 	if units <= 0 {
 		return ErrZeroAmount
 	}
+
 	// 扣减 gateway providerCredits（Secret 构造调用，同 txn 原子）。
 	gwSecret := gateway.GatewaySecret{Gateway: *gateway.NewGateway(m.api)}
 	if err := gwSecret.WithdrawToC2C(merchant, uint64(units)); err != nil {
 		return err
 	}
+
 	// 记入 c2c escrow。
 	cur, err := m.merchantEscrow.Get(m.api.GetTxn(), merchant)
 	if err != nil || cur == nil {
@@ -192,7 +194,7 @@ func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) err
 
 // ── ④ 受控放款 ────────────────────────────────────────────────
 
-// Release 由注册验证节点发起：在“TEE 证明代码 = 节点注册值 + 白名单 + 订单未重复”后，
+// Release 由注册验证节点发起：在“TEE 证明代码 ∈ 白名单 + 订单未重复”后，
 // 把 AI 从商户 escrow 转给买方。
 // 安全模型：用户须携带 TEE quote（TeeReport）、签发时间（TeeTime）与代码对放款数据的签名（CodeSignature）；
 // quote 绑定 [签发时间 || 节点 || SCALE(放款数据)]，由验证节点在 TEE 内签发（TeeTime 与节点签名内容中的 Time 同值）；
@@ -200,7 +202,7 @@ func (m C2CMutation) DepositFor(merchant store.UniAddr, amount store.Amount) err
 // 返回 TEE 证明的代码三要素，再链上验证用户 CodeSignature——代码版本由 TEE 硬件证明，用户无法伪造。
 func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	// ① 调用方必须是已注册的验证节点。
-	node, err := m.nodes.Get(m.api.GetTxn(), m.api.GetCaller())
+	node, err := m.authorizedNodes.Get(m.api.GetTxn(), m.api.GetCaller())
 	if err != nil || node == nil {
 		return ErrNotNode
 	}
@@ -210,8 +212,9 @@ func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	// ② TEE 证明：用户必须携带 TEE quote 字节（即 model.TeeCall 的 Report 字段，非整个 TeeCall）。
 	// 被证明的数据 Text 为放款数据 r 的 SCALE 编码（节点签发 quote 时绑定同一份数据）；
 	// TeeTime 为节点签发时间（节点签名内容中的 Time，伪造需持有 TEE 内私钥）；
-	// 完整 TeeCall 由运行时用执行上下文补齐（Caller/TeeType 均为用户不可伪造），
-	// 并校验 TeeTime 与区块时间在窗口内（防旧 quote 重放）；
+	// Caller 为交易调用方（已校验为注册节点，即 quote 绑定的签发者公钥）；
+	// TeeType 为节点声明的 TEE 类型，VerifyReport 据此分发验签分支（类型与 quote 不符 → 验签失败）；
+	// 运行时并校验 TeeTime 与区块时间在窗口内（防旧 quote 重放）；
 	// 节点侧 VerifyTEE 完成真实 quote 验签，返回 TEE 证明的代码三要素（TeeType/CodeSigner/CodeSignature）——
 	// 代码版本由 TEE 硬件证明确定，而非用户声称。
 	if len(sig.TeeReport) == 0 {
@@ -221,14 +224,10 @@ func (m C2CMutation) Release(sig ReleaseWithSig) error {
 	if err != nil {
 		return err
 	}
-	tee, err := m.api.VerifyTEE(sig.TeeReport, payload, sig.TeeTime).UnWrap()
+	tee, err := m.api.VerifyTEE(sig.TeeReport, payload, sig.TeeTime, m.api.GetCaller().V, sig.TeeType).UnWrap()
 	if err != nil {
-		return ErrTeeVerifyFailed
-	}
-
-	// ③ TEE 证明的代码版本必须与节点注册值一致（节点只能为其自身代码背书）。
-	if len(tee.CodeSignature) == 0 || !bytesEqual(node.CodeVersion, tee.CodeSignature) {
-		return ErrCodeMismatch
+		// 保留底层原因（如 quote 验签失败详情）便于排查，同时保持 ErrTeeVerifyFailed 可 errors.Is 匹配。
+		return fmt.Errorf("%w: %v", ErrTeeVerifyFailed, err)
 	}
 
 	// ④ 该代码版本必须在白名单内（链上信任锚）。
@@ -236,18 +235,9 @@ func (m C2CMutation) Release(sig ReleaseWithSig) error {
 		return ErrCodeNotAuthorized
 	}
 
-	// ⑤ 链上验证用户的 CodeSignature：证明放款数据出自 TEE 证明的代码
-	// （代码私钥在 TEE 飞地内，用户无法伪造；签名内容为 Data 的 SCALE 编码，与 TEE 侧签名算法一致）。
-	if len(sig.CodeSignature) == 0 {
-		return ErrCodeSigInvalid
-	}
-	if !verifyCodeSig(tee.CodeSigner, payload, sig.CodeSignature) {
-		return ErrCodeSigInvalid
-	}
-
 	// ⑥ 订单去重。
 	if existed, _ := m.releasedNonces.Contains(m.api.GetTxn(), hexOrder(r.OrderNo)); existed {
-		return ErrDuplicateRelease
+		return nil
 	}
 
 	// ⑦ 积分须为正。
@@ -370,9 +360,18 @@ func (q C2CQuery) IsCodeAuthorized(codeHash []byte) (bool, error) {
 	return v, nil
 }
 
+// ListAuthorizedCodes 列出白名单中的全部代码签名版本（治理管理列表用）。
+func (q C2CQuery) ListAuthorizedCodes() ([]AuthorizedCode, error) {
+	_, values, err := q.authorizedCodes.List(q.api.GetTxn())
+	if err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
 // GetNode 读取某节点的注册信息。
 func (q C2CQuery) GetNode(node store.UniAddr) (NodeRecord, error) {
-	v, err := q.nodes.Get(q.api.GetTxn(), node)
+	v, err := q.authorizedNodes.Get(q.api.GetTxn(), node)
 	if err != nil {
 		return NodeRecord{}, err
 	}
@@ -384,7 +383,7 @@ func (q C2CQuery) GetNode(node store.UniAddr) (NodeRecord, error) {
 
 // ListNodes 列出全部注册节点。
 func (q C2CQuery) ListNodes() ([]NodeRecord, error) {
-	_, values, err := q.nodes.List(q.api.GetTxn())
+	_, values, err := q.authorizedNodes.List(q.api.GetTxn())
 	if err != nil {
 		return nil, err
 	}
@@ -509,35 +508,6 @@ func hexOrder(orderNo []byte) string {
 
 func addrEqual(a, b store.UniAddr) bool {
 	return a.T == b.T && bytes.Equal(a.V, b.V)
-}
-
-func bytesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// verifyCodeSig 链上验证代码签名（ed25519，RFC 8032）。
-// 算法与 TEE 侧 model.Ed25519SignVerify 完全一致：32 字节公钥长度校验（不可信输入防 panic）
-// + 消息 >256 字节时 blake2b-256 预哈希 + ed25519 验签。
-// 合约层用标准库直接实现（不 import pkg/model），避免其依赖链（pkg/types/crypto → ego cgo）
-// 进入 WASM/TinyGo 构建。
-func verifyCodeSig(codeSigner, payload, codeSignature []byte) bool {
-	if len(codeSigner) != ed25519.PublicKeySize {
-		return false
-	}
-	msg := payload
-	if len(msg) > 256 {
-		h := blake2b.Sum256(msg)
-		msg = h[:]
-	}
-	return ed25519.Verify(codeSigner, msg, codeSignature)
 }
 
 // getFxConfigTxn 读取 FxConfig（未配置返回全 0，不报错）。

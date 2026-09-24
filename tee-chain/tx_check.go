@@ -2,8 +2,6 @@ package teechain
 
 import (
 	"bytes"
-	"encoding/hex"
-	"fmt"
 
 	"github.com/computeflux/tee-provider/pkg/chains"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -15,14 +13,14 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	txbox := new(model.Tx)
 	err := protoio.Unmarshal(txbt, txbox)
 	if err != nil {
-		fmt.Println("TeeChain CheckTx protoio.ReadMessage TxBox error")
+		util.LogWarnf("CheckTx encoding error: %v", err)
 		return CodeTypeEncodingError
 	}
 
 	_, err = model.VerifyTxSigner(txbox)
 	// 验证交易签名
 	if err != nil {
-		fmt.Println("TeeChain CheckTx VerifyTxSigner error", err)
+		util.LogWarnf("CheckTx VerifyTxSigner error: %v (caller %x, type %d)", err, txbox.GetCaller(), txbox.GetCallerType())
 		return CodeTypeInvalidTxFormat
 	}
 
@@ -35,13 +33,13 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 			txNonce := contract.GetNonce()
 			expectedNonce := GetNextCallerNonce(txbox.GetCaller(), txbox.GetCallerType())
 			if txNonce != expectedNonce {
-				util.LogWithYellow("CHECK TX", "invalid nonce: expected ", expectedNonce, "got ", txNonce, " (caller ", hex.EncodeToString(txbox.GetCaller()), ", type ", txbox.GetCallerType(), ")")
+				util.LogWarnf("CheckTx invalid nonce: expected %d got %d (caller %x, type %d)", expectedNonce, txNonce, txbox.GetCaller(), txbox.GetCallerType())
 				return CodeInvalidNode
 			}
 
 			err := app.ContractDryRun(txbox.Caller, txbox.CallerType, contract)
 			if err != nil {
-				util.LogWithYellow("CHECK TX", "DryRun error", err.Error())
+				util.LogWarnf("CheckTx DryRun error: %v (caller %x, type %d)", err, txbox.Caller, txbox.CallerType)
 				return CodeInvalidNode
 			}
 		}
@@ -50,7 +48,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 	// 验证节点之间的数据交换需要验证彼此的节点ID
 	if txbox.CallerType == 0 {
 		if len(txbox.Caller) == 0 {
-			fmt.Println("invalid node caller is nil")
+			util.LogWarnf("CheckTx invalid node caller is nil (type %d)", txbox.GetCallerType())
 			return CodeInvalidNode
 		}
 
@@ -62,7 +60,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 
 		keys, err := chains.MainChain.GetValidatorList()
 		if err != nil {
-			fmt.Println("invalid node: get validator list error", err)
+			util.LogWarnf("CheckTx get validator list error: %v (caller %x)", err, txbox.Caller)
 			return CodeInvalidNode
 		}
 
@@ -75,7 +73,7 @@ func (app *TeeChain) checkTx(txbt []byte) uint32 {
 		}
 
 		if !isIn {
-			fmt.Println("invalid node is not validator")
+			util.LogWarnf("CheckTx caller %x is not validator", txbox.Caller)
 			return CodeInvalidNode
 		}
 	}

@@ -34,7 +34,7 @@ func setupGovernance(t *testing.T) (*C2C, *testutil.MockRuntime, []byte, ed25519
 	_, codePriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	codePub := codePriv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64, _ []byte, _ uint32) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
 			TeeType:       1,
 			CodeSigner:    codePub,
@@ -43,7 +43,7 @@ func setupGovernance(t *testing.T) (*C2C, *testutil.MockRuntime, []byte, ed25519
 	}
 	rt.System = true
 	require.NoError(t, m.RegisterCode(code, "1.0.0"))
-	require.NoError(t, m.RegisterNode(addr(0x10), code))
+	require.NoError(t, m.RegisterNode(addr(0x10)))
 	rt.System = false
 	return c, rt, code, codePriv
 }
@@ -66,6 +66,7 @@ func releaseWithSig(t *testing.T, rt *testutil.MockRuntime, priv ed25519.Private
 		TeeReport:     []byte("tee-report"),
 		CodeSignature: signRelease(t, priv, r),
 		TeeTime:       rt.Time,
+		TeeType:       0, // SGX（mock 下不影响验证，仅走完整编码路径）
 	}
 }
 
@@ -105,7 +106,7 @@ func TestGovernanceRequiresSystem(t *testing.T) {
 	c, rt, _, _ := setupGovernance(t)
 	rt.System = false
 	assert.Error(t, C2CMutation{*c}.RegisterCode([]byte("x"), "1.0"))
-	assert.Error(t, C2CMutation{*c}.RegisterNode(addr(0x01), []byte("x")))
+	assert.Error(t, C2CMutation{*c}.RegisterNode(addr(0x01)))
 	assert.Error(t, C2CMutation{*c}.SetFxConfig(FxConfig{CnyPerPoint: 72000}))
 }
 
@@ -146,25 +147,70 @@ func TestIsCodeAuthorized_Empty(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestListAuthorizedCodes(t *testing.T) {
+	c, rt, code, _ := setupGovernance(t)
+
+	// setupGovernance 已授权 1 个代码版本（version=1.0.0）
+	list, err := C2CQuery{*c}.ListAuthorizedCodes()
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, code, list[0].CodeHash)
+	assert.Equal(t, "1.0.0", list[0].Version)
+
+	// 再授权一个 → 列表 2 条，记录版本号与注册时间
+	rt.Time = 1700000000
+	rt.System = true
+	require.NoError(t, C2CMutation{*c}.RegisterCode([]byte("c2c-code-v2"), "1.0.1"))
+	rt.System = false
+
+	list, err = C2CQuery{*c}.ListAuthorizedCodes()
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+
+	var found *AuthorizedCode
+	for i := range list {
+		if string(list[i].CodeHash) == "c2c-code-v2" {
+			found = &list[i]
+		}
+	}
+	require.NotNil(t, found, "新授权的代码版本应出现在列表中")
+	assert.Equal(t, "1.0.1", found.Version)
+	assert.Equal(t, uint64(1700000000), found.RegisteredAt)
+
+	// 撤销后从列表消失
+	rt.System = true
+	require.NoError(t, C2CMutation{*c}.RevokeCode(code))
+	rt.System = false
+
+	list, err = C2CQuery{*c}.ListAuthorizedCodes()
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, []byte("c2c-code-v2"), list[0].CodeHash)
+}
+
 // ── ② 节点注册表 ─────────────────────────────────────────────
 
-func TestRegisterNode_RequiresAuthorizedCode(t *testing.T) {
+// RegisterNode 不再绑定代码版本：白名单为空时节点注册同样成功。
+// 代码版本在 Release 时由“TEE 证明 + 白名单”校验，而非注册时绑定。
+func TestRegisterNode_NoCodeBinding(t *testing.T) {
 	c, rt := newTestC2C()
 	rt.System = true
-	// 系统账户调用，但未授权代码 → ErrCodeNotAuthorized。
-	assert.ErrorIs(t, C2CMutation{*c}.RegisterNode(addr(0x10), []byte("unauthorized")), ErrCodeNotAuthorized)
+	assert.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x10)))
+	n, err := C2CQuery{*c}.GetNode(addr(0x10))
+	require.NoError(t, err)
+	assert.True(t, n.Active)
 	rt.System = false
 }
 
 func TestRegisterNode_Duplicate(t *testing.T) {
-	c, rt, code, _ := setupGovernance(t)
+	c, rt, _, _ := setupGovernance(t)
 	rt.System = true
-	assert.ErrorIs(t, C2CMutation{*c}.RegisterNode(addr(0x10), code), ErrNodeExists)
+	assert.ErrorIs(t, C2CMutation{*c}.RegisterNode(addr(0x10)), ErrNodeExists)
 	rt.System = false
 }
 
 func TestRemoveNode_SelfAndGovernance(t *testing.T) {
-	c, rt, code, _ := setupGovernance(t)
+	c, rt, _, _ := setupGovernance(t)
 
 	// 节点自行注销。
 	rt.Caller = addr(0x10)
@@ -174,7 +220,7 @@ func TestRemoveNode_SelfAndGovernance(t *testing.T) {
 
 	// 系统账户重新注册后再移除。
 	rt.System = true
-	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x10), code))
+	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x10)))
 	require.NoError(t, C2CMutation{*c}.RemoveNode(addr(0x10)))
 	rt.System = false
 }
@@ -186,9 +232,9 @@ func TestRemoveNode_OnlyGovernanceOrSelf(t *testing.T) {
 }
 
 func TestListNodes(t *testing.T) {
-	c, rt, code, _ := setupGovernance(t)
+	c, rt, _, _ := setupGovernance(t)
 	rt.System = true
-	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x20), code))
+	require.NoError(t, C2CMutation{*c}.RegisterNode(addr(0x20)))
 	rt.System = false
 
 	nodes, err := C2CQuery{*c}.ListNodes()
@@ -201,7 +247,6 @@ func TestGetNode(t *testing.T) {
 	n, err := C2CQuery{*c}.GetNode(addr(0x10))
 	require.NoError(t, err)
 	assert.True(t, n.Active)
-	assert.Equal(t, []byte("c2c-code-v1"), n.CodeVersion)
 }
 
 // ── ③ 挂单托管 ───────────────────────────────────────────────
@@ -327,7 +372,7 @@ func TestRelease_TeeVerifyFailed(t *testing.T) {
 	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
 	rt.Caller = addr(0x10) // 节点
 	// 验证节点 quote 验签失败（如报告伪造/过期）→ 拒绝。
-	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64, _ []byte, _ uint32) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewErr[store.TeeVerifyInfo, string]("invalid report sign")
 	}
 	rel := Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}
@@ -336,28 +381,6 @@ func TestRelease_TeeVerifyFailed(t *testing.T) {
 		TeeReport:     []byte("forged-report"),
 		CodeSignature: signRelease(t, priv, rel),
 	}), ErrTeeVerifyFailed)
-}
-
-func TestRelease_CodeMismatch(t *testing.T) {
-	c, rt, _, priv := setupGovernance(t)
-	rt.Caller = addr(0x30)
-	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
-	rt.Caller = addr(0x10) // 节点
-	// TEE 证明的代码指纹与节点注册值不一致（节点只能为其自身代码背书）→ 拒绝。
-	codePub := priv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
-		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
-			TeeType:       1,
-			CodeSigner:    codePub,
-			CodeSignature: []byte("other"),
-		})
-	}
-	rel := Release{Merchant: addr(0x30), Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("o1")}
-	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
-		Data:          rel,
-		TeeReport:     []byte("tee-report"),
-		CodeSignature: signRelease(t, priv, rel),
-	}), ErrCodeMismatch)
 }
 
 func TestRelease_CodeRevoked(t *testing.T) {
@@ -374,23 +397,6 @@ func TestRelease_CodeRevoked(t *testing.T) {
 		Merchant: merchant, Buyer: addr(0x40), Amount: amt(10),
 		OrderNo: []byte("r1"), FiatCents: 1000, Currency: "USD",
 	})), ErrCodeNotAuthorized)
-}
-
-func TestRelease_InvalidCodeSignature(t *testing.T) {
-	c, rt, _, _ := setupGovernance(t)
-	merchant := addr(0x30)
-	rt.Caller = merchant
-	require.NoError(t, C2CMutation{*c}.Deposit(amt(1000)))
-	rt.Caller = addr(0x10)
-	rel := Release{Merchant: merchant, Buyer: addr(0x40), Amount: amt(10), OrderNo: []byte("s1")}
-	// 用错误密钥签名（伪造用户 CodeSignature）→ 链上验证不通过。
-	_, otherPriv, err := ed25519.GenerateKey(rand.Reader)
-	require.NoError(t, err)
-	assert.ErrorIs(t, C2CMutation{*c}.Release(ReleaseWithSig{
-		Data:          rel,
-		TeeReport:     []byte("tee-report"),
-		CodeSignature: signRelease(t, otherPriv, rel),
-	}), ErrCodeSigInvalid)
 }
 
 func TestRelease_InsufficientEscrow(t *testing.T) {

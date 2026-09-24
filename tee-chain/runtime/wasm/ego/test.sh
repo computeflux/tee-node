@@ -73,7 +73,7 @@ echo ""
 echo "=========================================="
 echo " 3/5 ego-go build ..."
 echo "=========================================="
-( cd "$SCRIPT_DIR" && ego-go build -o ego . )
+( cd "$SCRIPT_DIR" && GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ego . )
 echo "  ✓ built: $SCRIPT_DIR/ego"
 
 # ── 4. ego sign ────────────────────────────────────────────

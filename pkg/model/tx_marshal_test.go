@@ -63,6 +63,33 @@ func TestProtoioWriteMessageRoundTrip(t *testing.T) {
 	require.Equal(t, uint32(9), restored.ChainId)
 }
 
+func assertVTMarshaler[T protoio.VTMarshaler](_ T) {}
+
+// TestProtoioMarshalVT_OneofWrapper 回归：vtproto 不对 oneof 包装消息生成
+// MarshalVT()（只有 SizeVT + MarshalToVT），VTMarshaler 接口若要求它，
+// SgxIssue/SgxVerify 等对 call.Tx（如 *TeeCall_Text）的 protoio.MarshalVT
+// 会报 "unsupported tee tx type"。
+func TestProtoioMarshalVT_OneofWrapper(t *testing.T) {
+	// 编译期：TeeCall 全部 oneof 包装类型须满足 VTMarshaler。
+	assertVTMarshaler((*TeeCall_PodStart)(nil))
+	assertVTMarshaler((*TeeCall_PodMint)(nil))
+	assertVTMarshaler((*TeeCall_BridgeCall)(nil))
+	assertVTMarshaler((*TeeCall_Text)(nil))
+	assertVTMarshaler((*TeeCall_UploadSecret)(nil))
+	assertVTMarshaler((*TeeCall_InitDisk)(nil))
+
+	w := &TeeCall_Text{Text: []byte("abc")}
+	data, err := protoio.MarshalVT(w)
+	require.NoError(t, err)
+	// field 8、length-delimited：[0x42][varint 长度][text]
+	require.Equal(t, []byte{0x42, 0x03, 'a', 'b', 'c'}, data)
+
+	// 与外层 TeeCall 的 oneof 段字节一致（quote 签名两端编码必须逐字节相同）。
+	full, err := protoio.MarshalVT(&TeeCall{Tx: w})
+	require.NoError(t, err)
+	require.Equal(t, full, data)
+}
+
 func TestProtoioErrors(t *testing.T) {
 	_, err := protoio.Marshal(nil)
 	require.Error(t, err)

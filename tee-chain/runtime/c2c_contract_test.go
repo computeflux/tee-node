@@ -46,7 +46,7 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 	rt.System = true
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
 
-	call = &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("register_node"), Args: [][]byte{c2cScale(t, c2cAddr(0x10)), c2cScale(t, code)}}
+	call = &store.InContractCall{Name: []byte("c2c"), Method: store.MethodToSelectorBytes("register_node"), Args: [][]byte{c2cScale(t, c2cAddr(0x10))}}
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))
 	rt.System = false
 
@@ -56,7 +56,7 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 	_, codePriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	codePub := codePriv.Public().(ed25519.PublicKey)
-	rt.VerifyTEEFunc = func(_, _ []byte, _ int64) store.Result[store.TeeVerifyInfo, string] {
+	rt.VerifyTEEFunc = func(_, _ []byte, _ int64, _ []byte, _ uint32) store.Result[store.TeeVerifyInfo, string] {
 		return store.NewOk[store.TeeVerifyInfo, string](store.TeeVerifyInfo{
 			TeeType:       1,
 			CodeSigner:    codePub,
@@ -83,6 +83,7 @@ func TestC2C_Dispatch_EndToEnd(t *testing.T) {
 		Data:          rel,
 		TeeReport:     []byte("tee-report"),
 		CodeSignature: codeSig,
+		TeeType:       0, // SGX（mock 下不影响验证，仅走完整编码路径）
 	})}}
 	rt.Caller = c2cAddr(0x10)
 	require.NoError(t, Mutation(module.NativeVersion, call, rt))

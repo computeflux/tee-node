@@ -18,7 +18,7 @@ mv runtime.wasm.tmp runtime.wasm
 echo ">>> 完成: $(ls -lh runtime.wasm | awk '{print $5}')"
 gzip -9 -k -f runtime.wasm
 echo ">>> gzip: $(ls -lh runtime.wasm.gz | awk '{print $5}')"
-echo ">>> 导出: $(strings runtime.wasm | grep -E '^(ping|execute|get_buffer|memory|_initialize)$' | sort -u | tr '\n' ' ')"
+echo ">>> 导出: $(strings runtime.wasm | grep -E '^(ping|execute|get_buffer|alloc|memory|_initialize)$' | sort -u | tr '\n' ' ')"
 
 # ── 开发构建（保留 panic 信息，便于调试）──
 # tinygo build -target=wasi -no-debug -gc=leaking -o runtime.wasm ./

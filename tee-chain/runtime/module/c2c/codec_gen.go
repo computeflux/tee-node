@@ -5,9 +5,49 @@ package c2c
 import (
 	"encoding/binary"
 	"fmt"
-
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
+
+// Encode SCALE 编码 AuthorizedCode。
+func (v *AuthorizedCode) Encode() ([]byte, error) {
+	var buf []byte
+	buf = store.EncodeCompact(buf, uint64(len(v.CodeHash)))
+	buf = append(buf, v.CodeHash...)
+	buf = store.EncodeCompact(buf, uint64(len(v.Version)))
+	buf = append(buf, v.Version...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.RegisteredAt))
+	return buf, nil
+}
+
+// Decode SCALE 解码 AuthorizedCode。
+func (v *AuthorizedCode) Decode(data []byte) (int, error) {
+	off := 0
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeHash")
+		}
+		v.CodeHash = make([]byte, n)
+		copy(v.CodeHash, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading Version")
+		}
+		v.Version = string(data[off : off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading RegisteredAt")
+	}
+	v.RegisteredAt = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
 
 // Encode SCALE 编码 BuyerDaily。
 func (v *BuyerDaily) Encode() ([]byte, error) {
@@ -89,8 +129,6 @@ func (v *FxConfig) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 NodeRecord。
 func (v *NodeRecord) Encode() ([]byte, error) {
 	var buf []byte
-	buf = store.EncodeCompact(buf, uint64(len(v.CodeVersion)))
-	buf = append(buf, v.CodeVersion...)
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.RegisteredAt))
 	if v.Active {
 		buf = append(buf, 1)
@@ -103,16 +141,6 @@ func (v *NodeRecord) Encode() ([]byte, error) {
 // Decode SCALE 解码 NodeRecord。
 func (v *NodeRecord) Decode(data []byte) (int, error) {
 	off := 0
-	{
-		n, sz := store.DecodeCompact(data[off:])
-		off += sz
-		if off+int(n) > len(data) {
-			return 0, fmt.Errorf("EOF reading CodeVersion")
-		}
-		v.CodeVersion = make([]byte, n)
-		copy(v.CodeVersion, data[off:off+int(n)])
-		off += int(n)
-	}
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading RegisteredAt")
 	}
@@ -152,62 +180,6 @@ func (v *Release) Encode() ([]byte, error) {
 	return buf, nil
 }
 
-// Encode SCALE 编码 ReleaseWithSig。
-func (v *ReleaseWithSig) Encode() ([]byte, error) {
-	var buf []byte
-	{
-		b, err := v.Data.Encode()
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, b...)
-	}
-	buf = store.EncodeCompact(buf, uint64(len(v.TeeReport)))
-	buf = append(buf, v.TeeReport...)
-	buf = store.EncodeCompact(buf, uint64(len(v.CodeSignature)))
-	buf = append(buf, v.CodeSignature...)
-	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TeeTime))
-	return buf, nil
-}
-
-// Decode SCALE 解码 ReleaseWithSig。
-func (v *ReleaseWithSig) Decode(data []byte) (int, error) {
-	off := 0
-	{
-		n, err := v.Data.Decode(data[off:])
-		if err != nil {
-			return 0, err
-		}
-		off += n
-	}
-	{
-		n, sz := store.DecodeCompact(data[off:])
-		off += sz
-		if off+int(n) > len(data) {
-			return 0, fmt.Errorf("EOF reading TeeReport")
-		}
-		v.TeeReport = make([]byte, n)
-		copy(v.TeeReport, data[off:off+int(n)])
-		off += int(n)
-	}
-	{
-		n, sz := store.DecodeCompact(data[off:])
-		off += sz
-		if off+int(n) > len(data) {
-			return 0, fmt.Errorf("EOF reading CodeSignature")
-		}
-		v.CodeSignature = make([]byte, n)
-		copy(v.CodeSignature, data[off:off+int(n)])
-		off += int(n)
-	}
-	if off+8 > len(data) {
-		return 0, fmt.Errorf("EOF reading TeeTime")
-	}
-	v.TeeTime = int64(binary.LittleEndian.Uint64(data[off:]))
-	off += 8
-	return off, nil
-}
-
 // Decode SCALE 解码 Release。
 func (v *Release) Decode(data []byte) (int, error) {
 	off := 0
@@ -243,7 +215,6 @@ func (v *Release) Decode(data []byte) (int, error) {
 	}
 	{
 		n, err := v.Amount.Decode(data[off:])
-		v.Amount.Decode(data[off:])
 		if err != nil {
 			return 0, err
 		}
@@ -283,5 +254,67 @@ func (v *Release) Decode(data []byte) (int, error) {
 	}
 	v.FeePct = int64(binary.LittleEndian.Uint64(data[off:]))
 	off += 8
+	return off, nil
+}
+
+// Encode SCALE 编码 ReleaseWithSig。
+func (v *ReleaseWithSig) Encode() ([]byte, error) {
+	var buf []byte
+	{
+		b, err := v.Data.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
+	}
+	buf = store.EncodeCompact(buf, uint64(len(v.TeeReport)))
+	buf = append(buf, v.TeeReport...)
+	buf = store.EncodeCompact(buf, uint64(len(v.CodeSignature)))
+	buf = append(buf, v.CodeSignature...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TeeTime))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.TeeType))
+	return buf, nil
+}
+
+// Decode SCALE 解码 ReleaseWithSig。
+func (v *ReleaseWithSig) Decode(data []byte) (int, error) {
+	off := 0
+	{
+		n, err := v.Data.Decode(data[off:])
+		if err != nil {
+			return 0, err
+		}
+		off += n
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading TeeReport")
+		}
+		v.TeeReport = make([]byte, n)
+		copy(v.TeeReport, data[off:off+int(n)])
+		off += int(n)
+	}
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading CodeSignature")
+		}
+		v.CodeSignature = make([]byte, n)
+		copy(v.CodeSignature, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TeeTime")
+	}
+	v.TeeTime = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading TeeType")
+	}
+	v.TeeType = binary.LittleEndian.Uint32(data[off:])
+	off += 4
 	return off, nil
 }

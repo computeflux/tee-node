@@ -203,16 +203,16 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 	}
 
 	// Get the WASM-side buffer address for writing call data
-	// 获取 WASM 端缓冲区地址
-	bufPtr, err := getWasmBuffer(ctx, instance)
+	// 获取写入调用数据的 WASM 内存地址（新版 wasm 用 alloc 按需分配，旧版 fallback 到固定 buf）
+	bufPtr, err := getCallBuffer(ctx, instance, len(callData))
 	if err != nil {
-		return nil, fmt.Errorf("wasm get_buffer: %w", err)
+		return nil, fmt.Errorf("wasm get_call_buffer: %w", err)
 	}
 
 	// Write SCALE-encoded call data into WASM linear memory
 	// 将 SCALE 编码写入 WASM 线性内存
 	if !instance.Memory().Write(bufPtr, callData) {
-		return nil, fmt.Errorf("wasm: failed to write call data to memory")
+		return nil, fmt.Errorf("wasm: failed to write call data to memory (callData=%d bytes, bufPtr=%d, memory=%d bytes)", len(callData), bufPtr, instance.Memory().Size())
 	}
 
 	// Call execute(isQuery, dataPtr, dataLen)
@@ -240,6 +240,35 @@ func (e *Engine) executeWasmCall(version uint32, call store.ContractCall, api st
 		return nil, fmt.Errorf("wasm: failed to read result from memory")
 	}
 	return copyBytes(result), nil
+}
+
+// wasmBufLimit 旧版 wasm 固定缓冲区的大小（main.go 的 bufSize，128KB）。
+// 旧版 wasm 没有 alloc 导出：payload 超过 128KB 若写入固定 buf 会溢出到
+// TinyGo 堆区损坏堆元数据（→ unreachable trap）。对旧版 wasm 超限 payload
+// 直接报清晰错误，而不是静默写穿。
+const wasmBufLimit = 128 * 1024
+
+// getCallBuffer 获取写入调用数据（callData）的 wasm 内存地址：
+//  1. 新版 wasm（导出 alloc）：alloc(len) 动态分配，支持任意大小 payload
+//     （TinyGo 堆不足时自动 memory.grow；每次调用新建实例、Close 后内存释放，无累积）；
+//  2. 旧版 wasm（无 alloc）：fallback 到固定 128KB buf（get_buffer），
+//     payload 超过 128KB 直接返回错误（≤128KB 恰好装入 buf，不会触碰堆区）。
+func getCallBuffer(ctx context.Context, mod wazapi.Module, dataLen int) (uint32, error) {
+	if fn := mod.ExportedFunction("alloc"); fn != nil {
+		results, err := fn.Call(ctx, uint64(dataLen))
+		if err != nil {
+			return 0, err
+		}
+		ptr := uint32(results[0])
+		if ptr == 0 && dataLen > 0 {
+			return 0, fmt.Errorf("alloc(%d) returned 0", dataLen)
+		}
+		return ptr, nil
+	}
+	if dataLen > wasmBufLimit {
+		return 0, fmt.Errorf("call data %d bytes exceeds old wasm fixed buffer limit %d bytes (this wasm version has no alloc export); upgrade the on-chain runtime first", dataLen, wasmBufLimit)
+	}
+	return getWasmBuffer(ctx, mod)
 }
 
 // getWasmBuffer calls the WASM module's exported get_buffer function

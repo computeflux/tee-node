@@ -62,7 +62,7 @@ type MockRuntime struct {
 	Sudo          store.UniAddr
 	System        bool
 	CallFunc      func(store.UniAddr, store.ContractCall) ([]byte, error)
-	VerifyTEEFunc func(report, data []byte, t int64) store.Result[store.TeeVerifyInfo, string]
+	VerifyTEEFunc func(report, data []byte, t int64, caller []byte, teeType uint32) store.Result[store.TeeVerifyInfo, string]
 }
 
 var _ store.ContractApi = (*MockRuntime)(nil)
@@ -83,9 +83,9 @@ func (r *MockRuntime) Call(target store.UniAddr, call store.ContractCall) ([]byt
 	}
 	return nil, nil
 }
-func (r *MockRuntime) VerifyTEE(report, data []byte, t int64) store.Result[store.TeeVerifyInfo, string] {
+func (r *MockRuntime) VerifyTEE(report, data []byte, t int64, caller []byte, teeType uint32) store.Result[store.TeeVerifyInfo, string] {
 	if r.VerifyTEEFunc != nil {
-		return r.VerifyTEEFunc(report, data, t)
+		return r.VerifyTEEFunc(report, data, t, caller, teeType)
 	}
 	// 默认 fail-closed：未配置验证函数时视为验证失败。
 	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not configured")

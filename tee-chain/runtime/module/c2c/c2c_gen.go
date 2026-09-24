@@ -54,18 +54,14 @@ func (d C2CMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.RegisterCode(codeHash, version)
 	case [4]byte{0x45, 0xa6, 0x7c, 0xc6}:
-		if err := store.RequireArgLen(args, 2, "register_node"); err != nil {
+		if err := store.RequireArgLen(args, 1, "register_node"); err != nil {
 			return err
 		}
 		node, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
 		if err != nil {
 			return fmt.Errorf("register_node: node: %w", err)
 		}
-		codeHash, err := store.DecodeScaleArgBytes[[]byte](args[1])
-		if err != nil {
-			return fmt.Errorf("register_node: codeHash: %w", err)
-		}
-		return m.RegisterNode(node, codeHash)
+		return m.RegisterNode(node)
 	case [4]byte{0x8a, 0x1c, 0x02, 0x72}:
 		if err := store.RequireArgLen(args, 1, "release"); err != nil {
 			return err
@@ -210,6 +206,12 @@ func (q C2CQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 			return nil, err
 		}
 		return store.ScaleEncode(out)
+	case [4]byte{0x4a, 0x0c, 0xc9, 0x17}:
+		out, err := q.ListAuthorizedCodes()
+		if err != nil {
+			return nil, err
+		}
+		return store.ScaleEncode(out)
 	case [4]byte{0x9a, 0xa5, 0x98, 0xec}:
 		out, err := q.ListNodes()
 		if err != nil {
@@ -224,8 +226,8 @@ func (q C2CQuery) ExecQuery(call store.ContractCall) ([]byte, error) {
 func NewC2C(api store.ContractApi) *C2C {
 	return &C2C{
 		api:             api,
-		authorizedCodes: &store.StoreMapping[string, bool]{Namespace: "c2c", KeyPrefix: "authorized_code_"},
-		nodes:           &store.StoreMapping[store.UniAddr, NodeRecord]{Namespace: "c2c", KeyPrefix: "node_"},
+		authorizedCodes: &store.StoreMapping[string, AuthorizedCode]{Namespace: "c2c", KeyPrefix: "v2_authorized_codes_"},
+		authorizedNodes: &store.StoreMapping[store.UniAddr, NodeRecord]{Namespace: "c2c", KeyPrefix: "authorized_node_"},
 		merchantEscrow:  &store.StoreMapping[store.UniAddr, store.Amount]{Namespace: "c2c", KeyPrefix: "merchant_escrow_"},
 		releasedNonces:  &store.StoreMapping[string, bool]{Namespace: "c2c", KeyPrefix: "released_nonce_"},
 		fxConfig:        &store.StoreValue[FxConfig]{Namespace: "c2c", Key: "fx_config"},
@@ -243,5 +245,6 @@ var MethodMap = map[[4]byte]string{
 	[4]byte{0x36, 0xed, 0x9e, 0x8c}: "get_node",
 	[4]byte{0x66, 0x68, 0x79, 0x68}: "get_platform_commission",
 	[4]byte{0x00, 0xda, 0xb4, 0xd6}: "is_code_authorized",
+	[4]byte{0x4a, 0x0c, 0xc9, 0x17}: "list_authorized_codes",
 	[4]byte{0x9a, 0xa5, 0x98, 0xec}: "list_nodes",
 }

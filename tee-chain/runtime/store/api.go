@@ -40,9 +40,11 @@ type ContractApi interface {
 	// 如放款数据 Release 的 SCALE 编码）——quote 绑定 [Time || Caller || marshal(Tx)]；
 	// t 为节点签发 quote 时的时间戳（与节点签名内容中的 Time 同值，用户无法伪造——
 	// 伪造需持有 TEE 内私钥），运行时校验其与区块时间的偏差在窗口内（防旧 quote 重放）。
-	// Caller/TeeType 由运行时从执行上下文补齐（用户不可伪造）。
+	// caller 为报告签发者公钥（即发起交易的验证节点，quote 绑定的 Caller，须与其交易签名密钥一致）；
+	// teeType 为报告签发节点的 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE），由合约显式传入，
+	// VerifyReport 据此分发验签分支（类型与 quote 不符时硬件验签失败，fail-closed）。
 	// 成功返回 Ok 携带 TEE 证明代码三要素（TeeType/CodeSigner/CodeSignature），失败返回 Err 携带错误信息。
-	VerifyTEE(report, data []byte, t int64) Result[TeeVerifyInfo, string]
+	VerifyTEE(report, data []byte, t int64, caller []byte, teeType uint32) Result[TeeVerifyInfo, string]
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
 }

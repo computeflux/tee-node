@@ -132,7 +132,10 @@ ensure_chain_data_link() {
 ensure_chain_data_link "$NODE_CHAIN_DIR" || exit 1
 
 # build binary
-ego-go build -o ./hack/build/dsecret ./main.go
+# 注意: ego-go 自带一套 patch 过的 Go 工具链（/opt/ego/go，当前 go1.26.1），
+# 与系统 go（如 1.26.6）共用同一个 build cache 时会混入不兼容的目标文件，
+# 链接时报 "invalid relocation ... not in [0,N)"。这里用独立 GOCACHE 隔离。
+GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
 
 # sign binary
 cd ./hack/build/
@@ -174,6 +177,18 @@ sudo tee /etc/systemd/system/tee-node0.service.d/no-rebuild.conf >/dev/null <<'E
 [Service]
 ExecStartPre=
 ExecStartPre=+/bin/bash -c 'mkdir -p /srv/token_node0/token_chain_data && rm -f /token_chain_data && ln -s /srv/token_node0/token_chain_data /token_chain_data'
+EOF
+sudo systemctl daemon-reload
+
+# ── sgx 验证服务地址 ──
+# 统一用本地服务器的公网地址（服务监听 0.0.0.0:8004），可用 SVS_HOST 覆盖。
+# 需 DNS/DDNS 指向本机公网 IP + 路由器做 8004 端口映射才能通。
+SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
+echo "Configuring SGX verify service URL (http://$SVS_HOST:8004) ..."
+sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+sudo tee /etc/systemd/system/tee-node0.service.d/svs.conf >/dev/null <<EOF
+[Service]
+Environment="SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004"
 EOF
 sudo systemctl daemon-reload
 

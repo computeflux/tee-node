@@ -30,6 +30,10 @@
         {
             "name": "CHAIN_ENV",
             "fromHost": true
+        },
+        {
+            "name": "SGX_VERIFY_SERVICE_URL",
+            "fromHost": true
         }
     ],
     "files": [

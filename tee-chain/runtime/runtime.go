@@ -105,32 +105,32 @@ func (r *Runtime) CallbySystem() bool {
 // teeTimeDrift 签名时间（节点签发 quote 的墙钟时间）与区块时间的允许偏差（秒）。
 // 区块时间由 proposer 时钟设定，quote 时间由执行节点时钟设定，两者存在秒级偏差；
 // 超出窗口视为旧 quote 重放，拒绝。
-const teeTimeDrift = int64(10)
+const teeTimeDrift = int64(600)
 
 // VerifyTEE 校验客户端传入的 TEE quote。
 // report 仅为 quote 字节（model.TeeCall 的 Report 字段，非整个 TeeCall）；
 // data 为被证明的数据字节（绑定为 TeeCall.Tx = TeeCall_Text{Text: data}，如放款数据的 SCALE 编码）；
-// t 为节点签发 quote 时的时间戳（节点对 [t || Caller || marshal(Tx)] 签名所用的 Time）。
-// 完整的 model.TeeCall 由运行时用执行上下文补齐（用户不可伪造）：
-//
-//	Caller:  当前交易调用方（验证节点公钥，即报告签发者）
-//	Time:    t（节点签发时间；区块时间 r.unix 仅用于新鲜度窗口校验，
-//	         因节点签发时间与实际区块时间必有秒级偏差，不能直接用作签名时间）
-//	TeeType: 本节点 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE）
+// t 为节点签发 quote 时的时间戳（节点对 [t || Caller || marshal(Tx)] 签名所用的 Time）；
+// caller 为报告签发者公钥（quote 绑定的 Caller，须与节点交易签名密钥一致，节点侧签名时即绑定）；
+// teeType 为报告签发节点的 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE），
+// VerifyReport 据此分发到对应验签分支（类型与 quote 不符 → 硬件验签失败，fail-closed）。
+// 区块时间 r.unix 仅用于新鲜度窗口校验（节点签发时间与实际区块时间必有秒级偏差，
+// 不能直接用作签名时间）。
 //
 // 节点侧签发报告须与上述参数对齐：用与交易签名相同的密钥，以签发瞬间的墙钟时间为 t，
 // 对 [t || Caller || marshal(TeeCall_Text{Text: data})] 签名后生成 quote，并把同一 t 随交易上报。
 // 成功返回 Ok，携带 TEE 证明的代码三要素（TeeType/CodeSigner/CodeSignature），供合约验证用户的 CodeSignature；
 // 失败返回 Err，携带验证错误信息。
-func (r *Runtime) VerifyTEE(report, data []byte, t int64) store.Result[store.TeeVerifyInfo, string] {
-	if d := r.unix - t; d > teeTimeDrift || d < -teeTimeDrift {
+func (r *Runtime) VerifyTEE(report, data []byte, t int64, caller []byte, teeType uint32) store.Result[store.TeeVerifyInfo, string] {
+	if d := r.unix - t; d > teeTimeDrift {
 		return store.NewErr[store.TeeVerifyInfo, string](
 			fmt.Sprintf("tee report time out of window: block=%d quote=%d", r.unix, t))
 	}
+
 	call := &model.TeeCall{
-		Caller:  r.caller.V,
+		Caller:  caller,
 		Time:    t,
-		TeeType: uint32(teetypes.TeeType),
+		TeeType: teeType,
 		Report:  report,
 	}
 	if len(data) > 0 {

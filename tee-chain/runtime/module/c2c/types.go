@@ -5,13 +5,21 @@ import (
 )
 
 // NodeRecord 验证节点记录（以节点地址为 key 存储）。
-// CodeVersion 为该节点被授权运行的 c2c 代码指纹（TEE 测量值 / 签名）；
-// release 时节点只能为其自身注册的 CodeVersion 背书，确保“节点运行的代码 ∈ 白名单”。
+// 注册不绑定代码版本；release 时代码版本由 TEE 证明 + 白名单校验（见 c2c.go Release）。
 // scale-codec-gen:generate
 type NodeRecord struct {
-	CodeVersion  []byte
 	RegisteredAt uint64
 	Active       bool
+}
+
+// AuthorizedCode 代码签名版本白名单记录（以 hex(codeHash) 为 key 存储）。
+// Release 时用 TEE 证明返回的 CodeSignature 在此表命中即视为授权。
+// 保留 Version/RegisteredAt 供治理管理列表展示。
+// scale-codec-gen:generate
+type AuthorizedCode struct {
+	CodeHash     []byte
+	Version      string
+	RegisteredAt uint64
 }
 
 // FxConfig 经济策略配置（治理写入，链上权威源）。所有数值整数缩放（ABI 不支持 float）。
@@ -46,7 +54,6 @@ type BuyerDaily struct {
 //	Merchant    商户（其 escrow 被扣减）
 //	Buyer       买方（接收 AI，扣佣金）
 //	Amount      放款 AI（积分）数量（从商户 escrow 全额扣减）
-//	CodeVersion 处理该交易的 c2c 代码指纹（须与节点注册值一致且已在白名单）
 //	OrderNo      订单号（去重 + 审计）
 //	FiatCents    买家实付法币（分）：合约据此校验折算
 //	Currency     币种 USD/CNY
@@ -78,6 +85,9 @@ type Release struct {
 //	              （私钥在 TEE 飞地内，用户无法伪造）
 //	TeeTime       节点签发 quote 时的时间戳（秒），即节点对 [Time || Caller || Text] 签名中的 Time：
 //	              节点侧与 quote 内嵌时间戳同值；合约校验其与区块时间的偏差在窗口内（防旧 quote 重放）
+//	TeeType       报告签发节点的 TEE 类型（0=SGX, 1=SEV-SNP, 2=TDX, 9999=非 TEE）：
+//	              由合约显式传入 VerifyTEE，VerifyReport 据此分发到对应验签分支；
+//	              类型与 quote 实际类型不符时硬件验签失败（fail-closed，无法伪造）
 //
 // scale-codec-gen:generate
 type ReleaseWithSig struct {
@@ -85,4 +95,5 @@ type ReleaseWithSig struct {
 	TeeReport     []byte
 	CodeSignature []byte
 	TeeTime       int64
+	TeeType       uint32
 }

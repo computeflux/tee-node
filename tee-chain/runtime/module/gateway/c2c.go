@@ -40,7 +40,7 @@ func (g GatewaySecret) WithdrawToC2C(merchant store.UniAddr, amount uint64) erro
 	return nil
 }
 
-// AddCredit 给买家加 gateway credits（1e-6 分单位）。
+// AddCredit 给买家加 gateway credits（1e-6 分单位），并写入充值历史（与 Recharge 记录格式一致）。
 // 由 c2c 合约 Release 放款后调用（Secret 内部信任，无调用者校验）。
 func (g GatewaySecret) AddCredit(user store.UniAddr, amount uint64) error {
 	if amount == 0 {
@@ -52,9 +52,16 @@ func (g GatewaySecret) AddCredit(user store.UniAddr, amount uint64) error {
 		bal = new(uint64)
 	}
 
-	*bal += amount
+	*bal += amount * 10000 // 发币是 0.01 计算的
 	if err := g.credits.Set(g.api.GetTxn(), user, *bal); err != nil {
 		return fmt.Errorf("c2c: credit buyer: %w", err)
 	}
+
+	// 记录充值历史（c2c Release 放款到账，与 GatewayMutation.Recharge 保持一致）
+	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
+		User:   user,
+		Amount: amount * 10000,
+		Time:   g.api.GetBlockTime(),
+	})
 	return nil
 }

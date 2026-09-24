@@ -66,7 +66,7 @@ func (v *InContractCall) Decode(data []byte) (int, error) {
 // Encode SCALE 编码 TeeVerifyInfo。
 func (v *TeeVerifyInfo) Encode() ([]byte, error) {
 	var buf []byte
-	buf = binary.LittleEndian.AppendUint32(buf, v.TeeType)
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.TeeType))
 	buf = EncodeCompact(buf, uint64(len(v.CodeSigner)))
 	buf = append(buf, v.CodeSigner...)
 	buf = EncodeCompact(buf, uint64(len(v.CodeSignature)))
