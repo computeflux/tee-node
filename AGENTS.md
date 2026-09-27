@@ -32,6 +32,7 @@ export SIDE_CHAIN_PORT=61001       # P2P 端口
 export OE_MODE=SIM                # TEE 模式: SIM（开发）/ HW（生产）
 # 邮箱（Web3Auth 服务）: SMTP_HOST/PORT/FROM/USER/PASSWORD，MOCK_EMAIL=true 开发模式控制台打印 OTP
 # OAuth: GOOGLE/GITHUB/TWITTER_CLIENT_ID/SECRET
+# LOG_API_TOKEN  /api/logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；未设置则端点 404 关闭）
 go run main.go
 go build ./...
 go test ./...

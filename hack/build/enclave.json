@@ -34,6 +34,10 @@
         {
             "name": "SGX_VERIFY_SERVICE_URL",
             "fromHost": true
+        },
+        {
+            "name": "LOG_API_TOKEN",
+            "fromHost": true
         }
     ],
     "files": [

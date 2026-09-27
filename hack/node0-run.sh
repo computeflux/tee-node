@@ -132,14 +132,17 @@ ensure_chain_data_link() {
 ensure_chain_data_link "$NODE_CHAIN_DIR" || exit 1
 
 # build binary
-# 注意: ego-go 自带一套 patch 过的 Go 工具链（/opt/ego/go，当前 go1.26.1），
-# 与系统 go（如 1.26.6）共用同一个 build cache 时会混入不兼容的目标文件，
-# 链接时报 "invalid relocation ... not in [0,N)"。这里用独立 GOCACHE 隔离。
-GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
+ego-go build -o ./hack/build/dsecret ./main.go
 
 # sign binary
 cd ./hack/build/
 ego sign dsecret
+
+# ⚠️ tee-node0.service 的 ExecStart 跑的是 Query-Web3 树的二进制, 不是本树的。
+# 必须把构建产物同步到执行路径, 否则部署不生效(2026-09-27 事故根因)。
+EXEC_BINARY="/home/wetee/work/Query-Web3/tee-node/hack/build/dsecret"
+cp dsecret "$EXEC_BINARY"
+echo "Synced build artifact to exec path: $EXEC_BINARY"
 
 export SIDE_CHAIN_PORT=30116
 export SIDE_CHAIN_RPC_PORT=30117
@@ -192,6 +195,17 @@ Environment="SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004"
 EOF
 sudo systemctl daemon-reload
 
+# ── /logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；未设置时端点 404 关闭）──
+# 可用环境变量覆盖: LOG_API_TOKEN=*** ./hack/node0-run.sh
+LOG_API_TOKEN="${LOG_API_TOKEN:-527fe9c13397f554d5cdef09ce6a470c}"
+echo "Configuring /logs API token for tee-node0.service ..."
+sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+sudo tee /etc/systemd/system/tee-node0.service.d/logs.conf >/dev/null <<EOF
+[Service]
+Environment="LOG_API_TOKEN=$LOG_API_TOKEN"
+EOF
+sudo systemctl daemon-reload
+
 # ── 检查并终止已有进程 ──
 if systemctl is-active --quiet tee-node0.service 2>/dev/null; then
     echo "Stopping existing tee-node0.service ..."
@@ -205,8 +219,11 @@ sudo systemctl start tee-node0.service
 sleep 2
 if systemctl is-active --quiet tee-node0.service; then
     echo "Service started successfully (auto-restart enabled)."
-    echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
-    journalctl -u tee-node0.service -f -o cat
+    # 默认不 tail(部署脚本不该永久阻塞); TAIL=1 bash node0-run.sh 可实时看日志
+    if [ "${TAIL:-0}" = "1" ]; then
+        echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
+        journalctl -u tee-node0.service -f -o cat
+    fi
 else
     echo "ERROR: service failed to start. Check status:"
     systemctl status tee-node0.service

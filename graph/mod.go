@@ -105,6 +105,9 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	})
 	router.Handle("/gql", srv)
 
+	// 只读日志查询（供 tee-node-monitor 远程拉取; 受 LOG_API_TOKEN 控制, 默认 404 关闭）
+	router.Get("/logs", handleLogsAPI)
+
 	// Gateway REST routes (OpenAI SDK compatible)
 	gateway.RegisterGatewayRoutes(router)
 
@@ -119,6 +122,7 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	util.LogWithBlue("API", "  /gql        -> GraphQL (auth, wallet, secrets)")
 	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")
 	util.LogWithBlue("API", "  /health     -> health check")
+	util.LogWithBlue("API", "  /logs   -> 日志查询 (monitor, 需 LOG_API_TOKEN)")
 
 	server := &http.Server{
 		Addr:        ":" + fmt.Sprint(port),

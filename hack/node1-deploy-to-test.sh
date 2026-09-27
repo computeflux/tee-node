@@ -12,10 +12,7 @@ DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
 
 # build binary
-# 注意: ego-go 自带一套 patch 过的 Go 工具链（/opt/ego/go，当前 go1.26.1），
-# 与系统 go（如 1.26.6）共用同一个 build cache 时会混入不兼容的目标文件，
-# 链接时报 "invalid relocation ... not in [0,N)"。这里用独立 GOCACHE 隔离。
-GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
+ego-go build -o ./hack/build/dsecret ./main.go
 
 # build sgx verify service (cgo: 静态链接 /opt/ego/lib 的 liboehostverify；
 # 随 sync_build 同步到 test 机 /srv/token_node1/build/ 并在那里本机运行)
@@ -32,6 +29,9 @@ REMOTE_HOST="computefluxtest"
 # sgx-verify-service 统一用本地服务器的公网地址（服务监听 0.0.0.0:8004）；
 # 可能需要 DNS/DDNS + 路由器端口映射 8004 才能通，可用环境变量覆盖: SVS_HOST=1.2.3.4 $0 deploy
 SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
+# /logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；与监控侧 MONITOR_LOG_TOKEN 一致）
+# 可用环境变量覆盖: LOG_API_TOKEN=*** $0 deploy
+LOG_API_TOKEN="${LOG_API_TOKEN:-527fe9c13397f554d5cdef09ce6a470c}"
 REMOTE_NODE_DIR="/srv/token_node1"
 REMOTE_CHAIN_DIR="$REMOTE_NODE_DIR/token_chain_data"
 REMOTE_BUILD_DIR="$REMOTE_NODE_DIR/build"
@@ -49,7 +49,7 @@ show_usage() {
 Usage: $0 <command>
 
 Commands:
-  deploy    同步构建产物到远程，安装/更新 systemd 服务并启动，随后实时 tail 日志
+  deploy    同步构建产物到远程，安装/更新 systemd 服务并启动（默认不 tail; TAIL=1 实时看日志）
   logs      实时查看服务日志（journalctl -f）
   status    查看服务运行状态
   restart   重启服务
@@ -160,6 +160,12 @@ EOF
 Environment="SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004"
 EOF
 
+    # /logs 端点 token（未设置时端点 404 关闭）；drop-in 注入，不改原单元文件
+    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/$SERVICE_NAME.d/logs.conf" > /dev/null << EOF
+[Service]
+Environment="LOG_API_TOKEN=$LOG_API_TOKEN"
+EOF
+
     remote_exec "sudo systemctl daemon-reload"
     remote_exec "sudo systemctl enable $SERVICE_NAME"
     remote_exec "sudo systemctl enable sgx-verify-service"
@@ -174,11 +180,14 @@ start_and_tail_logs() {
     remote_exec "sudo systemctl restart $SERVICE_NAME"
     sleep 1
     remote_exec "sudo systemctl status $SERVICE_NAME --no-pager"
-    echo ""
-    echo "========================================="
-    echo "  实时日志输出（按 Ctrl+C 退出日志追踪，服务不会停止）"
-    echo "========================================="
-    remote_exec "sudo journalctl -u $SERVICE_NAME -f  -o cat --no-hostname --since '1 minute ago'"
+    # 默认不 tail(部署脚本不该永久阻塞); TAIL=1 $0 deploy 可实时看日志
+    if [ "${TAIL:-0}" = "1" ]; then
+        echo ""
+        echo "========================================="
+        echo "  实时日志输出（按 Ctrl+C 退出日志追踪，服务不会停止）"
+        echo "========================================="
+        remote_exec "sudo journalctl -u $SERVICE_NAME -f  -o cat --no-hostname --since '1 minute ago'"
+    fi
 }
 
 # -------------------------------------------------
