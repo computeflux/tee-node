@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/computeflux/tee-provider/pkg/util"
 	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
@@ -78,9 +77,6 @@ func BuildEndpointsFromModelInfo(modelID uint64, model *cgateway.ModelInfoV2, pr
 		})
 	}
 
-	if len(endpoints) == 0 && model.ModelType != cgateway.EdgeRoute {
-		util.LogWarnf("[scheduler] model %s (provider=%s type=%d) has no usable API keys, endpoint_count=0", model.Name, providerName, model.ModelType)
-	}
 	return endpoints
 }
 
