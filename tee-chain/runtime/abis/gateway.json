@@ -1520,6 +1520,33 @@
               ],
               "type": 3
             }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "close_provider",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0x6b9701c2"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "provider_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
           },
           {
             "docs": [],
@@ -2499,6 +2526,43 @@
           "type": 11
         },
         "selector": "0xd41eabfd"
+      },
+      {
+        "args": [
+          {
+            "docs": [],
+            "label": "provider_i_d",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          },
+          {
+            "docs": [],
+            "label": "amount",
+            "type": {
+              "displayName": [
+                "u64"
+              ],
+              "type": 3
+            }
+          }
+        ],
+        "default": false,
+        "docs": [],
+        "label": "add_deposit",
+        "mutates": true,
+        "payable": false,
+        "returnType": {
+          "displayName": [
+            "ink",
+            "MessageResult"
+          ],
+          "type": 11
+        },
+        "selector": "0xd5422a31"
       },
       {
         "args": [

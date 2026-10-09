@@ -14,13 +14,35 @@ func newTestGateway() (*Gateway, *testutil.MockRuntime) {
 	return NewGateway(rt), rt
 }
 
+// seedProvider 先给当前调用者充值 deposit 积分，再注册 provider（质押从可用余额扣除），返回 providerID。
+func seedProvider(t *testing.T, gw *Gateway, rt *testutil.MockRuntime, name string, deposit uint64) uint64 {
+	t.Helper()
+	user := rt.Caller
+	rt.System = true
+	require.NoError(t, GatewayMutation{Gateway: *gw}.Recharge(user, deposit, []byte("seed-nonce")))
+	rt.System = false
+
+	m := GatewayMutation{Gateway: *gw}
+	require.NoError(t, m.CreateProvider(name, "", "", RegionAsiaEast, deposit))
+
+	q := GatewayQuery{Gateway: *gw}
+	provOpt, err := q.GetProviderByOwner()
+	require.NoError(t, err)
+	id, err := provOpt.UnWrap()
+	require.NoError(t, err)
+	return id
+}
+
 // ── Provider Tests ───────────────────────────────────────
 
 func TestGateway_CreateProvider_Success(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	err := m.CreateProvider("AI Corp", "https://logo.png", "Best AI", RegionAsiaEast, 5000)
+	rt.System = true
+	require.NoError(t, m.Recharge(rt.Caller, 200_000_000, []byte("success-nonce")))
+	rt.System = false
+	err := m.CreateProvider("AI Corp", "https://logo.png", "Best AI", RegionAsiaEast, 200_000_000)
 	require.NoError(t, err)
 
 	// Query back
@@ -36,16 +58,16 @@ func TestGateway_CreateProvider_Success(t *testing.T) {
 	require.NotNil(t, prov)
 	assert.Equal(t, "AI Corp", prov.Name)
 	assert.Equal(t, rt.Caller, prov.Owner)
-	assert.Equal(t, uint64(5000), prov.Deposit)
+	assert.Equal(t, uint64(200_000_000), prov.Deposit)
 	assert.True(t, prov.IsActive)
 }
 
 func TestGateway_CreateProvider_DuplicateOwner(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
-	err := m.CreateProvider("AI Corp 2", "", "", RegionAsiaEast, 2000)
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
+	err := m.CreateProvider("AI Corp 2", "", "", RegionAsiaEast, 200_000_000)
 	assert.ErrorContains(t, err, "already exists")
 }
 
@@ -53,20 +75,20 @@ func TestGateway_CreateProvider_DuplicateName(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 
 	// Change caller to simulate different owner on same store
 	rt.Caller = store.UniAddr{T: 1, V: []byte{0x02}}
-	err := m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 2000)
+	err := m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000)
 	assert.ErrorContains(t, err, "already exists")
 }
 
 func TestGateway_UpdateProvider_Success(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	id, _ := provOpt.UnWrap()
 
@@ -83,17 +105,137 @@ func TestGateway_CreateProvider_ReservedName(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	for _, name := range []string{"Edge", "edge", "MININGPOOL", "MiningPool", "tee", "TEE"} {
-		err := m.CreateProvider(name, "", "", RegionAsiaEast, 1000)
+		err := m.CreateProvider(name, "", "", RegionAsiaEast, 200_000_000)
 		assert.ErrorContains(t, err, "route prefix", "name=%q", name)
 	}
 }
 
-func TestGateway_UpdateProvider_ReservedName(t *testing.T) {
+func TestGateway_CreateProvider_MinDeposit(t *testing.T) {
 	gw, _ := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	// deposit 必须严格大于 MinProviderDeposit
+	for _, deposit := range []uint64{0, 1000, MinProviderDeposit} {
+		err := m.CreateProvider("AI Corp", "", "", RegionAsiaEast, deposit)
+		assert.ErrorContains(t, err, "deposit must be greater than", "deposit=%d", deposit)
+	}
+}
+
+func TestGateway_CreateProvider_StakesBalance(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	// 余额 500M，质押 200M → 可用余额 300M
+	rt.System = true
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("stake-nonce")))
+	rt.System = false
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
+
+	q := GatewayQuery{*gw}
+	cred, err := q.GetCredit(rt.Caller)
+	require.NoError(t, err)
+	assert.Equal(t, int64(300_000_000), cred)
+
+	prov, err := q.GetProvider(0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(200_000_000), prov.Deposit)
+}
+
+func TestGateway_CreateProvider_InsufficientBalance(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+
+	// 无余额 → ErrLowCredit
+	assert.ErrorIs(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000), ErrLowCredit)
+
+	// 余额不足（100M < 200M）→ ErrLowCredit
+	rt.System = true
+	require.NoError(t, m.Recharge(rt.Caller, 100_000_000, []byte("insufficient-nonce")))
+	rt.System = false
+	assert.ErrorIs(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000), ErrLowCredit)
+}
+
+func TestGateway_CloseProvider_RefundAndReopen(t *testing.T) {
+	gw, rt := newTestGateway()
+	q := GatewayQuery{*gw}
+
+	m := GatewayMutation{Gateway: *gw}
+
+	// 余额 500M，质押 200M → 可用余额 300M
+	rt.System = true
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("close-nonce")))
+	rt.System = false
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
+
+	cred, _ := q.GetCredit(rt.Caller)
+	assert.Equal(t, int64(300_000_000), cred)
+
+	// 关闭店铺：质押金返还，owner 映射清除
+	require.NoError(t, m.CloseProvider(0))
+
+	cred, _ = q.GetCredit(rt.Caller)
+	assert.Equal(t, int64(500_000_000), cred)
+
+	prov, err := q.GetProvider(0)
+	require.NoError(t, err)
+	assert.False(t, prov.IsActive)
+
+	provOpt, err := q.GetProviderByOwner()
+	require.NoError(t, err)
+	assert.False(t, provOpt.IsSome())
+
+	// 重复关闭 → 拒绝
+	assert.ErrorContains(t, m.CloseProvider(0), "already closed")
+
+	// 重新开店需重新质押（300M）
+	require.NoError(t, m.CreateProvider("AI Corp 2", "", "", RegionAsiaEast, 300_000_000))
+	cred, _ = q.GetCredit(rt.Caller)
+	assert.Equal(t, int64(200_000_000), cred)
+}
+
+func TestGateway_CloseProvider_NotOwner(t *testing.T) {
+	gw, rt := newTestGateway()
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
+
+	rt.Caller = store.UniAddr{T: 1, V: []byte{0x99}}
+	assert.ErrorIs(t, GatewayMutation{Gateway: *gw}.CloseProvider(0), ErrNotOwner)
+}
+
+func TestGateway_AddDeposit(t *testing.T) {
+	gw, rt := newTestGateway()
+	q := GatewayQuery{*gw}
+	m := GatewayMutation{Gateway: *gw}
+
+	// 余额 500M，质押 200M 后追加 100M → 可用余额 200M，deposit 300M
+	rt.System = true
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("adddeposit-nonce")))
+	rt.System = false
+	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
+	require.NoError(t, m.AddDeposit(0, 100_000_000))
+
+	cred, err := q.GetCredit(rt.Caller)
+	require.NoError(t, err)
+	assert.Equal(t, int64(200_000_000), cred)
+
+	prov, err := q.GetProvider(0)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(300_000_000), prov.Deposit)
+
+	// 余额不足（剩余 200M < 300M）→ ErrLowCredit
+	assert.ErrorIs(t, m.AddDeposit(0, 300_000_000), ErrLowCredit)
+
+	// 零金额 → ErrZeroAmount；非 owner → ErrNotOwner
+	assert.ErrorIs(t, m.AddDeposit(0, 0), ErrZeroAmount)
+	rt.Caller = store.UniAddr{T: 1, V: []byte{0x99}}
+	assert.ErrorIs(t, m.AddDeposit(0, 1), ErrNotOwner)
+}
+
+func TestGateway_UpdateProvider_ReservedName(t *testing.T) {
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	id, _ := provOpt.UnWrap()
 
@@ -104,11 +246,11 @@ func TestGateway_UpdateProvider_ReservedName(t *testing.T) {
 // ── Model Tests ──────────────────────────────────────────
 
 func TestGateway_RegisterModel_Success(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", []string{"sk-abc"}, 0, 0, false, "")
 	require.NoError(t, err)
 
@@ -134,10 +276,10 @@ func TestGateway_RegisterModel_WithoutProvider(t *testing.T) {
 }
 
 func TestGateway_RegisterModel_DuplicateName(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
 	err := m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, "")
@@ -145,11 +287,11 @@ func TestGateway_RegisterModel_DuplicateName(t *testing.T) {
 }
 
 func TestGateway_DeactivateAndActiveModel(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
 	active, err := q.ListActiveModels(0, 10)
@@ -170,11 +312,11 @@ func TestGateway_DeactivateAndActiveModel(t *testing.T) {
 }
 
 func TestGateway_GetModelByName(t *testing.T) {
-	gw, _ := newTestGateway()
+	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 5000, 2500, 15000, OpenAI, "", nil, 0, 0, false, ""))
 
 	provOpt, _ := q.GetProviderByOwner()
@@ -385,7 +527,7 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	// Setup: create provider + model + recharge user
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
@@ -426,7 +568,7 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 	gw, rt := newTestGateway()
 	m := GatewayMutation{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
@@ -459,7 +601,7 @@ func TestGateway_SettleUsage_ConsecutiveFailDelist(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
@@ -536,7 +678,7 @@ func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
 	q := GatewayQuery{*gw}
 
 	// Setup: create provider + model
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	// Create route with different prices and join model 0
@@ -595,7 +737,7 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 
 	// ApplyWithdraw requires caller.T == 2 and matching provider owner
 	rt.Caller.T = 2
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
@@ -635,7 +777,7 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 
 	// ApplyWithdraw requires caller.T == 2 and matching provider owner
 	rt.Caller.T = 2
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
@@ -663,7 +805,7 @@ func TestGateway_JoinRoute_OnlyOwner(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
@@ -695,7 +837,7 @@ func TestGateway_LeaveRoute_OnlyOwner(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
@@ -731,7 +873,7 @@ func TestGateway_JoinRoute_ModelIds(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
@@ -778,7 +920,7 @@ func TestGateway_JoinRoute_PersonalToEdge(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("Personal AI", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "Personal AI", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
@@ -808,7 +950,7 @@ func TestGateway_JoinRoute_MismatchedTypeFails(t *testing.T) {
 	m := GatewayMutation{*gw}
 	q := GatewayQuery{*gw}
 
-	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 1000))
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
 	provOpt, _ := q.GetProviderByOwner()
 	provID, _ := provOpt.UnWrap()
 
@@ -826,4 +968,128 @@ func TestGateway_JoinRoute_MismatchedTypeFails(t *testing.T) {
 
 	err = m.JoinRoute(modelID, routeID)
 	assert.ErrorContains(t, err, "does not match route type")
+}
+
+// ── History 分页（offset/limit 语义）─────────────────────────
+
+// TestGateway_SettlementHistoryPaging 结算历史分页: 倒序、从最新起跳过 offset 条、
+// 每页最多 limit 条（修复前起始游标多跳一条, 每页只返回 limit-1 条）。
+func TestGateway_SettlementHistoryPaging(t *testing.T) {
+	gw, _ := newTestGateway()
+	q := GatewayQuery{*gw}
+	txn := gw.api.GetTxn()
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	const providerID uint64 = 7
+	const total = 1200
+
+	for i := 0; i < total; i++ {
+		_, err := gw.settlementHistory.Insert(txn, providerID, ProviderSettlementRecord{
+			User: user, ModelID: 1, Cost: uint64(i), Count: 1, Time: int64(i),
+		})
+		require.NoError(t, err)
+		_, err = gw.userSettlementHistory.Insert(txn, user, UserSettlementRecord{
+			ProviderID: providerID, ModelID: 1, Cost: uint64(i), Count: 1, Time: int64(i),
+		})
+		require.NoError(t, err)
+	}
+
+	// provider 维度: 500 + 500 + 200 拉完
+	page1, err := q.GetSettlementHistory(providerID, 0, 500)
+	require.NoError(t, err)
+	require.Len(t, page1, 500)
+	assert.Equal(t, int64(1199), page1[0].Time, "最新一条在前")
+	assert.Equal(t, int64(700), page1[499].Time)
+
+	page2, err := q.GetSettlementHistory(providerID, 500, 500)
+	require.NoError(t, err)
+	require.Len(t, page2, 500)
+	assert.Equal(t, int64(699), page2[0].Time)
+	assert.Equal(t, int64(200), page2[499].Time)
+
+	page3, err := q.GetSettlementHistory(providerID, 1000, 500)
+	require.NoError(t, err)
+	require.Len(t, page3, 200)
+	assert.Equal(t, int64(199), page3[0].Time)
+	assert.Equal(t, int64(0), page3[199].Time)
+
+	// 越界 / 未知 provider / limit=0 → 空
+	for _, tc := range []struct {
+		name   string
+		pid    uint64
+		offset uint64
+		limit  uint32
+	}{
+		{"offset=总数", providerID, total, 500},
+		{"offset 远超", providerID, 9999, 500},
+		{"未知 provider", 999, 0, 500},
+		{"limit=0", providerID, 0, 0},
+	} {
+		got, err := q.GetSettlementHistory(tc.pid, tc.offset, tc.limit)
+		require.NoError(t, err, tc.name)
+		assert.Empty(t, got, tc.name)
+	}
+
+	// user 维度同语义
+	u1, err := q.GetUserSettlementHistory(user, 0, 500)
+	require.NoError(t, err)
+	require.Len(t, u1, 500)
+	assert.Equal(t, int64(1199), u1[0].Time)
+	u3, err := q.GetUserSettlementHistory(user, 1000, 500)
+	require.NoError(t, err)
+	require.Len(t, u3, 200)
+	assert.Equal(t, int64(0), u3[199].Time)
+	uEmpty, err := q.GetUserSettlementHistory(user, total, 500)
+	require.NoError(t, err)
+	assert.Empty(t, uEmpty)
+}
+
+// TestGateway_RechargeTransferHistoryPaging 充值/转账历史分页（修复前 offset>0 恒返回空）。
+func TestGateway_RechargeTransferHistoryPaging(t *testing.T) {
+	gw, _ := newTestGateway()
+	q := GatewayQuery{*gw}
+	txn := gw.api.GetTxn()
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	to := store.UniAddr{T: 1, V: []byte{0xCD}}
+	for i := 0; i < 5; i++ {
+		_, err := gw.rechargeHistory.Insert(txn, user, RechargeRecord{
+			User: user, Amount: uint64(100 * (i + 1)), Time: int64(i),
+		})
+		require.NoError(t, err)
+		_, err = gw.transferHistory.Insert(txn, user, TransferRecord{
+			From: user, To: to, Amount: uint64(10 * (i + 1)), Time: int64(i),
+		})
+		require.NoError(t, err)
+	}
+
+	// 全量: 最新在前
+	all, err := q.GetRechargeHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, all, 5)
+	assert.Equal(t, uint64(500), all[0].Amount)
+	assert.Equal(t, uint64(100), all[4].Amount)
+
+	// 第二页: 跳过最新 2 条后取 2 条（修复前这里返回空）
+	page2, err := q.GetRechargeHistory(user, 2, 2)
+	require.NoError(t, err)
+	require.Len(t, page2, 2)
+	assert.Equal(t, uint64(300), page2[0].Amount)
+	assert.Equal(t, uint64(200), page2[1].Amount)
+
+	// 末页 + 越界
+	tail, err := q.GetRechargeHistory(user, 4, 10)
+	require.NoError(t, err)
+	require.Len(t, tail, 1)
+	assert.Equal(t, uint64(100), tail[0].Amount)
+	empty, err := q.GetRechargeHistory(user, 5, 10)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+
+	// 转账历史同语义
+	tr, err := q.GetTransferHistory(user, 1, 2)
+	require.NoError(t, err)
+	require.Len(t, tr, 2)
+	assert.Equal(t, uint64(40), tr[0].Amount)
+	assert.Equal(t, uint64(30), tr[1].Amount)
 }

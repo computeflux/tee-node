@@ -25,6 +25,19 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 			return fmt.Errorf("active_model: modelID: %w", err)
 		}
 		return m.ActiveModel(modelID)
+	case [4]byte{0xd5, 0x42, 0x2a, 0x31}:
+		if err := store.RequireArgLen(args, 2, "add_deposit"); err != nil {
+			return err
+		}
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("add_deposit: providerID: %w", err)
+		}
+		amount, err := store.DecodeScaleArgBytes[uint64](args[1])
+		if err != nil {
+			return fmt.Errorf("add_deposit: amount: %w", err)
+		}
+		return m.AddDeposit(providerID, amount)
 	case [4]byte{0xe2, 0x1a, 0x50, 0x89}:
 		if err := store.RequireArgLen(args, 2, "add_model_a_p_i_key_ref"); err != nil {
 			return err
@@ -85,6 +98,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		_, err = m.AuditModel(modelID, triggerBy, passed, detail).UnWrap()
 		return err
+	case [4]byte{0x6b, 0x97, 0x01, 0xc2}:
+		if err := store.RequireArgLen(args, 1, "close_provider"); err != nil {
+			return err
+		}
+		providerID, err := store.DecodeScaleArgBytes[uint64](args[0])
+		if err != nil {
+			return fmt.Errorf("close_provider: providerID: %w", err)
+		}
+		return m.CloseProvider(providerID)
 	case [4]byte{0x7e, 0xed, 0xb4, 0x05}:
 		if err := store.RequireArgLen(args, 5, "create_provider"); err != nil {
 			return err

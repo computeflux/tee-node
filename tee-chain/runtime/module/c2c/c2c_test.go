@@ -81,7 +81,11 @@ func seedProviderCredits(t *testing.T, rt *testutil.MockRuntime, gw *gateway.Gat
 	t.Helper()
 	gm := gateway.GatewayMutation{Gateway: *gw}
 	rt.Caller = merchant
-	require.NoError(t, gm.CreateProvider(fmt.Sprintf("shop-%02x", merchant.V[0]), "", "", gateway.RegionAsiaEast, 0))
+	// 注册 provider 需真实质押：先充值质押金
+	rt.System = true
+	require.NoError(t, gm.Recharge(merchant, 200_000_000, []byte("seed-deposit-nonce")))
+	rt.System = false
+	require.NoError(t, gm.CreateProvider(fmt.Sprintf("shop-%02x", merchant.V[0]), "", "", gateway.RegionAsiaEast, 200_000_000))
 	require.NoError(t, gm.RegisterModel("m", gateway.ModalityText, 128000, 1_000_000, 0, 0, gateway.OpenAI, "", nil, 0, 0, false, ""))
 	// 结算必须节点（T == 0）发起。
 	rt.Caller = store.UniAddr{T: 0}

@@ -141,31 +141,38 @@ func (g GatewayQuery) GetProviderCredit(providerID uint64) (uint64, error) {
 
 // ── Query: History ───────────────────────────────────────
 
-// GetRechargeHistory 查询用户充值历史（按时间倒序）
+// GetRechargeHistory 查询用户充值历史（按时间倒序, 从最新起跳过 offset 条, 最多返回 limit 条）
 func (g GatewayQuery) GetRechargeHistory(user store.UniAddr, offset uint64, limit uint32) ([]RechargeRecord, error) {
-	_, records, err := g.rechargeHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
+	txn := g.api.GetTxn()
+	total, err := g.rechargeHistory.NextID(txn, user)
 	if err != nil {
 		return nil, err
 	}
-
-	// DescList 从最新开始返回，若 offset > 0 需要跳过前面条目
-	if int(offset) >= len(records) {
-		return []RechargeRecord{}, nil
+	startKey, ok := historyStartKey(total, offset)
+	if !ok {
+		return nil, nil
 	}
-
-	return records[offset:], nil
+	_, records, err := g.rechargeHistory.DescList(txn, user, &startKey, limit)
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
 }
 
-// GetTransferHistory 查询用户转账历史（按时间倒序）
+// GetTransferHistory 查询用户转账历史（按时间倒序, 从最新起跳过 offset 条, 最多返回 limit 条）
 func (g GatewayQuery) GetTransferHistory(user store.UniAddr, offset uint64, limit uint32) ([]TransferRecord, error) {
-	_, records, err := g.transferHistory.DescList(g.api.GetTxn(), user, (*uint32)(nil), limit)
+	txn := g.api.GetTxn()
+	total, err := g.transferHistory.NextID(txn, user)
 	if err != nil {
 		return nil, err
 	}
-
-	if int(offset) >= len(records) {
-		return []TransferRecord{}, nil
+	startKey, ok := historyStartKey(total, offset)
+	if !ok {
+		return nil, nil
 	}
-
-	return records[offset:], nil
+	_, records, err := g.transferHistory.DescList(txn, user, &startKey, limit)
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
 }

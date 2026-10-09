@@ -201,12 +201,26 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 	return nil
 }
 
-// GetSettlementHistory 查询 Provider 结算历史（按时间倒序）
+// historyStartKey 计算倒序分页的起始下标: 第 offset 条（从最新算起）在 store 中的 k2。
+// total = NextID = 记录总数, 有效下标 0..total-1; offset 越界时返回 false（无数据）。
+func historyStartKey(total uint32, offset uint64) (uint32, bool) {
+	if total == 0 || offset >= uint64(total) {
+		return 0, false
+	}
+	return total - 1 - uint32(offset), true
+}
+
+// GetSettlementHistory 查询 Provider 结算历史（按时间倒序, 从最新起跳过 offset 条, 最多返回 limit 条）
 func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, limit uint32) ([]ProviderSettlementRecord, error) {
 	txn := g.api.GetTxn()
-	startKey := uint32(offset)
-	end, _ := g.settlementHistory.NextID(txn, providerID)
-	startKey = end - startKey
+	total, err := g.settlementHistory.NextID(txn, providerID)
+	if err != nil {
+		return nil, err
+	}
+	startKey, ok := historyStartKey(total, offset)
+	if !ok {
+		return nil, nil
+	}
 	_, records, err := g.settlementHistory.DescList(txn, providerID, &startKey, limit)
 	if err != nil {
 		return nil, err
@@ -214,12 +228,17 @@ func (g GatewayQuery) GetSettlementHistory(providerID uint64, offset uint64, lim
 	return records, nil
 }
 
-// GetUserSettlementHistory 查询用户的结算历史（按时间倒序）
+// GetUserSettlementHistory 查询用户的结算历史（按时间倒序, 从最新起跳过 offset 条, 最多返回 limit 条）
 func (g GatewayQuery) GetUserSettlementHistory(user store.UniAddr, offset uint64, limit uint32) ([]UserSettlementRecord, error) {
 	txn := g.api.GetTxn()
-	startKey := uint32(offset)
-	end, _ := g.userSettlementHistory.NextID(txn, user)
-	startKey = end - startKey
+	total, err := g.userSettlementHistory.NextID(txn, user)
+	if err != nil {
+		return nil, err
+	}
+	startKey, ok := historyStartKey(total, offset)
+	if !ok {
+		return nil, nil
+	}
 	_, records, err := g.userSettlementHistory.DescList(txn, user, &startKey, limit)
 	if err != nil {
 		return nil, err

@@ -70,6 +70,11 @@ type UserSettlementRecord struct {
 | `GetSettlementHistory` | `providerID`, `offset`, `limit` | `[]ProviderSettlementRecord` | 按时间倒序返回 Provider 结算记录 |
 | `GetUserSettlementHistory` | `user`, `offset`, `limit` | `[]UserSettlementRecord` | 按时间倒序返回用户消费记录 |
 
+> **分页语义**：`offset` = 从最新记录起跳过的条数（0 = 从最新一条开始），`limit` = 单页最多返回条数。
+> 早期实现起始游标多跳一条（`startKey = 总数 - offset`，越界一条），每页实际只返回 `limit-1` 条；
+> 客户端不能用“返回条数 < limit”判断拉完，必须按实际返回条数推进 offset、以空页为结束。
+> 四个历史查询（含充值/转账）已在合约侧统一修正为上述语义。
+
 > **已移除**：`GetUsageHistory` / `GetAllUsageByUser` — `DailyUsage` 不再写入，查询无意义。
 
 ### 2.5 合约路由（`gateway_gen.go`）

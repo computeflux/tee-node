@@ -19,6 +19,9 @@ func isReservedProviderName(name string) bool {
 
 // ── Provider / Provider ───────────────────────────────────
 
+// MinProviderDeposit provider 最低质押金：deposit 必须大于该值才可注册。
+const MinProviderDeposit = 100_000_000
+
 func (g GatewayMutation) CreateProvider(
 	name, logoURL, description string,
 	region uint8, deposit uint64,
@@ -32,6 +35,11 @@ func (g GatewayMutation) CreateProvider(
 
 	if isReservedProviderName(name) {
 		return errors.New("provider name conflicts with route prefix")
+	}
+
+	// 最低质押校验：deposit 必须大于 MinProviderDeposit
+	if deposit <= MinProviderDeposit {
+		return fmt.Errorf("deposit must be greater than %d, got %d", MinProviderDeposit, deposit)
 	}
 
 	// 一人只能注册一个 provider
@@ -55,6 +63,12 @@ func (g GatewayMutation) CreateProvider(
 	default:
 		priority = 30
 	}
+
+	// 真实质押：从调用者可用余额扣除 deposit（关闭店铺时才返还）
+	if err := g.stakeDeposit(owner, deposit); err != nil {
+		return err
+	}
+
 	id, err := g.providers.Insert(txn, ProviderInfo{
 		Owner:       owner,
 		Name:        name,
@@ -75,6 +89,123 @@ func (g GatewayMutation) CreateProvider(
 		return err
 	}
 	return nil
+}
+
+// ── 质押（deposit 从用户可用余额锁定，关闭店铺时返还）──────────
+
+// stakeDeposit 从 owner 可用余额扣除 amount 并锁定为质押：
+// 与 TransferCredit 一致，仅从 credits（总余额）扣除，不动 credit_useds（已用额度）。
+func (g Gateway) stakeDeposit(owner store.UniAddr, amount uint64) error {
+	txn := g.api.GetTxn()
+	bal, _ := g.credits.Get(txn, owner)
+	if bal == nil {
+		bal = new(uint64)
+	}
+	used, _ := g.credit_useds.Get(txn, owner)
+	if used == nil {
+		used = new(uint64)
+	}
+	if *bal-*used < amount {
+		return fmt.Errorf("stake deposit: %w", ErrLowCredit)
+	}
+	*bal -= amount
+	if err := g.credits.Set(txn, owner, *bal); err != nil {
+		return fmt.Errorf("stake deposit: debit failed: %w", err)
+	}
+	return nil
+}
+
+// releaseDeposit stakeDeposit 的逆操作：将 amount 质押返还给 owner 的可用余额。
+func (g Gateway) releaseDeposit(owner store.UniAddr, amount uint64) error {
+	txn := g.api.GetTxn()
+	bal, _ := g.credits.Get(txn, owner)
+	if bal == nil {
+		bal = new(uint64)
+	}
+	*bal += amount
+	if err := g.credits.Set(txn, owner, *bal); err != nil {
+		return fmt.Errorf("release deposit: credit failed: %w", err)
+	}
+	return nil
+}
+
+// CloseProvider 关闭店铺（仅 owner 可调用）：下架 provider 及其名下模型，
+// 将质押金返还到 owner 可用余额，并清除 owner→providerID 映射；
+// 同一账户重新开店需重新注册并重新质押。
+func (g GatewayMutation) CloseProvider(providerID uint64) error {
+	owner := g.api.GetCaller()
+	txn := g.api.GetTxn()
+
+	prov, err := g.providers.Get(txn, providerID)
+	if err != nil {
+		return err
+	}
+	if prov == nil {
+		return ErrProviderNotFound
+	}
+	if owner.String() != prov.Owner.String() {
+		return ErrNotOwner
+	}
+	if !prov.IsActive {
+		return errors.New("provider is already closed")
+	}
+
+	// 下架 provider 及其名下模型
+	if err := g.providers.UpdateFn(txn, providerID, func(p *ProviderInfo) {
+		p.IsActive = false
+	}); err != nil {
+		return err
+	}
+	modelIDs, err := g.modelsV2.Query(txn, store.QueryCond{Field: "ProviderID", Val: uint64(providerID)})
+	if err != nil {
+		return err
+	}
+	for _, modelID := range modelIDs {
+		if err := g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
+			m.IsActive = false
+		}); err != nil {
+			return err
+		}
+	}
+
+	// 返还质押金到 owner 可用余额
+	if err := g.releaseDeposit(prov.Owner, prov.Deposit); err != nil {
+		return err
+	}
+
+	// 清除 owner→providerID 映射：重新开店需重新质押
+	return g.providerByOwner.Delete(txn, owner)
+}
+
+// AddDeposit 追加质押（仅 owner 可调用）：用户需要提供更多信用时，
+// 从可用余额扣除更多余额并累加到 provider 的 deposit。
+func (g GatewayMutation) AddDeposit(providerID uint64, amount uint64) error {
+	if amount == 0 {
+		return ErrZeroAmount
+	}
+	owner := g.api.GetCaller()
+	txn := g.api.GetTxn()
+
+	prov, err := g.providers.Get(txn, providerID)
+	if err != nil {
+		return err
+	}
+	if prov == nil {
+		return ErrProviderNotFound
+	}
+	if owner.String() != prov.Owner.String() {
+		return ErrNotOwner
+	}
+	if !prov.IsActive {
+		return errors.New("provider is closed, cannot add deposit")
+	}
+
+	if err := g.stakeDeposit(owner, amount); err != nil {
+		return err
+	}
+	return g.providers.UpdateFn(txn, providerID, func(p *ProviderInfo) {
+		p.Deposit += amount
+	})
 }
 
 func (g GatewayMutation) UpdateProvider(
