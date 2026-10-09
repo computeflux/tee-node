@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -129,7 +130,7 @@ func (g Gateway) releaseDeposit(owner store.UniAddr, amount uint64) error {
 	return nil
 }
 
-// CloseProvider 关闭店铺（仅 owner 可调用）：下架 provider 及其名下模型，
+// CloseProvider 关闭店铺（仅 owner 可调用）：下架 provider 及其名下模型（并从所有路由移除），
 // 将质押金返还到 owner 可用余额，并清除 owner→providerID 映射；
 // 同一账户重新开店需重新注册并重新质押。
 func (g GatewayMutation) CloseProvider(providerID uint64) error {
@@ -163,6 +164,35 @@ func (g GatewayMutation) CloseProvider(providerID uint64) error {
 	for _, modelID := range modelIDs {
 		if err := g.modelsV2.UpdateFn(txn, modelID, func(m *ModelInfoV2) {
 			m.IsActive = false
+		}); err != nil {
+			return err
+		}
+	}
+
+	// 从所有包含这些模型的路由中移除（与 DeleteModel 一致, 避免 route 残留失效模型 ID）
+	rkeys, _, err := g.routes.ListAll(txn)
+	if err != nil {
+		return err
+	}
+	for _, rid := range rkeys {
+		r, rerr := g.routes.Get(txn, rid)
+		if rerr != nil || r == nil {
+			continue
+		}
+		hit := false
+		for _, modelID := range modelIDs {
+			if slices.Contains(r.ModelIds, modelID) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			continue
+		}
+		if err := g.routes.UpdateFn(txn, rid, func(rt *ModelRoute) {
+			for _, modelID := range modelIDs {
+				rt.ModelIds = removeUint64(rt.ModelIds, modelID)
+			}
 		}); err != nil {
 			return err
 		}

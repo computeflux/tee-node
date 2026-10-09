@@ -201,6 +201,35 @@ func TestGateway_CloseProvider_NotOwner(t *testing.T) {
 	assert.ErrorIs(t, GatewayMutation{Gateway: *gw}.CloseProvider(0), ErrNotOwner)
 }
 
+func TestGateway_CloseProvider_RemovesModelsFromRoutes(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{Gateway: *gw}
+	q := GatewayQuery{Gateway: *gw}
+
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
+
+	// 建路由并加入模型 0
+	rt.System = true
+	routeRes := m.CreateRoute("miningpool/close-test", MiningPoolRoute, 1_000_000, 500_000, 2_000_000, true)
+	require.True(t, routeRes.IsOk())
+	routeID, err := routeRes.UnWrap()
+	require.NoError(t, err)
+	require.NoError(t, m.JoinRoute(0, routeID))
+	rt.System = false
+
+	route, err := q.GetRoute(routeID)
+	require.NoError(t, err)
+	assert.Contains(t, route.ModelIds, uint64(0))
+
+	// 关闭店铺后, 模型应从路由中移除
+	require.NoError(t, m.CloseProvider(0))
+
+	route, err = q.GetRoute(routeID)
+	require.NoError(t, err)
+	assert.NotContains(t, route.ModelIds, uint64(0))
+}
+
 func TestGateway_AddDeposit(t *testing.T) {
 	gw, rt := newTestGateway()
 	q := GatewayQuery{*gw}
