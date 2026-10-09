@@ -30,8 +30,8 @@ REMOTE_HOST="computefluxtest"
 # 可能需要 DNS/DDNS + 路由器端口映射 8004 才能通，可用环境变量覆盖: SVS_HOST=1.2.3.4 $0 deploy
 SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
 # /logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；与监控侧 MONITOR_LOG_TOKEN 一致）
-# 可用环境变量覆盖: LOG_API_TOKEN=*** $0 deploy
-LOG_API_TOKEN="${LOG_API_TOKEN:-527fe9c13397f554d5cdef09ce6a470c}"
+# 须显式设置 LOG_API_TOKEN=*** 保持与监控侧同步; 未设置时每次部署随机生成（监控侧需同步更新）
+LOG_API_TOKEN="${LOG_API_TOKEN:-$(openssl rand -hex 16)}"
 REMOTE_NODE_DIR="/srv/token_node1"
 REMOTE_CHAIN_DIR="$REMOTE_NODE_DIR/token_chain_data"
 REMOTE_BUILD_DIR="$REMOTE_NODE_DIR/build"

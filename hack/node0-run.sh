@@ -196,8 +196,9 @@ EOF
 sudo systemctl daemon-reload
 
 # ── /logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；未设置时端点 404 关闭）──
-# 可用环境变量覆盖: LOG_API_TOKEN=*** ./hack/node0-run.sh
-LOG_API_TOKEN="${LOG_API_TOKEN:-527fe9c13397f554d5cdef09ce6a470c}"
+# 须与监控侧 MONITOR_LOG_TOKEN 一致: 显式设置 LOG_API_TOKEN=*** ./hack/node0-run.sh
+# 未显式设置时每次部署随机生成（监控侧需同步更新, 否则拉取 401）
+LOG_API_TOKEN="${LOG_API_TOKEN:-$(openssl rand -hex 16)}"
 echo "Configuring /logs API token for tee-node0.service ..."
 sudo mkdir -p /etc/systemd/system/tee-node0.service.d
 sudo tee /etc/systemd/system/tee-node0.service.d/logs.conf >/dev/null <<EOF
