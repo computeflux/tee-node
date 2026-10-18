@@ -18,6 +18,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/indexer"
 	authsvc "github.com/computeflux/tee-provider/pkg/services/auth"
+	"github.com/computeflux/tee-provider/pkg/services/notify"
 	"github.com/computeflux/tee-provider/pkg/services/wallet"
 	store "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
@@ -187,6 +188,19 @@ func main() {
 		log.Fatalf("failed to start indexer: %v", err)
 	}
 	defer idx.Stop()
+
+	// ── 用户消息中心：tee-node 链上事件通知（模型下架降级方案）──────────
+	// 模型状态变化（下架/恢复）→ 模板化/LLM 生成文案 → 推送 actives 消息中心 → dapp 展示。
+	// 未配置 ACTIVES_URL/ACTIVES_PUSH_TOKEN 时仅记录日志，不阻断节点启动。
+	notifyCfg := notify.LoadConfigFromEnv()
+	notifier := notify.NewNotifier(notifyCfg)
+	if notifier.Enabled() {
+		modelWatcher := notify.NewModelEventWatcher(teeChain, notifier, 1*time.Minute)
+		modelWatcher.Start(ctx)
+		util.LogWithCyan("NOTIFY", "model event watcher started (actives push enabled)")
+	} else {
+		util.LogWithGray("NOTIFY", "actives push not configured, model event notifications disabled")
+	}
 
 	// ── 创建 Resolver 注入所有依赖 ──────────────────────────
 	resolver := &graph.Resolver{
