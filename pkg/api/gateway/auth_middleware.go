@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/computeflux/tee-provider/pkg/types"
+	cgateway "github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
 )
 
 type contextKey string
@@ -90,14 +91,54 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			writeProtocolError(w, r, http.StatusUnauthorized, "authentication required", "auth_error")
 			return
 		}
-		if bridge := getBridgeFn(); bridge != nil {
-			credit, err := gatewayGetCreditFn(bridge, token.Addr)
-			if err != nil {
-				GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
-			} else if credit <= 0 {
-				GATEWAYLOG().Printf("[AUTH] insufficient credit for owner=%s, credit=%d", token.Owner, credit)
-				writeProtocolError(w, r, http.StatusPaymentRequired, "insufficient credit", "insufficient_credit")
-				return
+
+		// 查找模型信息（用于免费模型跳过余额检查 + 调用者白名单检查）
+		var modelInfo *cgateway.ModelInfoV2
+		_ = getCachedGatewayModels() // 触发缓存刷新（TTL 内为 no-op），返回值在此不需要
+		gatewayModelCache.mu.RLock()
+		if m, ok := gatewayModelCache.nameMap[modelNameArg]; ok {
+			modelInfo = &m
+		} else if _, bare := parseProviderModel(modelNameArg); bare != modelNameArg {
+			if m, ok := gatewayModelCache.nameMap[bare]; ok {
+				modelInfo = &m
+			}
+		}
+		gatewayModelCache.mu.RUnlock()
+
+		// 调用者白名单检查（meta.callers 非空时，仅允许列表中的地址）
+		if modelInfo != nil && modelInfo.Meta != "" {
+			var meta struct {
+				Callers []string `json:"callers"`
+			}
+			if json.Unmarshal([]byte(modelInfo.Meta), &meta) == nil && len(meta.Callers) > 0 {
+				caller := strings.TrimPrefix(strings.ToLower(token.Owner), "0x")
+				allowed := false
+				for _, c := range meta.Callers {
+					if strings.TrimPrefix(strings.ToLower(c), "0x") == caller {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					GATEWAYLOG().Printf("[AUTH] caller %s not in allowed list for model %s", token.Owner, modelNameArg)
+					writeProtocolError(w, r, http.StatusForbidden, "caller not authorized for this model", "forbidden")
+					return
+				}
+			}
+		}
+
+		// 免费模型（所有价格均为 0）跳过余额检查
+		isFree := modelInfo != nil && modelInfo.InPrice == 0 && modelInfo.OutPrice == 0 && modelInfo.CachedPrice == 0
+		if !isFree {
+			if bridge := getBridgeFn(); bridge != nil {
+				credit, err := gatewayGetCreditFn(bridge, token.Addr)
+				if err != nil {
+					GATEWAYLOG().Printf("[AUTH] get credit error for owner=%s: %v", token.Owner, err)
+				} else if credit <= 0 {
+					GATEWAYLOG().Printf("[AUTH] insufficient credit for owner=%s, credit=%d", token.Owner, credit)
+					writeProtocolError(w, r, http.StatusPaymentRequired, "insufficient credit", "insufficient_credit")
+					return
+				}
 			}
 		}
 
