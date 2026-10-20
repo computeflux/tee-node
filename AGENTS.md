@@ -33,9 +33,12 @@ export OE_MODE=SIM                # TEE 模式: SIM（开发）/ HW（生产）
 # 邮箱（Web3Auth 服务）: SMTP_HOST/PORT/FROM/USER/PASSWORD，MOCK_EMAIL=true 开发模式控制台打印 OTP
 # OAuth: GOOGLE/GITHUB/TWITTER_CLIENT_ID/SECRET
 # LOG_API_TOKEN  /api/logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；未设置则端点 404 关闭）
-go run main.go
-go build ./...
-go test ./...
+# ⚠️ 编译/运行必须用 ego 工具链（不能用 go build / go run 调用编译；普通 go 产物无法在 TEE 中运行）
+GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
+ego sign ./hack/build/dsecret      # 签名（TEE 校验，生成 dsecret.sig）
+OE_SIMULATION=1 ego run ./hack/build/dsecret
+# 一键构建（ego-go build + ego sign + 打 docker 镜像）：./hack/build.sh
+# 仅语法/单测检查（不产出 TEE 二进制）：go vet ./... && go test ./...
 ```
 
 ## 与各项目的关系
@@ -51,5 +54,6 @@ go test ./...
 - 遵循仓库根级约定（见上级 `AGENTS.md`）。
 - 独立 go.mod 模块，不随主仓库 go.sum 同步。
 - 改 GraphQL schema 后重新 `gqlgen` 生成 `graph/` 产物；改合约相关逻辑后同步 ABI。
-- 改动后跑 `go vet` / `go build ./...` / `go test ./...`。
+- **编译必须用 ego 工具链，不要用 `go build` / `go run`**：`GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go` → `ego sign ./hack/build/dsecret` → `OE_SIMULATION=1 ego run ./hack/build/dsecret`（一键 `./hack/build.sh`）。ego-go 自带 patch 过的 Go 工具链，与系统 go 共用 build cache 会混入不兼容目标文件（链接报 `invalid relocation ... not in [0,N)`）→ 必须用独立 GOCACHE。
+- 改动后跑 `go vet ./...` / `go test ./...` 做语法与单测检查（不产出 TEE 二进制）。
 - 信任模型：不信任单个节点，信任 TEE 硬件 + >2/3 诚实（BFT）+ DKG 门限——涉及密码学/共识路径的改动须评估对三者的影响。
