@@ -127,8 +127,11 @@ func DistributeMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
-		// 免费模型（所有价格均为 0）跳过余额检查
-		isFree := modelInfo != nil && modelInfo.InPrice == 0 && modelInfo.OutPrice == 0 && modelInfo.CachedPrice == 0
+		// 免费模型（独立定价且所有价格均为 0）跳过余额检查。
+		// 加入路由的模型（RouteID>0）结算时按路由价格计费（见 usage.go），
+		// 不能仅凭模型级价格判定免费，故此处要求 RouteID==0。
+		isFree := modelInfo != nil && modelInfo.RouteID == 0 &&
+			modelInfo.InPrice == 0 && modelInfo.OutPrice == 0 && modelInfo.CachedPrice == 0
 		if !isFree {
 			if bridge := getBridgeFn(); bridge != nil {
 				credit, err := gatewayGetCreditFn(bridge, token.Addr)
