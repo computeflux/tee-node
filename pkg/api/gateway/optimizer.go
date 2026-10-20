@@ -1,12 +1,14 @@
 package gateway
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 
+	"github.com/computeflux/tee-provider/pkg/services/notify"
 	"github.com/computeflux/tee-provider/pkg/services/scheduler"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
@@ -311,6 +313,10 @@ func settlePendingUsage() error {
 	}
 	GATEWAYLOG().Printf("[SETTLE] batch submitted %d records across %d providers", len(routeSettlements), len(records))
 
+	// 2.5 结算通知（降级方案）：按用户聚合本期结算，推送模板化通知到 actives 消息中心。
+	//     模型不可用时走模板（零 LLM 依赖）；未配置 actives 时静默 no-op，不影响结算主链路。
+	notifySettlements(routeSettlements)
+
 	// 4. 删除已提交的 usage 记录。
 	deleted := 0
 	for _, k := range keys {
@@ -325,6 +331,45 @@ func settlePendingUsage() error {
 	GATEWAYLOG().Printf("[SETTLE] deleted %d local usage records", deleted)
 
 	return nil
+}
+
+// notifySettlements 按用户聚合本期结算记录，推送模板化结算通知到 actives 消息中心。
+// 降级方案：模型不可用时走模板（零 LLM 依赖）；未配置 actives 时静默 no-op。
+// 任何推送失败仅记日志，绝不影响结算主链路。
+func notifySettlements(settlements []cgateway.SettlementWithRoute) {
+	if len(settlements) == 0 {
+		return
+	}
+	n := notify.NewFromEnv()
+	if !n.Enabled() {
+		return
+	}
+	// 按用户聚合调用次数与 token 消耗
+	type agg struct{ calls, tokens uint64 }
+	byUser := make(map[string]*agg, len(settlements))
+	for _, s := range settlements {
+		wallet := notify.WalletFromAddr(s.User)
+		if wallet == "" {
+			continue
+		}
+		a := byUser[wallet]
+		if a == nil {
+			a = &agg{}
+			byUser[wallet] = a
+		}
+		a.calls += uint64(s.Count)
+		a.tokens += uint64(s.TokenIn) + uint64(s.TokenOut)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for wallet, a := range byUser {
+		if err := n.Push(ctx, wallet, notify.EventTypeSettlement, map[string]string{
+			"calls":  fmt.Sprintf("%d", a.calls),
+			"tokens": fmt.Sprintf("%d", a.tokens),
+		}); err != nil {
+			GATEWAYLOG().Printf("[SETTLE] notify settlement wallet=%s failed: %v", wallet, err)
+		}
+	}
 }
 
 // submitSettleUsageWithRoute 提交 SettleUsageWithRoute 合约调用。
