@@ -166,6 +166,13 @@ EOF
 Environment="LOG_API_TOKEN=$LOG_API_TOKEN"
 EOF
 
+    # 通知推送（actives 服务地址 + 推送密钥，所有节点统一值）
+    ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/$SERVICE_NAME.d/notify.conf" > /dev/null << EOF
+[Service]
+Environment="NOTIFY_PUSH_SECRET=4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c"
+Environment="NOTIFY_ACTIVES_URL=https://test-api.computeflux.ai:9100"
+EOF
+
     remote_exec "sudo systemctl daemon-reload"
     remote_exec "sudo systemctl enable $SERVICE_NAME"
     remote_exec "sudo systemctl enable sgx-verify-service"

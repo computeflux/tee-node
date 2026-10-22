@@ -24,6 +24,17 @@ func TestTemplateFor(t *testing.T) {
 	assert.Contains(t, cc2, "10")
 	assert.Contains(t, cc2, "1000")
 
+	// 模型上架/下架（目录变更，推送给模型主人）
+	ttL, ccL := TemplateFor(EventTypeModelListed, map[string]string{"model": "claude-3"})
+	assert.Equal(t, "新模型上架", ttL)
+	assert.Contains(t, ccL, "claude-3")
+	assert.NotContains(t, ccL, "{model}")
+
+	ttD, ccD := TemplateFor(EventTypeModelDelisted, map[string]string{"model": "gpt-4o"})
+	assert.Equal(t, "模型已下架", ttD)
+	assert.Contains(t, ccD, "gpt-4o")
+	assert.NotContains(t, ccD, "{model}")
+
 	// 未知类型 → system 兜底
 	tt3, cc3 := TemplateFor("unknown", nil)
 	assert.Equal(t, "系统通知", tt3)

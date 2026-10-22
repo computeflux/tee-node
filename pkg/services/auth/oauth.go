@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	teechain "github.com/computeflux/tee-provider/tee-chain"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // OAuthService 社交登录验证
@@ -76,11 +78,11 @@ func (s *OAuthService) XAuthURL(state, codeChallenge, redirectUri string) string
 
 // ── Domain matching helpers ───────────────────────────────
 
-// extractHost 从 URL 中提取 hostname（去掉 scheme 和 path）。
+// extractHost 从 URL 中提取 hostname（去掉 scheme、path 和端口）。
 func extractHost(raw string) string {
 	u, err := url.Parse(raw)
 	if err == nil && u.Host != "" {
-		return u.Host
+		return u.Hostname()
 	}
 	//  fallback：手动去掉 scheme
 	s := strings.TrimSpace(raw)
@@ -95,17 +97,43 @@ func extractHost(raw string) string {
 	return s
 }
 
-// sameMainDomain 判断两个 URL 是否属于同一主域名。
-// 例如 https://app.example.com 和 https://example.com 返回 true。
+// eTLDPlusOne 返回 host 的可注册域名（eTLD+1），例如
+// test.computeflux.ai → computeflux.ai，example.com → example.com。
+func eTLDPlusOne(host string) (string, error) {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	ps := publicsuffix.List.PublicSuffix(host)
+	if ps == "" {
+		return "", fmt.Errorf("host %q has no public suffix", host)
+	}
+	if !strings.HasSuffix(host, "."+ps) {
+		return "", fmt.Errorf("host %q has no registrable domain", host)
+	}
+	rest := strings.TrimSuffix(host, "."+ps)
+	if idx := strings.LastIndex(rest, "."); idx != -1 {
+		rest = rest[idx+1:]
+	}
+	return rest + "." + ps, nil
+}
+
+// sameMainDomain 判断两个 URL 是否属于同一主域名（eTLD+1 / 可注册域名）。
+// 例如 https://test.computeflux.ai 和 https://shop.computeflux.ai 返回 true，
+// 因为它们都属于主域名 computeflux.ai；https://app.example.com 和
+// https://example.com 同样返回 true。
 func sameMainDomain(a, b string) bool {
 	aHost := extractHost(a)
 	bHost := extractHost(b)
 	if aHost == "" || bHost == "" {
 		return false
 	}
-	return aHost == bHost ||
-		strings.HasSuffix(aHost, "."+bHost) ||
-		strings.HasSuffix(bHost, "."+aHost)
+	if aHost == bHost {
+		return true
+	}
+	aMain, aErr := eTLDPlusOne(aHost)
+	bMain, bErr := eTLDPlusOne(bHost)
+	if aErr != nil || bErr != nil {
+		return false
+	}
+	return aMain == bMain
 }
 
 // pickRedirectURI 根据前端传入的 redirectUri 选择最终使用的 redirect_uri。
@@ -145,7 +173,7 @@ func (s *OAuthService) VerifyGoogleIDToken(idToken string) (*OAuthUserInfo, erro
 		return nil, fmt.Errorf("parse google response: %w", err)
 	}
 	if tokenInfo.Error != "" {
-		return nil, fmt.Errorf("google token error: %s — %s", tokenInfo.Error, tokenInfo.ErrorDesc)
+		return nil, fmt.Errorf("google id token error: %s — %s", tokenInfo.Error, tokenInfo.ErrorDesc)
 	}
 	if tokenInfo.Aud != s.cfg().GoogleClientID {
 		return nil, fmt.Errorf("token audience mismatch")
@@ -184,7 +212,7 @@ func (s *OAuthService) ExchangeGoogleCode(code, redirectUri string) (*OAuthUserI
 		Error       string `json:"error"`
 	}
 	if json.Unmarshal(body, &tokenResp) != nil || tokenResp.Error != "" {
-		return nil, fmt.Errorf("google token error: %s", string(body))
+		return nil, fmt.Errorf("google code token error: %s", string(body))
 	}
 
 	if tokenResp.IDToken != "" {

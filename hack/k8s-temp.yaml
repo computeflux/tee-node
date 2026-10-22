@@ -33,6 +33,10 @@ spec:
                         value: "$GQL_PORT"
                       - name: CHAIN_ENV
                         value: $CHAIN_ENV
+                      - name: NOTIFY_PUSH_SECRET
+                        value: "4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c"
+                      - name: NOTIFY_ACTIVES_URL
+                        value: "https://xiaobai.asyou.me:9100"
                   volumeMounts:
                       - name: $NAME
                         mountPath: /token_chain_data

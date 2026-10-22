@@ -156,6 +156,9 @@ func recordScheduleFailure(token *types.GatewayTokenInfo, modelKey string, err e
 	}
 	util.LogError("[ScheduleFailure]", m.ProviderID, m.Name, err)
 	usageCh <- usageRecord{user: token.Addr, tokenID: token.ID, model: model, routeID: 0, failCount: 1}
+
+	// 模型不可用（无可用端点/凭证全失效）时，给该用户推 model_offline（带冷却）
+	notifyModelUnavailable(token, modelKey, err)
 }
 
 func uintToStr(n uint64) string {
@@ -406,5 +409,6 @@ func InitOptimizations() {
 	initUsageWriter()
 	initRateLimiterCleanup()
 	initUsageSettler()
-	GATEWAYLOG().Printf("[OPT] async usage writer + rate limiter cleanup + usage settler started")
+	StartModelCatalogWatcher()
+	GATEWAYLOG().Printf("[OPT] async usage writer + rate limiter cleanup + usage settler + model catalog watcher started")
 }

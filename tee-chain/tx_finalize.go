@@ -99,6 +99,8 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 						if err := bm.SetHubCallStatus(id, status); err != nil {
 							util.LogWithRed("FinalizeTx", "SetHubCallStatus error for id", id, ":", err)
 						}
+						// hub call 已确认完成，清除错误池记录（若存在）
+						txErrPool.recordSuccess(p.SyncTxEnd.ChainId, id)
 					}
 				}
 			}

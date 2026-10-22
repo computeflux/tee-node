@@ -108,6 +108,10 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 	// 只读日志查询（供 tee-node-monitor 远程拉取; 受 LOG_API_TOKEN 控制, 默认 404 关闭）
 	router.Get("/logs", handleLogsAPI)
 
+	// 服务间 token 内省：下游服务（actives 等）用已有登录会话 token 换钱包，
+	// 避免用户再单独登录/签名（见 auth_whoami.go）。
+	router.Get("/auth/whoami", handleWhoami)
+
 	// Gateway REST routes (OpenAI SDK compatible)
 	gateway.RegisterGatewayRoutes(router)
 
@@ -121,6 +125,7 @@ func StartServerWithResolver(ctx context.Context, s *teechain.TeeChain, port int
 
 	util.LogWithBlue("API", "  /gql        -> GraphQL (auth, wallet, secrets)")
 	util.LogWithBlue("API", "  /v1/*       -> REST (AI relay)")
+	util.LogWithBlue("API", "  /auth/whoami -> token introspection (wallet)")
 	util.LogWithBlue("API", "  /health     -> health check")
 	util.LogWithBlue("API", "  /logs   -> 日志查询 (monitor, 需 LOG_API_TOKEN)")
 

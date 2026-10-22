@@ -37,6 +37,8 @@ docker run -d \
     -e GQL_PORT=$GQL_PORT \
     -e CHAIN_ENV=$CHAIN_ENV \
     -e SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004 \
+    -e NOTIFY_PUSH_SECRET=4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c \
+    -e NOTIFY_ACTIVES_URL=http://xiaobai.asyou.me:9100 \
     $img
 
 docker ps --filter name=$NAME

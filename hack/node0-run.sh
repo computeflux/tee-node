@@ -207,6 +207,18 @@ Environment="LOG_API_TOKEN=$LOG_API_TOKEN"
 EOF
 sudo systemctl daemon-reload
 
+# ── 通知推送（actives 服务地址 + 推送密钥，所有节点统一值）──
+NOTIFY_PUSH_SECRET="4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c"
+NOTIFY_ACTIVES_URL="${NOTIFY_ACTIVES_URL:-http://xiaobai.asyou.me:9100}"
+echo "Configuring NOTIFY_PUSH_SECRET / NOTIFY_ACTIVES_URL for tee-node0.service ..."
+sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+sudo tee /etc/systemd/system/tee-node0.service.d/notify.conf >/dev/null <<EOF
+[Service]
+Environment="NOTIFY_PUSH_SECRET=$NOTIFY_PUSH_SECRET"
+Environment="NOTIFY_ACTIVES_URL=$NOTIFY_ACTIVES_URL"
+EOF
+sudo systemctl daemon-reload
+
 # ── 检查并终止已有进程 ──
 if systemctl is-active --quiet tee-node0.service 2>/dev/null; then
     echo "Stopping existing tee-node0.service ..."

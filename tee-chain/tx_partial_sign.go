@@ -55,15 +55,38 @@ func (app *TeeChain) sendPartialSignByIds(chainId uint32, ids []uint64, proposer
 
 	calls := make([]chaintypes.ChainCall, 0, len(hubCalls))
 	for _, hc := range hubCalls {
+		// 错误池：多次失败的 hub call 暂时跳过，避免反复执行（持久化，重启保留）
+		if txErrPool.isPoisoned(chainId, hc.CallID) {
+			util.LogWithRed("sendPartialSignByIds", "skip poisoned hub call", hc.CallID, "chainId=", chainId)
+			continue
+		}
 		call, err := chain.TEECallToCall(hc, dkgKey)
 		if err != nil {
+			txErrPool.recordFailure(chainId, hc.CallID, err.Error())
 			util.LogWithRed("sendPartialSignByIds", "TEECallToCall error:", err)
 			continue
 		}
+		txErrPool.recordSuccess(chainId, hc.CallID)
 		calls = append(calls, *call)
 	}
 
 	if len(calls) == 0 {
+		// 所有 hub call 都 poisoned（或不可执行）：没有可发送的交易，
+		// 若不处理，这些 hub call 永远停留在 HubCallPending，
+		// targetSyncRelay 会每轮重新拾起 → 死循环。
+		// 标记为 HubCallDone 放弃该链，让交易生命周期正常结束。
+		// 状态更新纳入 txn，与区块提交原子化。
+		bm := batch.BatchSecret{Batch: *batch.NewBatch(runtime)}
+		for _, hc := range hubCalls {
+			if hc.Status == batch.HubCallPending {
+				util.LogWithRed("sendPartialSignByIds", "abandon all-poisoned hub call", hc.CallID, "chainId=", chainId)
+				if err := bm.SetHubCallStatus(hc.CallID, batch.HubCallDone); err != nil {
+					util.LogWithRed("sendPartialSignByIds", "SetHubCallStatus error for id", hc.CallID, ":", err)
+				}
+				// 已放弃，清除错误池记录，避免残留
+				txErrPool.recordSuccess(chainId, hc.CallID)
+			}
+		}
 		return errors.New("sendPartialSignByIds: no valid chain calls")
 	}
 

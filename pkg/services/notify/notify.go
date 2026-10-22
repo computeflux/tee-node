@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,8 +33,10 @@ import (
 
 // 预置事件类型（与 actives 侧 TemplateFor 保持一致）。
 const (
-	EventTypeModelOffline  = "model_offline"  // 模型下架/不可用
-	EventTypeModelRestored = "model_restored" // 模型恢复
+	EventTypeModelOffline  = "model_offline"  // 模型下架/不可用（用户请求失败触发）
+	EventTypeModelRestored = "model_restored" // 模型恢复（用户请求成功触发）
+	EventTypeModelListed   = "model_listed"   // 模型上架（目录变更，推送给模型主人）
+	EventTypeModelDelisted = "model_delisted" // 模型下架（目录变更，推送给模型主人）
 	EventTypeSettlement    = "settlement"     // 用量结算
 	EventTypeSystem        = "system"         // 系统公告
 )
@@ -95,6 +98,12 @@ func New(cfg Config) *Notifier {
 
 // Enabled 返回通知链路总开关状态。
 func (n *Notifier) Enabled() bool { return n.cfg.Enabled }
+
+// ActivesURL 返回配置的 actives 服务地址（未配置时为空串）。
+func (n *Notifier) ActivesURL() string { return n.cfg.ActivesURL }
+
+// HasSecret 返回是否配置了推送密钥。
+func (n *Notifier) HasSecret() bool { return n.cfg.PushSecret != "" }
 
 // NewFromEnv 从环境变量构造 Notifier。
 func NewFromEnv() *Notifier {
@@ -240,6 +249,12 @@ func TemplateFor(eventType string, vars map[string]string) (title, content strin
 	case EventTypeModelRestored:
 		title = "模型已恢复"
 		content = "您关注的模型 {model} 已恢复可用，欢迎继续使用。"
+	case EventTypeModelListed:
+		title = "新模型上架"
+		content = "模型 {model} 已上架，现在可以调用了。"
+	case EventTypeModelDelisted:
+		title = "模型已下架"
+		content = "模型 {model} 已下架，相关调用将不可用。"
 	case EventTypeSettlement:
 		title = "用量结算通知"
 		content = "本期结算完成：调用 {calls} 次，消耗 {tokens} tokens。"
@@ -264,7 +279,10 @@ func WalletFromAddr(a store.UniAddr) string {
 	if len(a.V) == 0 {
 		return ""
 	}
-	if a.T == 0 && len(a.V) == 20 {
+	// T=2 是 EVM（见 graph/auth_helpers.go createUserAPIKey：以太坊地址 callerType=2）；
+	// T=0 兼容旧数据。两者都按 20 字节 EVM 地址输出 0x 形式，否则下游（actives 按钱包寻址）
+	// 会拿到 "2:hex" 这类非法地址而拒绝。
+	if (a.T == 2 || a.T == 0) && len(a.V) == 20 {
 		return "0x" + hex.EncodeToString(a.V)
 	}
 	return fmt.Sprintf("%d:%s", a.T, hex.EncodeToString(a.V))
@@ -285,14 +303,17 @@ type pushRequest struct {
 // （已自动降级到模板）。未启用 / 未配置 actives 地址 / 空 wallet 时静默 no-op。
 func (n *Notifier) Push(ctx context.Context, wallet, eventType string, vars map[string]string) error {
 	if !n.cfg.Enabled {
+		log.Printf("[notify] Push no-op: disabled (eventType=%s wallet=%s)", eventType, wallet)
 		return nil
 	}
 	wallet = strings.ToLower(strings.TrimSpace(wallet))
 	if wallet == "" {
+		log.Printf("[notify] Push no-op: empty wallet (eventType=%s)", eventType)
 		return nil
 	}
 	if n.cfg.ActivesURL == "" || n.cfg.PushSecret == "" {
-		// 未配置推送目标：不产生外呼（开发环境默认）。
+		log.Printf("[notify] Push no-op: not configured (eventType=%s wallet=%s activesURL=%q secretSet=%v)",
+			eventType, wallet, n.cfg.ActivesURL, n.cfg.PushSecret != "")
 		return nil
 	}
 

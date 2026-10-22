@@ -287,6 +287,10 @@ func trimSSELine(line []byte) []byte {
 
 // recordRelayUsage 异步记录用量计费。Endpoint 已携带计费身份(ModelID/ContractProviderID)。
 func recordRelayUsage(token *types.GatewayTokenInfo, ep *scheduler.Endpoint, usage *relay.Usage) {
+	// 请求成功：若该 用户+模型 曾被标记不可用，推 model_restored（usage 为空也要发）
+	if token != nil && ep != nil {
+		notifyModelAvailable(token, ep.ModelName)
+	}
 	if usage == nil || token == nil || ep == nil {
 		return
 	}

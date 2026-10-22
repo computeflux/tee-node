@@ -105,6 +105,9 @@ func NewTeeChain(light bool) (*TeeChain, error) {
 
 		// 启动后台 goroutine 异步执行 ApplyToChain
 		go c.applyTxLoop()
+
+		// 启动错误池后台清理（回收过期条目，防止 DB 残留 key 无限增长）
+		go txErrPool.cleanupLoop()
 	}
 
 	return c, nil

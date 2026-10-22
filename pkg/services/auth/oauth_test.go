@@ -48,6 +48,57 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return m.base.RoundTrip(req)
 }
 
+// ── Domain matching tests ─────────────────────────────────
+
+func TestSameMainDomain(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"sibling subdomains", "https://test.computeflux.ai/oauth/callback.html", "https://shop.computeflux.ai/oauth/callback.html", true},
+		{"subdomain vs apex", "https://app.example.com", "https://example.com", true},
+		{"identical", "https://example.com/cb", "https://example.com/other", true},
+		{"different domains", "https://a.example.com", "https://b.other.com", false},
+		{"suffix trick not matched", "https://evilexample.com", "https://example.com", false},
+		{"subdomain of suffix trick", "https://a.evilexample.com", "https://example.com", false},
+		{"empty a", "", "https://example.com", false},
+		{"empty b", "https://example.com", "", false},
+		{"with port", "https://example.com:8080/cb", "https://example.com/cb", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, sameMainDomain(tt.a, tt.b))
+		})
+	}
+}
+
+func TestPickRedirectURI(t *testing.T) {
+	ResetConfigCache()
+	SetCachedConfigForTest(&AuthConfig{
+		GoogleClientID:    "google-client-id",
+		GoogleRedirectURL: "https://test.computeflux.ai/oauth/callback.html",
+	})
+	svc := &OAuthService{tc: nil}
+
+	// 同一主域名的兄弟子域名应被接受
+	assert.Equal(t,
+		"https://shop.computeflux.ai/oauth/callback.html",
+		svc.pickRedirectURI("https://shop.computeflux.ai/oauth/callback.html"))
+	// 完全相同
+	assert.Equal(t,
+		"https://test.computeflux.ai/oauth/callback.html",
+		svc.pickRedirectURI("https://test.computeflux.ai/oauth/callback.html"))
+	// 不同主域名应回退到配置值
+	assert.Equal(t,
+		"https://test.computeflux.ai/oauth/callback.html",
+		svc.pickRedirectURI("https://evil.com/callback"))
+	// 空值回退到配置值
+	assert.Equal(t,
+		"https://test.computeflux.ai/oauth/callback.html",
+		svc.pickRedirectURI(""))
+}
+
 // ── Auth URL tests ─────────────────────────────────────────
 
 func TestOAuthService_GoogleAuthURL(t *testing.T) {

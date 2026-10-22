@@ -38,6 +38,14 @@
         {
             "name": "LOG_API_TOKEN",
             "fromHost": true
+        },
+        {
+            "name": "NOTIFY_PUSH_SECRET",
+            "fromHost": true
+        },
+        {
+            "name": "NOTIFY_ACTIVES_URL",
+            "fromHost": true
         }
     ],
     "files": [
