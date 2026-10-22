@@ -45,6 +45,8 @@ ext/experimental/dss
 
 ext/actives/build
 hack/build/keys
+# 构建产物（hack/build.sh 重新生成，勿入库）
+/hack/build/sgx-verify-service
 tee-chain/runtime/wasm/ego/ego
 
 # Local secrets / operator config (NEVER commit)
