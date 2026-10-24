@@ -15,29 +15,29 @@ import (
 // TestTemplateFor 验证模板兜底（零 LLM 依赖）：各事件类型产出非空文案，占位符被替换。
 func TestTemplateFor(t *testing.T) {
 	tt, cc := TemplateFor(EventTypeModelOffline, map[string]string{"model": "gpt-4"})
-	assert.Equal(t, "模型暂时不可用", tt)
+	assert.Equal(t, "Model temporarily unavailable", tt)
 	assert.Contains(t, cc, "gpt-4")
 	assert.NotContains(t, cc, "{model}")
 
 	tt2, cc2 := TemplateFor(EventTypeSettlement, map[string]string{"calls": "10", "tokens": "1000"})
-	assert.Equal(t, "用量结算通知", tt2)
+	assert.Equal(t, "Usage settlement", tt2)
 	assert.Contains(t, cc2, "10")
 	assert.Contains(t, cc2, "1000")
 
 	// 模型上架/下架（目录变更，推送给模型主人）
 	ttL, ccL := TemplateFor(EventTypeModelListed, map[string]string{"model": "claude-3"})
-	assert.Equal(t, "新模型上架", ttL)
+	assert.Equal(t, "New model listed", ttL)
 	assert.Contains(t, ccL, "claude-3")
 	assert.NotContains(t, ccL, "{model}")
 
 	ttD, ccD := TemplateFor(EventTypeModelDelisted, map[string]string{"model": "gpt-4o"})
-	assert.Equal(t, "模型已下架", ttD)
+	assert.Equal(t, "Model delisted", ttD)
 	assert.Contains(t, ccD, "gpt-4o")
 	assert.NotContains(t, ccD, "{model}")
 
 	// 未知类型 → system 兜底
 	tt3, cc3 := TemplateFor("unknown", nil)
-	assert.Equal(t, "系统通知", tt3)
+	assert.Equal(t, "System notification", tt3)
 	assert.NotEmpty(t, cc3)
 }
 
@@ -45,7 +45,7 @@ func TestTemplateFor(t *testing.T) {
 func TestGenerate_NoLLM(t *testing.T) {
 	n := New(Config{Enabled: true})
 	title, content := n.Generate(context.Background(), EventTypeModelOffline, map[string]string{"model": "gpt-4"})
-	assert.Equal(t, "模型暂时不可用", title)
+	assert.Equal(t, "Model temporarily unavailable", title)
 	assert.Contains(t, content, "gpt-4")
 }
 
@@ -65,7 +65,7 @@ func TestGenerate_LLMUnavailable(t *testing.T) {
 	})
 	title, content := n.Generate(context.Background(), EventTypeModelOffline, map[string]string{"model": "gpt-4"})
 	// 降级到模板
-	assert.Equal(t, "模型暂时不可用", title)
+	assert.Equal(t, "Model temporarily unavailable", title)
 	assert.Contains(t, content, "gpt-4")
 }
 
@@ -74,7 +74,7 @@ func TestGenerate_LLMOK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/chat/completions", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"自定义标题\n自定义正文内容"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Custom title\nCustom body text"}}]}`))
 	}))
 	defer srv.Close()
 
@@ -85,8 +85,8 @@ func TestGenerate_LLMOK(t *testing.T) {
 		LLMTimeout: 2 * time.Second,
 	})
 	title, content := n.Generate(context.Background(), EventTypeSystem, nil)
-	assert.Equal(t, "自定义标题", title)
-	assert.Equal(t, "自定义正文内容", content)
+	assert.Equal(t, "Custom title", title)
+	assert.Equal(t, "Custom body text", content)
 }
 
 // TestPush_TemplateFallback 核心验收：模型完全不可访问时，Push 仍能产生通知并成功推送到 actives。
@@ -124,7 +124,7 @@ func TestPush_TemplateFallback(t *testing.T) {
 	assert.Equal(t, "s3cret", gotSecret)
 	assert.Contains(t, gotBody, `"wallet":"0xabc"`) // wallet 归一化小写
 	assert.Contains(t, gotBody, `"type":"model_offline"`)
-	assert.Contains(t, gotBody, "模型暂时不可用") // 模板兜底文案
+	assert.Contains(t, gotBody, "Model temporarily unavailable") // 模板兜底文案
 	assert.Contains(t, gotBody, "gpt-4")
 }
 

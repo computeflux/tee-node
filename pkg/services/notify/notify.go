@@ -205,12 +205,12 @@ func (n *Notifier) generateByLLM(ctx context.Context, eventType string, vars map
 // buildLLMPrompt 构造 LLM 提示词（要求两行输出：title / content）。
 func buildLLMPrompt(eventType string, vars map[string]string) string {
 	var b strings.Builder
-	b.WriteString("你是 ComputeFlux 的用户通知文案助手。请为以下链上事件生成一条简短、友好的中文通知。\n")
-	b.WriteString("事件类型: ")
+	b.WriteString("You are the user-notification copywriter for ComputeFlux. Write a short, friendly English notification for the on-chain event below.\n")
+	b.WriteString("Event type: ")
 	b.WriteString(eventType)
 	b.WriteString("\n")
 	if len(vars) > 0 {
-		b.WriteString("变量: ")
+		b.WriteString("Variables: ")
 		first := true
 		for k, v := range vars {
 			if !first {
@@ -223,7 +223,7 @@ func buildLLMPrompt(eventType string, vars map[string]string) string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("输出格式（严格两行，不要多余内容）:\n第一行: 标题（≤16字）\n第二行: 正文（≤60字）\n")
+	b.WriteString("Output format (exactly two lines, no extra text):\nLine 1: title (max 6 words)\nLine 2: body (max 30 words)\n")
 	return b.String()
 }
 
@@ -244,23 +244,23 @@ func parseLLMOutput(raw string) (title, content string) {
 func TemplateFor(eventType string, vars map[string]string) (title, content string) {
 	switch eventType {
 	case EventTypeModelOffline:
-		title = "模型暂时不可用"
-		content = "您使用的模型 {model} 暂时下架，相关调用已暂停。恢复后将自动通知您。"
+		title = "Model temporarily unavailable"
+		content = "Model {model} is temporarily unavailable and related calls are paused. We will notify you once it is restored."
 	case EventTypeModelRestored:
-		title = "模型已恢复"
-		content = "您关注的模型 {model} 已恢复可用，欢迎继续使用。"
+		title = "Model restored"
+		content = "Model {model} is available again. You can continue using it."
 	case EventTypeModelListed:
-		title = "新模型上架"
-		content = "模型 {model} 已上架，现在可以调用了。"
+		title = "New model listed"
+		content = "Model {model} is now listed and ready to use."
 	case EventTypeModelDelisted:
-		title = "模型已下架"
-		content = "模型 {model} 已下架，相关调用将不可用。"
+		title = "Model delisted"
+		content = "Model {model} has been delisted and can no longer be used."
 	case EventTypeSettlement:
-		title = "用量结算通知"
-		content = "本期结算完成：调用 {calls} 次，消耗 {tokens} tokens。"
+		title = "Usage settlement"
+		content = "Settlement for this period is complete: {calls} calls, {tokens} tokens consumed."
 	default:
-		title = "系统通知"
-		content = "您有一条新的系统通知。"
+		title = "System notification"
+		content = "You have a new system notification."
 	}
 	for k, v := range vars {
 		title = strings.ReplaceAll(title, "{"+k+"}", v)

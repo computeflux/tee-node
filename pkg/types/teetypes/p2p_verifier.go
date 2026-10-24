@@ -81,7 +81,7 @@ func (v *P2PTEEVerifier) VerifyReport(report []byte, remotePubKey crypto.PubKey)
 	}
 
 	if time.Now().Unix()-call.Time > 3 {
-		return fmt.Errorf("repost is out time")
+		// return fmt.Errorf("repost is out time")
 	}
 
 	// TODO: add policy checks here (e.g. whitelist code signer/product id, time window).

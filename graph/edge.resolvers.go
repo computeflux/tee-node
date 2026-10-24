@@ -180,6 +180,11 @@ func (r *queryResolver) Models(ctx context.Context, keyword *string, minContext 
 			continue
 		}
 
+		// 判断激活状态
+		if !d.IsActive {
+			continue
+		}
+
 		// 路由在索引层不支持价格范围，这里按 inPrice 在内存中补一道价格过滤。
 		if minPrice != nil && d.InPrice < uint64(*minPrice) {
 			continue
