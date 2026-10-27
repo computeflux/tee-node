@@ -159,3 +159,70 @@ func TestPush_ActivesRejects(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "401"))
 }
+
+// TestPush_SettlementDisabledByDefault 验收 1：结算通知子开关默认关闭，
+// Usage settlement 消息不产生/不外呼；其余事件类型不受影响。
+func TestPush_SettlementDisabledByDefault(t *testing.T) {
+	var settlementCalls, otherCalls int
+	actives := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(buf)
+		if strings.Contains(string(buf), `"type":"settlement"`) {
+			settlementCalls++
+		} else {
+			otherCalls++
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer actives.Close()
+
+	// 默认 Config（SettlementEnabled 零值 = false）
+	n := New(Config{Enabled: true, ActivesURL: actives.URL, PushSecret: "s"})
+	assert.False(t, n.SettlementEnabled())
+
+	// settlement 被短路（无外呼、无报错）
+	err := n.Push(context.Background(), "0xabc", EventTypeSettlement, map[string]string{"calls": "10", "tokens": "1000"})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, settlementCalls)
+
+	// 其余事件类型正常推送
+	err = n.Push(context.Background(), "0xabc", EventTypeModelOffline, map[string]string{"model": "gpt-4"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, otherCalls)
+}
+
+// TestPush_SettlementEnabled 验收 3：开关置 true 后结算通知恢复发送，无需改代码。
+func TestPush_SettlementEnabled(t *testing.T) {
+	var settlementCalls int
+	actives := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(buf)
+		if strings.Contains(string(buf), `"type":"settlement"`) {
+			settlementCalls++
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer actives.Close()
+
+	n := New(Config{Enabled: true, SettlementEnabled: true, ActivesURL: actives.URL, PushSecret: "s"})
+	assert.True(t, n.SettlementEnabled())
+
+	err := n.Push(context.Background(), "0xabc", EventTypeSettlement, map[string]string{"calls": "10", "tokens": "1000"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, settlementCalls)
+}
+
+// TestConfigFromEnv_SettlementSwitch 验收 1/3：环境变量 TEE_USAGE_SETTLEMENT_ENABLED
+// 默认 false（暂停），显式 "true" 时恢复。
+func TestConfigFromEnv_SettlementSwitch(t *testing.T) {
+	t.Setenv("TEE_USAGE_SETTLEMENT_ENABLED", "")
+	assert.False(t, configFromEnv().SettlementEnabled) // 未设置 → 默认关闭
+
+	t.Setenv("TEE_USAGE_SETTLEMENT_ENABLED", "false")
+	assert.False(t, configFromEnv().SettlementEnabled)
+
+	t.Setenv("TEE_USAGE_SETTLEMENT_ENABLED", "true")
+	assert.True(t, configFromEnv().SettlementEnabled)
+}

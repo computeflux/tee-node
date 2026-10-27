@@ -33,6 +33,10 @@ export OE_MODE=SIM                # TEE 模式: SIM（开发）/ HW（生产）
 # 邮箱（Web3Auth 服务）: SMTP_HOST/PORT/FROM/USER/PASSWORD，MOCK_EMAIL=true 开发模式控制台打印 OTP
 # OAuth: GOOGLE/GITHUB/TWITTER_CLIENT_ID/SECRET
 # LOG_API_TOKEN  /api/logs 日志查询端点 token（供 tee-node-monitor 远程拉取日志；未设置则端点 404 关闭）
+# 用户通知（actives 消息中心）: NOTIFY_ENABLED（总开关，默认 true）/ NOTIFY_ACTIVES_URL / NOTIFY_PUSH_SECRET
+#   TEE_USAGE_SETTLEMENT_ENABLED — 「Usage settlement」结算通知子开关，**默认 false（暂停）**：
+#   结算消息量过大，默认不生成/不推送该类型通知；置 "true" 即恢复发送，无需改代码。
+#   仅暂停消息，不影响结算/计费主链路，也不影响 model_offline/restored/listed/delisted 等其它通知。
 # ⚠️ 编译/运行必须用 ego 工具链（不能用 go build / go run 调用编译；普通 go 产物无法在 TEE 中运行）
 GOCACHE="$HOME/.cache/ego-go-build" ego-go build -o ./hack/build/dsecret ./main.go
 ego sign ./hack/build/dsecret      # 签名（TEE 校验，生成 dsecret.sig）

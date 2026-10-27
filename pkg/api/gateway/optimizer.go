@@ -347,6 +347,12 @@ func notifySettlements(settlements []cgateway.SettlementWithRoute) {
 	if !n.Enabled() {
 		return
 	}
+	if !n.SettlementEnabled() {
+		// 结算通知子开关关闭（TEE_USAGE_SETTLEMENT_ENABLED 默认 false）：
+		// 跳过聚合与推送，仅暂停该类型消息，不影响结算主链路。
+		GATEWAYLOG().Printf("[SETTLE] notify settlement skipped: TEE_USAGE_SETTLEMENT_ENABLED=false (%d records)", len(settlements))
+		return
+	}
 	// 按用户聚合调用次数与 token 消耗
 	type agg struct{ calls, tokens uint64 }
 	byUser := make(map[string]*agg, len(settlements))

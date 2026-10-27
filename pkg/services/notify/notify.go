@@ -45,6 +45,9 @@ const (
 type Config struct {
 	// Enabled 总开关；false 时 Push 直接 no-op（不产生任何外呼）。
 	Enabled bool
+	// SettlementEnabled 结算通知（Usage settlement）子开关；默认 false（消息量过大，暂停）。
+	// false 时 Push 对 EventTypeSettlement 直接 no-op（跳过文案构造与推送），其余事件类型不受影响。
+	SettlementEnabled bool
 	// ActivesURL actives 服务根地址（如 https://api.computeflux.ai），推送打到 <ActivesURL>/messages/push。
 	ActivesURL string
 	// PushSecret 与 actives 的 ACTIVES_MESSAGE_PUSH_SECRET 一致的共享密钥。
@@ -65,15 +68,18 @@ type Config struct {
 // configFromEnv 从环境变量构造 Config。
 func configFromEnv() Config {
 	enabled := util.GetEnv("NOTIFY_ENABLED", "true") != "false"
+	// 结算通知默认关闭（量过大）；显式置 "true" 才恢复发送。
+	settlementEnabled := util.GetEnv("TEE_USAGE_SETTLEMENT_ENABLED", "false") == "true"
 	return Config{
-		Enabled:     enabled,
-		ActivesURL:  strings.TrimRight(util.GetEnv("NOTIFY_ACTIVES_URL", ""), "/"),
-		PushSecret:  util.GetEnv("NOTIFY_PUSH_SECRET", ""),
-		LLMBaseURL:  strings.TrimRight(util.GetEnv("NOTIFY_LLM_BASE_URL", ""), "/"),
-		LLMKey:      util.GetEnv("NOTIFY_LLM_KEY", ""),
-		LLMModel:    util.GetEnv("NOTIFY_LLM_MODEL", ""),
-		LLMTimeout:  time.Duration(util.GetEnvInt("NOTIFY_LLM_TIMEOUT_MS", 8000)) * time.Millisecond,
-		PushTimeout: time.Duration(util.GetEnvInt("NOTIFY_PUSH_TIMEOUT_MS", 5000)) * time.Millisecond,
+		Enabled:           enabled,
+		SettlementEnabled: settlementEnabled,
+		ActivesURL:        strings.TrimRight(util.GetEnv("NOTIFY_ACTIVES_URL", ""), "/"),
+		PushSecret:        util.GetEnv("NOTIFY_PUSH_SECRET", ""),
+		LLMBaseURL:        strings.TrimRight(util.GetEnv("NOTIFY_LLM_BASE_URL", ""), "/"),
+		LLMKey:            util.GetEnv("NOTIFY_LLM_KEY", ""),
+		LLMModel:          util.GetEnv("NOTIFY_LLM_MODEL", ""),
+		LLMTimeout:        time.Duration(util.GetEnvInt("NOTIFY_LLM_TIMEOUT_MS", 8000)) * time.Millisecond,
+		PushTimeout:       time.Duration(util.GetEnvInt("NOTIFY_PUSH_TIMEOUT_MS", 5000)) * time.Millisecond,
 	}
 }
 
@@ -98,6 +104,9 @@ func New(cfg Config) *Notifier {
 
 // Enabled 返回通知链路总开关状态。
 func (n *Notifier) Enabled() bool { return n.cfg.Enabled }
+
+// SettlementEnabled 返回结算通知（Usage settlement）子开关状态（默认 false）。
+func (n *Notifier) SettlementEnabled() bool { return n.cfg.SettlementEnabled }
 
 // ActivesURL 返回配置的 actives 服务地址（未配置时为空串）。
 func (n *Notifier) ActivesURL() string { return n.cfg.ActivesURL }
@@ -304,6 +313,12 @@ type pushRequest struct {
 func (n *Notifier) Push(ctx context.Context, wallet, eventType string, vars map[string]string) error {
 	if !n.cfg.Enabled {
 		log.Printf("[notify] Push no-op: disabled (eventType=%s wallet=%s)", eventType, wallet)
+		return nil
+	}
+	if eventType == EventTypeSettlement && !n.cfg.SettlementEnabled {
+		// 结算通知子开关关闭（TEE_USAGE_SETTLEMENT_ENABLED 默认 false）：
+		// 跳过文案构造与推送，仅暂停该类型消息，不影响结算主链路与其它通知。
+		log.Printf("[notify] Push no-op: usage settlement disabled (TEE_USAGE_SETTLEMENT_ENABLED=false, wallet=%s)", wallet)
 		return nil
 	}
 	wallet = strings.ToLower(strings.TrimSpace(wallet))
