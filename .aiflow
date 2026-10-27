@@ -1,0 +1,7 @@
+# tee-node 应用级流程配置（evolve-driver 识别）
+#
+# image_build: skip
+#   tee-node 是 TEE 进程（宿主 workflow-c2c.service 部署），不走容器灰度；
+#   且 Dockerfile 打包 ego 预编译产物 dsecret（gitignored，worktree 缺文件无法 docker build）。
+#   进化链路跳过镜像构建，灰度回退继承 live 镜像。
+image_build: skip
