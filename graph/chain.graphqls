@@ -12,6 +12,36 @@ type ChainInfo {
 extend type Query {
   chain_info: [ChainInfo!]!
   validators: [String!]!
+  """区块详情（区块头 + 区块内交易列表），按高度或哈希查询"""
+  block_detail(height: Int, hash: String): BlockDetail
+}
+
+type BlockDetail {
+  """区块高度"""
+  height: Int!
+  """区块哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """出块时间（RFC3339）"""
+  time: String!
+  """链 ID"""
+  chain_id: String!
+  """出块节点（proposer address，hex）"""
+  proposer: String!
+  """上一区块哈希（hex）"""
+  prev_hash: String
+  """应用哈希（hex）"""
+  app_hash: String
+  """数据哈希（hex）"""
+  data_hash: String
+  """区块内交易列表"""
+  txs: [BlockTx!]!
+}
+
+type BlockTx {
+  """交易在区块内的索引"""
+  index: Int!
+  """交易哈希（hex，无 0x 前缀）"""
+  hash: String!
 }
 
 extend type Mutation {

@@ -6,12 +6,15 @@ package graph
 
 import (
 	"context"
+	"encoding/hex"
 	"time"
 
+	"github.com/cometbft/cometbft/types"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
+	teechain "github.com/computeflux/tee-provider/tee-chain"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
@@ -64,4 +67,66 @@ func (r *queryResolver) Validators(ctx context.Context) ([]string, error) {
 		list = append(list, pub.SS58())
 	}
 	return list, nil
+}
+
+// BlockDetail is the resolver for the block_detail field.
+//
+// 从本节点内置的 CometBFT BlockStore 读取区块（区块头 + 区块内交易列表）。
+// 支持按高度（height）或哈希（hash）查询；两者都传时优先 height。
+// 交易哈希由区块内原始交易字节计算（与链上 /tx 查询一致），供前端跳转交易详情。
+func (r *queryResolver) BlockDetail(ctx context.Context, height *int, hash *string) (*model.BlockDetail, error) {
+	node := teechain.TeeChainNode
+	if node == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+	bs := node.BlockStore()
+	if bs == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+
+	var block *types.Block
+	switch {
+	case height != nil:
+		block = bs.LoadBlock(int64(*height))
+	case hash != nil && *hash != "":
+		hexHash, err := normalizeHexHash(*hash)
+		if err != nil {
+			return nil, gqlerror.Errorf("%s", "invalid block hash: "+err.Error())
+		}
+		block = bs.LoadBlockByHash(hexHash)
+	default:
+		return nil, gqlerror.Errorf("%s", "either height or hash is required")
+	}
+	if block == nil {
+		return nil, gqlerror.Errorf("%s", "block not found")
+	}
+
+	h := block.Header
+	detail := &model.BlockDetail{
+		Height:   int(h.Height),
+		Hash:     hex.EncodeToString(block.Hash()),
+		Time:     h.Time.UTC().Format(time.RFC3339),
+		ChainID:  h.ChainID,
+		Proposer: hex.EncodeToString(h.ProposerAddress),
+		Txs:      make([]*model.BlockTx, 0, len(block.Data.Txs)),
+	}
+	if len(h.LastBlockID.Hash) > 0 {
+		prev := hex.EncodeToString(h.LastBlockID.Hash)
+		detail.PrevHash = &prev
+	}
+	if len(h.AppHash) > 0 {
+		app := hex.EncodeToString(h.AppHash)
+		detail.AppHash = &app
+	}
+	if len(h.DataHash) > 0 {
+		data := hex.EncodeToString(h.DataHash)
+		detail.DataHash = &data
+	}
+	for i, tx := range block.Data.Txs {
+		detail.Txs = append(detail.Txs, &model.BlockTx{
+			Index: i,
+			Hash:  hex.EncodeToString(tx.Hash()),
+		})
+	}
+	return detail, nil
 }

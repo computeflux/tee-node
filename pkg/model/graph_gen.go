@@ -43,6 +43,34 @@ type AuthConfigInput struct {
 	TwitterRedirectURL  string `json:"twitterRedirectURL"`
 }
 
+type BlockDetail struct {
+	// 区块高度
+	Height int `json:"height"`
+	// 区块哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+	// 出块时间（RFC3339）
+	Time string `json:"time"`
+	// 链 ID
+	ChainID string `json:"chain_id"`
+	// 出块节点（proposer address，hex）
+	Proposer string `json:"proposer"`
+	// 上一区块哈希（hex）
+	PrevHash *string `json:"prev_hash,omitempty"`
+	// 应用哈希（hex）
+	AppHash *string `json:"app_hash,omitempty"`
+	// 数据哈希（hex）
+	DataHash *string `json:"data_hash,omitempty"`
+	// 区块内交易列表
+	Txs []*BlockTx `json:"txs"`
+}
+
+type BlockTx struct {
+	// 交易在区块内的索引
+	Index int `json:"index"`
+	// 交易哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+}
+
 type ChainInfo struct {
 	IsMain         bool   `json:"is_main"`
 	SubnetContract string `json:"subnet_contract"`
