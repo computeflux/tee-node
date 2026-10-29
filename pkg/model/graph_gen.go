@@ -205,3 +205,38 @@ type SignSessionResult struct {
 	ExpiresAt *int    `json:"expiresAt,omitempty"`
 	Error     *string `json:"error,omitempty"`
 }
+
+type TxDetail struct {
+	// 交易哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+	// 所在区块高度
+	Height int `json:"height"`
+	// 交易在区块内的索引
+	Index int `json:"index"`
+	// 出块时间（RFC3339）
+	Time string `json:"time"`
+	// 执行码（0 = 成功）
+	Code int `json:"code"`
+	// 是否成功
+	Success bool `json:"success"`
+	// 发起方地址（SS58）
+	From *string `json:"from,omitempty"`
+	// 目标合约名（合约调用时）
+	To *string `json:"to,omitempty"`
+	// 合约方法（合约调用时）
+	Method *string `json:"method,omitempty"`
+	// 合约参数（hex 列表，合约调用时）
+	Args []string `json:"args,omitempty"`
+	// 用户级 nonce（合约调用时）
+	Nonce *int `json:"nonce,omitempty"`
+	// 金额（本侧链为合约调用，通常无原生金额，留空）
+	Amount *string `json:"amount,omitempty"`
+	// Gas 用量
+	GasUsed *int `json:"gas_used,omitempty"`
+	// Gas 上限
+	GasWanted *int `json:"gas_wanted,omitempty"`
+	// 原始交易字节（hex）
+	Data *string `json:"data,omitempty"`
+	// 事件（JSON 字符串）
+	Events *string `json:"events,omitempty"`
+}

@@ -7,6 +7,7 @@ package graph
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	"github.com/cometbft/cometbft/types"
@@ -128,5 +129,96 @@ func (r *queryResolver) BlockDetail(ctx context.Context, height *int, hash *stri
 			Hash:  hex.EncodeToString(tx.Hash()),
 		})
 	}
+	return detail, nil
+}
+
+// TxDetail is the resolver for the tx_detail field.
+//
+// 从本节点内置的 CometBFT TxIndexer 按交易哈希查询交易结果，
+// 再解码原始交易字节（model.Tx → model.SysCall）提取 From/To/方法/参数，
+// 并加载所在区块获取出块时间。数据与链上 /tx 查询一致。
+func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDetail, error) {
+	node := teechain.TeeChainNode
+	if node == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+
+	hexHash, err := normalizeHexHash(hash)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "invalid tx hash: "+err.Error())
+	}
+
+	// 通过 ConfigureRPC 拿到内置 TxIndexer（与 /tx RPC 同一数据源）
+	env, err := node.ConfigureRPC()
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "tx indexer not ready: "+err.Error())
+	}
+	if env.TxIndexer == nil {
+		return nil, gqlerror.Errorf("%s", "tx indexer not ready")
+	}
+
+	res, err := env.TxIndexer.Get(hexHash)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "tx not found: "+err.Error())
+	}
+	if res == nil {
+		return nil, gqlerror.Errorf("%s", "tx not found")
+	}
+
+	// 加载所在区块获取出块时间
+	var blockTime string
+	if block := node.BlockStore().LoadBlock(res.Height); block != nil {
+		blockTime = block.Header.Time.UTC().Format(time.RFC3339)
+	}
+
+	detail := &model.TxDetail{
+		Hash:      hex.EncodeToString(hexHash),
+		Height:    int(res.Height),
+		Index:     int(res.Index),
+		Time:      blockTime,
+		Code:      int(res.Result.Code),
+		Success:   res.Result.Code == 0,
+		GasUsed:   intPtr(res.Result.GasUsed),
+		GasWanted: intPtr(res.Result.GasWanted),
+		Data:      strPtr(hex.EncodeToString(res.Tx)),
+	}
+
+	// 事件序列化为 JSON 字符串
+	if len(res.Result.Events) > 0 {
+		if b, e := json.Marshal(res.Result.Events); e == nil {
+			events := string(b)
+			detail.Events = &events
+		}
+	}
+
+	// 解码原始交易字节，提取 From/To/方法/参数/nonce
+	if txBox, e := decodeTxBox(res.Tx); e == nil && txBox != nil {
+		if len(txBox.Caller) > 0 {
+			from := crypto.PubKeyFromByte(txBox.Caller).SS58()
+			detail.From = &from
+		}
+		if call, e2 := decodeSysCall(txBox.Call); e2 == nil && call != nil {
+			if cc, ok := call.Payload.(*model.SysCall_Contract); ok && cc.Contract != nil {
+				if len(cc.Contract.Name) > 0 {
+					to := string(cc.Contract.Name)
+					detail.To = &to
+				}
+				if len(cc.Contract.Method) > 0 {
+					method := string(cc.Contract.Method)
+					detail.Method = &method
+				}
+				if len(cc.Contract.Args) > 0 {
+					args := make([]string, 0, len(cc.Contract.Args))
+					for _, a := range cc.Contract.Args {
+						args = append(args, hex.EncodeToString(a))
+					}
+					detail.Args = args
+				}
+				nonce := int(cc.Contract.Nonce)
+				detail.Nonce = &nonce
+			}
+		}
+	}
+
 	return detail, nil
 }

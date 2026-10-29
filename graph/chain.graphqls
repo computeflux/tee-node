@@ -14,6 +14,8 @@ extend type Query {
   validators: [String!]!
   """区块详情（区块头 + 区块内交易列表），按高度或哈希查询"""
   block_detail(height: Int, hash: String): BlockDetail
+  """交易详情（按交易哈希查询），含 From/To/状态/所在区块"""
+  tx_detail(hash: String!): TxDetail
 }
 
 type BlockDetail {
@@ -42,6 +44,41 @@ type BlockTx {
   index: Int!
   """交易哈希（hex，无 0x 前缀）"""
   hash: String!
+}
+
+type TxDetail {
+  """交易哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """所在区块高度"""
+  height: Int!
+  """交易在区块内的索引"""
+  index: Int!
+  """出块时间（RFC3339）"""
+  time: String!
+  """执行码（0 = 成功）"""
+  code: Int!
+  """是否成功"""
+  success: Boolean!
+  """发起方地址（SS58）"""
+  from: String
+  """目标合约名（合约调用时）"""
+  to: String
+  """合约方法（合约调用时）"""
+  method: String
+  """合约参数（hex 列表，合约调用时）"""
+  args: [String!]
+  """用户级 nonce（合约调用时）"""
+  nonce: Int
+  """金额（本侧链为合约调用，通常无原生金额，留空）"""
+  amount: String
+  """Gas 用量"""
+  gas_used: Int
+  """Gas 上限"""
+  gas_wanted: Int
+  """原始交易字节（hex）"""
+  data: String
+  """事件（JSON 字符串）"""
+  events: String
 }
 
 extend type Mutation {
