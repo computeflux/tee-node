@@ -8,8 +8,12 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"sync"
 	"time"
 
+	"github.com/cometbft/cometbft/state/txindex"
+	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -221,4 +225,188 @@ func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDet
 	}
 
 	return detail, nil
+}
+
+// maxChainOverviewLimit 是 chain_overview 单次查询的 blockLimit/txLimit 上限。
+//
+// 该查询未挂 @auth 指令、对匿名请求可达，入参若不加上限：
+//   - make(..., 0, *limit) 会按攻击者给的容量预分配（传 1e9 即单请求申请数 GB 内存 → OOM）；
+//   - 区块列表循环会遍历整条链的区块头（每次 LoadBlockMeta 都是一次 DB 读）。
+//
+// 因此对入参做统一截断：<=0 取默认 10，> 上限取上限。
+const maxChainOverviewLimit = 100
+
+// maxTxScanBlocks 是「最近交易列表」从 latest 向下逐块扫描的硬上限（块数）。
+// 开销只与该常量 + txLimit 相关，与链上交易总量无关——防止交易稀疏时
+// 为凑够 txLimit 而遍历整条链（匿名请求资源放大）。测试网出块节奏下，
+// 最近交易通常落在最新少数几个块内，200 块足够覆盖。
+const maxTxScanBlocks = 200
+
+// ChainOverview is the resolver for the chain_overview field.
+//
+// 一次性返回链状态总览：最新区块高度/时间、总交易数、总地址数、
+// 最近区块列表、最近交易列表。供 dapp /chain 首页总览页使用。
+//
+// 数据来源：
+//   - 最新区块高度/时间、最近区块列表：本节点内置 CometBFT BlockStore
+//     （LoadBlockMeta 只读区块头，不加载交易体，开销小）。
+//   - 最近交易列表：从 latest 向下逐块 LoadBlock（块数受 maxTxScanBlocks +
+//     txLimit 约束），每笔交易用 TxIndexer.Get(hash) 点查执行码——开销只与
+//     扫描块数相关，与链上交易总量无关（避免全量物化 + 排序的资源放大）。
+//   - 总交易数：遍历 block meta 累加 NumTxs（O(块数) 次小读，不物化交易字节），
+//     结果用「按高度增量」缓存，避免高频匿名请求重复全链扫描。
+//   - 总地址数：SECRET_DB 中 `call_nonce:` 前缀记录数（每个发起过交易的
+//     地址一条 nonce 记录，去重后的地址数）。
+//
+// 各子项独立降级：任一数据源不可用时对应字段返回零值/空列表并记 warn 日志，
+// 不整体报错，保证前端总览页始终有兜底展示（不白屏）。
+func (r *queryResolver) ChainOverview(ctx context.Context, blockLimit *int, txLimit *int) (*model.ChainOverview, error) {
+	node := teechain.TeeChainNode
+	if node == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+	bs := node.BlockStore()
+	if bs == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+
+	if blockLimit == nil || *blockLimit <= 0 {
+		blockLimit = intPtr(10)
+	} else if *blockLimit > maxChainOverviewLimit {
+		blockLimit = intPtr(maxChainOverviewLimit)
+	}
+	if txLimit == nil || *txLimit <= 0 {
+		txLimit = intPtr(10)
+	} else if *txLimit > maxChainOverviewLimit {
+		txLimit = intPtr(maxChainOverviewLimit)
+	}
+
+	overview := &model.ChainOverview{
+		Blocks: make([]*model.ChainOverviewBlock, 0, *blockLimit),
+		Txs:    make([]*model.ChainOverviewTx, 0, *txLimit),
+	}
+
+	// 最新区块高度
+	latest := bs.Height()
+	if latest <= 0 {
+		// 链尚未出块：返回空总览（前端兜底展示）
+		return overview, nil
+	}
+	overview.LatestHeight = int(latest)
+
+	// 最新区块时间 + 最近区块列表（LoadBlockMeta 只读区块头，不加载交易体）
+	for h := latest; h > latest-int64(*blockLimit) && h >= 1; h-- {
+		meta := bs.LoadBlockMeta(h)
+		if meta == nil {
+			continue
+		}
+		if h == latest {
+			overview.LatestTime = meta.Header.Time.UTC().Format(time.RFC3339)
+		}
+		overview.Blocks = append(overview.Blocks, &model.ChainOverviewBlock{
+			Height: int(h),
+			Hash:   hex.EncodeToString(meta.BlockID.Hash),
+			Time:   meta.Header.Time.UTC().Format(time.RFC3339),
+			NumTxs: meta.NumTxs,
+		})
+	}
+
+	// 最近交易列表：从 latest 向下逐块 LoadBlock（块数受 maxTxScanBlocks +
+	// txLimit 约束），每笔交易用 TxIndexer.Get(hash) 点查执行码。
+	// 开销只与扫描块数相关，与链上交易总量无关。
+	if env, err := node.ConfigureRPC(); err == nil && env.TxIndexer != nil {
+		scanLimit := int64(maxTxScanBlocks)
+		if int64(*txLimit) < scanLimit {
+			scanLimit = int64(*txLimit)
+		}
+		for h := latest; h > latest-scanLimit && h >= 1 && len(overview.Txs) < *txLimit; h-- {
+			block := bs.LoadBlock(h)
+			if block == nil {
+				continue
+			}
+			blockTime := block.Header.Time.UTC().Format(time.RFC3339)
+			// 块内交易按索引降序（同块内最新在前）
+			for i := len(block.Data.Txs) - 1; i >= 0 && len(overview.Txs) < *txLimit; i-- {
+				rawTx := block.Data.Txs[i]
+				hash := rawTx.Hash()
+				code := 0
+				if res, e := env.TxIndexer.Get(hash); e == nil && res != nil {
+					code = int(res.Result.Code)
+				} else if e != nil && !errors.Is(e, txindex.ErrorEmptyHash) {
+					util.LogWarnf("chain_overview: tx index get height=%d idx=%d: %v", h, i, e)
+				}
+				overview.Txs = append(overview.Txs, &model.ChainOverviewTx{
+					Hash:    hex.EncodeToString(hash),
+					Height:  int(h),
+					Time:    blockTime,
+					Code:    code,
+					Success: code == 0,
+				})
+			}
+		}
+	}
+
+	// 总交易数：遍历 block meta 累加 NumTxs（O(块数) 次小读，不物化交易字节）。
+	// 全链扫描开销随链增长，故用「按高度增量」缓存：冷启动全扫一次，之后
+	// 每个新区块只累加新增块的 NumTxs，开销与新增块数相关（非全链）。
+	overview.TotalTxs = totalTxCountCached(bs, latest)
+
+	// 总地址数：SECRET_DB 中 call_nonce: 前缀记录数
+	overview.TotalAddresses = countAddressKeys()
+
+	return overview, nil
+}
+
+// totalTxCache 是总交易数的「按高度增量」缓存。
+//
+// 总交易数 = 全链所有块 NumTxs 之和。冷启动需全扫一次（O(块数) 次 LoadBlockMeta
+// 小读，不物化交易字节）；之后每个新区块只累加新增块的 NumTxs，开销与新增块数
+// 相关而非全链。chain_overview 匿名可达且前端 12s 轮询，该缓存避免高频请求重复
+// 全链扫描。高度键自洽：latest == cachedHeight 直接命中；latest > cachedHeight
+// 增量累加；latest < cachedHeight（链重置）全扫重算。
+type totalTxCache struct {
+	mu           sync.Mutex
+	cachedHeight int64
+	cachedTotal  int
+}
+
+var totalTxCacheInst totalTxCache
+
+// totalTxCountCached 返回截至 latest 的总交易数（按高度增量缓存）。
+func totalTxCountCached(bs *store.BlockStore, latest int64) int {
+	c := &totalTxCacheInst
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	switch {
+	case c.cachedHeight == latest:
+		// 命中：高度一致，直接返回
+		return c.cachedTotal
+
+	case c.cachedHeight > 0 && c.cachedHeight < latest:
+		// 增量：只累加新增块（cachedHeight+1 .. latest）的 NumTxs
+		for h := c.cachedHeight + 1; h <= latest; h++ {
+			if meta := bs.LoadBlockMeta(h); meta != nil {
+				c.cachedTotal += meta.NumTxs
+			}
+		}
+		c.cachedHeight = latest
+		return c.cachedTotal
+
+	default:
+		// 冷启动 / 链重置：全扫 base..latest 累加 NumTxs
+		base := bs.Base()
+		if base < 1 {
+			base = 1
+		}
+		total := 0
+		for h := base; h <= latest; h++ {
+			if meta := bs.LoadBlockMeta(h); meta != nil {
+				total += meta.NumTxs
+			}
+		}
+		c.cachedHeight = latest
+		c.cachedTotal = total
+		return total
+	}
 }

@@ -16,6 +16,47 @@ extend type Query {
   block_detail(height: Int, hash: String): BlockDetail
   """交易详情（按交易哈希查询），含 From/To/状态/所在区块"""
   tx_detail(hash: String!): TxDetail
+  """链状态总览：最新区块高度/时间、总交易数、总地址数、最近区块列表、最近交易列表"""
+  chain_overview(blockLimit: Int, txLimit: Int): ChainOverview
+}
+
+type ChainOverview {
+  """最新区块高度"""
+  latest_height: Int!
+  """最新区块出块时间（RFC3339）"""
+  latest_time: String!
+  """总交易数"""
+  total_txs: Int!
+  """总地址数（曾发起过交易的地址数）"""
+  total_addresses: Int!
+  """最近区块列表（按高度降序）"""
+  blocks: [ChainOverviewBlock!]!
+  """最近交易列表（按时间降序）"""
+  txs: [ChainOverviewTx!]!
+}
+
+type ChainOverviewBlock {
+  """区块高度"""
+  height: Int!
+  """区块哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """出块时间（RFC3339）"""
+  time: String!
+  """区块内交易数"""
+  num_txs: Int!
+}
+
+type ChainOverviewTx {
+  """交易哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """所在区块高度"""
+  height: Int!
+  """出块时间（RFC3339）"""
+  time: String!
+  """执行码（0 = 成功）"""
+  code: Int!
+  """是否成功"""
+  success: Boolean!
 }
 
 type BlockDetail {

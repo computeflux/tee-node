@@ -104,6 +104,30 @@ type ComplexityRoot struct {
 		Urls           func(childComplexity int) int
 	}
 
+	ChainOverview struct {
+		Blocks         func(childComplexity int) int
+		LatestHeight   func(childComplexity int) int
+		LatestTime     func(childComplexity int) int
+		TotalAddresses func(childComplexity int) int
+		TotalTxs       func(childComplexity int) int
+		Txs            func(childComplexity int) int
+	}
+
+	ChainOverviewBlock struct {
+		Hash   func(childComplexity int) int
+		Height func(childComplexity int) int
+		NumTxs func(childComplexity int) int
+		Time   func(childComplexity int) int
+	}
+
+	ChainOverviewTx struct {
+		Code    func(childComplexity int) int
+		Hash    func(childComplexity int) int
+		Height  func(childComplexity int) int
+		Success func(childComplexity int) int
+		Time    func(childComplexity int) int
+	}
+
 	ChallengeResult struct {
 		Challenge func(childComplexity int) int
 		Error     func(childComplexity int) int
@@ -205,6 +229,7 @@ type ComplexityRoot struct {
 		AuthHealth             func(childComplexity int) int
 		BlockDetail            func(childComplexity int, height *int, hash *string) int
 		ChainInfo              func(childComplexity int) int
+		ChainOverview          func(childComplexity int, blockLimit *int, txLimit *int) int
 		CheckSession           func(childComplexity int, token string) int
 		ContractDryRun         func(childComplexity int, caller string, callerType int, contract string, mut bool, method string, args []string) int
 		ContractNonce          func(childComplexity int, caller string, callerType int) int
@@ -330,6 +355,7 @@ type QueryResolver interface {
 	Validators(ctx context.Context) ([]string, error)
 	BlockDetail(ctx context.Context, height *int, hash *string) (*model.BlockDetail, error)
 	TxDetail(ctx context.Context, hash string) (*model.TxDetail, error)
+	ChainOverview(ctx context.Context, blockLimit *int, txLimit *int) (*model.ChainOverview, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
 	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
@@ -645,6 +671,111 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChainInfo.Urls(childComplexity), true
+
+	case "ChainOverview.blocks":
+		if e.complexity.ChainOverview.Blocks == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.Blocks(childComplexity), true
+
+	case "ChainOverview.latest_height":
+		if e.complexity.ChainOverview.LatestHeight == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.LatestHeight(childComplexity), true
+
+	case "ChainOverview.latest_time":
+		if e.complexity.ChainOverview.LatestTime == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.LatestTime(childComplexity), true
+
+	case "ChainOverview.total_addresses":
+		if e.complexity.ChainOverview.TotalAddresses == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.TotalAddresses(childComplexity), true
+
+	case "ChainOverview.total_txs":
+		if e.complexity.ChainOverview.TotalTxs == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.TotalTxs(childComplexity), true
+
+	case "ChainOverview.txs":
+		if e.complexity.ChainOverview.Txs == nil {
+			break
+		}
+
+		return e.complexity.ChainOverview.Txs(childComplexity), true
+
+	case "ChainOverviewBlock.hash":
+		if e.complexity.ChainOverviewBlock.Hash == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewBlock.Hash(childComplexity), true
+
+	case "ChainOverviewBlock.height":
+		if e.complexity.ChainOverviewBlock.Height == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewBlock.Height(childComplexity), true
+
+	case "ChainOverviewBlock.num_txs":
+		if e.complexity.ChainOverviewBlock.NumTxs == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewBlock.NumTxs(childComplexity), true
+
+	case "ChainOverviewBlock.time":
+		if e.complexity.ChainOverviewBlock.Time == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewBlock.Time(childComplexity), true
+
+	case "ChainOverviewTx.code":
+		if e.complexity.ChainOverviewTx.Code == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewTx.Code(childComplexity), true
+
+	case "ChainOverviewTx.hash":
+		if e.complexity.ChainOverviewTx.Hash == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewTx.Hash(childComplexity), true
+
+	case "ChainOverviewTx.height":
+		if e.complexity.ChainOverviewTx.Height == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewTx.Height(childComplexity), true
+
+	case "ChainOverviewTx.success":
+		if e.complexity.ChainOverviewTx.Success == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewTx.Success(childComplexity), true
+
+	case "ChainOverviewTx.time":
+		if e.complexity.ChainOverviewTx.Time == nil {
+			break
+		}
+
+		return e.complexity.ChainOverviewTx.Time(childComplexity), true
 
 	case "ChallengeResult.challenge":
 		if e.complexity.ChallengeResult.Challenge == nil {
@@ -1256,6 +1387,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.ChainInfo(childComplexity), true
+
+	case "Query.chain_overview":
+		if e.complexity.Query.ChainOverview == nil {
+			break
+		}
+
+		args, err := ec.field_Query_chain_overview_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ChainOverview(childComplexity, args["blockLimit"].(*int), args["txLimit"].(*int)), true
 
 	case "Query.checkSession":
 		if e.complexity.Query.CheckSession == nil {
@@ -3249,6 +3392,57 @@ func (ec *executionContext) field_Query_block_detail_argsHash(
 	}
 
 	var zeroVal *string
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_chain_overview_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_chain_overview_argsBlockLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["blockLimit"] = arg0
+	arg1, err := ec.field_Query_chain_overview_argsTxLimit(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["txLimit"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_chain_overview_argsBlockLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["blockLimit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("blockLimit"))
+	if tmp, ok := rawArgs["blockLimit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_chain_overview_argsTxLimit(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	if _, ok := rawArgs["txLimit"]; !ok {
+		var zeroVal *int
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("txLimit"))
+	if tmp, ok := rawArgs["txLimit"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -5852,6 +6046,688 @@ func (ec *executionContext) fieldContext_ChainInfo_urls(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_latest_height(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_latest_height(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LatestHeight, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_latest_height(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_latest_time(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_latest_time(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.LatestTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_latest_time(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_total_txs(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_total_txs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalTxs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_total_txs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_total_addresses(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_total_addresses(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TotalAddresses, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_total_addresses(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_blocks(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_blocks(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Blocks, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ChainOverviewBlock)
+	fc.Result = res
+	return ec.marshalNChainOverviewBlock2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewBlockᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_blocks(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "height":
+				return ec.fieldContext_ChainOverviewBlock_height(ctx, field)
+			case "hash":
+				return ec.fieldContext_ChainOverviewBlock_hash(ctx, field)
+			case "time":
+				return ec.fieldContext_ChainOverviewBlock_time(ctx, field)
+			case "num_txs":
+				return ec.fieldContext_ChainOverviewBlock_num_txs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainOverviewBlock", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverview_txs(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverview) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverview_txs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Txs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ChainOverviewTx)
+	fc.Result = res
+	return ec.marshalNChainOverviewTx2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewTxᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverview_txs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "hash":
+				return ec.fieldContext_ChainOverviewTx_hash(ctx, field)
+			case "height":
+				return ec.fieldContext_ChainOverviewTx_height(ctx, field)
+			case "time":
+				return ec.fieldContext_ChainOverviewTx_time(ctx, field)
+			case "code":
+				return ec.fieldContext_ChainOverviewTx_code(ctx, field)
+			case "success":
+				return ec.fieldContext_ChainOverviewTx_success(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainOverviewTx", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewBlock_height(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewBlock) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewBlock_height(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewBlock_height(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewBlock",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewBlock_hash(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewBlock) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewBlock_hash(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Hash, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewBlock_hash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewBlock",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewBlock_time(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewBlock) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewBlock_time(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Time, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewBlock_time(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewBlock",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewBlock_num_txs(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewBlock) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewBlock_num_txs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NumTxs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewBlock_num_txs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewBlock",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewTx_hash(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewTx) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewTx_hash(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Hash, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewTx_hash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewTx",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewTx_height(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewTx) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewTx_height(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewTx_height(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewTx",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewTx_time(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewTx) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewTx_time(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Time, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewTx_time(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewTx",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewTx_code(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewTx) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewTx_code(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Code, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewTx_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewTx",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ChainOverviewTx_success(ctx context.Context, field graphql.CollectedField, obj *model.ChainOverviewTx) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ChainOverviewTx_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ChainOverviewTx_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ChainOverviewTx",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -9963,6 +10839,72 @@ func (ec *executionContext) fieldContext_Query_tx_detail(ctx context.Context, fi
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_tx_detail_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_chain_overview(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_chain_overview(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ChainOverview(rctx, fc.Args["blockLimit"].(*int), fc.Args["txLimit"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ChainOverview)
+	fc.Result = res
+	return ec.marshalOChainOverview2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverview(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_chain_overview(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "latest_height":
+				return ec.fieldContext_ChainOverview_latest_height(ctx, field)
+			case "latest_time":
+				return ec.fieldContext_ChainOverview_latest_time(ctx, field)
+			case "total_txs":
+				return ec.fieldContext_ChainOverview_total_txs(ctx, field)
+			case "total_addresses":
+				return ec.fieldContext_ChainOverview_total_addresses(ctx, field)
+			case "blocks":
+				return ec.fieldContext_ChainOverview_blocks(ctx, field)
+			case "txs":
+				return ec.fieldContext_ChainOverview_txs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChainOverview", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_chain_overview_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -15422,6 +16364,183 @@ func (ec *executionContext) _ChainInfo(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var chainOverviewImplementors = []string{"ChainOverview"}
+
+func (ec *executionContext) _ChainOverview(ctx context.Context, sel ast.SelectionSet, obj *model.ChainOverview) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainOverviewImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainOverview")
+		case "latest_height":
+			out.Values[i] = ec._ChainOverview_latest_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latest_time":
+			out.Values[i] = ec._ChainOverview_latest_time(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total_txs":
+			out.Values[i] = ec._ChainOverview_total_txs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "total_addresses":
+			out.Values[i] = ec._ChainOverview_total_addresses(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "blocks":
+			out.Values[i] = ec._ChainOverview_blocks(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "txs":
+			out.Values[i] = ec._ChainOverview_txs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var chainOverviewBlockImplementors = []string{"ChainOverviewBlock"}
+
+func (ec *executionContext) _ChainOverviewBlock(ctx context.Context, sel ast.SelectionSet, obj *model.ChainOverviewBlock) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainOverviewBlockImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainOverviewBlock")
+		case "height":
+			out.Values[i] = ec._ChainOverviewBlock_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hash":
+			out.Values[i] = ec._ChainOverviewBlock_hash(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "time":
+			out.Values[i] = ec._ChainOverviewBlock_time(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "num_txs":
+			out.Values[i] = ec._ChainOverviewBlock_num_txs(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var chainOverviewTxImplementors = []string{"ChainOverviewTx"}
+
+func (ec *executionContext) _ChainOverviewTx(ctx context.Context, sel ast.SelectionSet, obj *model.ChainOverviewTx) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainOverviewTxImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainOverviewTx")
+		case "hash":
+			out.Values[i] = ec._ChainOverviewTx_hash(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "height":
+			out.Values[i] = ec._ChainOverviewTx_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "time":
+			out.Values[i] = ec._ChainOverviewTx_time(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "code":
+			out.Values[i] = ec._ChainOverviewTx_code(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "success":
+			out.Values[i] = ec._ChainOverviewTx_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var challengeResultImplementors = []string{"ChallengeResult"}
 
 func (ec *executionContext) _ChallengeResult(ctx context.Context, sel ast.SelectionSet, obj *model.ChallengeResult) graphql.Marshaler {
@@ -16299,6 +17418,25 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_tx_detail(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "chain_overview":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_chain_overview(ctx, field)
 				return res
 			}
 
@@ -17443,6 +18581,114 @@ func (ec *executionContext) marshalNChainInfo2ᚖgithubᚗcomᚋcomputefluxᚋte
 	return ec._ChainInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNChainOverviewBlock2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewBlockᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChainOverviewBlock) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChainOverviewBlock2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewBlock(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNChainOverviewBlock2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewBlock(ctx context.Context, sel ast.SelectionSet, v *model.ChainOverviewBlock) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChainOverviewBlock(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNChainOverviewTx2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewTxᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ChainOverviewTx) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNChainOverviewTx2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewTx(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNChainOverviewTx2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverviewTx(ctx context.Context, sel ast.SelectionSet, v *model.ChainOverviewTx) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ChainOverviewTx(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNChallengeResult2githubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChallengeResult(ctx context.Context, sel ast.SelectionSet, v model.ChallengeResult) graphql.Marshaler {
 	return ec._ChallengeResult(ctx, sel, &v)
 }
@@ -18185,6 +19431,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOChainOverview2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐChainOverview(ctx context.Context, sel ast.SelectionSet, v *model.ChainOverview) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ChainOverview(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

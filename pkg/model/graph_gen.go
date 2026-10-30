@@ -82,6 +82,45 @@ type ChainInfo struct {
 	Urls []string `json:"urls"`
 }
 
+type ChainOverview struct {
+	// 最新区块高度
+	LatestHeight int `json:"latest_height"`
+	// 最新区块出块时间（RFC3339）
+	LatestTime string `json:"latest_time"`
+	// 总交易数
+	TotalTxs int `json:"total_txs"`
+	// 总地址数（曾发起过交易的地址数）
+	TotalAddresses int `json:"total_addresses"`
+	// 最近区块列表（按高度降序）
+	Blocks []*ChainOverviewBlock `json:"blocks"`
+	// 最近交易列表（按时间降序）
+	Txs []*ChainOverviewTx `json:"txs"`
+}
+
+type ChainOverviewBlock struct {
+	// 区块高度
+	Height int `json:"height"`
+	// 区块哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+	// 出块时间（RFC3339）
+	Time string `json:"time"`
+	// 区块内交易数
+	NumTxs int `json:"num_txs"`
+}
+
+type ChainOverviewTx struct {
+	// 交易哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+	// 所在区块高度
+	Height int `json:"height"`
+	// 出块时间（RFC3339）
+	Time string `json:"time"`
+	// 执行码（0 = 成功）
+	Code int `json:"code"`
+	// 是否成功
+	Success bool `json:"success"`
+}
+
 type ChallengeResult struct {
 	Status    string  `json:"status"`
 	Challenge *string `json:"challenge,omitempty"`
