@@ -14,6 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testChainID 测试用主链 ID（与 relay 一致：chainID + nonce 唯一确定一笔跨链充值）
+const testChainID uint32 = 420420417
+
 func newTestC2C() (*C2C, *testutil.MockRuntime) {
 	rt := testutil.NewMockRuntime()
 	return NewC2C(rt), rt
@@ -83,7 +86,7 @@ func seedProviderCredits(t *testing.T, rt *testutil.MockRuntime, gw *gateway.Gat
 	rt.Caller = merchant
 	// 注册 provider 需真实质押：先充值质押金
 	rt.System = true
-	require.NoError(t, gm.Recharge(merchant, 200_000_000, []byte("seed-deposit-nonce")))
+	require.NoError(t, gm.Recharge(merchant, 200_000_000, testChainID, 1))
 	rt.System = false
 	require.NoError(t, gm.CreateProvider(fmt.Sprintf("shop-%02x", merchant.V[0]), "", "", gateway.RegionAsiaEast, 200_000_000))
 	require.NoError(t, gm.RegisterModel("m", gateway.ModalityText, 128000, 1_000_000, 0, 0, gateway.OpenAI, "", nil, 0, 0, false, ""))

@@ -1349,9 +1349,11 @@ func randDailyUsage(rng *rand.Rand) *gateway.DailyUsage {
 
 func randRechargeRecord(rng *rand.Rand) *gateway.RechargeRecord {
 	return &gateway.RechargeRecord{
-		User:   *randUniAddr(rng),
-		Amount: rng.Uint64(),
-		Time:   randInt63(rng),
+		User:    *randUniAddr(rng),
+		Amount:  rng.Uint64(),
+		Time:    randInt63(rng),
+		ChainID: rng.Uint32(),
+		Nonce:   rng.Uint64(),
 	}
 }
 

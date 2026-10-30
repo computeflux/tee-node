@@ -292,9 +292,11 @@ func TestRechargeRecord(t *testing.T) {
 	rng := rand.New(rand.NewSource(53))
 	for i := 0; i < 200; i++ {
 		r := gateway.RechargeRecord{
-			User:   randUniAddr(rng),
-			Amount: rng.Uint64(),
-			Time:   int64(rng.Uint64()),
+			User:    randUniAddr(rng),
+			Amount:  rng.Uint64(),
+			Time:    int64(rng.Uint64()),
+			ChainID: rng.Uint32(),
+			Nonce:   rng.Uint64(),
 		}
 		testRoundtrip(t, "RechargeRecord", r)
 	}

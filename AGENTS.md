@@ -124,6 +124,80 @@ OE_SIMULATION=1 ego run ./hack/build/dsecret
 - `gen_codec.sh` 文件头写的是 `generate_codec.sh`，实际文件名是 `gen_codec.sh`；报错提示的模块列表漏了 `c2c`（`c2c` 实际可用）。`gen_tx_proto.sh` 末尾复制到 `apps/libos-entry/model/`，当前仓库无 `apps/libos-entry`，该步会失败。
 - `tools/ink-abi-ts-gen/gen.sh` 会先 `cd` 到自身目录，ABI 与输出路径都按该目录解析，需要用 `../../tee-chain/abis/...` 这类相对生成器目录的路径。
 
+## 合约存储迁移（Schema 升级）
+
+合约状态按 SCALE 编码存于 PebbleDB。结构体增删字段、改字段顺序或类型后，旧字节流无法按新编码解码——这类改动必须用「运行时版本号 + 迁移函数」把存量数据原地重写成新编码。**迁移只重写编码：同一批 key、原有字段值全部保留，新增字段填零值/默认值，不会丢数据。**
+
+完整范例：`tee-chain/runtime/module/gov/migrations/v33.go` + `v33_test.go`（`RechargeRecord` 增加 `ChainID`/`Nonce` 跨链凭据）。
+
+### 触发链路
+1. `hack/update_runtime.sh` 编译 WASM、读取 `tee-chain/runtime/module/call.go` 的 `NativeVersion`，经 GraphQL 提交 `gov.RuntimeUpgrade`。
+2. `GovMutation.RuntimeUpgrade` 校验 `version == 链上 current + 1`，写 `runtime_meta_<v>` / `runtime_version` / `runtime_at_height_<height>`。
+3. `tee-chain/tx_finalize.go` 的 `FinalizeTx` 末尾比较 `GetCurrentRuntimeVersion` 与 `app.state.RuntimeVersion`；变化时刷新 WASM 缓存，并以 **dkgPub 系统账户** 调用 `gov.migration(newVersion)`。
+4. `GovMutation.Migration` 要求 `CallbySystem()`（dkgPub 发起即满足），转调 `migrations.Migration(newVersion, api)`，由 `migrations/mod.go` 按版本号分派到 `V<N>`。
+5. 每个合约调用按 `GetRuntimeVersionAtHeight(height)` 选原生/WASM 路径：升级交易所在区块内，升级 tx 之后的交易已按新版本执行；迁移在该区块末尾统一重写存量数据。
+
+⚠️ 迁移返回 error 只会在 `FinalizeTx` 里 `LogError`，不会回滚版本号；所以迁移函数必须幂等（可重复执行），失败要在日志里可见。
+
+### 是否需要迁移
+| 改动 | 是否迁移 | 说明 |
+|------|----------|------|
+| 结构体增/删字段、改顺序或类型 | 必须 | 旧字节流按新编码解码会 EOF 或错位 |
+| 新增独立存储（新 struct + 新 `keyPfx`） | 不需要 | 新代码直接读写新前缀 |
+| 仅改方法签名（ABI 参数） | 不需要数据迁移 | 但要重生成 `*_gen.go` / ABI 并同步调用方 |
+| 改 `idx:"exact"/"range"` 索引字段 | 需重建索引 | 主数据重写时同步维护 `idx_*` 条目 |
+| 只改计算/语义、不改字段 | 通常不需要 | 需确认存量数据语义仍成立 |
+
+### 步骤
+
+**0. 评估影响面**：`grep -rn "<类型名>" --include=*.go tee-chain/`，确认写入方/读取方、是否进 ABI（`// scale-codec-gen:generate`）、是否被 GraphQL 暴露。
+
+**1. 改类型（`module/<contract>/types.go`）**
+- 新字段追加到末尾；旧结构体保留为 `<Name>V1`（注释标明禁止新写入），供迁移解码
+- 新旧两个类型都保留 `// scale-codec-gen:generate`（迁移要用旧类型的 `Decode`）
+
+**2. 版本号 +1**
+- `tee-chain/runtime/module/call.go`：`const NativeVersion = uint32(N)`
+- `tee-chain/runtime/module/call_test.go` 的 `TestNativeVersion` 同步为 `N`（该测试钉住版本号）
+
+**3. 写迁移 `module/gov/migrations/v<N>.go`**
+- 签名固定：`func V<N>(api store.ContractApi) error`
+- 遍历：`keys, vals, err := api.GetTxn().ListByPrefix(store.ComboNamespaceKey(ns, prefix))`，再 `txn.Set(key, store.ScaleEncode(newVal))` **原地写回同一 key**
+- 解码旧值：`store.ScaleDecode(&old, raw)`（`<Name>V1` 需 generated codec）
+- 幂等判断：`if n, err := old.Decode(raw); err == nil && n == len(raw) { /* 旧编码才迁移 */ }`——`store.ScaleDecode` **不校验尾部字节**，直接用它会误判，重复执行时把新记录当旧记录重写、清掉新增字段
+- 单条解码失败：打印并 `continue`，不要 `return err`
+- 扫 `StoreList2D` 的 store 前缀**不要**用 `StoreMapping.List/ListRaw`：它们会跳过 suffix 含 `_` 的 key，而 `(id,k2)` 是二进制编码，可能恰好含 `_`
+- 已导出字段的 store 可用 `gateway.NewGateway(api)` 访问；未导出字段（如 `rechargeHistory`）只能按前缀裸扫
+
+**4. 注册**：`migrations/mod.go` 增加 `if newVersion == <N> { return V<N>(api) }`
+
+**5. 单测 `v<N>_test.go`（`migrations_test` 包）**
+- 用与合约相同的 namespace/前缀、以旧类型写入旧数据（`store.NewStoreList2D[...,<Name>V1]`）
+- `rt := testutil.NewMockRuntime(); rt.System = true` → `govmod.GovMutation{Gov: *govmod.NewGov(rt)}.Migration(<N>)`
+- 用公开 Query 校验迁移结果；补「重复执行不丢新字段」「空存储不报错」用例
+
+**6. 重新生成代码与 ABI**
+- codec：`./hack/gen_codec.sh gateway`（可选 store/gov/auth/gateway/batch/c2c/all）
+- dispatch + ABI：见 `hack/gen_local_contract_abi.sh` 中 gateway 那段 `go run ./tools/contractgen ...`
+- 前端 ABI 需同步到 `apps/dapp/public/contract/`
+- `git diff` 应只含预期改动（生成结果确定）
+
+**7. 本地校验**：`go vet ./...` / `go test ./...`。依赖 `ego/eclient` 的包在缺 OE 头文件的环境里会编译失败，属环境问题。
+
+**8. 升级**：三个节点先升级到同一二进制（版本/编码必须一致）→ `SUDO_MNEMONIC=... ./hack/update_runtime.sh --gql <GQL>`（默认重编 WASM，版本取自 `NativeVersion`）。版本必须等于链上当前版本 +1；链上版本查 `gov.RuntimeVersion`。
+
+**9. 验证**：日志 `FinalizeTx migration success`、`[V<N>] ... total/migrated`；抽查合约查询（`contractDryRun` / `contractCall`）；出现 `skip undecodable` 要立即排查。
+
+### 存储 key 速查（`tee-chain/runtime/store`）
+| 类型 | key 布局 |
+|------|----------|
+| `StoreValue` | `ns_<key>` |
+| `StoreMapping` | `ns_<prefix><keySuffix>`；suffix：string 原样 / []byte hex / uint 十进制 / `UniAddr` hex(SCALE) |
+| `StoreList2D` | `ns_<pK1ToID><hex(SCALE(k1))>`→id；`ns_<pK1Length>`（下一个 id）；`ns_<pK2NextID><id>`；`ns_<pStore>`+二进制 `(id,k2)`（大端，可能含 `_`） |
+| `IndexedList`/`IndexedStore` | 主数据 + `idx_<Field>_...` 索引条目，迁移需成对维护 |
+
+namespace 为合约名（`gateway`/`gov`/...），前缀以 `NewGateway`/`NewGov` 里的字符串为准。
+
 ## 约定
 - 遵循仓库根级约定（见上级 `AGENTS.md`）。
 - 独立 go.mod 模块，不随主仓库 go.sum 同步。

@@ -1,7 +1,8 @@
 # Gateway 历史查询 API 接口总结
 
-> 最后更新：2026-05-26
+> 最后更新：2026-10-30
 > 重要变更：DailyUsage 已废弃，不再写入；结算记录双写（Provider + User 维度）
+> 2026-10-30：`RechargeRecord` 增加 `ChainID`/`Nonce` 跨链凭据（运行时 V33 迁移）；`Recharge` 参数变为 `(user, amount, chainID, nonce)`
 
 ## 1. 设计目标
 
@@ -20,11 +21,13 @@ userSettlementHistory *model.StoreList2D[model.UniAddr, uint32, UserSettlementRe
 ### 2.2 数据类型（`types.go`）
 
 ```go
-// RechargeRecord 单笔充值记录
+// RechargeRecord 单笔充值记录（V33 起含跨链凭据）
 type RechargeRecord struct {
-    User   model.UniAddr `json:"user"`
-    Amount uint64        `json:"amount"`
-    Time   int64         `json:"time"`
+    User    model.UniAddr `json:"user"`
+    Amount  uint64        `json:"amount"`
+    Time    int64         `json:"time"`
+    ChainID uint32        `json:"chainId"` // 充值来源链 ID（0 = 非跨链/旧记录）
+    Nonce   uint64        `json:"nonce"`   // 来源链事件序号
 }
 
 // ProviderSettlementRecord Provider 视角的结算记录
@@ -59,7 +62,7 @@ type UserSettlementRecord struct {
 
 | 方法 | 变更说明 |
 |------|----------|
-| `Recharge(user, amount)` | 充值成功后向 `rechargeHistory.Insert()` 写入记录（含 `Time` 字段） |
+| `Recharge(user, amount, chainID, nonce)` | 充值成功后向 `rechargeHistory.Insert()` 写入记录（含 `Time` 字段与跨链凭据 `ChainID`/`Nonce`）；`(chainID, nonce)` 同时是防重放 key |
 | `SettleUsage(records)` | 每笔结算成功后双写：`settlementHistory.Insert()` + `userSettlementHistory.Insert()` |
 
 ### 2.4 新增 Query 方法

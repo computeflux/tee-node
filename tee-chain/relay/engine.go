@@ -159,11 +159,18 @@ func dispatch(ev SyncEvent, api store.ContractApi) error {
 	}
 
 	args := ev.EventData
-	// Recharge 增加 nonce 防重放：使用 chainID + nonce 组合作为唯一标识
+	// Recharge 追加跨链凭据参数：chainID 与事件 nonce。
+	// 合约侧用 (chainID, nonce) 做防重放，并把二者写入充值历史以便回溯主链交易。
 	if target == "gateway.Recharge" {
-		nonce := fmt.Sprintf("%d:%d", ev.ChainID, ev.Nonce)
-		nonceBytes, _ := store.ScaleEncode([]byte(nonce))
-		args = append(args, nonceBytes)
+		chainIDBytes, err := store.ScaleEncode(ev.ChainID)
+		if err != nil {
+			return fmt.Errorf("relay: encode chainID: %w", err)
+		}
+		nonceBytes, err := store.ScaleEncode(ev.Nonce)
+		if err != nil {
+			return fmt.Errorf("relay: encode nonce: %w", err)
+		}
+		args = append(args, chainIDBytes, nonceBytes)
 	}
 
 	_, err := api.Call(api.GetSystemAccount(), &model.ContractCall{

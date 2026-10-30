@@ -231,7 +231,7 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		}
 		return m.LeaveRoute(modelID, routeID)
 	case [4]byte{0x9b, 0x1e, 0x77, 0xa7}:
-		if err := store.RequireArgLen(args, 3, "recharge"); err != nil {
+		if err := store.RequireArgLen(args, 4, "recharge"); err != nil {
 			return err
 		}
 		user, err := store.DecodeScaleArgBytes[store.UniAddr](args[0])
@@ -242,11 +242,15 @@ func (d GatewayMutation) ExecCall(call store.ContractCall) error {
 		if err != nil {
 			return fmt.Errorf("recharge: amount: %w", err)
 		}
-		nonce, err := store.DecodeScaleArgBytes[[]byte](args[2])
+		chainID, err := store.DecodeScaleArgBytes[uint32](args[2])
+		if err != nil {
+			return fmt.Errorf("recharge: chainID: %w", err)
+		}
+		nonce, err := store.DecodeScaleArgBytes[uint64](args[3])
 		if err != nil {
 			return fmt.Errorf("recharge: nonce: %w", err)
 		}
-		return m.Recharge(user, amount, nonce)
+		return m.Recharge(user, amount, chainID, nonce)
 	case [4]byte{0xf8, 0xea, 0x1a, 0x7b}:
 		if err := store.RequireArgLen(args, 3, "register_a_p_i_key"); err != nil {
 			return err
