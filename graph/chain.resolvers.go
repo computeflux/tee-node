@@ -130,3 +130,65 @@ func (r *queryResolver) BlockDetail(ctx context.Context, height *int, hash *stri
 	}
 	return detail, nil
 }
+
+// AddressBalance is the resolver for the address_balance field.
+//
+// 地址当前余额：走 gov 合约 balance_of。address 支持 SS58 或 hex 公钥（DecodeCaller 统一解析）。
+// 余额查询的 selector 与 owner 的 T 编码细节见 address.go 的 queryGovBalance。
+func (r *queryResolver) AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error) {
+	addrRaw, err := DecodeCaller(address)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "invalid address: "+err.Error())
+	}
+
+	balance, err := queryGovBalance(addrRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.AddressBalance{
+		Address: address,
+		Balance: balance,
+	}, nil
+}
+
+// AddressTxs is the resolver for the address_txs field.
+//
+// 地址交易列表：从最新区块向前扫描（有界窗口），解码合约交易并按收/发方向归类，
+// 分页返回（时间倒序）。address 支持 SS58 或 hex 公钥。
+func (r *queryResolver) AddressTxs(ctx context.Context, address string, page *int, pageSize *int) (*model.AddressTxsPage, error) {
+	addrRaw, err := DecodeCaller(address)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "invalid address: "+err.Error())
+	}
+
+	pg := 1
+	if page != nil && *page > 0 {
+		pg = *page
+	}
+	size := addressTxsDefaultPageSize
+	if pageSize != nil && *pageSize > 0 {
+		size = *pageSize
+	}
+	if size > addressTxsMaxPageSize {
+		size = addressTxsMaxPageSize
+	}
+
+	all, total, truncated, err := scanAddressTxs(addrRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	// 收敛分页区间（防 (pg-1)*size 溢出为负导致 all[start:end] 越界 panic）
+	start, end := clampPage(pg, size, total)
+	pageTxs := all[start:end]
+	if pageTxs == nil {
+		pageTxs = []*model.AddressTx{}
+	}
+
+	return &model.AddressTxsPage{
+		Txs:     pageTxs,
+		Total:   &total,
+		HasMore: end < total || truncated,
+	}, nil
+}

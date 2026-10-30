@@ -14,6 +14,43 @@ extend type Query {
   validators: [String!]!
   """区块详情（区块头 + 区块内交易列表），按高度或哈希查询"""
   block_detail(height: Int, hash: String): BlockDetail
+  """地址当前余额（gov 合约 balanceOf），address 为 SS58 或 hex 公钥"""
+  address_balance(address: String!): AddressBalance
+  """地址交易列表（区分收/发方向，分页），从最新区块向前扫描"""
+  address_txs(address: String!, page: Int, pageSize: Int): AddressTxsPage
+}
+
+type AddressBalance {
+  """地址（原样回显）"""
+  address: String!
+  """当前余额（十进制字符串，U256）"""
+  balance: String!
+}
+
+type AddressTx {
+  """交易哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """区块高度"""
+  height: Int!
+  """交易在区块内的索引"""
+  index: Int!
+  """出块时间（RFC3339）"""
+  time: String!
+  """方向：in=收 / out=发"""
+  direction: String!
+  """金额（十进制字符串，仅转账类交易；其余为 null）"""
+  amount: String
+  """对手方地址（SS58；无法识别时为 null）"""
+  counterparty: String
+}
+
+type AddressTxsPage {
+  """当前页交易（时间倒序）"""
+  txs: [AddressTx!]!
+  """扫描窗口内命中的交易总数"""
+  total: Int
+  """是否还有下一页"""
+  hasMore: Boolean!
 }
 
 type BlockDetail {
