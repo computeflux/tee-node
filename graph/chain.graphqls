@@ -18,6 +18,43 @@ extend type Query {
   tx_detail(hash: String!): TxDetail
   """链状态总览：最新区块高度/时间、总交易数、总地址数、最近区块列表、最近交易列表"""
   chain_overview(blockLimit: Int, txLimit: Int): ChainOverview
+  """地址当前余额（gov 合约 balanceOf）。address 支持 SS58 / hex 公钥 / EVM 0x 地址（统一归一化为 UniAddr）"""
+  address_balance(address: String!): AddressBalance
+  """地址交易列表（收/发方向 + 金额 + 对手方，分页）。address 支持 SS58 / hex 公钥 / EVM 0x 地址"""
+  address_txs(address: String!, page: Int, pageSize: Int): AddressTxs
+}
+
+type AddressBalance {
+  """归一化后的地址展示形式（SS58 或 0x EVM 地址）"""
+  address: String!
+  """当前余额（十进制字符串，U256）"""
+  balance: String!
+}
+
+type AddressTxs {
+  """交易列表（时间倒序）"""
+  txs: [AddressTx!]!
+  """扫描窗口内命中的交易总数"""
+  total: Int
+  """是否还有下一页"""
+  hasMore: Boolean!
+}
+
+type AddressTx {
+  """交易哈希（hex，无 0x 前缀）"""
+  hash: String!
+  """所在区块高度"""
+  height: Int!
+  """交易在区块内的索引"""
+  index: Int!
+  """出块时间（RFC3339）"""
+  time: String!
+  """方向：in=收 / out=发"""
+  direction: String!
+  """金额（十进制字符串，仅转账类交易；其余为 null）"""
+  amount: String
+  """对手方地址（SS58 或 0x EVM 地址；无法识别时为 null）"""
+  counterparty: String
 }
 
 type ChainOverview {
