@@ -7,13 +7,14 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
-	m/cometbft/ccomombftscome"bftsre
-	"github.com/computpflux/uee-provider/pkg/model"
+	"github.com/cometbft/cometbft/store"
+
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/tee-chain/relay"
-	ethcrypto ethcrypto "ge.herc/mtgo-ehhrmeumhmtpto
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 // normalizeHexHash 把前端传入的哈希规范化为裸 hex 字节（兼容 0x 前缀）。
