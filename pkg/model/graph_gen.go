@@ -2,6 +2,39 @@
 
 package model
 
+type AddressBalance struct {
+	// 归一化后的地址展示形式（SS58 或 0x EVM 地址）
+	Address string `json:"address"`
+	// 当前余额（十进制字符串，U256）
+	Balance string `json:"balance"`
+}
+
+type AddressTx struct {
+	// 交易哈希（hex，无 0x 前缀）
+	Hash string `json:"hash"`
+	// 所在区块高度
+	Height int `json:"height"`
+	// 交易在区块内的索引
+	Index int `json:"index"`
+	// 出块时间（RFC3339）
+	Time string `json:"time"`
+	// 方向：in=收 / out=发
+	Direction string `json:"direction"`
+	// 金额（十进制字符串，仅转账类交易；其余为 null）
+	Amount *string `json:"amount,omitempty"`
+	// 对手方地址（SS58 或 0x EVM 地址；无法识别时为 null）
+	Counterparty *string `json:"counterparty,omitempty"`
+}
+
+type AddressTxs struct {
+	// 交易列表（时间倒序）
+	Txs []*AddressTx `json:"txs"`
+	// 扫描窗口内命中的交易总数
+	Total *int `json:"total,omitempty"`
+	// 是否还有下一页
+	HasMore bool `json:"hasMore"`
+}
+
 type AuthConfig struct {
 	CorsOrigins         string `json:"corsOrigins"`
 	SMTPHost            string `json:"smtpHost"`
