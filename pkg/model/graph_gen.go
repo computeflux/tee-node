@@ -129,6 +129,19 @@ type ChallengeResult struct {
 	Error     *string `json:"error,omitempty"`
 }
 
+type CrossChainInfo struct {
+	// 主链 ID
+	ChainID int `json:"chain_id"`
+	// 事件序号（per chain，严格递增）
+	Nonce int `json:"nonce"`
+	// 主链区块号（当前 relay 管道未捕获，恒为 0；上游带出后填充）
+	MainBlock int `json:"main_block"`
+	// 主链 explorer 区块链接（当前为空字符串，前端判空隐藏；上游带出主链区块号后填充）
+	MainExplorerURL string `json:"main_explorer_url"`
+	// 事件类型（如 Recharge / WithdrawalDone）
+	EventType *string `json:"event_type,omitempty"`
+}
+
 // ERC20 代币信息
 type Erc20Item struct {
 	// 代币合约地址
@@ -278,4 +291,6 @@ type TxDetail struct {
 	Data *string `json:"data,omitempty"`
 	// 事件（JSON 字符串）
 	Events *string `json:"events,omitempty"`
+	// 跨链 relay 交易的主链关联信息（SysCall_RelaySync 时非空，普通合约交易为 null）
+	CrossChain *CrossChainInfo `json:"cross_chain,omitempty"`
 }
