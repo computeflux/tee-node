@@ -258,7 +258,7 @@ type TxDetail struct {
 	Code int `json:"code"`
 	// 是否成功
 	Success bool `json:"success"`
-	// 发起方地址（SS58）
+	// 发起方地址（EVM 账户为 0x 地址，其余为 SS58）
 	From *string `json:"from,omitempty"`
 	// 目标合约名（合约调用时）
 	To *string `json:"to,omitempty"`

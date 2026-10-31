@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/cockroachdb/pebble"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/model/protoio"
+	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 )
 
@@ -71,6 +73,55 @@ func prefixUpperBound(prefix []byte) []byte {
 		}
 	}
 	return append(prefix, 0)
+}
+
+// displayCallerAddr 根据 callerType 把交易发起方字节回显为用户可识别的地址。
+//
+//   - CallerType=2（EVM）：caller 为 20 字节以太坊地址 / 33 字节压缩公钥 /
+//     65 字节未压缩公钥，统一派生为 0x 前缀 40 hex 地址（EVM 用户可识别）。
+//   - 其它（TEE / Polkadot sr25519 / ed25519）：按 SS58 回显（向后兼容）。
+//
+// EVM 派生失败时回退 SS58，避免丢字段。
+func displayCallerAddr(caller []byte, callerType uint32) string {
+	if callerType == 2 {
+		if addr := evmCallerToAddress(caller); addr != "" {
+			return addr
+		}
+	}
+	return crypto.PubKeyFromByte(caller).SS58()
+}
+
+// evmCallerToAddress 把 EVM caller 字节派生为 0x 前缀 20 字节地址。
+//
+//   - 20 字节：直接是以太坊地址
+//   - 33 字节：压缩 secp256k1 公钥（0x02/0x03 前缀）→ 解压 → keccak256[12:]
+//   - 65 字节：未压缩 secp256k1 公钥（0x04 前缀）→ keccak256[12:]
+//
+// 无法识别的长度或前缀返回空串（调用方回退 SS58）。
+func evmCallerToAddress(caller []byte) string {
+	var addr [20]byte
+	switch len(caller) {
+	case 20:
+		copy(addr[:], caller)
+	case 33:
+		if caller[0] != 0x02 && caller[0] != 0x03 {
+			return ""
+		}
+		pk, err := ethcrypto.DecompressPubkey(caller)
+		if err != nil {
+			return ""
+		}
+		copy(addr[:], ethcrypto.PubkeyToAddress(*pk).Bytes())
+	case 65:
+		if caller[0] != 0x04 {
+			return ""
+		}
+		h := ethcrypto.Keccak256(caller[1:])
+		copy(addr[:], h[12:])
+	default:
+		return ""
+	}
+	return "0x" + hex.EncodeToString(addr[:])
 }
 
 // countAddressKeys 统计曾发起过交易的地址数。

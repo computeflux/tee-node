@@ -198,7 +198,8 @@ func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDet
 	// 解码原始交易字节，提取 From/To/方法/参数/nonce
 	if txBox, e := decodeTxBox(res.Tx); e == nil && txBox != nil {
 		if len(txBox.Caller) > 0 {
-			from := crypto.PubKeyFromByte(txBox.Caller).SS58()
+			// EVM 账户（CallerType=2）回显 0x 地址，其余按 SS58（向后兼容）
+			from := displayCallerAddr(txBox.Caller, txBox.CallerType)
 			detail.From = &from
 		}
 		if call, e2 := decodeSysCall(txBox.Call); e2 == nil && call != nil {
