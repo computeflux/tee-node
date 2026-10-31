@@ -266,10 +266,25 @@ type DailyUsage struct {
 
 // ── RechargeHistory ──────────────────────────────────────
 
-// RechargeRecord 单笔充值记录
+// RechargeRecord 单笔充值记录。
+//
+// ChainID + Nonce 是跨链充值的凭据：对应主链 Recharge 事件的 (链, 事件序号)，
+// 据此可在主链上定位原始交易；本链侧则以 (User, 本记录在充值历史中的序号) 定位。
+// 二者为 0 表示非跨链来源（本链内部放款）或 V33 之前的旧记录（链信息未知）。
 // scale-codec-gen:generate
 type RechargeRecord struct {
-	User   store.UniAddr `json:"user" idx:"exact"`
+	User    store.UniAddr `json:"user" idx:"exact"`
+	Amount  uint64        `json:"amount"`
+	Time    int64         `json:"time"`
+	ChainID uint32        `json:"chainId"` // 充值来源链 ID
+	Nonce   uint64        `json:"nonce"`   // 来源链上的事件序号（与 ChainID 组合唯一）
+}
+
+// RechargeRecordV1 旧版充值记录编码（User/Amount/Time），V33 迁移后已不再写入。
+// 仅供 migrations.V33 解码存量数据，禁止在新代码中使用。
+// scale-codec-gen:generate
+type RechargeRecordV1 struct {
+	User   store.UniAddr `json:"user"`
 	Amount uint64        `json:"amount"`
 	Time   int64         `json:"time"`
 }

@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testChainID 测试用主链 ID（与 relay 一致：chainID + nonce 唯一确定一笔跨链充值）
+const testChainID uint32 = 420420417
+
 func newTestGateway() (*Gateway, *testutil.MockRuntime) {
 	rt := testutil.NewMockRuntime()
 	return NewGateway(rt), rt
@@ -19,7 +22,7 @@ func seedProvider(t *testing.T, gw *Gateway, rt *testutil.MockRuntime, name stri
 	t.Helper()
 	user := rt.Caller
 	rt.System = true
-	require.NoError(t, GatewayMutation{Gateway: *gw}.Recharge(user, deposit, []byte("seed-nonce")))
+	require.NoError(t, GatewayMutation{Gateway: *gw}.Recharge(user, deposit, testChainID, 1))
 	rt.System = false
 
 	m := GatewayMutation{Gateway: *gw}
@@ -40,7 +43,7 @@ func TestGateway_CreateProvider_Success(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	rt.System = true
-	require.NoError(t, m.Recharge(rt.Caller, 200_000_000, []byte("success-nonce")))
+	require.NoError(t, m.Recharge(rt.Caller, 200_000_000, testChainID, 1))
 	rt.System = false
 	err := m.CreateProvider("AI Corp", "https://logo.png", "Best AI", RegionAsiaEast, 200_000_000)
 	require.NoError(t, err)
@@ -127,7 +130,7 @@ func TestGateway_CreateProvider_StakesBalance(t *testing.T) {
 
 	// 余额 500M，质押 200M → 可用余额 300M
 	rt.System = true
-	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("stake-nonce")))
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, testChainID, 1))
 	rt.System = false
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
 
@@ -150,7 +153,7 @@ func TestGateway_CreateProvider_InsufficientBalance(t *testing.T) {
 
 	// 余额不足（100M < 200M）→ ErrLowCredit
 	rt.System = true
-	require.NoError(t, m.Recharge(rt.Caller, 100_000_000, []byte("insufficient-nonce")))
+	require.NoError(t, m.Recharge(rt.Caller, 100_000_000, testChainID, 1))
 	rt.System = false
 	assert.ErrorIs(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000), ErrLowCredit)
 }
@@ -163,7 +166,7 @@ func TestGateway_CloseProvider_RefundAndReopen(t *testing.T) {
 
 	// 余额 500M，质押 200M → 可用余额 300M
 	rt.System = true
-	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("close-nonce")))
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, testChainID, 1))
 	rt.System = false
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
 
@@ -237,7 +240,7 @@ func TestGateway_AddDeposit(t *testing.T) {
 
 	// 余额 500M，质押 200M 后追加 100M → 可用余额 200M，deposit 300M
 	rt.System = true
-	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, []byte("adddeposit-nonce")))
+	require.NoError(t, m.Recharge(rt.Caller, 500_000_000, testChainID, 1))
 	rt.System = false
 	require.NoError(t, m.CreateProvider("AI Corp", "", "", RegionAsiaEast, 200_000_000))
 	require.NoError(t, m.AddDeposit(0, 100_000_000))
@@ -444,7 +447,7 @@ func TestGateway_Recharge_Success(t *testing.T) {
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
 
-	err := m.Recharge(user, 1000, []byte("nonce1"))
+	err := m.Recharge(user, 1000, testChainID, 1)
 	require.NoError(t, err)
 
 	credit, err := q.GetCredit(user)
@@ -457,7 +460,7 @@ func TestGateway_Recharge_RequiresSystem(t *testing.T) {
 	m := GatewayMutation{*gw}
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
-	err := m.Recharge(user, 1000, []byte("nonce1"))
+	err := m.Recharge(user, 1000, testChainID, 1)
 	assert.ErrorContains(t, err, "not sudo")
 }
 
@@ -469,18 +472,39 @@ func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
 
-	require.NoError(t, m.Recharge(user, 1000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1000, testChainID, 1))
 	credit1, _ := q.GetCredit(user)
 
-	// 相同 nonce 再次充值应被静默跳过（return nil），余额不变
-	require.NoError(t, m.Recharge(user, 2000, []byte("nonce1")))
+	// 同一 (chainID, nonce) 再次充值应被静默跳过（return nil），余额不变
+	require.NoError(t, m.Recharge(user, 2000, testChainID, 1))
 	credit2, _ := q.GetCredit(user)
 	assert.Equal(t, credit1, credit2)
 
 	// 不同 nonce 可以正常充值
-	require.NoError(t, m.Recharge(user, 3000, []byte("nonce2")))
+	require.NoError(t, m.Recharge(user, 3000, testChainID, 2))
 	credit3, _ := q.GetCredit(user)
 	assert.Equal(t, credit1+3000, credit3)
+
+	// 不同链上的相同 nonce 是不同事件，可以正常充值
+	require.NoError(t, m.Recharge(user, 500, testChainID+1, 1))
+	credit4, _ := q.GetCredit(user)
+	assert.Equal(t, credit3+500, credit4)
+
+	// nonce=0 不是合法的 relay 事件序号，静默跳过
+	require.NoError(t, m.Recharge(user, 700, testChainID, 0))
+	credit5, _ := q.GetCredit(user)
+	assert.Equal(t, credit4, credit5)
+
+	// 充值历史里记录了跨链凭据（chainID + nonce）
+	records, err := q.GetRechargeHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, records, 3)
+	assert.Equal(t, uint64(500), records[0].Amount)
+	assert.Equal(t, uint32(testChainID+1), records[0].ChainID)
+	assert.Equal(t, uint64(1), records[0].Nonce)
+	assert.Equal(t, uint32(testChainID), records[1].ChainID)
+	assert.Equal(t, uint64(2), records[1].Nonce)
+	assert.Equal(t, uint64(1), records[2].Nonce)
 }
 
 func TestGateway_TransferCredit_Success(t *testing.T) {
@@ -492,7 +516,7 @@ func TestGateway_TransferCredit_Success(t *testing.T) {
 	to := store.UniAddr{T: 1, V: []byte{0xCD}}
 
 	rt.System = true
-	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(from, 1000, testChainID, 1))
 	rt.System = false
 
 	// Transfer from caller
@@ -523,7 +547,7 @@ func TestGateway_TransferCredit_Insufficient(t *testing.T) {
 	to := store.UniAddr{T: 1, V: []byte{0xCD}}
 
 	rt.System = true
-	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(from, 1000, testChainID, 1))
 	rt.System = false
 
 	rt.Caller = from
@@ -540,7 +564,7 @@ func TestGateway_TransferCredit_ZeroAmount(t *testing.T) {
 	to := store.UniAddr{T: 1, V: []byte{0xCD}}
 
 	rt.System = true
-	require.NoError(t, m.Recharge(from, 1000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(from, 1000, testChainID, 1))
 	rt.System = false
 
 	rt.Caller = from
@@ -561,7 +585,7 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	// Settle must be called by node (T == 0)
@@ -602,7 +626,7 @@ func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	nonce := []byte{0x01, 0x02, 0x03, 0x04}
@@ -635,7 +659,7 @@ func TestGateway_SettleUsage_ConsecutiveFailDelist(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	// Settle must be called by node (T == 0)
@@ -721,7 +745,7 @@ func TestGateway_SettleUsageWithRoute_Success(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	// Settle by node (T == 0)
@@ -771,7 +795,7 @@ func TestGateway_Withdraw_Success(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	// Settle must be called by node (T == 0)
@@ -811,7 +835,7 @@ func TestGateway_Withdraw_InsufficientCredit(t *testing.T) {
 
 	user := store.UniAddr{T: 1, V: []byte{0xAB}}
 	rt.System = true
-	require.NoError(t, m.Recharge(user, 1_000_000, []byte("nonce1")))
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
 	rt.System = false
 
 	// Settle must be called by node (T == 0)
@@ -1084,6 +1108,7 @@ func TestGateway_RechargeTransferHistoryPaging(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		_, err := gw.rechargeHistory.Insert(txn, user, RechargeRecord{
 			User: user, Amount: uint64(100 * (i + 1)), Time: int64(i),
+			ChainID: testChainID, Nonce: uint64(i + 1),
 		})
 		require.NoError(t, err)
 		_, err = gw.transferHistory.Insert(txn, user, TransferRecord{

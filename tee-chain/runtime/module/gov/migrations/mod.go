@@ -15,5 +15,9 @@ func Migration(newVersion uint32, api store.ContractApi) error {
 		return V20(api)
 	}
 
+	if newVersion == 33 {
+		return V33(api)
+	}
+
 	return nil
 }

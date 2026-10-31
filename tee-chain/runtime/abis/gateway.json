@@ -1852,12 +1852,22 @@
           },
           {
             "docs": [],
+            "label": "chain_i_d",
+            "type": {
+              "displayName": [
+                "u32"
+              ],
+              "type": 2
+            }
+          },
+          {
+            "docs": [],
             "label": "nonce",
             "type": {
               "displayName": [
-                "Vec"
+                "u64"
               ],
-              "type": 15
+              "type": 3
             }
           }
         ],
@@ -4125,6 +4135,14 @@
               {
                 "name": "Time",
                 "type": 4
+              },
+              {
+                "name": "ChainID",
+                "type": 2
+              },
+              {
+                "name": "Nonce",
+                "type": 3
               }
             ]
           }

@@ -57,7 +57,8 @@ func (g GatewaySecret) AddCredit(user store.UniAddr, amount uint64) error {
 		return fmt.Errorf("c2c: credit buyer: %w", err)
 	}
 
-	// 记录充值历史（c2c Release 放款到账，与 GatewayMutation.Recharge 保持一致）
+	// 记录充值历史（c2c Release 放款到账，与 GatewayMutation.Recharge 保持一致）。
+	// 非跨链充值，不存在主链事件，故 ChainID/Nonce 留 0。
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
 		User:   user,
 		Amount: amount * 10000,

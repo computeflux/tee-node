@@ -1,12 +1,14 @@
 package graph
 
 import (
+	"crypto/elliptic"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/computeflux/tee-provider/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,6 +55,64 @@ func TestDecodeArgs(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, args)
 	})
+}
+
+// ── displayCallerAddr / evmCallerToAddress ────────────────────────────────
+
+// secp256k1Curve 返回 secp256k1 椭圆曲线（go-ethereum 内置）。
+func secp256k1Curve() elliptic.Curve { return ethcrypto.S256() }
+
+func TestEvmCallerToAddress(t *testing.T) {
+	// ganache 测试账户 #0：私钥 → 地址 0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1
+	privKey, err := ethcrypto.HexToECDSA("4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d")
+	require.NoError(t, err)
+	addr := ethcrypto.PubkeyToAddress(privKey.PublicKey)
+	want := "0x" + strings.ToLower(addr.Hex()[2:])
+
+	t.Run("20_byte_address", func(t *testing.T) {
+		assert.Equal(t, want, evmCallerToAddress(addr.Bytes()))
+	})
+
+	t.Run("33_byte_compressed_pubkey", func(t *testing.T) {
+		assert.Equal(t, want, evmCallerToAddress(ethcrypto.CompressPubkey(&privKey.PublicKey)))
+	})
+
+	t.Run("65_byte_uncompressed_pubkey", func(t *testing.T) {
+		uncompressed := elliptic.Marshal(secp256k1Curve(), privKey.PublicKey.X, privKey.PublicKey.Y) // 65B 0x04 前缀
+		assert.Equal(t, want, evmCallerToAddress(uncompressed))
+	})
+
+	t.Run("bad_prefix_returns_empty", func(t *testing.T) {
+		assert.Empty(t, evmCallerToAddress(append([]byte{0xff}, addr.Bytes()...)))
+		uncompressed := elliptic.Marshal(secp256k1Curve(), privKey.PublicKey.X, privKey.PublicKey.Y)
+		assert.Empty(t, evmCallerToAddress(append([]byte{0xff}, uncompressed[1:]...)))
+	})
+
+	t.Run("unknown_length_returns_empty", func(t *testing.T) {
+		assert.Empty(t, evmCallerToAddress([]byte{1, 2, 3}))
+		assert.Empty(t, evmCallerToAddress(nil))
+	})
+}
+
+func TestDisplayCallerAddr(t *testing.T) {
+	// EVM（CallerType=2）：20 字节地址 → 0x 回显
+	addrBytes := []byte{0x90, 0xf8, 0xbf, 0x6a, 0x47, 0x9f, 0x32, 0x0e, 0xad, 0x07,
+		0x44, 0x11, 0xa4, 0xb0, 0xe7, 0x94, 0x4e, 0xa8, 0xc9, 0xc1}
+	assert.Equal(t, "0x90f8bf6a479f320ead074411a4b0e7944ea8c9c1", displayCallerAddr(addrBytes, 2))
+
+	// 非 EVM（CallerType=0/1/3）：32 字节公钥 → SS58（向后兼容）
+	pub32 := make([]byte, 32)
+	for i := range pub32 {
+		pub32[i] = byte(i)
+	}
+	ss58 := displayCallerAddr(pub32, 0)
+	assert.NotEmpty(t, ss58)
+	assert.NotContains(t, ss58, "0x")
+	assert.Equal(t, ss58, displayCallerAddr(pub32, 1))
+	assert.Equal(t, ss58, displayCallerAddr(pub32, 3))
+
+	// EVM 但长度无法识别：回退 SS58 不 panic
+	assert.NotPanics(t, func() { _ = displayCallerAddr([]byte{1, 2, 3}, 2) })
 }
 
 // ── computeHMAC ───────────────────────────────────────────

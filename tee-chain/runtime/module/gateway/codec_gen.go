@@ -1165,11 +1165,65 @@ func (v *RechargeRecord) Encode() ([]byte, error) {
 	buf = append(buf, v.User.V...)
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Amount))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Nonce))
 	return buf, nil
 }
 
 // Decode SCALE 解码 RechargeRecord。
 func (v *RechargeRecord) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading User.T")
+	}
+	v.User.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading User.V")
+		}
+		v.User.V = make([]byte, n)
+		copy(v.User.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Amount")
+	}
+	v.Amount = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Time")
+	}
+	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ChainID")
+	}
+	v.ChainID = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Nonce")
+	}
+	v.Nonce = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
+
+// Encode SCALE 编码 RechargeRecordV1。
+func (v *RechargeRecordV1) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
+	buf = append(buf, v.User.V...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Amount))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	return buf, nil
+}
+
+// Decode SCALE 解码 RechargeRecordV1。
+func (v *RechargeRecordV1) Decode(data []byte) (int, error) {
 	off := 0
 	if off+4 > len(data) {
 		return 0, fmt.Errorf("EOF reading User.T")

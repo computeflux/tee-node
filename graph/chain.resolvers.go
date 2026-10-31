@@ -7,8 +7,11 @@ package graph
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"time"
 
+	"github.com/cometbft/cometbft/state/txindex"
 	"github.com/cometbft/cometbft/types"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -131,6 +134,7 @@ func (r *queryResolver) BlockDetail(ctx context.Context, height *int, hash *stri
 	return detail, nil
 }
 
+<<<<<<< HEAD
 // AddressBalance is the resolver for the address_balance field.
 //
 // 地址当前余额：走 gov 合约 balance_of。address 支持 SS58 或 hex 公钥（DecodeCaller 统一解析）。
@@ -191,4 +195,220 @@ func (r *queryResolver) AddressTxs(ctx context.Context, address string, page *in
 		Total:   &total,
 		HasMore: end < total || truncated,
 	}, nil
+=======
+// TxDetail is the resolver for the tx_detail field.
+//
+// 从本节点内置的 CometBFT TxIndexer 按交易哈希查询交易结果，
+// 再解码原始交易字节（model.Tx → model.SysCall）提取 From/To/方法/参数，
+// 并加载所在区块获取出块时间。数据与链上 /tx 查询一致。
+func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDetail, error) {
+	node := teechain.TeeChainNode
+	if node == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+
+	hexHash, err := normalizeHexHash(hash)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "invalid tx hash: "+err.Error())
+	}
+
+	// 通过 ConfigureRPC 拿到内置 TxIndexer（与 /tx RPC 同一数据源）
+	env, err := node.ConfigureRPC()
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "tx indexer not ready: "+err.Error())
+	}
+	if env.TxIndexer == nil {
+		return nil, gqlerror.Errorf("%s", "tx indexer not ready")
+	}
+
+	res, err := env.TxIndexer.Get(hexHash)
+	if err != nil {
+		return nil, gqlerror.Errorf("%s", "tx not found: "+err.Error())
+	}
+	if res == nil {
+		return nil, gqlerror.Errorf("%s", "tx not found")
+	}
+
+	// 加载所在区块获取出块时间
+	var blockTime string
+	if block := node.BlockStore().LoadBlock(res.Height); block != nil {
+		blockTime = block.Header.Time.UTC().Format(time.RFC3339)
+	}
+
+	detail := &model.TxDetail{
+		Hash:      hex.EncodeToString(hexHash),
+		Height:    int(res.Height),
+		Index:     int(res.Index),
+		Time:      blockTime,
+		Code:      int(res.Result.Code),
+		Success:   res.Result.Code == 0,
+		GasUsed:   intPtr(res.Result.GasUsed),
+		GasWanted: intPtr(res.Result.GasWanted),
+		Data:      strPtr(hex.EncodeToString(res.Tx)),
+	}
+
+	// 事件序列化为 JSON 字符串
+	if len(res.Result.Events) > 0 {
+		if b, e := json.Marshal(res.Result.Events); e == nil {
+			events := string(b)
+			detail.Events = &events
+		}
+	}
+
+	// 解码原始交易字节，提取 From/To/方法/参数/nonce
+	if txBox, e := decodeTxBox(res.Tx); e == nil && txBox != nil {
+		if len(txBox.Caller) > 0 {
+			// EVM 账户（CallerType=2）回显 0x 地址，其余按 SS58（向后兼容）
+			from := displayCallerAddr(txBox.Caller, txBox.CallerType)
+			detail.From = &from
+		}
+		if call, e2 := decodeSysCall(txBox.Call); e2 == nil && call != nil {
+			switch payload := call.Payload.(type) {
+			case *model.SysCall_Contract:
+				cc := payload.Contract
+				if cc != nil {
+					if len(cc.Name) > 0 {
+						to := string(cc.Name)
+						detail.To = &to
+					}
+					if len(cc.Method) > 0 {
+						method := string(cc.Method)
+						detail.Method = &method
+					}
+					if len(cc.Args) > 0 {
+						args := make([]string, 0, len(cc.Args))
+						for _, a := range cc.Args {
+							args = append(args, hex.EncodeToString(a))
+						}
+						detail.Args = args
+					}
+					nonce := int(cc.Nonce)
+					detail.Nonce = &nonce
+				}
+			case *model.SysCall_RelaySync:
+				// 跨链 relay 交易：反解 SyncEvent，填充主链关联信息
+				if payload.RelaySync != nil {
+					detail.CrossChain = crossChainInfoFromRelaySync(payload.RelaySync)
+				}
+			}
+		}
+	}
+
+	return detail, nil
+}
+
+// ChainOverview is the resolver for the chain_overview field.
+//
+// 一次性返回链状态总览：最新区块高度/时间、总交易数、总地址数、
+// 最近区块列表、最近交易列表。供 dapp /chain 首页总览页使用。
+//
+// 数据来源：
+//   - 最新区块高度/时间、最近区块列表：本节点内置 CometBFT BlockStore
+//     （LoadBlockMeta 只读区块头，不加载交易体，开销小）。
+//   - 最近交易列表：从 latest 向下逐块 LoadBlock（块数受 maxTxScanBlocks +
+//     txLimit 约束），每笔交易用 TxIndexer.Get(hash) 点查执行码——开销只与
+//     扫描块数相关，与链上交易总量无关（避免全量物化 + 排序的资源放大）。
+//   - 总交易数：遍历 block meta 累加 NumTxs（O(块数) 次小读，不物化交易字节），
+//     结果用「按高度增量」缓存，避免高频匿名请求重复全链扫描。
+//   - 总地址数：SECRET_DB 中 `call_nonce:` 前缀记录数（每个发起过交易的
+//     地址一条 nonce 记录，去重后的地址数）。
+//
+// 各子项独立降级：任一数据源不可用时对应字段返回零值/空列表并记 warn 日志，
+// 不整体报错，保证前端总览页始终有兜底展示（不白屏）。
+func (r *queryResolver) ChainOverview(ctx context.Context, blockLimit *int, txLimit *int) (*model.ChainOverview, error) {
+	node := teechain.TeeChainNode
+	if node == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+	bs := node.BlockStore()
+	if bs == nil {
+		return nil, gqlerror.Errorf("%s", "block store not ready")
+	}
+
+	if blockLimit == nil || *blockLimit <= 0 {
+		blockLimit = intPtr(10)
+	} else if *blockLimit > maxChainOverviewLimit {
+		blockLimit = intPtr(maxChainOverviewLimit)
+	}
+	if txLimit == nil || *txLimit <= 0 {
+		txLimit = intPtr(10)
+	} else if *txLimit > maxChainOverviewLimit {
+		txLimit = intPtr(maxChainOverviewLimit)
+	}
+
+	overview := &model.ChainOverview{
+		Blocks: make([]*model.ChainOverviewBlock, 0, *blockLimit),
+		Txs:    make([]*model.ChainOverviewTx, 0, *txLimit),
+	}
+
+	// 最新区块高度
+	latest := bs.Height()
+	if latest <= 0 {
+		// 链尚未出块：返回空总览（前端兜底展示）
+		return overview, nil
+	}
+	overview.LatestHeight = int(latest)
+
+	// 最新区块时间 + 最近区块列表（LoadBlockMeta 只读区块头，不加载交易体）
+	for h := latest; h > latest-int64(*blockLimit) && h >= 1; h-- {
+		meta := bs.LoadBlockMeta(h)
+		if meta == nil {
+			continue
+		}
+		if h == latest {
+			overview.LatestTime = meta.Header.Time.UTC().Format(time.RFC3339)
+		}
+		overview.Blocks = append(overview.Blocks, &model.ChainOverviewBlock{
+			Height: int(h),
+			Hash:   hex.EncodeToString(meta.BlockID.Hash),
+			Time:   meta.Header.Time.UTC().Format(time.RFC3339),
+			NumTxs: meta.NumTxs,
+		})
+	}
+
+	// 最近交易列表：从 latest 向下逐块 LoadBlock（块数受 maxTxScanBlocks +
+	// txLimit 约束），每笔交易用 TxIndexer.Get(hash) 点查执行码。
+	// 开销只与扫描块数相关，与链上交易总量无关。
+	if env, err := node.ConfigureRPC(); err == nil && env.TxIndexer != nil {
+		scanLimit := int64(maxTxScanBlocks)
+		if int64(*txLimit) < scanLimit {
+			scanLimit = int64(*txLimit)
+		}
+		for h := latest; h > latest-scanLimit && h >= 1 && len(overview.Txs) < *txLimit; h-- {
+			block := bs.LoadBlock(h)
+			if block == nil {
+				continue
+			}
+			blockTime := block.Header.Time.UTC().Format(time.RFC3339)
+			// 块内交易按索引降序（同块内最新在前）
+			for i := len(block.Data.Txs) - 1; i >= 0 && len(overview.Txs) < *txLimit; i-- {
+				rawTx := block.Data.Txs[i]
+				hash := rawTx.Hash()
+				code := 0
+				if res, e := env.TxIndexer.Get(hash); e == nil && res != nil {
+					code = int(res.Result.Code)
+				} else if e != nil && !errors.Is(e, txindex.ErrorEmptyHash) {
+					util.LogWarnf("chain_overview: tx index get height=%d idx=%d: %v", h, i, e)
+				}
+				overview.Txs = append(overview.Txs, &model.ChainOverviewTx{
+					Hash:    hex.EncodeToString(hash),
+					Height:  int(h),
+					Time:    blockTime,
+					Code:    code,
+					Success: code == 0,
+				})
+			}
+		}
+	}
+
+	// 总交易数：遍历 block meta 累加 NumTxs（O(块数) 次小读，不物化交易字节）。
+	// 全链扫描开销随链增长，故用「按高度增量」缓存：冷启动全扫一次，之后
+	// 每个新区块只累加新增块的 NumTxs，开销与新增块数相关（非全链）。
+	overview.TotalTxs = totalTxCountCached(bs, latest)
+
+	// 总地址数：SECRET_DB 中 call_nonce: 前缀记录数
+	overview.TotalAddresses = countAddressKeys()
+
+	return overview, nil
+>>>>>>> main
 }

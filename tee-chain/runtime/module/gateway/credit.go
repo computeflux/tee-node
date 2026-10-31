@@ -14,18 +14,19 @@ var UserTypeToChainID = map[uint32][]uint32{
 
 // ── Points ───────────────────────────────────────────────
 
-func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, nonce []byte) error {
+// Recharge 跨链充值入账。chainID + nonce 标识主链上的充值事件，作为跨链凭据存入充值历史。
+func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, chainID uint32, nonce uint64) error {
 	if !g.api.CallbySystem() {
 		return fmt.Errorf("Recharge: caller is not sudo account")
 	}
 
-	// 防重放检查：nonce 必须非空且未使用过
-	nonceHex := hex.EncodeToString(nonce)
-	if nonceHex == "" {
-		fmt.Println("Recharge: empty nonce")
+	// 防重放检查：nonce 由主链 relay 从 1 开始严格递增，0 视为非法事件
+	if nonce == 0 {
+		fmt.Println("Recharge: invalid nonce (0)")
 		return nil
 	}
 
+	nonceHex := rechargeNonceKey(chainID, nonce)
 	exists, _ := g.rechargeNonces.Get(g.api.GetTxn(), nonceHex)
 	if exists != nil && *exists {
 		fmt.Println("Recharge: duplicate nonce")
@@ -41,11 +42,13 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, nonce []byt
 		return err
 	}
 
-	// 记录充值历史
+	// 记录充值历史（含跨链凭据）
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
-		User:   user,
-		Amount: amount,
-		Time:   g.api.GetBlockTime(),
+		User:    user,
+		Amount:  amount,
+		Time:    g.api.GetBlockTime(),
+		ChainID: chainID,
+		Nonce:   nonce,
 	})
 
 	// 标记 nonce 已使用（防重放永久拒绝）
@@ -175,4 +178,10 @@ func (g GatewayQuery) GetTransferHistory(user store.UniAddr, offset uint64, limi
 		return nil, err
 	}
 	return records, nil
+}
+
+// rechargeNonceKey 生成充值防重放 key：hex("<chainID>:<nonce>")。
+// 该格式与 V33 之前的 relay 约定一致，升级后存量 key 仍然有效。
+func rechargeNonceKey(chainID uint32, nonce uint64) string {
+	return hex.EncodeToString([]byte(fmt.Sprintf("%d:%d", chainID, nonce)))
 }
