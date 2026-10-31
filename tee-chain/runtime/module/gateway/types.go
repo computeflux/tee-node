@@ -271,13 +271,15 @@ type DailyUsage struct {
 // ChainID + Nonce 是跨链充值的凭据：对应主链 Recharge 事件的 (链, 事件序号)，
 // 据此可在主链上定位原始交易；本链侧则以 (User, 本记录在充值历史中的序号) 定位。
 // 二者为 0 表示非跨链来源（本链内部放款）或 V33 之前的旧记录（链信息未知）。
+// BlockHeight 为写入本记录时的侧链区块高度（V34 起），0 表示 V34 迁移前的旧记录。
 // scale-codec-gen:generate
 type RechargeRecord struct {
-	User    store.UniAddr `json:"user" idx:"exact"`
-	Amount  uint64        `json:"amount"`
-	Time    int64         `json:"time"`
-	ChainID uint32        `json:"chainId"` // 充值来源链 ID
-	Nonce   uint64        `json:"nonce"`   // 来源链上的事件序号（与 ChainID 组合唯一）
+	User        store.UniAddr `json:"user" idx:"exact"`
+	Amount      uint64        `json:"amount"`
+	Time        int64         `json:"time"`
+	ChainID     uint32        `json:"chainId"`     // 充值来源链 ID
+	Nonce       uint64        `json:"nonce"`       // 来源链上的事件序号（与 ChainID 组合唯一）
+	BlockHeight uint64        `json:"blockHeight"` // 侧链区块高度（V34 起，0 = 旧记录）
 }
 
 // RechargeRecordV1 旧版充值记录编码（User/Amount/Time），V33 迁移后已不再写入。
@@ -287,6 +289,31 @@ type RechargeRecordV1 struct {
 	User   store.UniAddr `json:"user"`
 	Amount uint64        `json:"amount"`
 	Time   int64         `json:"time"`
+}
+
+// RechargeRecordV33 V33 编码的充值记录（User/Amount/Time/ChainID/Nonce），V34 迁移后已不再写入。
+// 仅供 migrations.V34 解码存量数据，禁止在新代码中使用。
+// scale-codec-gen:generate
+type RechargeRecordV33 struct {
+	User    store.UniAddr `json:"user"`
+	Amount  uint64        `json:"amount"`
+	Time    int64         `json:"time"`
+	ChainID uint32        `json:"chainId"`
+	Nonce   uint64        `json:"nonce"`
+}
+
+// UserSettlementRecordV33 V33 及之前编码的用户结算记录（无 BlockHeight），V34 迁移后已不再写入。
+// 仅供 migrations.V34 解码存量数据，禁止在新代码中使用。
+// scale-codec-gen:generate
+type UserSettlementRecordV33 struct {
+	ProviderID  uint64 `json:"providerId"`
+	ModelID     uint64 `json:"modelId"`
+	TokenIn     uint64 `json:"TokenIn"`
+	TokenOut    uint64 `json:"tokensOut"`
+	CachedToken uint64 `json:"cachedToken"`
+	Cost        uint64 `json:"cost"`
+	Count       uint16 `json:"count"`
+	Time        int64  `json:"time"`
 }
 
 // TransferRecord 单笔转账记录
@@ -300,7 +327,8 @@ type TransferRecord struct {
 
 // ── SettlementHistory ────────────────────────────────────
 
-// SettlementRecord 单笔结算记录（Provider 视角）
+// SettlementRecord 单笔结算记录（User 视角）
+// BlockHeight 为写入本记录时的侧链区块高度（V34 起），0 表示 V34 迁移前的旧记录。
 // scale-codec-gen:generate
 type UserSettlementRecord struct {
 	ProviderID  uint64 `json:"providerId"`
@@ -311,6 +339,7 @@ type UserSettlementRecord struct {
 	Cost        uint64 `json:"cost"`
 	Count       uint16 `json:"count"`
 	Time        int64  `json:"time"`
+	BlockHeight uint64 `json:"blockHeight"` // 侧链区块高度（V34 起，0 = 旧记录）
 }
 
 // SettlementRecord 单笔结算记录（Provider 视角）

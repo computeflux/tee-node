@@ -42,13 +42,14 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, chainID uin
 		return err
 	}
 
-	// 记录充值历史（含跨链凭据）
+	// 记录充值历史（含跨链凭据 + 侧链区块高度）
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
-		User:    user,
-		Amount:  amount,
-		Time:    g.api.GetBlockTime(),
-		ChainID: chainID,
-		Nonce:   nonce,
+		User:        user,
+		Amount:      amount,
+		Time:        g.api.GetBlockTime(),
+		ChainID:     chainID,
+		Nonce:       nonce,
+		BlockHeight: uint64(g.api.GetHeight()),
 	})
 
 	// 标记 nonce 已使用（防重放永久拒绝）

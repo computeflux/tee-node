@@ -1167,6 +1167,7 @@ func (v *RechargeRecord) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Nonce))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.BlockHeight))
 	return buf, nil
 }
 
@@ -1207,6 +1208,11 @@ func (v *RechargeRecord) Decode(data []byte) (int, error) {
 		return 0, fmt.Errorf("EOF reading Nonce")
 	}
 	v.Nonce = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading BlockHeight")
+	}
+	v.BlockHeight = binary.LittleEndian.Uint64(data[off:])
 	off += 8
 	return off, nil
 }
@@ -1249,6 +1255,60 @@ func (v *RechargeRecordV1) Decode(data []byte) (int, error) {
 		return 0, fmt.Errorf("EOF reading Time")
 	}
 	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	return off, nil
+}
+
+// Encode SCALE 编码 RechargeRecordV33。
+func (v *RechargeRecordV33) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, v.User.T)
+	buf = store.EncodeCompact(buf, uint64(len(v.User.V)))
+	buf = append(buf, v.User.V...)
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Amount))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(v.ChainID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Nonce))
+	return buf, nil
+}
+
+// Decode SCALE 解码 RechargeRecordV33。
+func (v *RechargeRecordV33) Decode(data []byte) (int, error) {
+	off := 0
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading User.T")
+	}
+	v.User.T = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	{
+		n, sz := store.DecodeCompact(data[off:])
+		off += sz
+		if off+int(n) > len(data) {
+			return 0, fmt.Errorf("EOF reading User.V")
+		}
+		v.User.V = make([]byte, n)
+		copy(v.User.V, data[off:off+int(n)])
+		off += int(n)
+	}
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Amount")
+	}
+	v.Amount = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Time")
+	}
+	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	if off+4 > len(data) {
+		return 0, fmt.Errorf("EOF reading ChainID")
+	}
+	v.ChainID = binary.LittleEndian.Uint32(data[off:])
+	off += 4
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Nonce")
+	}
+	v.Nonce = binary.LittleEndian.Uint64(data[off:])
 	off += 8
 	return off, nil
 }
@@ -1514,11 +1574,77 @@ func (v *UserSettlementRecord) Encode() ([]byte, error) {
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Cost))
 	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.BlockHeight))
 	return buf, nil
 }
 
 // Decode SCALE 解码 UserSettlementRecord。
 func (v *UserSettlementRecord) Decode(data []byte) (int, error) {
+	off := 0
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ProviderID")
+	}
+	v.ProviderID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading ModelID")
+	}
+	v.ModelID = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TokenIn")
+	}
+	v.TokenIn = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading TokenOut")
+	}
+	v.TokenOut = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading CachedToken")
+	}
+	v.CachedToken = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Cost")
+	}
+	v.Cost = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	if off+2 > len(data) {
+		return 0, fmt.Errorf("EOF reading Count")
+	}
+	v.Count = binary.LittleEndian.Uint16(data[off:])
+	off += 2
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading Time")
+	}
+	v.Time = int64(binary.LittleEndian.Uint64(data[off:]))
+	off += 8
+	if off+8 > len(data) {
+		return 0, fmt.Errorf("EOF reading BlockHeight")
+	}
+	v.BlockHeight = binary.LittleEndian.Uint64(data[off:])
+	off += 8
+	return off, nil
+}
+
+// Encode SCALE 编码 UserSettlementRecordV33。
+func (v *UserSettlementRecordV33) Encode() ([]byte, error) {
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ProviderID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.ModelID))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenIn))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.TokenOut))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.CachedToken))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Cost))
+	buf = binary.LittleEndian.AppendUint16(buf, uint16(v.Count))
+	buf = binary.LittleEndian.AppendUint64(buf, uint64(v.Time))
+	return buf, nil
+}
+
+// Decode SCALE 解码 UserSettlementRecordV33。
+func (v *UserSettlementRecordV33) Decode(data []byte) (int, error) {
 	off := 0
 	if off+8 > len(data) {
 		return 0, fmt.Errorf("EOF reading ProviderID")

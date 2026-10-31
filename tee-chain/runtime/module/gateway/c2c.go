@@ -58,11 +58,12 @@ func (g GatewaySecret) AddCredit(user store.UniAddr, amount uint64) error {
 	}
 
 	// 记录充值历史（c2c Release 放款到账，与 GatewayMutation.Recharge 保持一致）。
-	// 非跨链充值，不存在主链事件，故 ChainID/Nonce 留 0。
+	// 非跨链充值，不存在主链事件，故 ChainID/Nonce 留 0；BlockHeight 记录侧链存证高度。
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
-		User:   user,
-		Amount: amount * 10000,
-		Time:   g.api.GetBlockTime(),
+		User:        user,
+		Amount:      amount * 10000,
+		Time:        g.api.GetBlockTime(),
+		BlockHeight: uint64(g.api.GetHeight()),
 	})
 	return nil
 }

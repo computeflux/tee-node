@@ -93,7 +93,8 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 		*pb += cost
 		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
 
-		// 记录结算历史（Provider 维度）
+		// 记录结算历史（Provider 维度 + User 维度，含侧链区块高度）
+		blockHeight := uint64(g.api.GetHeight())
 		_, _ = g.settlementHistory.Insert(g.api.GetTxn(), r.ProviderID, ProviderSettlementRecord{
 			User:        r.User,
 			ModelID:     r.ModelID,
@@ -113,6 +114,7 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 			Cost:        cost,
 			Count:       r.Count,
 			Time:        g.api.GetBlockTime(),
+			BlockHeight: blockHeight,
 		})
 
 		// 标记 nonce 已使用（防重放永久拒绝）

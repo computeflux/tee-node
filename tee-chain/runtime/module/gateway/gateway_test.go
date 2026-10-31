@@ -495,7 +495,7 @@ func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
 	credit5, _ := q.GetCredit(user)
 	assert.Equal(t, credit4, credit5)
 
-	// 充值历史里记录了跨链凭据（chainID + nonce）
+	// 充值历史里记录了跨链凭据（chainID + nonce）与侧链区块高度
 	records, err := q.GetRechargeHistory(user, 0, 10)
 	require.NoError(t, err)
 	require.Len(t, records, 3)
@@ -505,6 +505,47 @@ func TestGateway_Recharge_DuplicateNonce(t *testing.T) {
 	assert.Equal(t, uint32(testChainID), records[1].ChainID)
 	assert.Equal(t, uint64(2), records[1].Nonce)
 	assert.Equal(t, uint64(1), records[2].Nonce)
+	// V34 起新充值记录必须携带侧链区块高度
+	for _, r := range records {
+		assert.Greater(t, r.BlockHeight, uint64(0))
+	}
+}
+
+// TestGateway_Recharge_BlockHeight 新充值记录的 BlockHeight 等于写入时的侧链区块高度。
+func TestGateway_Recharge_BlockHeight(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.System = true
+	rt.Height = 12345
+	require.NoError(t, m.Recharge(user, 1000, testChainID, 1))
+
+	records, err := q.GetRechargeHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	assert.Equal(t, uint64(12345), records[0].BlockHeight)
+}
+
+// TestGateway_C2C_AddCredit_BlockHeight c2c 放款（GatewaySecret.AddCredit）写入的充值记录
+// 也必须携带侧链区块高度，否则会被前端/查询误判为 V34 之前的旧记录。
+func TestGateway_C2C_AddCredit_BlockHeight(t *testing.T) {
+	gw, rt := newTestGateway()
+	s := GatewaySecret{Gateway: *gw}
+	q := GatewayQuery{*gw}
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.Height = 54321
+	require.NoError(t, s.AddCredit(user, 100))
+
+	records, err := q.GetRechargeHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	// c2c 放款非跨链来源，ChainID/Nonce 为 0，但 BlockHeight 必须 > 0
+	assert.Equal(t, uint32(0), records[0].ChainID)
+	assert.Equal(t, uint64(0), records[0].Nonce)
+	assert.Equal(t, uint64(54321), records[0].BlockHeight)
 }
 
 func TestGateway_TransferCredit_Success(t *testing.T) {
@@ -615,6 +656,47 @@ func TestGateway_SettleUsage_Success(t *testing.T) {
 	provCredit, err := q.GetProviderCredit(0)
 	require.NoError(t, err)
 	assert.Greater(t, provCredit, uint64(0))
+
+	// V34 起新结算记录必须携带侧链区块高度
+	userRecords, err := q.GetUserSettlementHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, userRecords, 1)
+	assert.Greater(t, userRecords[0].BlockHeight, uint64(0))
+}
+
+// TestGateway_SettleUsage_BlockHeight 新结算记录的 BlockHeight 等于写入时的侧链区块高度。
+func TestGateway_SettleUsage_BlockHeight(t *testing.T) {
+	gw, rt := newTestGateway()
+	m := GatewayMutation{*gw}
+	q := GatewayQuery{*gw}
+
+	seedProvider(t, gw, rt, "AI Corp", 200_000_000)
+	require.NoError(t, m.RegisterModel("gpt-4", ModalityText, 128000, 1_000_000, 500_000, 2_000_000, OpenAI, "", nil, 0, 0, false, ""))
+
+	user := store.UniAddr{T: 1, V: []byte{0xAB}}
+	rt.System = true
+	require.NoError(t, m.Recharge(user, 1_000_000, testChainID, 1))
+	rt.System = false
+
+	rt.Caller.T = 0
+	rt.Height = 67890
+	require.NoError(t, m.SettleUsageWithRoute([]SettlementWithRoute{
+		{
+			User:       user,
+			RouteID:    store.NewNone[uint64](),
+			ModelID:    0,
+			ProviderID: 0,
+			TokenIn:    1000,
+			TokenOut:   500,
+			Count:      1,
+			Nonce:      []byte{0x0a, 0x0b, 0x0c, 0x0d},
+		},
+	}))
+
+	userRecords, err := q.GetUserSettlementHistory(user, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, userRecords, 1)
+	assert.Equal(t, uint64(67890), userRecords[0].BlockHeight)
 }
 
 func TestGateway_SettleUsage_DuplicateNonce(t *testing.T) {

@@ -117,6 +117,9 @@ export interface RechargeRecord {
   User: UniAddr;
   Amount: string;
   Time: string;
+  ChainID: number;
+  Nonce: string;
+  BlockHeight: string;
 }
 
 export interface TransferRecord {
@@ -144,6 +147,7 @@ export interface UserSettlementRecord {
   Cost: string;
   Count: number;
   Time: string;
+  BlockHeight: string;
 }
 
 export interface WithdrawApply {

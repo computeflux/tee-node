@@ -4143,6 +4143,10 @@
               {
                 "name": "Nonce",
                 "type": 3
+              },
+              {
+                "name": "BlockHeight",
+                "type": 3
               }
             ]
           }
@@ -4604,6 +4608,10 @@
               {
                 "name": "Time",
                 "type": 4
+              },
+              {
+                "name": "BlockHeight",
+                "type": 3
               }
             ]
           }
