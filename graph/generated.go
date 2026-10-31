@@ -157,6 +157,14 @@ type ComplexityRoot struct {
 		Status    func(childComplexity int) int
 	}
 
+	CrossChainInfo struct {
+		ChainID         func(childComplexity int) int
+		EventType       func(childComplexity int) int
+		MainBlock       func(childComplexity int) int
+		MainExplorerURL func(childComplexity int) int
+		Nonce           func(childComplexity int) int
+	}
+
 	Erc20Item struct {
 		Active   func(childComplexity int) int
 		Address  func(childComplexity int) int
@@ -309,22 +317,23 @@ type ComplexityRoot struct {
 	}
 
 	TxDetail struct {
-		Amount    func(childComplexity int) int
-		Args      func(childComplexity int) int
-		Code      func(childComplexity int) int
-		Data      func(childComplexity int) int
-		Events    func(childComplexity int) int
-		From      func(childComplexity int) int
-		GasUsed   func(childComplexity int) int
-		GasWanted func(childComplexity int) int
-		Hash      func(childComplexity int) int
-		Height    func(childComplexity int) int
-		Index     func(childComplexity int) int
-		Method    func(childComplexity int) int
-		Nonce     func(childComplexity int) int
-		Success   func(childComplexity int) int
-		Time      func(childComplexity int) int
-		To        func(childComplexity int) int
+		Amount     func(childComplexity int) int
+		Args       func(childComplexity int) int
+		Code       func(childComplexity int) int
+		CrossChain func(childComplexity int) int
+		Data       func(childComplexity int) int
+		Events     func(childComplexity int) int
+		From       func(childComplexity int) int
+		GasUsed    func(childComplexity int) int
+		GasWanted  func(childComplexity int) int
+		Hash       func(childComplexity int) int
+		Height     func(childComplexity int) int
+		Index      func(childComplexity int) int
+		Method     func(childComplexity int) int
+		Nonce      func(childComplexity int) int
+		Success    func(childComplexity int) int
+		Time       func(childComplexity int) int
+		To         func(childComplexity int) int
 	}
 
 	UserInfo struct {
@@ -920,6 +929,41 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.ChallengeResult.Status(childComplexity), true
+
+	case "CrossChainInfo.chain_id":
+		if e.complexity.CrossChainInfo.ChainID == nil {
+			break
+		}
+
+		return e.complexity.CrossChainInfo.ChainID(childComplexity), true
+
+	case "CrossChainInfo.event_type":
+		if e.complexity.CrossChainInfo.EventType == nil {
+			break
+		}
+
+		return e.complexity.CrossChainInfo.EventType(childComplexity), true
+
+	case "CrossChainInfo.main_block":
+		if e.complexity.CrossChainInfo.MainBlock == nil {
+			break
+		}
+
+		return e.complexity.CrossChainInfo.MainBlock(childComplexity), true
+
+	case "CrossChainInfo.main_explorer_url":
+		if e.complexity.CrossChainInfo.MainExplorerURL == nil {
+			break
+		}
+
+		return e.complexity.CrossChainInfo.MainExplorerURL(childComplexity), true
+
+	case "CrossChainInfo.nonce":
+		if e.complexity.CrossChainInfo.Nonce == nil {
+			break
+		}
+
+		return e.complexity.CrossChainInfo.Nonce(childComplexity), true
 
 	case "Erc20Item.active":
 		if e.complexity.Erc20Item.Active == nil {
@@ -1869,6 +1913,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.TxDetail.Code(childComplexity), true
+
+	case "TxDetail.cross_chain":
+		if e.complexity.TxDetail.CrossChain == nil {
+			break
+		}
+
+		return e.complexity.TxDetail.CrossChain(childComplexity), true
 
 	case "TxDetail.data":
 		if e.complexity.TxDetail.Data == nil {
@@ -7711,6 +7762,223 @@ func (ec *executionContext) fieldContext_ChallengeResult_error(_ context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _CrossChainInfo_chain_id(ctx context.Context, field graphql.CollectedField, obj *model.CrossChainInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CrossChainInfo_chain_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ChainID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CrossChainInfo_chain_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CrossChainInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CrossChainInfo_nonce(ctx context.Context, field graphql.CollectedField, obj *model.CrossChainInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CrossChainInfo_nonce(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nonce, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CrossChainInfo_nonce(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CrossChainInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CrossChainInfo_main_block(ctx context.Context, field graphql.CollectedField, obj *model.CrossChainInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CrossChainInfo_main_block(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MainBlock, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CrossChainInfo_main_block(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CrossChainInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CrossChainInfo_main_explorer_url(ctx context.Context, field graphql.CollectedField, obj *model.CrossChainInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CrossChainInfo_main_explorer_url(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MainExplorerURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CrossChainInfo_main_explorer_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CrossChainInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CrossChainInfo_event_type(ctx context.Context, field graphql.CollectedField, obj *model.CrossChainInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CrossChainInfo_event_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CrossChainInfo_event_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CrossChainInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Erc20Item_address(ctx context.Context, field graphql.CollectedField, obj *model.Erc20Item) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Erc20Item_address(ctx, field)
 	if err != nil {
@@ -11597,6 +11865,8 @@ func (ec *executionContext) fieldContext_Query_tx_detail(ctx context.Context, fi
 				return ec.fieldContext_TxDetail_data(ctx, field)
 			case "events":
 				return ec.fieldContext_TxDetail_events(ctx, field)
+			case "cross_chain":
+				return ec.fieldContext_TxDetail_cross_chain(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TxDetail", field.Name)
 		},
@@ -14190,6 +14460,59 @@ func (ec *executionContext) fieldContext_TxDetail_events(_ context.Context, fiel
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TxDetail_cross_chain(ctx context.Context, field graphql.CollectedField, obj *model.TxDetail) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TxDetail_cross_chain(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CrossChain, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CrossChainInfo)
+	fc.Result = res
+	return ec.marshalOCrossChainInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐCrossChainInfo(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TxDetail_cross_chain(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TxDetail",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "chain_id":
+				return ec.fieldContext_CrossChainInfo_chain_id(ctx, field)
+			case "nonce":
+				return ec.fieldContext_CrossChainInfo_nonce(ctx, field)
+			case "main_block":
+				return ec.fieldContext_CrossChainInfo_main_block(ctx, field)
+			case "main_explorer_url":
+				return ec.fieldContext_CrossChainInfo_main_explorer_url(ctx, field)
+			case "event_type":
+				return ec.fieldContext_CrossChainInfo_event_type(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CrossChainInfo", field.Name)
 		},
 	}
 	return fc, nil
@@ -17629,6 +17952,62 @@ func (ec *executionContext) _ChallengeResult(ctx context.Context, sel ast.Select
 	return out
 }
 
+var crossChainInfoImplementors = []string{"CrossChainInfo"}
+
+func (ec *executionContext) _CrossChainInfo(ctx context.Context, sel ast.SelectionSet, obj *model.CrossChainInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, crossChainInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CrossChainInfo")
+		case "chain_id":
+			out.Values[i] = ec._CrossChainInfo_chain_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "nonce":
+			out.Values[i] = ec._CrossChainInfo_nonce(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "main_block":
+			out.Values[i] = ec._CrossChainInfo_main_block(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "main_explorer_url":
+			out.Values[i] = ec._CrossChainInfo_main_explorer_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "event_type":
+			out.Values[i] = ec._CrossChainInfo_event_type(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var erc20ItemImplementors = []string{"Erc20Item"}
 
 func (ec *executionContext) _Erc20Item(ctx context.Context, sel ast.SelectionSet, obj *model.Erc20Item) graphql.Marshaler {
@@ -19061,6 +19440,8 @@ func (ec *executionContext) _TxDetail(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._TxDetail_data(ctx, field, obj)
 		case "events":
 			out.Values[i] = ec._TxDetail_events(ctx, field, obj)
+		case "cross_chain":
+			out.Values[i] = ec._TxDetail_cross_chain(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -20585,6 +20966,13 @@ func (ec *executionContext) marshalOChainOverview2ᚖgithubᚗcomᚋcomputeflux�
 		return graphql.Null
 	}
 	return ec._ChainOverview(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCrossChainInfo2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐCrossChainInfo(ctx context.Context, sel ast.SelectionSet, v *model.CrossChainInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CrossChainInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {

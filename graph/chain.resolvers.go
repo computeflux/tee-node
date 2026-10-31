@@ -9,11 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/cometbft/cometbft/state/txindex"
-	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	"github.com/computeflux/tee-provider/config"
 	"github.com/computeflux/tee-provider/pkg/model"
@@ -203,45 +201,39 @@ func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDet
 			detail.From = &from
 		}
 		if call, e2 := decodeSysCall(txBox.Call); e2 == nil && call != nil {
-			if cc, ok := call.Payload.(*model.SysCall_Contract); ok && cc.Contract != nil {
-				if len(cc.Contract.Name) > 0 {
-					to := string(cc.Contract.Name)
-					detail.To = &to
-				}
-				if len(cc.Contract.Method) > 0 {
-					method := string(cc.Contract.Method)
-					detail.Method = &method
-				}
-				if len(cc.Contract.Args) > 0 {
-					args := make([]string, 0, len(cc.Contract.Args))
-					for _, a := range cc.Contract.Args {
-						args = append(args, hex.EncodeToString(a))
+			switch payload := call.Payload.(type) {
+			case *model.SysCall_Contract:
+				cc := payload.Contract
+				if cc != nil {
+					if len(cc.Name) > 0 {
+						to := string(cc.Name)
+						detail.To = &to
 					}
-					detail.Args = args
+					if len(cc.Method) > 0 {
+						method := string(cc.Method)
+						detail.Method = &method
+					}
+					if len(cc.Args) > 0 {
+						args := make([]string, 0, len(cc.Args))
+						for _, a := range cc.Args {
+							args = append(args, hex.EncodeToString(a))
+						}
+						detail.Args = args
+					}
+					nonce := int(cc.Nonce)
+					detail.Nonce = &nonce
 				}
-				nonce := int(cc.Contract.Nonce)
-				detail.Nonce = &nonce
+			case *model.SysCall_RelaySync:
+				// 跨链 relay 交易：反解 SyncEvent，填充主链关联信息
+				if payload.RelaySync != nil {
+					detail.CrossChain = crossChainInfoFromRelaySync(payload.RelaySync)
+				}
 			}
 		}
 	}
 
 	return detail, nil
 }
-
-// maxChainOverviewLimit 是 chain_overview 单次查询的 blockLimit/txLimit 上限。
-//
-// 该查询未挂 @auth 指令、对匿名请求可达，入参若不加上限：
-//   - make(..., 0, *limit) 会按攻击者给的容量预分配（传 1e9 即单请求申请数 GB 内存 → OOM）；
-//   - 区块列表循环会遍历整条链的区块头（每次 LoadBlockMeta 都是一次 DB 读）。
-//
-// 因此对入参做统一截断：<=0 取默认 10，> 上限取上限。
-const maxChainOverviewLimit = 100
-
-// maxTxScanBlocks 是「最近交易列表」从 latest 向下逐块扫描的硬上限（块数）。
-// 开销只与该常量 + txLimit 相关，与链上交易总量无关——防止交易稀疏时
-// 为凑够 txLimit 而遍历整条链（匿名请求资源放大）。测试网出块节奏下，
-// 最近交易通常落在最新少数几个块内，200 块足够覆盖。
-const maxTxScanBlocks = 200
 
 // ChainOverview is the resolver for the chain_overview field.
 //
@@ -356,58 +348,4 @@ func (r *queryResolver) ChainOverview(ctx context.Context, blockLimit *int, txLi
 	overview.TotalAddresses = countAddressKeys()
 
 	return overview, nil
-}
-
-// totalTxCache 是总交易数的「按高度增量」缓存。
-//
-// 总交易数 = 全链所有块 NumTxs 之和。冷启动需全扫一次（O(块数) 次 LoadBlockMeta
-// 小读，不物化交易字节）；之后每个新区块只累加新增块的 NumTxs，开销与新增块数
-// 相关而非全链。chain_overview 匿名可达且前端 12s 轮询，该缓存避免高频请求重复
-// 全链扫描。高度键自洽：latest == cachedHeight 直接命中；latest > cachedHeight
-// 增量累加；latest < cachedHeight（链重置）全扫重算。
-type totalTxCache struct {
-	mu           sync.Mutex
-	cachedHeight int64
-	cachedTotal  int
-}
-
-var totalTxCacheInst totalTxCache
-
-// totalTxCountCached 返回截至 latest 的总交易数（按高度增量缓存）。
-func totalTxCountCached(bs *store.BlockStore, latest int64) int {
-	c := &totalTxCacheInst
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	switch {
-	case c.cachedHeight == latest:
-		// 命中：高度一致，直接返回
-		return c.cachedTotal
-
-	case c.cachedHeight > 0 && c.cachedHeight < latest:
-		// 增量：只累加新增块（cachedHeight+1 .. latest）的 NumTxs
-		for h := c.cachedHeight + 1; h <= latest; h++ {
-			if meta := bs.LoadBlockMeta(h); meta != nil {
-				c.cachedTotal += meta.NumTxs
-			}
-		}
-		c.cachedHeight = latest
-		return c.cachedTotal
-
-	default:
-		// 冷启动 / 链重置：全扫 base..latest 累加 NumTxs
-		base := bs.Base()
-		if base < 1 {
-			base = 1
-		}
-		total := 0
-		for h := base; h <= latest; h++ {
-			if meta := bs.LoadBlockMeta(h); meta != nil {
-				total += meta.NumTxs
-			}
-		}
-		c.cachedHeight = latest
-		c.cachedTotal = total
-		return total
-	}
 }
