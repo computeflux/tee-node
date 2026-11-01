@@ -46,14 +46,16 @@ func copyBytes(b []byte) []byte {
 //
 // encodeScanPairs 将 keys/vals 数组写入 WASM 内存指定位置。
 // 格式: [数量: u32LE][长度: u32LE][数据...][数量: u32LE][长度: u32LE][数据...]
-func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]byte) uint32 {
+func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]byte) (uint32, bool) {
 	buf := make([]byte, 0, 1024)
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(keys)))
 	for _, k := range keys {
 		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(k)))
 		buf = append(buf, k...)
 	}
-	mem.Write(keysPtr, buf)
+	if _, err := mem.Write(keysPtr, buf); err != nil {
+		return 0, false
+	}
 
 	buf = buf[:0]
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(vals)))
@@ -61,9 +63,11 @@ func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]
 		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(v)))
 		buf = append(buf, v...)
 	}
-	mem.Write(valsPtr, buf)
+	if _, err := mem.Write(valsPtr, buf); err != nil {
+		return 0, false
+	}
 
-	return uint32(len(keys))
+	return uint32(len(keys)), true
 }
 
 // instantiateHostModule creates and registers the "runtime" host module.
@@ -168,7 +172,11 @@ func registerStorage(b wazero.HostModuleBuilder, s *hostState) {
 				stack[0] = errStorage
 				return
 			}
-			n := encodeScanPairs(mem, uint32(stack[2]), uint32(stack[3]), keys, vals)
+			n, ok := encodeScanPairs(mem, uint32(stack[2]), uint32(stack[3]), keys, vals)
+			if !ok {
+				stack[0] = errMem
+				return
+			}
 			stack[0] = uint64(n)
 		}),
 		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},

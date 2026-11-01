@@ -63,11 +63,7 @@ type ComplexityRoot struct {
 		Time         func(childComplexity int) int
 	}
 
-<<<<<<< HEAD
-	AddressTxsPage struct {
-=======
 	AddressTxs struct {
->>>>>>> main
 		HasMore func(childComplexity int) int
 		Total   func(childComplexity int) int
 		Txs     func(childComplexity int) int
@@ -390,15 +386,10 @@ type QueryResolver interface {
 	ChainInfo(ctx context.Context) ([]*model.ChainInfo, error)
 	Validators(ctx context.Context) ([]string, error)
 	BlockDetail(ctx context.Context, height *int, hash *string) (*model.BlockDetail, error)
-<<<<<<< HEAD
-	AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error)
-	AddressTxs(ctx context.Context, address string, page *int, pageSize *int) (*model.AddressTxsPage, error)
-=======
 	TxDetail(ctx context.Context, hash string) (*model.TxDetail, error)
 	ChainOverview(ctx context.Context, blockLimit *int, txLimit *int) (*model.ChainOverview, error)
 	AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error)
 	AddressTxs(ctx context.Context, address string, page *int, pageSize *int) (*model.AddressTxs, error)
->>>>>>> main
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
 	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
@@ -491,28 +482,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.AddressTx.Time(childComplexity), true
 
-<<<<<<< HEAD
-	case "AddressTxsPage.hasMore":
-		if e.complexity.AddressTxsPage.HasMore == nil {
-			break
-		}
-
-		return e.complexity.AddressTxsPage.HasMore(childComplexity), true
-
-	case "AddressTxsPage.total":
-		if e.complexity.AddressTxsPage.Total == nil {
-			break
-		}
-
-		return e.complexity.AddressTxsPage.Total(childComplexity), true
-
-	case "AddressTxsPage.txs":
-		if e.complexity.AddressTxsPage.Txs == nil {
-			break
-		}
-
-		return e.complexity.AddressTxsPage.Txs(childComplexity), true
-=======
 	case "AddressTxs.hasMore":
 		if e.complexity.AddressTxs.HasMore == nil {
 			break
@@ -533,7 +502,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AddressTxs.Txs(childComplexity), true
->>>>>>> main
 
 	case "AuthConfig.corsOrigins":
 		if e.complexity.AuthConfig.CorsOrigins == nil {
@@ -4953,13 +4921,8 @@ func (ec *executionContext) fieldContext_AddressTx_counterparty(_ context.Contex
 	return fc, nil
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) _AddressTxsPage_txs(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxsPage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AddressTxsPage_txs(ctx, field)
-=======
 func (ec *executionContext) _AddressTxs_txs(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxs) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AddressTxs_txs(ctx, field)
->>>>>>> main
 	if err != nil {
 		return graphql.Null
 	}
@@ -4989,15 +4952,9 @@ func (ec *executionContext) _AddressTxs_txs(ctx context.Context, field graphql.C
 	return ec.marshalNAddressTx2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxᚄ(ctx, field.Selections, res)
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) fieldContext_AddressTxsPage_txs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AddressTxsPage",
-=======
 func (ec *executionContext) fieldContext_AddressTxs_txs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AddressTxs",
->>>>>>> main
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -5024,13 +4981,8 @@ func (ec *executionContext) fieldContext_AddressTxs_txs(_ context.Context, field
 	return fc, nil
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) _AddressTxsPage_total(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxsPage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AddressTxsPage_total(ctx, field)
-=======
 func (ec *executionContext) _AddressTxs_total(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxs) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AddressTxs_total(ctx, field)
->>>>>>> main
 	if err != nil {
 		return graphql.Null
 	}
@@ -5057,15 +5009,9 @@ func (ec *executionContext) _AddressTxs_total(ctx context.Context, field graphql
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) fieldContext_AddressTxsPage_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AddressTxsPage",
-=======
 func (ec *executionContext) fieldContext_AddressTxs_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AddressTxs",
->>>>>>> main
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -5076,13 +5022,8 @@ func (ec *executionContext) fieldContext_AddressTxs_total(_ context.Context, fie
 	return fc, nil
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) _AddressTxsPage_hasMore(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxsPage) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AddressTxsPage_hasMore(ctx, field)
-=======
 func (ec *executionContext) _AddressTxs_hasMore(ctx context.Context, field graphql.CollectedField, obj *model.AddressTxs) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_AddressTxs_hasMore(ctx, field)
->>>>>>> main
 	if err != nil {
 		return graphql.Null
 	}
@@ -5112,15 +5053,9 @@ func (ec *executionContext) _AddressTxs_hasMore(ctx context.Context, field graph
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) fieldContext_AddressTxsPage_hasMore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "AddressTxsPage",
-=======
 func (ec *executionContext) fieldContext_AddressTxs_hasMore(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AddressTxs",
->>>>>>> main
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -11862,8 +11797,6 @@ func (ec *executionContext) fieldContext_Query_block_detail(ctx context.Context,
 	return fc, nil
 }
 
-<<<<<<< HEAD
-=======
 func (ec *executionContext) _Query_tx_detail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_tx_detail(ctx, field)
 	if err != nil {
@@ -12018,7 +11951,6 @@ func (ec *executionContext) fieldContext_Query_chain_overview(ctx context.Contex
 	return fc, nil
 }
 
->>>>>>> main
 func (ec *executionContext) _Query_address_balance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_address_balance(ctx, field)
 	if err != nil {
@@ -12100,15 +12032,9 @@ func (ec *executionContext) _Query_address_txs(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-<<<<<<< HEAD
-	res := resTmp.(*model.AddressTxsPage)
-	fc.Result = res
-	return ec.marshalOAddressTxsPage2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxsPage(ctx, field.Selections, res)
-=======
 	res := resTmp.(*model.AddressTxs)
 	fc.Result = res
 	return ec.marshalOAddressTxs2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxs(ctx, field.Selections, res)
->>>>>>> main
 }
 
 func (ec *executionContext) fieldContext_Query_address_txs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -12120,15 +12046,6 @@ func (ec *executionContext) fieldContext_Query_address_txs(ctx context.Context, 
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "txs":
-<<<<<<< HEAD
-				return ec.fieldContext_AddressTxsPage_txs(ctx, field)
-			case "total":
-				return ec.fieldContext_AddressTxsPage_total(ctx, field)
-			case "hasMore":
-				return ec.fieldContext_AddressTxsPage_hasMore(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type AddressTxsPage", field.Name)
-=======
 				return ec.fieldContext_AddressTxs_txs(ctx, field)
 			case "total":
 				return ec.fieldContext_AddressTxs_total(ctx, field)
@@ -12136,7 +12053,6 @@ func (ec *executionContext) fieldContext_Query_address_txs(ctx context.Context, 
 				return ec.fieldContext_AddressTxs_hasMore(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AddressTxs", field.Name)
->>>>>>> main
 		},
 	}
 	defer func() {
@@ -17415,45 +17331,26 @@ func (ec *executionContext) _AddressTx(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
-<<<<<<< HEAD
-var addressTxsPageImplementors = []string{"AddressTxsPage"}
-
-func (ec *executionContext) _AddressTxsPage(ctx context.Context, sel ast.SelectionSet, obj *model.AddressTxsPage) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, addressTxsPageImplementors)
-=======
 var addressTxsImplementors = []string{"AddressTxs"}
 
 func (ec *executionContext) _AddressTxs(ctx context.Context, sel ast.SelectionSet, obj *model.AddressTxs) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, addressTxsImplementors)
->>>>>>> main
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-<<<<<<< HEAD
-			out.Values[i] = graphql.MarshalString("AddressTxsPage")
-		case "txs":
-			out.Values[i] = ec._AddressTxsPage_txs(ctx, field, obj)
-=======
 			out.Values[i] = graphql.MarshalString("AddressTxs")
 		case "txs":
 			out.Values[i] = ec._AddressTxs_txs(ctx, field, obj)
->>>>>>> main
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "total":
-<<<<<<< HEAD
-			out.Values[i] = ec._AddressTxsPage_total(ctx, field, obj)
-		case "hasMore":
-			out.Values[i] = ec._AddressTxsPage_hasMore(ctx, field, obj)
-=======
 			out.Values[i] = ec._AddressTxs_total(ctx, field, obj)
 		case "hasMore":
 			out.Values[i] = ec._AddressTxs_hasMore(ctx, field, obj)
->>>>>>> main
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -18931,8 +18828,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-<<<<<<< HEAD
-=======
 		case "tx_detail":
 			field := field
 
@@ -18971,7 +18866,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
->>>>>>> main
 		case "address_balance":
 			field := field
 
@@ -21016,19 +20910,11 @@ func (ec *executionContext) marshalOAddressBalance2ᚖgithubᚗcomᚋcomputeflux
 	return ec._AddressBalance(ctx, sel, v)
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) marshalOAddressTxsPage2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxsPage(ctx context.Context, sel ast.SelectionSet, v *model.AddressTxsPage) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._AddressTxsPage(ctx, sel, v)
-=======
 func (ec *executionContext) marshalOAddressTxs2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxs(ctx context.Context, sel ast.SelectionSet, v *model.AddressTxs) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._AddressTxs(ctx, sel, v)
->>>>>>> main
 }
 
 func (ec *executionContext) marshalOAuthConfig2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAuthConfig(ctx context.Context, sel ast.SelectionSet, v *model.AuthConfig) graphql.Marshaler {

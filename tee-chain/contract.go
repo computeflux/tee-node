@@ -1,6 +1,8 @@
 package teechain
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"time"
 
@@ -8,8 +10,44 @@ import (
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
+
+// runtimeUpgradeSelector 是 gov.runtime_upgrade 的方法选择器（mutates=true）。
+var runtimeUpgradeSelector = store.MethodToSelectorBytes("runtime_upgrade")
+
+// runtimeUpgradeTargetVersion 若 call 是 gov.runtime_upgrade，返回其目标版本。
+//
+// PendingRuntimeUpgrade 的 SCALE 编码以 Version(u32, LE) 开头（见
+// ext/runtimeupgrade 的 scaleEncodePendingRuntimeUpgrade 与 gov_gen.go 的
+// runtime_upgrade 分发），因此直接读 args[0] 前 4 字节即可，无需完整解码。
+func runtimeUpgradeTargetVersion(call store.ContractCall) (uint32, bool) {
+	if string(call.GetName()) != "gov" {
+		return 0, false
+	}
+	if !bytes.Equal(call.GetMethod(), runtimeUpgradeSelector) {
+		return 0, false
+	}
+	args := call.GetArgs()
+	if len(args) == 0 || len(args[0]) < 4 {
+		return 0, false
+	}
+	return binary.LittleEndian.Uint32(args[0][:4]), true
+}
+
+// nativeVersionForCall 选择本次调用使用的运行时版本。
+//
+// 运行时升级的 WASM 载荷（400KB+）远超 WASM 兼容路径的 256KB 共享缓冲区，
+// 经 WASM 执行会被截断，导致链上留下 gunzip unexpected EOF 的残缺 blob。
+// 若本二进制恰好就是升级目标版本，直接走原生路径（本二进制实现即目标版本
+// 的运行时），保证 WASM 与版本元数据完整落库。
+func nativeVersionForCall(version uint32, call store.ContractCall) uint32 {
+	if target, ok := runtimeUpgradeTargetVersion(call); ok && target == module.NativeVersion {
+		return target
+	}
+	return version
+}
 
 // ContractRuntime 构造一个新的合约运行时上下文，供外部包（gateway、graph 等）使用。
 // 调用者负责 defer runtime.GetTxn().Rollback()。
@@ -83,6 +121,7 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbs
 	if err != nil {
 		return fmt.Errorf("get runtime version: %w", err)
 	}
+	version = nativeVersionForCall(version, call)
 
 	runtime := contracts.NewRuntimeWithVersion(height, t, txn, address, chaintypes.UniAddr{
 		V: pub.ToBytes(),
@@ -150,6 +189,7 @@ func (app *TeeChain) ContractDryRun(caller []byte, callerType uint32, call store
 	if err != nil {
 		return fmt.Errorf("get runtime version: %w", err)
 	}
+	version = nativeVersionForCall(version, call)
 
 	runtime := contracts.NewRuntimeWithVersion(height, time.Now(), txn, address, chaintypes.UniAddr{
 		V: app.dkg.SystemPubKey().Byte(),

@@ -52,13 +52,34 @@ func isSystem() int32
 func verifyTEEV2(reportPtr, reportLen, dataPtr, dataLen int32, t int64, callerPtr, callerLen int32, teeType int32, outPtr, outLen int32) int32
 
 // Shared buffer for interop with host functions.
-// Layout: first 64KB for keys/prefix, last 64KB for values.
+// Layout: [0, txnKeyArea) for keys/prefix (and ListByPrefix key results),
+// [txnKeyArea, txnBufSize) for values (and ListByPrefix value results).
 //
 // 与宿主函数交互的共享缓冲区。
-// 布局: 前 64KB 存放 key/prefix，后 64KB 存放 value。
-const txnBufSize = 256 * 1024 // 256KB
+// 布局: [0, txnKeyArea) 存放 key/prefix（含 ListByPrefix 的 key 结果），
+// [txnKeyArea, txnBufSize) 存放 value（含 ListByPrefix 的 value 结果）。
+const (
+	// txnBufSize 必须容纳 runtime_upgrade 上传的整个 SCALE 编码
+	// PendingRuntimeUpgrade（含 wasm 字节：当前 raw ≈1.1MB / gzip ≈400KB）。
+	// 旧值 256KB 会让 Set 静默截断大 value，链上留下 gunzip 报 unexpected EOF
+	// 的残缺 WASM，迁移也随之失败。
+	txnBufSize = 4 * 1024 * 1024 // 4MB
+
+	// txnKeyArea 是 key/prefix 区大小；value 区从该偏移开始，
+	// 可用空间为 txnBufSize - txnKeyArea。
+	txnKeyArea = 256 * 1024 // 256KB
+)
 
 var txnBuf [txnBufSize]byte
+
+// Host function error codes (mirror tee-chain/runtime/wasm/host.go).
+// 宿主函数错误码（与 tee-chain/runtime/wasm/host.go 保持一致）。
+const (
+	errKeyNotFound int32 = -4
+	errBufTooSmall int32 = -3
+	errStorage     int32 = -2
+	errMem         int32 = -1
+)
 
 // storageError represents an error code returned by a storage host function.
 type storageError struct {
@@ -85,10 +106,13 @@ type WasmTxn struct{}
 func (txn *WasmTxn) Get(key []byte) ([]byte, error) {
 	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
-	vp := kp + 65536
-	ret := storageGet(kp, int32(len(key)), vp, int32(len(txnBuf)-65536))
-	if ret <= 0 {
+	vp := kp + txnKeyArea
+	ret := storageGet(kp, int32(len(key)), vp, int32(len(txnBuf)-txnKeyArea))
+	if ret == 0 || ret == errKeyNotFound {
 		return nil, nil
+	}
+	if ret < 0 {
+		return nil, &storageError{ret, "storage_get"}
 	}
 	val := make([]byte, ret)
 	copy(val, txnBuf[vp-kp:vp-kp+ret])
@@ -96,6 +120,14 @@ func (txn *WasmTxn) Get(key []byte) ([]byte, error) {
 }
 
 func (txn *WasmTxn) Set(key, value []byte) error {
+	// 共享缓冲区只 txnBufSize 字节：key 从 0 开始、value 从 len(key)+16 开始。
+	// 超长 value（如 runtime_upgrade 上传的 WASM）必须显式报错，不能静默截断，
+	// 否则链上会写入残缺的 WASM（gunzip 时报 unexpected EOF）。
+	if len(key)+16+len(value) > len(txnBuf) {
+		return fmt.Errorf("storage_set: key(%d)+value(%d) exceeds shared buffer (%d bytes)",
+			len(key), len(value), len(txnBuf))
+	}
+
 	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], key)
 	vp := kp + int32(len(key)) + 16
@@ -126,10 +158,13 @@ func (txn *WasmTxn) ListByPrefix(prefix []byte) (keys, vals [][]byte, err error)
 	kp := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
 	copy(txnBuf[:], prefix)
 	pp := kp
-	vp := kp + 65536
+	vp := kp + txnKeyArea
 	n := storageScanPrefix(pp, int32(len(prefix)), kp, vp)
-	if n <= 0 {
+	if n == 0 || n == errKeyNotFound {
 		return nil, nil, nil
+	}
+	if n < 0 {
+		return nil, nil, &storageError{n, "storage_scan_prefix"}
 	}
 	off := uint32(kp - pp)
 	count := readU32At(off)

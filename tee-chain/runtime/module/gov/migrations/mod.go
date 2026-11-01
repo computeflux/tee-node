@@ -23,5 +23,15 @@ func Migration(newVersion uint32, api store.ContractApi) error {
 		return V34(api)
 	}
 
+	// V35：重跑 V34（34 升级时迁移在 WASM 路径失败后的恢复版本，幂等）
+	if newVersion == 35 {
+		return V35(api)
+	}
+
+	// V36：重跑 V35（35 升级时 WASM 落库被截断、迁移失败后的恢复版本，幂等）
+	if newVersion == 36 {
+		return V36(api)
+	}
+
 	return nil
 }

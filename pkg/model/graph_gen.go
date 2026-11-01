@@ -3,11 +3,7 @@
 package model
 
 type AddressBalance struct {
-<<<<<<< HEAD
-	// 地址（原样回显）
-=======
 	// 归一化后的地址展示形式（SS58 或 0x EVM 地址）
->>>>>>> main
 	Address string `json:"address"`
 	// 当前余额（十进制字符串，U256）
 	Balance string `json:"balance"`
@@ -16,11 +12,7 @@ type AddressBalance struct {
 type AddressTx struct {
 	// 交易哈希（hex，无 0x 前缀）
 	Hash string `json:"hash"`
-<<<<<<< HEAD
-	// 区块高度
-=======
 	// 所在区块高度
->>>>>>> main
 	Height int `json:"height"`
 	// 交易在区块内的索引
 	Index int `json:"index"`
@@ -30,21 +22,12 @@ type AddressTx struct {
 	Direction string `json:"direction"`
 	// 金额（十进制字符串，仅转账类交易；其余为 null）
 	Amount *string `json:"amount,omitempty"`
-<<<<<<< HEAD
-	// 对手方地址（SS58；无法识别时为 null）
-	Counterparty *string `json:"counterparty,omitempty"`
-}
-
-type AddressTxsPage struct {
-	// 当前页交易（时间倒序）
-=======
 	// 对手方地址（SS58 或 0x EVM 地址；无法识别时为 null）
 	Counterparty *string `json:"counterparty,omitempty"`
 }
 
 type AddressTxs struct {
 	// 交易列表（时间倒序）
->>>>>>> main
 	Txs []*AddressTx `json:"txs"`
 	// 扫描窗口内命中的交易总数
 	Total *int `json:"total,omitempty"`

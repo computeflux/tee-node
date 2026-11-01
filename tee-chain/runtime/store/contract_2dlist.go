@@ -60,6 +60,13 @@ func (l *StoreList2D[K1, Ix, V]) storeKey(id, k2 Ix) string {
 	return list2DKeyEncode(id, k2)
 }
 
+// StorageKey 返回 (id, k2) 对应的完整存储 key（含 namespace 与前缀）。
+// 供迁移等需要逐条点查、避免整段 ListByPrefix 在 WASM 路径下超过共享缓冲区
+// 上限的场景使用。
+func (l *StoreList2D[K1, Ix, V]) StorageKey(id, k2 Ix) []byte {
+	return l.storeMapping().StorageKey(l.storeKey(id, k2))
+}
+
 // list2DKeyEncode 将 (id, k2) 编码为字符串 key。
 func list2DKeyEncode[Ix ListIndex](id, k2 Ix) string {
 	switch any(id).(type) {
