@@ -53,7 +53,7 @@ func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]
 		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(k)))
 		buf = append(buf, k...)
 	}
-	if _, err := mem.Write(keysPtr, buf); err != nil {
+	if !mem.Write(keysPtr, buf) {
 		return 0, false
 	}
 
@@ -63,7 +63,7 @@ func encodeScanPairs(mem wazapi.Memory, keysPtr, valsPtr uint32, keys, vals [][]
 		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(v)))
 		buf = append(buf, v...)
 	}
-	if _, err := mem.Write(valsPtr, buf); err != nil {
+	if !mem.Write(valsPtr, buf) {
 		return 0, false
 	}
 

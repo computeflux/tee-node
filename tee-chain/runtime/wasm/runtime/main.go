@@ -85,7 +85,17 @@ func execute(isQuery uint32, callDataPtr uint32, callDataLen uint32) uint64 {
 	if len(result) == 0 {
 		return 0
 	}
-	return packResult(uint32(uintptr(unsafe.Pointer(&buf[0]))), uint32(copy(buf[:], result)))
+	// 结果写入动态分配的线性内存，避免固定 128KB buf 截断大结果
+	// （如 runtime_meta 查询返回整个 1MB+ 的 PendingRuntimeUpgrade）。
+	// -gc=leaking 下分配的内存不会回收，实例 Close 后随线性内存一起释放。
+	outPtr := alloc(uint32(len(result)))
+	if outPtr == 0 {
+		// 理论上可走不到：退回固定 buf（可能截断）。
+		return packResult(uint32(uintptr(unsafe.Pointer(&buf[0]))), uint32(copy(buf[:], result)))
+	}
+	out := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(outPtr))), len(result))
+	copy(out, result)
+	return packResult(outPtr, uint32(len(result)))
 }
 
 // packResult packs (ptr, length) into a uint64: high 32 bits = ptr, low 32 bits = length.
