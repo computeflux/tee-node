@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
@@ -10,6 +11,35 @@ import (
 // 420420417 Paseo test evm
 var UserTypeToChainID = map[uint32][]uint32{
 	2: {420420417},
+}
+
+// ── 余额变动事件 ─────────────────────────────────────────
+
+// emitBalanceChange 在余额写入点发射统一的 balance_change 事件。
+// attrs：kind（gov/ai/merchant）、address（UniAddr 的 T:hex(V) 编码，resolver 侧再转展示地址）、
+// delta（有符号十进制，扣减为负）。magnitude 为 uint64（gateway 余额为 uint64），
+// 用 FormatUint 直接输出避免 int64 截断/符号翻转；negative 为 true 时加负号。
+// 仅 append 内存切片（Runtime.EmitEvent 内部校验 + 上限），失败静默丢弃，不影响交易执行。
+func emitBalanceChange(api store.ContractApi, kind string, addr store.UniAddr, magnitude uint64, negative bool) {
+	delta := strconv.FormatUint(magnitude, 10)
+	if negative {
+		delta = "-" + delta
+	}
+	api.EmitEvent("balance_change", map[string]string{
+		"kind":    kind,
+		"address": addr.String(),
+		"delta":   delta,
+	})
+}
+
+// providerOwnerOf 返回 provider 的 owner 地址（merchant 余额以 providerID 记账，
+// 事件 address 用 owner 的 UniAddr，resolver 侧再转展示地址）。查不到时返回零值 UniAddr。
+func providerOwnerOf(g Gateway, providerID uint64) store.UniAddr {
+	prov, err := g.providers.Get(g.api.GetTxn(), providerID)
+	if err != nil || prov == nil {
+		return store.UniAddr{}
+	}
+	return prov.Owner
 }
 
 // ── Points ───────────────────────────────────────────────
@@ -41,6 +71,7 @@ func (g GatewayMutation) Recharge(user store.UniAddr, amount uint64, chainID uin
 	if err := g.credits.Set(g.api.GetTxn(), user, *bal); err != nil {
 		return err
 	}
+	emitBalanceChange(g.api, "ai", user, amount, false)
 
 	// 记录充值历史（含跨链凭据 + 侧链区块高度）
 	_, _ = g.rechargeHistory.Insert(g.api.GetTxn(), user, RechargeRecord{
@@ -87,6 +118,7 @@ func (g GatewayMutation) TransferCredit(to store.UniAddr, amount uint64) error {
 	if err := g.credits.Set(g.api.GetTxn(), from, *fromBal); err != nil {
 		return fmt.Errorf("TransferCredit: debit sender failed: %w", err)
 	}
+	emitBalanceChange(g.api, "ai", from, amount, true)
 
 	// 增加接收方余额
 	toBal, _ := g.credits.Get(g.api.GetTxn(), to)
@@ -97,6 +129,7 @@ func (g GatewayMutation) TransferCredit(to store.UniAddr, amount uint64) error {
 	if err := g.credits.Set(g.api.GetTxn(), to, *toBal); err != nil {
 		return fmt.Errorf("TransferCredit: credit receiver failed: %w", err)
 	}
+	emitBalanceChange(g.api, "ai", to, amount, false)
 
 	// 记录转账历史
 	now := g.api.GetBlockTime()

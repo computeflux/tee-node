@@ -81,6 +81,7 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 		}
 		*c += cost
 		g.credit_useds.Set(g.api.GetTxn(), r.User, *c)
+		emitBalanceChange(g.api, "ai", r.User, cost, true)
 
 		// 加 provider 余额
 		pb, err := g.providerCredits.Get(g.api.GetTxn(), r.ProviderID)
@@ -92,6 +93,7 @@ func (g GatewayMutation) SettleUsageWithRoute(records []SettlementWithRoute) err
 		}
 		*pb += cost
 		g.providerCredits.Set(g.api.GetTxn(), r.ProviderID, *pb)
+		emitBalanceChange(g.api, "merchant", providerOwnerOf(g.Gateway, r.ProviderID), cost, false)
 
 		// 记录结算历史（Provider 维度 + User 维度，含侧链区块高度）
 		blockHeight := uint64(g.api.GetHeight())

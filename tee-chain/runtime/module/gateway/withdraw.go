@@ -41,6 +41,7 @@ func (g GatewayMutation) ApplyWithdraw(chainID uint32, token []byte, providerID 
 	if err := g.providerCredits.Set(txn, providerID, *pb); err != nil {
 		return err
 	}
+	emitBalanceChange(g.api, "merchant", caller, amount, true)
 
 	nonceId, err := g.withdrawNonces.Len(txn)
 	if err != nil {
@@ -114,6 +115,7 @@ func (g GatewayMutation) WithdrawalCancelled(nonce uint64) error {
 	if err := g.providerCredits.Set(txn, providerID, *pb); err != nil {
 		return fmt.Errorf("WithdrawalCancelled: restore provider credits: %w", err)
 	}
+	emitBalanceChange(g.api, "merchant", wa.User, amount, false)
 
 	return g.updateWithdrawStatus(nonce, WithdrawCancelled)
 }

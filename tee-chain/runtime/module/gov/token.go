@@ -3,9 +3,23 @@ package gov
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
+
+// emitBalanceChange 在余额写入点发射统一的 balance_change 事件。
+// attrs：kind（gov/ai/merchant）、address（UniAddr 的 T:hex(V) 编码，resolver 侧再转展示地址）、
+// delta（有符号十进制，扣减为负）。delta 为 *big.Int（Amount 是 U256/256 位），
+// 用 String() 输出避免 int64 截断。
+// 仅 append 内存切片（Runtime.EmitEvent 内部校验 + 上限），失败静默丢弃，不影响交易执行。
+func emitBalanceChange(api store.ContractApi, kind string, addr store.UniAddr, delta *big.Int) {
+	api.EmitEvent("balance_change", map[string]string{
+		"kind":    kind,
+		"address": addr.String(),
+		"delta":   delta.String(),
+	})
+}
 
 func (d GovQuery) TotalSupply() (store.Amount, error) {
 	return d.totalIssuance.GetOrDefault(d.api.GetTxn(), store.ZeroAmount)
@@ -76,7 +90,12 @@ func (d GovMutation) transfer(from, to store.UniAddr, value store.Amount) error 
 	if err := d.members.Set(d.api.GetTxn(), from, sender); err != nil {
 		return err
 	}
-	return d.members.Set(d.api.GetTxn(), to, receiver)
+	if err := d.members.Set(d.api.GetTxn(), to, receiver); err != nil {
+		return err
+	}
+	emitBalanceChange(d.api, "gov", from, new(big.Int).Neg(value.Int))
+	emitBalanceChange(d.api, "gov", to, value.Int)
+	return nil
 }
 
 func (d GovMutation) Mint(to store.UniAddr, value store.Amount) error {
@@ -102,6 +121,9 @@ func (d GovMutation) Mint(to store.UniAddr, value store.Amount) error {
 	if err != nil {
 		return err
 	}
-
-	return d.totalIssuance.Set(d.api.GetTxn(), store.AmountAdd(total, value))
+	if err := d.totalIssuance.Set(d.api.GetTxn(), store.AmountAdd(total, value)); err != nil {
+		return err
+	}
+	emitBalanceChange(d.api, "gov", to, value.Int)
+	return nil
 }

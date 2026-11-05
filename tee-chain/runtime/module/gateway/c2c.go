@@ -37,6 +37,7 @@ func (g GatewaySecret) WithdrawToC2C(merchant store.UniAddr, amount uint64) erro
 	if err := g.providerCredits.Set(g.api.GetTxn(), *pidPtr, *pb); err != nil {
 		return fmt.Errorf("c2c: debit provider credits: %w", err)
 	}
+	emitBalanceChange(g.api, "merchant", merchant, amount, true)
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (g GatewaySecret) AddCredit(user store.UniAddr, amount uint64) error {
 	if err := g.credits.Set(g.api.GetTxn(), user, *bal); err != nil {
 		return fmt.Errorf("c2c: credit buyer: %w", err)
 	}
+	emitBalanceChange(g.api, "ai", user, amount*10000, false)
 
 	// 记录充值历史（c2c Release 放款到账，与 GatewayMutation.Recharge 保持一致）。
 	// 非跨链充值，不存在主链事件，故 ChainID/Nonce 留 0；BlockHeight 记录侧链存证高度。
