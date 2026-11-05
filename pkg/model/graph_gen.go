@@ -5,8 +5,12 @@ package model
 type AddressBalance struct {
 	// 归一化后的地址展示形式（SS58 或 0x EVM 地址）
 	Address string `json:"address"`
-	// 当前余额（十进制字符串，U256）
-	Balance string `json:"balance"`
+	// gov 治理代币余额（十进制字符串，U256，gov 合约 balanceOf）
+	Gov string `json:"gov"`
+	// gateway 用户 AI 余额（十进制字符串，uint64 credit，gateway get_credit = credits - credit_useds）
+	Ai string `json:"ai"`
+	// gateway 商户（provider）余额（十进制字符串，uint64 credit；地址无商户身份时为 "0"）
+	Merchant string `json:"merchant"`
 }
 
 type AddressTx struct {

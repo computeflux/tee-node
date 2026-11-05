@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/cometbft/cometbft/types"
@@ -167,9 +168,15 @@ func uniAddrDisplay(a cstore.UniAddr) string {
 
 // AddressBalance is the resolver for the address_balance field.
 //
-// 地址归一化（SS58 / hex 公钥 / EVM 0x → 候选 UniAddr 集）后，对每个候选 T 走
-// gov 合约 balanceOf 只读查询，返回首个非零余额（同一公钥只会在一个 T 命名空间
-// 有余额）；全为零则返回 "0"。返回十进制余额字符串（U256）。
+// 地址归一化（SS58 / hex 公钥 / EVM 0x → 候选 UniAddr 集）后，对每个候选 T 依次
+// 查三种余额，返回首个非零候选的结果（同一公钥只会在一个 T 命名空间有余额）：
+//   - gov：gov 合约 balanceOf（U256 治理代币，用于治理和投票）；
+//   - ai：gateway get_credit（uint64 用户 AI credit = credits - credit_useds）；
+//   - merchant：gateway get_provider_by_owner（caller=候选地址，一人一 provider）
+//     → Some 时再查 get_provider_credit（uint64 商户余额）；无商户身份时为 "0"。
+//
+// 三者均原样返回十进制字符串（单位不同：gov 为 U256 代币，ai/merchant 为
+// uint64 积分），全为零则返回 "0"。
 func (r *queryResolver) AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error) {
 	na, err := normalizeAddress(address)
 	if err != nil {
@@ -179,12 +186,18 @@ func (r *queryResolver) AddressBalance(ctx context.Context, address string) (*mo
 		return nil, gqlerror.Errorf("%s", "chain not ready")
 	}
 
-	// balanceOf 是查询方法（mutates=false），其 selector 与 mutates=true 不同；
-	// ContractQuery 内部走 MethodToSelectorBytes（默认 mutates=true），故这里直接
-	// 传查询 selector 的十六进制（MethodToSelector 会走 hex 分支），避免命中
-	// GovQuery.ExecQuery 的 default 分支报 unknown method。
-	balance := "0"
+	// 各查询方法 selector（mutates=false）的十六进制：
+	//   - balanceOf / get_credit / get_provider_credit 是查询方法，其 selector 与
+	//     mutates=true 不同；ContractQuery 内部走 MethodToSelectorBytes（默认
+	//     mutates=true），故直接传查询 selector 的十六进制（MethodToSelector 会走
+	//     hex 分支），避免命中 ExecQuery 的 default 分支报 unknown method。
+	//   - get_provider_by_owner 无参数，caller 即 owner（ContractQuery 的 caller
+	//     设为候选地址，即可查任意地址的商户 providerID）。
+	govBalance := "0"
+	aiBalance := "0"
+	merchantBalance := "0"
 	for _, cand := range na.candidates {
+		// 1. gov 合约 balanceOf（U256 治理代币）
 		ownerArg, err := cstore.ScaleEncode(cand)
 		if err != nil {
 			return nil, gqlerror.Errorf("%s", "address_balance: encode owner: "+err.Error())
@@ -198,12 +211,54 @@ func (r *queryResolver) AddressBalance(ctx context.Context, address string) (*mo
 			return nil, gqlerror.Errorf("%s", "address_balance: decode balance: "+err.Error())
 		}
 		if amt.Int.Sign() > 0 {
-			balance = amt.String()
+			govBalance = amt.String()
+		}
+
+		// 2. gateway get_credit（uint64 用户 AI credit）
+		data, err = teeChain.ContractQuery(cand.V, cand.T, "gateway", gatewayGetCreditSelectorHex, [][]byte{ownerArg})
+		if err != nil {
+			return nil, gqlerror.Errorf("%s", "address_balance: "+err.Error())
+		}
+		credit, err := cstore.DecodeScaleArgBytes[int64](data)
+		if err != nil {
+			return nil, gqlerror.Errorf("%s", "address_balance: decode credit: "+err.Error())
+		}
+		if credit > 0 {
+			aiBalance = strconv.FormatInt(credit, 10)
+		}
+
+		// 3. gateway 商户余额：get_provider_by_owner（caller=候选）→ Some 时查 credit
+		data, err = teeChain.ContractQuery(cand.V, cand.T, "gateway", gatewayGetProviderByOwnerSelectorHex, nil)
+		if err != nil {
+			return nil, gqlerror.Errorf("%s", "address_balance: "+err.Error())
+		}
+		opt, err := cstore.DecodeScaleArgBytes[cstore.Option[uint64]](data)
+		if err != nil {
+			return nil, gqlerror.Errorf("%s", "address_balance: decode provider: "+err.Error())
+		}
+		if opt.IsSome() {
+			idArg, err := cstore.ScaleEncode(opt.V)
+			if err != nil {
+				return nil, gqlerror.Errorf("%s", "address_balance: encode provider id: "+err.Error())
+			}
+			data, err = teeChain.ContractQuery(cand.V, cand.T, "gateway", gatewayGetProviderCreditSelectorHex, [][]byte{idArg})
+			if err != nil {
+				return nil, gqlerror.Errorf("%s", "address_balance: "+err.Error())
+			}
+			mbal, err := cstore.DecodeScaleArgBytes[uint64](data)
+			if err != nil {
+				return nil, gqlerror.Errorf("%s", "address_balance: decode provider credit: "+err.Error())
+			}
+			merchantBalance = strconv.FormatUint(mbal, 10)
+		}
+
+		// 候选命中（任一余额非零）即停：同一公钥只会在一个 T 命名空间有余额
+		if govBalance != "0" || aiBalance != "0" || merchantBalance != "0" {
 			break
 		}
 	}
 
-	return &model.AddressBalance{Address: na.display, Balance: balance}, nil
+	return &model.AddressBalance{Address: na.display, Gov: govBalance, Ai: aiBalance, Merchant: merchantBalance}, nil
 }
 
 // AddressTxs is the resolver for the address_txs field.
@@ -392,6 +447,17 @@ func bytesEqual(a, b []byte) bool {
 // 4 字节 selector 十六进制（与 abis/gov.json 的 balance_of selector 一致）。
 // 查询方法 selector 与 mutates=true 不同，故不能走 MethodToSelectorBytes 默认分支。
 const govBalanceOfSelectorHex = "0x87e0ff32"
+
+// gateway 查询方法（mutates=false）的 4 字节 selector 十六进制（与
+// gateway_gen.go ExecQuery 的查询分支一致；计算方式同 govBalanceOfSelectorHex）。
+const (
+	// get_credit(user UniAddr) → int64（用户 AI credit = credits - credit_useds）
+	gatewayGetCreditSelectorHex = "0x04601fca"
+	// get_provider_by_owner() → Option[providerID]（以 caller 为 owner，一人一 provider）
+	gatewayGetProviderByOwnerSelectorHex = "0x55c04847"
+	// get_provider_credit(providerID uint64) → uint64（商户余额）
+	gatewayGetProviderCreditSelectorHex = "0xad4c38cd"
+)
 
 // timeRFC3339 是区块时间展示格式（与 chain.resolvers.go 一致）。
 const timeRFC3339 = "2006-01-02T15:04:05Z07:00"

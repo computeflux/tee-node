@@ -49,8 +49,10 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	AddressBalance struct {
-		Address func(childComplexity int) int
-		Balance func(childComplexity int) int
+		Address  func(childComplexity int) int
+		Ai       func(childComplexity int) int
+		Gov      func(childComplexity int) int
+		Merchant func(childComplexity int) int
 	}
 
 	AddressTx struct {
@@ -426,12 +428,26 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.AddressBalance.Address(childComplexity), true
 
-	case "AddressBalance.balance":
-		if e.complexity.AddressBalance.Balance == nil {
+	case "AddressBalance.ai":
+		if e.complexity.AddressBalance.Ai == nil {
 			break
 		}
 
-		return e.complexity.AddressBalance.Balance(childComplexity), true
+		return e.complexity.AddressBalance.Ai(childComplexity), true
+
+	case "AddressBalance.gov":
+		if e.complexity.AddressBalance.Gov == nil {
+			break
+		}
+
+		return e.complexity.AddressBalance.Gov(childComplexity), true
+
+	case "AddressBalance.merchant":
+		if e.complexity.AddressBalance.Merchant == nil {
+			break
+		}
+
+		return e.complexity.AddressBalance.Merchant(childComplexity), true
 
 	case "AddressTx.amount":
 		if e.complexity.AddressTx.Amount == nil {
@@ -4575,8 +4591,8 @@ func (ec *executionContext) fieldContext_AddressBalance_address(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _AddressBalance_balance(ctx context.Context, field graphql.CollectedField, obj *model.AddressBalance) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_AddressBalance_balance(ctx, field)
+func (ec *executionContext) _AddressBalance_gov(ctx context.Context, field graphql.CollectedField, obj *model.AddressBalance) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AddressBalance_gov(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4589,7 +4605,7 @@ func (ec *executionContext) _AddressBalance_balance(ctx context.Context, field g
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Balance, nil
+		return obj.Gov, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4606,7 +4622,95 @@ func (ec *executionContext) _AddressBalance_balance(ctx context.Context, field g
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_AddressBalance_balance(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AddressBalance_gov(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressBalance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressBalance_ai(ctx context.Context, field graphql.CollectedField, obj *model.AddressBalance) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AddressBalance_ai(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Ai, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AddressBalance_ai(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressBalance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressBalance_merchant(ctx context.Context, field graphql.CollectedField, obj *model.AddressBalance) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_AddressBalance_merchant(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Merchant, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_AddressBalance_merchant(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AddressBalance",
 		Field:      field,
@@ -11989,8 +12093,12 @@ func (ec *executionContext) fieldContext_Query_address_balance(ctx context.Conte
 			switch field.Name {
 			case "address":
 				return ec.fieldContext_AddressBalance_address(ctx, field)
-			case "balance":
-				return ec.fieldContext_AddressBalance_balance(ctx, field)
+			case "gov":
+				return ec.fieldContext_AddressBalance_gov(ctx, field)
+			case "ai":
+				return ec.fieldContext_AddressBalance_ai(ctx, field)
+			case "merchant":
+				return ec.fieldContext_AddressBalance_merchant(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type AddressBalance", field.Name)
 		},
@@ -17240,8 +17348,18 @@ func (ec *executionContext) _AddressBalance(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "balance":
-			out.Values[i] = ec._AddressBalance_balance(ctx, field, obj)
+		case "gov":
+			out.Values[i] = ec._AddressBalance_gov(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ai":
+			out.Values[i] = ec._AddressBalance_ai(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "merchant":
+			out.Values[i] = ec._AddressBalance_merchant(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
