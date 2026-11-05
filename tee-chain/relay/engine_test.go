@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	store "github.com/computeflux/tee-provider/pkg/types"
 	cstore "github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -130,6 +131,8 @@ func (m *mockAPI) Call(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error) 
 func (m *mockAPI) Query(_ cstore.UniAddr, _ cstore.ContractCall) ([]byte, error) {
 	return nil, nil
 }
+func (m *mockAPI) EmitEvent(_ string, _ map[string]string) {}
+func (m *mockAPI) TakeEvents() []abci.Event               { return nil }
 
 func newMockEngine() (*Engine, *store.Txn) {
 	txn := store.SECRET_DB.NewTransaction()

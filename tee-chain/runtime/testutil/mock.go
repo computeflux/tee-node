@@ -4,6 +4,7 @@ package testutil
 import (
 	"strings"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
@@ -63,6 +64,7 @@ type MockRuntime struct {
 	System        bool
 	CallFunc      func(store.UniAddr, store.ContractCall) ([]byte, error)
 	VerifyTEEFunc func(report, data []byte, t int64, caller []byte, teeType uint32) store.Result[store.TeeVerifyInfo, string]
+	events        []abci.Event
 }
 
 var _ store.ContractApi = (*MockRuntime)(nil)
@@ -89,6 +91,24 @@ func (r *MockRuntime) VerifyTEE(report, data []byte, t int64, caller []byte, tee
 	}
 	// 默认 fail-closed：未配置验证函数时视为验证失败。
 	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not configured")
+}
+
+func (r *MockRuntime) EmitEvent(eventType string, attrs map[string]string) {
+	event := abci.Event{Type: eventType}
+	for k, v := range attrs {
+		event.Attributes = append(event.Attributes, abci.EventAttribute{
+			Key:   k,
+			Value: v,
+			Index: true,
+		})
+	}
+	r.events = append(r.events, event)
+}
+
+func (r *MockRuntime) TakeEvents() []abci.Event {
+	events := r.events
+	r.events = nil
+	return events
 }
 
 // NewMockRuntime creates a MockRuntime with defaults.

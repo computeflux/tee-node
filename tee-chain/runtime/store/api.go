@@ -1,5 +1,9 @@
 package store
 
+import (
+	abci "github.com/cometbft/cometbft/abci/types"
+)
+
 type ContractCall interface {
 	GetName() []byte
 	GetMethod() []byte
@@ -47,6 +51,11 @@ type ContractApi interface {
 	VerifyTEE(report, data []byte, t int64, caller []byte, teeType uint32) Result[TeeVerifyInfo, string]
 	Query(UniAddr, ContractCall) ([]byte, error)
 	Call(UniAddr, ContractCall) ([]byte, error)
+	// EmitEvent 发射交易级事件（累积到运行时事件管道，FinalizeTx 挂到 ExecTxResult）。
+	// 事件 type 统一小写下划线命名；attrs 为事件属性键值对。
+	EmitEvent(eventType string, attrs map[string]string)
+	// TakeEvents 取出并清空当前运行时累积的所有事件（FinalizeTx 用）。
+	TakeEvents() []abci.Event
 }
 
 // StoreTx 抽象化存储操作接口。Native (*store.Txn) 和 WASM 均满足。

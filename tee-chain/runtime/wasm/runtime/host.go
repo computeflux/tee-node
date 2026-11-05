@@ -51,6 +51,9 @@ func isSystem() int32
 //go:wasmimport runtime verify_tee_v2
 func verifyTEEV2(reportPtr, reportLen, dataPtr, dataLen int32, t int64, callerPtr, callerLen int32, teeType int32, outPtr, outLen int32) int32
 
+//go:wasmimport runtime emit_event
+func emitEvent(typePtr, typeLen, attrsPtr, attrsLen int32) int32
+
 // Shared buffer for interop with host functions.
 // Layout: [0, txnKeyArea) for keys/prefix (and ListByPrefix key results),
 // [txnKeyArea, txnBufSize) for values (and ListByPrefix value results).

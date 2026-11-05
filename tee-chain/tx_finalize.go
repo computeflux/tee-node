@@ -1,6 +1,9 @@
 package teechain
 
 import (
+	"encoding/hex"
+	"fmt"
+	"sort"
 	"time"
 
 	abci "github.com/cometbft/cometbft/abci/types"
@@ -16,6 +19,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+// newPipelineEvent 构造一个交易级管道事件（属性按 key 排序后追加，保证顺序确定；
+// 所有属性标记 Index=true 供 CometBFT TxIndexer 索引；事件 type 统一小写下划线命名）。
+func newPipelineEvent(eventType string, attrs map[string]string) abci.Event {
+	event := abci.Event{Type: eventType}
+	if len(attrs) == 0 {
+		return event
+	}
+	keys := make([]string, 0, len(attrs))
+	for k := range attrs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		event.Attributes = append(event.Attributes, abci.EventAttribute{
+			Key:   k,
+			Value: attrs[k],
+			Index: true,
+		})
+	}
+	return event
+}
+
 func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
 	res := []*abci.ExecTxResult{}
 
@@ -30,6 +55,9 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 		if err != nil {
 			return nil, errors.Wrap(err, "verify tx signer")
 		}
+
+		// 每笔交易的事件管道：合约执行期间累积，最终挂到 ExecTxResult.Events
+		var txEvents []abci.Event
 
 		switch p := call.Payload.(type) {
 		case *model.SysCall_Empty:
@@ -123,6 +151,17 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				} else if err := app.relay.ApplyRelayEvent(ev, runtime); err != nil {
 					util.LogWithRed("Finalize TX", errors.Wrap(err, "apply relay event"))
 					return nil, errors.Wrap(err, "contract mutation error")
+				} else {
+					// 管道事件：relay 同步完成（交易详情页展示跨链同步的数据基础）
+					txEvents = append(txEvents, newPipelineEvent("relay_synced", map[string]string{
+						"chain_id":    fmt.Sprint(ev.ChainID),
+						"nonce":       fmt.Sprint(ev.Nonce),
+						"block_num":   fmt.Sprint(ev.BlockNum),
+						"contract":    string(ev.TargetContract),
+						"event_type":  string(ev.EventType),
+					}))
+					// 合约执行期间通过 EmitEvent 发射的事件一并挂上
+					txEvents = append(txEvents, runtime.TakeEvents()...)
 				}
 			}
 		case *model.SysCall_Contract:
@@ -143,11 +182,21 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				)
 			}
 
-			err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
+			var mutationEvents []abci.Event
+			mutationEvents, err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
 			if err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
 				return nil, errors.Wrap(err, "contract mutation error")
 			}
+			// 管道事件：合约调用完成（交易详情页展示合约调用的数据基础）
+			txEvents = append(txEvents, newPipelineEvent("contract_call", map[string]string{
+				"contract": string(p.Contract.GetName()),
+				"method":   hex.EncodeToString(p.Contract.GetMethod()),
+				"caller":   hex.EncodeToString(caller),
+				"nonce":    fmt.Sprint(txNonce),
+			}))
+			// 合约执行期间通过 EmitEvent 发射的事件一并挂上
+			txEvents = append(txEvents, mutationEvents...)
 
 			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))
@@ -157,7 +206,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 			return nil, errors.New("invalid tx type")
 		}
 
-		res = append(res, &abci.ExecTxResult{Code: uint32(abci.CodeTypeOK)})
+		res = append(res, &abci.ExecTxResult{Code: uint32(abci.CodeTypeOK), Events: txEvents})
 	}
 
 	// 同步链上运行时版本状态（合约已通过 RuntimeUpgrade 完成版本管理）
@@ -179,7 +228,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				Method: []byte{0xa6, 0x2c, 0x84, 0xf8}, // migration 方法选择器
 				Args:   [][]byte{versionBytes},
 			}
-			if err := app.ContractMutation(pub.ToBytes(), 0, txn, ts, height, migrationCall); err != nil {
+			if _, err := app.ContractMutation(pub.ToBytes(), 0, txn, ts, height, migrationCall); err != nil {
 				util.LogError("FinalizeTx migration", err)
 			} else {
 				util.LogOk("FinalizeTx migration", "success")

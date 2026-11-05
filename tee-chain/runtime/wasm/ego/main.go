@@ -17,6 +17,7 @@ import (
 	"os"
 	"strings"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/wasm"
 	"github.com/edgelesssys/ego/enclave"
@@ -178,6 +179,12 @@ func (r *testRuntime) Call(store.UniAddr, store.ContractCall) ([]byte, error) { 
 func (r *testRuntime) VerifyTEE(_, _ []byte, _ int64, _ []byte, _ uint32) store.Result[store.TeeVerifyInfo, string] {
 	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not available in ego test")
 }
+func (r *testRuntime) EmitEvent(_ string, _ map[string]string) {}
+func (r *testRuntime) TakeEvents() []abci.Event               { return nil }
+
+// 编译期断言：testRuntime 必须完整实现 store.ContractApi，
+// 接口再次扩展时此处会编译失败，避免遗漏实现。
+var _ store.ContractApi = (*testRuntime)(nil)
 
 // 兜底（避免 _ import）
 var _ = context.Background

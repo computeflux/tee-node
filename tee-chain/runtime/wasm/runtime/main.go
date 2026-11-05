@@ -3,9 +3,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"unsafe"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
@@ -159,6 +161,60 @@ func (r *wasmRuntime) Query(target store.UniAddr, call store.ContractCall) ([]by
 func (r *wasmRuntime) Call(target store.UniAddr, call store.ContractCall) ([]byte, error) {
 	return nil, module.Mutation(call, r)
 }
+
+// EmitEvent 通过 host emit_event 函数发射交易级事件。
+// attrs 编码格式与宿主 parseEventAttrs 一致：
+// [count: u32LE][len: u32LE][key...][len: u32LE][value...]...
+// 事件 type 非法（空/系统保留名/格式不符）时宿主返回 errEventInvalid，此处静默忽略。
+func (r *wasmRuntime) EmitEvent(eventType string, attrs map[string]string) {
+	if len(eventType) == 0 {
+		return
+	}
+	// guest 侧预校验（与宿主 store.IsValidEvent 一致的上限），提前拒绝可避免
+	// 构造超大 buf 后再被总量检查丢弃：事件名 ≤64、属性 ≤32 个、key ≤64 且不含 '.'、
+	// value ≤256。宿主侧仍会做完整校验（fail-closed）。
+	if len(eventType) > 64 || len(attrs) > 32 {
+		return
+	}
+	for k, v := range attrs {
+		if len(k) == 0 || len(k) > 64 || len(v) > 256 {
+			return
+		}
+		for _, c := range k {
+			if c == '.' || c < 0x20 {
+				return
+			}
+		}
+	}
+	// 编码 attrs 到共享缓冲区（复用 txnBuf，事件属性总量远小于 4MB）
+	var buf []byte
+	buf = binary.LittleEndian.AppendUint32(buf, uint32(len(attrs)))
+	for k, v := range attrs {
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(k)))
+		buf = append(buf, k...)
+		buf = binary.LittleEndian.AppendUint32(buf, uint32(len(v)))
+		buf = append(buf, v...)
+	}
+	// 事件名与属性共用 txnBuf：type 从 0 开始，属性从 len(eventType)+16 开始。
+	// 写入前统一校验总占用（与 WasmTxn.Set 的 len(key)+16+len(value) 校验一致）：
+	// 总量超限直接放弃发射，避免 copy 静默截断属性缓冲（宿主会解析出残缺事件）
+	// 或 attrsPtr 起始下标越界 panic。
+	if len(eventType)+16+len(buf) > len(txnBuf) {
+		return
+	}
+	typePtr := int32(uintptr(unsafe.Pointer(&txnBuf[0])))
+	copy(txnBuf[:], eventType)
+	attrsPtr := typePtr + int32(len(eventType)) + 16
+	copy(txnBuf[attrsPtr-typePtr:], buf)
+	_ = emitEvent(typePtr, int32(len(eventType)), attrsPtr, int32(len(buf)))
+}
+
+// TakeEvents 在 WASM guest 侧无意义：事件由宿主在 FinalizeTx 统一取出挂到 ExecTxResult。
+func (r *wasmRuntime) TakeEvents() []abci.Event { return nil }
+
+// 编译期断言：wasmRuntime 必须完整实现 store.ContractApi，
+// 接口再次扩展时（如新增方法）此处会编译失败，避免遗漏。
+var _ store.ContractApi = (*wasmRuntime)(nil)
 
 func (r *wasmRuntime) QueryNative(call store.ContractCall) ([]byte, error) {
 	return module.Query(call, r)

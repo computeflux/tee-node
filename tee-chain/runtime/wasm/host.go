@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/tetratelabs/wazero"
 	wazapi "github.com/tetratelabs/wazero/api"
 )
@@ -19,11 +20,12 @@ var i32, i64 = wazapi.ValueTypeI32, wazapi.ValueTypeI64
 // Error codes returned by host functions to WASM.
 // 宿主函数返回给 WASM 的错误码。
 const (
-	errOK          = uint64(0)          // success
-	errMem         = uint64(0xFFFFFFFF) // memory access error
-	errStorage     = uint64(0xFFFFFFFE) // storage operation error
-	errBufTooSmall = uint64(0xFFFFFFFD) // output buffer too small
-	errKeyNotFound = uint64(0xFFFFFFFC) // key not found
+	errOK             = uint64(0)          // success
+	errMem            = uint64(0xFFFFFFFF) // memory access error
+	errStorage        = uint64(0xFFFFFFFE) // storage operation error
+	errBufTooSmall    = uint64(0xFFFFFFFD) // output buffer too small
+	errKeyNotFound    = uint64(0xFFFFFFFC) // key not found
+	errEventInvalid   = uint64(0xFFFFFFFB) // invalid event type (empty / reserved / bad format)
 )
 
 // copyBytes deep-copies a byte slice.
@@ -81,6 +83,7 @@ func instantiateHostModule(ctx context.Context, rt wazero.Runtime, s *hostState)
 	registerContext(b, s)
 	registerIdentity(b, s)
 	registerVerifyTEE(b, s)
+	registerEmitEvent(b, s)
 	return b.Instantiate(ctx)
 }
 
@@ -338,4 +341,76 @@ func doVerifyTEE(s *hostState, mod wazapi.Module, report, data, caller []byte, t
 	}
 	mod.Memory().Write(outPtr, encoded)
 	return uint64(len(encoded)), errOK
+}
+
+// ── Event host functions / 事件宿主函数 ─────────────────
+
+// registerEmitEvent 注册 emit_event host 函数：WASM 合约发射交易级事件。
+// Params: typePtr, typeLen, attrsPtr, attrsLen。
+// attrs 格式: [count: u32LE][len: u32LE][key...][len: u32LE][value...]...
+// 返回 errOK on success；事件非法（type 格式/保留名、属性 key/value 格式与长度、
+// 属性个数超限）返回 errEventInvalid。校验在宿主侧完成（store.IsValidEvent），
+// 防止恶意合约伪造链上系统事件、构造保留 tag（tx.height/tx.hash）或资源放大。
+func registerEmitEvent(b wazero.HostModuleBuilder, s *hostState) {
+	b.NewFunctionBuilder().WithGoModuleFunction(
+		wazapi.GoModuleFunc(func(_ context.Context, mod wazapi.Module, stack []uint64) {
+			mem := mod.Memory()
+			eventType, _ := mem.Read(uint32(stack[0]), uint32(stack[1]))
+			if eventType == nil {
+				stack[0] = errMem
+				return
+			}
+			attrsRaw, _ := mem.Read(uint32(stack[2]), uint32(stack[3]))
+			if attrsRaw == nil && uint32(stack[3]) > 0 {
+				stack[0] = errMem
+				return
+			}
+
+			attrs := parseEventAttrs(attrsRaw)
+			// 校验整个事件（type + 属性 + 个数上限）：拒绝空/非法/系统保留事件名、
+			// 含 '.' 或超长的属性 key、超长 value，避免合约伪造系统事件/保留 tag/资源放大
+			if !store.IsValidEvent(string(eventType), attrs) {
+				stack[0] = errEventInvalid
+				return
+			}
+			s.api.EmitEvent(string(eventType), attrs)
+			stack[0] = errOK
+		}),
+		[]wazapi.ValueType{i32, i32, i32, i32}, []wazapi.ValueType{i32},
+	).Export("emit_event")
+}
+
+// parseEventAttrs 解析 emit_event 的 attrs 缓冲区。
+// 格式: [count: u32LE][len: u32LE][key...][len: u32LE][value...]...
+func parseEventAttrs(raw []byte) map[string]string {
+	attrs := make(map[string]string)
+	if len(raw) < 4 {
+		return attrs
+	}
+	count := binary.LittleEndian.Uint32(raw[:4])
+	off := 4
+	for i := uint32(0); i < count; i++ {
+		if off+4 > len(raw) {
+			break
+		}
+		keyLen := int(binary.LittleEndian.Uint32(raw[off : off+4]))
+		off += 4
+		if off+keyLen > len(raw) {
+			break
+		}
+		key := string(raw[off : off+keyLen])
+		off += keyLen
+
+		if off+4 > len(raw) {
+			break
+		}
+		valLen := int(binary.LittleEndian.Uint32(raw[off : off+4]))
+		off += 4
+		if off+valLen > len(raw) {
+			break
+		}
+		attrs[key] = string(raw[off : off+valLen])
+		off += valLen
+	}
+	return attrs
 }

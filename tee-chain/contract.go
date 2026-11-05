@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
@@ -96,10 +97,12 @@ func WithRuntimeCaller[T any](chain *TeeChain, caller chaintypes.UniAddr, fn fun
 }
 
 // ContractMutation 执行合约状态变更（共识层 ProcessProposal 调用）。
-func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall) error {
-	var err error
+// 返回合约执行期间通过 EmitEvent 发射的交易级事件（可能为空）。
+// 使用命名返回值确保 defer recover 能正确覆盖 panic 场景。
+func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbstore.Txn, t time.Time, height int64, call store.ContractCall) (events []abci.Event, err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			events = nil
 			err = fmt.Errorf("ContractMutation recovered from panic: %v", r)
 		}
 	}()
@@ -111,15 +114,15 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbs
 
 	pub, err := app.GetDkgPubkey()
 	if err != nil {
-		return fmt.Errorf("get dkg pubkey: %w", err)
+		return nil, fmt.Errorf("get dkg pubkey: %w", err)
 	}
 	if pub == nil {
-		return fmt.Errorf("dkg pubkey is nil")
+		return nil, fmt.Errorf("dkg pubkey is nil")
 	}
 
 	version, err := GetRuntimeVersionAtHeight(txn, height)
 	if err != nil {
-		return fmt.Errorf("get runtime version: %w", err)
+		return nil, fmt.Errorf("get runtime version: %w", err)
 	}
 	version = nativeVersionForCall(version, call)
 
@@ -128,7 +131,8 @@ func (app *TeeChain) ContractMutation(caller []byte, callerType uint32, txn *dbs
 	}, version)
 
 	err = contracts.Mutation(version, call, runtime)
-	return err
+	events = runtime.TakeEvents()
+	return events, err
 }
 
 // ContractQuery 只读合约查询。
