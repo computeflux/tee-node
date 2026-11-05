@@ -102,6 +102,12 @@ type ComplexityRoot struct {
 		UserInfo     func(childComplexity int) int
 	}
 
+	BalanceChange struct {
+		Address func(childComplexity int) int
+		Delta   func(childComplexity int) int
+		Kind    func(childComplexity int) int
+	}
+
 	BlockDetail struct {
 		AppHash  func(childComplexity int) int
 		ChainID  func(childComplexity int) int
@@ -319,23 +325,24 @@ type ComplexityRoot struct {
 	}
 
 	TxDetail struct {
-		Amount     func(childComplexity int) int
-		Args       func(childComplexity int) int
-		Code       func(childComplexity int) int
-		CrossChain func(childComplexity int) int
-		Data       func(childComplexity int) int
-		Events     func(childComplexity int) int
-		From       func(childComplexity int) int
-		GasUsed    func(childComplexity int) int
-		GasWanted  func(childComplexity int) int
-		Hash       func(childComplexity int) int
-		Height     func(childComplexity int) int
-		Index      func(childComplexity int) int
-		Method     func(childComplexity int) int
-		Nonce      func(childComplexity int) int
-		Success    func(childComplexity int) int
-		Time       func(childComplexity int) int
-		To         func(childComplexity int) int
+		Amount         func(childComplexity int) int
+		Args           func(childComplexity int) int
+		BalanceChanges func(childComplexity int) int
+		Code           func(childComplexity int) int
+		CrossChain     func(childComplexity int) int
+		Data           func(childComplexity int) int
+		Events         func(childComplexity int) int
+		From           func(childComplexity int) int
+		GasUsed        func(childComplexity int) int
+		GasWanted      func(childComplexity int) int
+		Hash           func(childComplexity int) int
+		Height         func(childComplexity int) int
+		Index          func(childComplexity int) int
+		Method         func(childComplexity int) int
+		Nonce          func(childComplexity int) int
+		Success        func(childComplexity int) int
+		Time           func(childComplexity int) int
+		To             func(childComplexity int) int
 	}
 
 	UserInfo struct {
@@ -380,6 +387,8 @@ type MutationResolver interface {
 	InitDiskKey(ctx context.Context, index string, user string) (bool, error)
 }
 type QueryResolver interface {
+	AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error)
+	AddressTxs(ctx context.Context, address string, page *int, pageSize *int) (*model.AddressTxs, error)
 	OauthURL(ctx context.Context, provider string, redirectURI *string) (*OAuthURL, error)
 	AuthHealth(ctx context.Context) (string, error)
 	GetChallenge(ctx context.Context, token string) (*model.ChallengeResult, error)
@@ -390,8 +399,6 @@ type QueryResolver interface {
 	BlockDetail(ctx context.Context, height *int, hash *string) (*model.BlockDetail, error)
 	TxDetail(ctx context.Context, hash string) (*model.TxDetail, error)
 	ChainOverview(ctx context.Context, blockLimit *int, txLimit *int) (*model.ChainOverview, error)
-	AddressBalance(ctx context.Context, address string) (*model.AddressBalance, error)
-	AddressTxs(ctx context.Context, address string, page *int, pageSize *int) (*model.AddressTxs, error)
 	ContractDryRun(ctx context.Context, caller string, callerType int, contract string, mut bool, method string, args []string) (string, error)
 	ContractNonce(ctx context.Context, caller string, callerType int) (int, error)
 	EdgeModels(ctx context.Context) ([]*model.ModelInfo, error)
@@ -693,6 +700,27 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.AuthResponse.UserInfo(childComplexity), true
+
+	case "BalanceChange.address":
+		if e.complexity.BalanceChange.Address == nil {
+			break
+		}
+
+		return e.complexity.BalanceChange.Address(childComplexity), true
+
+	case "BalanceChange.delta":
+		if e.complexity.BalanceChange.Delta == nil {
+			break
+		}
+
+		return e.complexity.BalanceChange.Delta(childComplexity), true
+
+	case "BalanceChange.kind":
+		if e.complexity.BalanceChange.Kind == nil {
+			break
+		}
+
+		return e.complexity.BalanceChange.Kind(childComplexity), true
 
 	case "BlockDetail.app_hash":
 		if e.complexity.BlockDetail.AppHash == nil {
@@ -1923,6 +1951,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.TxDetail.Args(childComplexity), true
 
+	case "TxDetail.balance_changes":
+		if e.complexity.TxDetail.BalanceChanges == nil {
+			break
+		}
+
+		return e.complexity.TxDetail.BalanceChanges(childComplexity), true
+
 	case "TxDetail.code":
 		if e.complexity.TxDetail.Code == nil {
 			break
@@ -2223,7 +2258,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "auth.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "erc20.graphqls" "secret.graphqls"
+//go:embed "address.graphqls" "auth.graphqls" "chain.graphqls" "contract.graphqls" "edge.graphqls" "erc20.graphqls" "secret.graphqls"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -2235,6 +2270,7 @@ func sourceData(filename string) string {
 }
 
 var sources = []*ast.Source{
+	{Name: "address.graphqls", Input: sourceData("address.graphqls"), BuiltIn: false},
 	{Name: "auth.graphqls", Input: sourceData("auth.graphqls"), BuiltIn: false},
 	{Name: "chain.graphqls", Input: sourceData("chain.graphqls"), BuiltIn: false},
 	{Name: "contract.graphqls", Input: sourceData("contract.graphqls"), BuiltIn: false},
@@ -6265,6 +6301,138 @@ func (ec *executionContext) _AuthResponse_error(ctx context.Context, field graph
 func (ec *executionContext) fieldContext_AuthResponse_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AuthResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BalanceChange_kind(ctx context.Context, field graphql.CollectedField, obj *model.BalanceChange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BalanceChange_kind(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Kind, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BalanceChange_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BalanceChange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BalanceChange_address(ctx context.Context, field graphql.CollectedField, obj *model.BalanceChange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BalanceChange_address(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Address, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BalanceChange_address(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BalanceChange",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BalanceChange_delta(ctx context.Context, field graphql.CollectedField, obj *model.BalanceChange) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BalanceChange_delta(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Delta, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BalanceChange_delta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BalanceChange",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -11409,6 +11577,128 @@ func (ec *executionContext) fieldContext_ProviderInfo_createdAt(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_address_balance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_address_balance(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().AddressBalance(rctx, fc.Args["address"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.AddressBalance)
+	fc.Result = res
+	return ec.marshalOAddressBalance2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressBalance(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_address_balance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "address":
+				return ec.fieldContext_AddressBalance_address(ctx, field)
+			case "gov":
+				return ec.fieldContext_AddressBalance_gov(ctx, field)
+			case "ai":
+				return ec.fieldContext_AddressBalance_ai(ctx, field)
+			case "merchant":
+				return ec.fieldContext_AddressBalance_merchant(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AddressBalance", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_address_balance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_address_txs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_address_txs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().AddressTxs(rctx, fc.Args["address"].(string), fc.Args["page"].(*int), fc.Args["pageSize"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.AddressTxs)
+	fc.Result = res
+	return ec.marshalOAddressTxs2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxs(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_address_txs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "txs":
+				return ec.fieldContext_AddressTxs_txs(ctx, field)
+			case "total":
+				return ec.fieldContext_AddressTxs_total(ctx, field)
+			case "hasMore":
+				return ec.fieldContext_AddressTxs_hasMore(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type AddressTxs", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_address_txs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_oauthURL(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_oauthURL(ctx, field)
 	if err != nil {
@@ -11969,6 +12259,8 @@ func (ec *executionContext) fieldContext_Query_tx_detail(ctx context.Context, fi
 				return ec.fieldContext_TxDetail_data(ctx, field)
 			case "events":
 				return ec.fieldContext_TxDetail_events(ctx, field)
+			case "balance_changes":
+				return ec.fieldContext_TxDetail_balance_changes(ctx, field)
 			case "cross_chain":
 				return ec.fieldContext_TxDetail_cross_chain(ctx, field)
 			}
@@ -12049,128 +12341,6 @@ func (ec *executionContext) fieldContext_Query_chain_overview(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_chain_overview_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_address_balance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_address_balance(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().AddressBalance(rctx, fc.Args["address"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.AddressBalance)
-	fc.Result = res
-	return ec.marshalOAddressBalance2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressBalance(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_address_balance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "address":
-				return ec.fieldContext_AddressBalance_address(ctx, field)
-			case "gov":
-				return ec.fieldContext_AddressBalance_gov(ctx, field)
-			case "ai":
-				return ec.fieldContext_AddressBalance_ai(ctx, field)
-			case "merchant":
-				return ec.fieldContext_AddressBalance_merchant(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type AddressBalance", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_address_balance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_address_txs(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_address_txs(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().AddressTxs(rctx, fc.Args["address"].(string), fc.Args["page"].(*int), fc.Args["pageSize"].(*int))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*model.AddressTxs)
-	fc.Result = res
-	return ec.marshalOAddressTxs2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐAddressTxs(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_address_txs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "txs":
-				return ec.fieldContext_AddressTxs_txs(ctx, field)
-			case "total":
-				return ec.fieldContext_AddressTxs_total(ctx, field)
-			case "hasMore":
-				return ec.fieldContext_AddressTxs_hasMore(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type AddressTxs", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_address_txs_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -14568,6 +14738,55 @@ func (ec *executionContext) fieldContext_TxDetail_events(_ context.Context, fiel
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TxDetail_balance_changes(ctx context.Context, field graphql.CollectedField, obj *model.TxDetail) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TxDetail_balance_changes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BalanceChanges, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.BalanceChange)
+	fc.Result = res
+	return ec.marshalOBalanceChange2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBalanceChangeᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TxDetail_balance_changes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TxDetail",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "kind":
+				return ec.fieldContext_BalanceChange_kind(ctx, field)
+			case "address":
+				return ec.fieldContext_BalanceChange_address(ctx, field)
+			case "delta":
+				return ec.fieldContext_BalanceChange_delta(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type BalanceChange", field.Name)
 		},
 	}
 	return fc, nil
@@ -17673,6 +17892,55 @@ func (ec *executionContext) _AuthResponse(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var balanceChangeImplementors = []string{"BalanceChange"}
+
+func (ec *executionContext) _BalanceChange(ctx context.Context, sel ast.SelectionSet, obj *model.BalanceChange) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, balanceChangeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BalanceChange")
+		case "kind":
+			out.Values[i] = ec._BalanceChange_kind(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "address":
+			out.Values[i] = ec._BalanceChange_address(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "delta":
+			out.Values[i] = ec._BalanceChange_delta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var blockDetailImplementors = []string{"BlockDetail"}
 
 func (ec *executionContext) _BlockDetail(ctx context.Context, sel ast.SelectionSet, obj *model.BlockDetail) graphql.Marshaler {
@@ -18776,6 +19044,44 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
+		case "address_balance":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_address_balance(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "address_txs":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_address_txs(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "oauthURL":
 			field := field
 
@@ -18975,44 +19281,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_chain_overview(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "address_balance":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_address_balance(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "address_txs":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_address_txs(ctx, field)
 				return res
 			}
 
@@ -19558,6 +19826,8 @@ func (ec *executionContext) _TxDetail(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._TxDetail_data(ctx, field, obj)
 		case "events":
 			out.Values[i] = ec._TxDetail_events(ctx, field, obj)
+		case "balance_changes":
+			out.Values[i] = ec._TxDetail_balance_changes(ctx, field, obj)
 		case "cross_chain":
 			out.Values[i] = ec._TxDetail_cross_chain(ctx, field, obj)
 		default:
@@ -20087,6 +20357,16 @@ func (ec *executionContext) marshalNAuthResponse2ᚖgithubᚗcomᚋcomputeflux�
 		return graphql.Null
 	}
 	return ec._AuthResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNBalanceChange2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBalanceChange(ctx context.Context, sel ast.SelectionSet, v *model.BalanceChange) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._BalanceChange(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNBlockTx2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBlockTxᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.BlockTx) graphql.Marshaler {
@@ -21040,6 +21320,53 @@ func (ec *executionContext) marshalOAuthConfig2ᚖgithubᚗcomᚋcomputefluxᚋt
 		return graphql.Null
 	}
 	return ec._AuthConfig(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOBalanceChange2ᚕᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBalanceChangeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.BalanceChange) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNBalanceChange2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBalanceChange(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOBlockDetail2ᚖgithubᚗcomᚋcomputefluxᚋteeᚑproviderᚋpkgᚋmodelᚐBlockDetail(ctx context.Context, sel ast.SelectionSet, v *model.BlockDetail) graphql.Marshaler {

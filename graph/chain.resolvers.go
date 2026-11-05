@@ -193,6 +193,10 @@ func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDet
 		}
 	}
 
+	// 余额变动列表：只读解析 events 中 type=balance_change 的事件
+	// （地址转展示形式、delta 带符号；无事件时为空列表，旧交易不报错）
+	detail.BalanceChanges = balanceChangesFromEvents(res.Result.Events)
+
 	// 解码原始交易字节，提取 From/To/方法/参数/nonce
 	if txBox, e := decodeTxBox(res.Tx); e == nil && txBox != nil {
 		if len(txBox.Caller) > 0 {

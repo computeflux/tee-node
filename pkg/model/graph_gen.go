@@ -80,6 +80,15 @@ type AuthConfigInput struct {
 	TwitterRedirectURL  string `json:"twitterRedirectURL"`
 }
 
+type BalanceChange struct {
+	// 余额类型：gov 治理代币 / ai 用户 AI credit / merchant 商户 provider credit
+	Kind string `json:"kind"`
+	// 变动地址（展示形式：SS58 或 0x EVM 地址）
+	Address string `json:"address"`
+	// 变动量（有符号十进制字符串，扣减为负）
+	Delta string `json:"delta"`
+}
+
 type BlockDetail struct {
 	// 区块高度
 	Height int `json:"height"`
@@ -328,6 +337,8 @@ type TxDetail struct {
 	Data *string `json:"data,omitempty"`
 	// 事件（JSON 字符串）
 	Events *string `json:"events,omitempty"`
+	// 余额变动列表（解析 events 中 type=balance_change 的事件；无事件时为空列表）
+	BalanceChanges []*BalanceChange `json:"balance_changes,omitempty"`
 	// 跨链 relay 交易的主链关联信息（SysCall_RelaySync 时非空，普通合约交易为 null）
 	CrossChain *CrossChainInfo `json:"cross_chain,omitempty"`
 }
