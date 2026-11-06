@@ -214,7 +214,7 @@ func (r *queryResolver) TxDetail(ctx context.Context, hash string) (*model.TxDet
 						detail.To = &to
 					}
 					if len(cc.Method) > 0 {
-						method := string(cc.Method)
+						method := hex.EncodeToString(cc.Method)
 						detail.Method = &method
 					}
 					if len(cc.Args) > 0 {

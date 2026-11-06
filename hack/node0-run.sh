@@ -1,9 +1,13 @@
+#!/bin/sh
 # get shell path
 SOURCE="$0"
-while [ -h "$SOURCE"  ]; do
-    DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
+while [ -h "$SOURCE" ]; do
+    DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
     SOURCE="$(readlink "$SOURCE")"
-    [[ $SOURCE != /*  ]] && SOURCE="$DIR/$SOURCE"
+    case "$SOURCE" in
+        /*) ;;
+        *) SOURCE="$DIR/$SOURCE" ;;
+    esac
 done
 DIR="$( cd -P "$( dirname "$SOURCE"  )" && pwd  )"
 cd $DIR/../
@@ -131,18 +135,21 @@ ensure_chain_data_link() {
 
 ensure_chain_data_link "$NODE_CHAIN_DIR" || exit 1
 
-# build binary
-ego-go build -o ./hack/build/dsecret ./main.go
+# ── 构建 & 签名（直接输出到本仓库 hack/build；下方 drop-in 把 ExecStart 指到这里）──
+EXEC_BINARY="${EXEC_BINARY:-$ROOT_DIR/hack/build/dsecret}"
+EXEC_BUILD_DIR="$(dirname "$EXEC_BINARY")"
+mkdir -p "$EXEC_BUILD_DIR"
 
-# sign binary
-cd ./hack/build/
-ego sign dsecret
+# ego-go 必须使用独立的 GOCACHE，避免与系统 go 的构建缓存混用导致链接错误
+: "${GOCACHE:=$HOME/.cache/ego-go-build}"
+export GOCACHE
 
-# ⚠️ tee-node0.service 的 ExecStart 跑的是 Query-Web3 树的二进制, 不是本树的。
-# 必须把构建产物同步到执行路径, 否则部署不生效(2026-09-27 事故根因)。
-EXEC_BINARY="/home/wetee/work/Query-Web3/tee-node/hack/build/dsecret"
-cp dsecret "$EXEC_BINARY"
-echo "Synced build artifact to exec path: $EXEC_BINARY"
+ego-go build -o "$EXEC_BINARY" ./main.go
+
+# 在二进制所在目录签名，保证 dsecret 与 enclave.json/密钥成对
+( cd "$EXEC_BUILD_DIR" && ego sign dsecret )
+
+echo "Built and signed at exec path: $EXEC_BINARY"
 
 export SIDE_CHAIN_PORT=30116
 export SIDE_CHAIN_RPC_PORT=30117
@@ -151,6 +158,9 @@ export CHAIN_ENV=test
 
 # run from / so relative ./token_chain_data resolves to /token_chain_data
 cd /
+
+# 后续 systemd 配置与重启都需要 root；失败时立即退出，避免“脚本跑完了但服务没重启”
+ensure_sudo || { echo "ERROR: sudo required to configure/restart tee-node0.service." 1>&2; exit 1; }
 
 # ── 确保服务有 Restart 策略（进程退出后 systemd 自动拉起）──
 # 用 systemctl edit 追加 drop-in 配置，避免改 /etc/systemd/system/tee-node0.service 原文件。
@@ -180,6 +190,15 @@ sudo tee /etc/systemd/system/tee-node0.service.d/no-rebuild.conf >/dev/null <<'E
 [Service]
 ExecStartPre=
 ExecStartPre=+/bin/bash -c 'mkdir -p /srv/token_node0/token_chain_data && rm -f /token_chain_data && ln -s /srv/token_node0/token_chain_data /token_chain_data'
+EOF
+sudo systemctl daemon-reload
+
+# ── ExecStart 指向本仓库的二进制（不再依赖 Query-Web3 树）──
+echo "Configuring systemd ExecStart to local path ($EXEC_BINARY) ..."
+sudo tee /etc/systemd/system/tee-node0.service.d/exec-path.conf >/dev/null <<EOF
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/ego run $EXEC_BINARY
 EOF
 sudo systemctl daemon-reload
 
