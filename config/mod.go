@@ -26,7 +26,7 @@ func GetMainChainConfig(env string) *chaintypes.ChainConfigType {
 func GetChainConfigs(env string) []chaintypes.ChainConfigType {
 	switch env {
 	case "test":
-		// Base Sepolia：合约地址未配置（主网未部署时为空）则不启用，避免无效连接。
+		// Base Testnet：合约地址未配置（主网未部署时为空）则不启用，避免无效连接。
 		if BaseTestChainConfig.TokenAddress == "" {
 			return []chaintypes.ChainConfigType{}
 		}

@@ -120,15 +120,15 @@ func TestRelayTopic0(t *testing.T) {
 
 // nil client（未连接）必须报错而不是 panic；错误信息须带链标识。
 func TestEvmChain_RelayNotConnected(t *testing.T) {
-	e := &EvmChain{chainId: 84532, chainName: "Base Sepolia"}
+	e := &EvmChain{chainId: 84532, chainName: "Base Testnet"}
 	_, err := e.GetLatestNonce()
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "chain Base Sepolia(84532)")
+	require.Contains(t, err.Error(), "chain Base Testnet(84532)")
 
 	events, err := e.GetRelayEvents(1, 10)
 	require.Nil(t, events)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "chain Base Sepolia(84532)")
+	require.Contains(t, err.Error(), "chain Base Testnet(84532)")
 
 	var _ chaintypes.RelayEvent
 }
@@ -144,7 +144,7 @@ func TestFilterRelayLogs_ChunkedAgainstPublicRPC(t *testing.T) {
 	e := &EvmChain{
 		client:    client,
 		chainId:   84532,
-		chainName: "Base Sepolia",
+		chainName: "Base Testnet",
 		tokenAddr: common.HexToAddress("0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0"),
 	}
 	defer client.Close()

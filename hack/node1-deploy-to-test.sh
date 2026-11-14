@@ -173,7 +173,7 @@ Environment="NOTIFY_PUSH_SECRET=4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8
 Environment="NOTIFY_ACTIVES_URL=https://test-api.computeflux.ai:9100"
 EOF
 
-    # Base Sepolia relay（积分充值/提现同步）：RPC/合约地址均写死在 config/test.go（防注入）；
+    # Base Testnet relay（积分充值/提现同步）：RPC/合约地址均写死在 config/test.go（防注入）；
     # ENABLE_BASE_SEPOLIA=0 可关闭。扫描起点默认 Token 部署块自动探测，可覆盖。
     if [ "${ENABLE_BASE_SEPOLIA:-1}" = "1" ]; then
     ssh "$REMOTE_HOST" "sudo tee /etc/systemd/system/$SERVICE_NAME.d/base.conf" > /dev/null << EOF

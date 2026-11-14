@@ -15,7 +15,7 @@ var TestChainConfig = chaintypes.ChainConfigType{
 	NetworkLabel:  "Paseo (Asset Hub)",
 }
 
-// Base Sepolia 测试链（积分充值/提现 relay + BaseBLS 网关）。
+// Base Testnet 测试链（积分充值/提现 relay + BaseBLS 网关）。
 // 地址写死（2026-11-14 部署，见 evms hack/base/deployments.json），不接受环境变量覆盖：
 //
 //	Token（UUPS 代理）0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0（impl 0x0eBFcbDA82979f22F1AfCDaF7cbe9A3E56A8C05e）
@@ -29,5 +29,5 @@ var BaseTestChainConfig = chaintypes.ChainConfigType{
 	Urls:         []string{"https://sepolia.base.org"},
 	TokenAddress: "0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0",
 	BLSAddress:   "0x2921A9385F94A78572A33C2590C94B93A5Ee2841",
-	NetworkLabel: "Base Sepolia",
+	NetworkLabel: "Base Testnet",
 }

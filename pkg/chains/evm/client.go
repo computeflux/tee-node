@@ -119,7 +119,7 @@ func NewContract(config *chaintypes.ChainConfigType, pk *teecrypto.PrivKey) (*Ev
 // ── Failover ──────────────────────────────────────────────
 
 // isBaseChainID reports whether the chain uses the BaseBLS gateway ABI
-// (submit(data, hmG1, negSig)): Base mainnet (8453) and Base Sepolia (84532).
+// (submit(data, hmG1, negSig)): Base mainnet (8453) and Base Testnet (84532).
 func isBaseChainID(chainID *big.Int) bool {
 	if chainID == nil {
 		return false
