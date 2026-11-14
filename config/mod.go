@@ -1,6 +1,8 @@
 package config
 
-import "github.com/computeflux/tee-provider/pkg/types/chaintypes"
+import (
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
+)
 
 // 获取最核心的主链，用于 tee chain 安全性的一部分，也作为一个主链
 // 返回的是全局配置的深拷贝，调用方修改返回值不会污染全局配置。
@@ -8,21 +10,39 @@ func GetMainChainConfig(env string) *chaintypes.ChainConfigType {
 	var cfg chaintypes.ChainConfigType
 	switch env {
 	case "local":
-		cfg = LocalChainConfig
+		cfg = deepCopyChainConfig(LocalChainConfig)
 	case "test":
-		cfg = TestChainConfig
+		cfg = deepCopyChainConfig(TestChainConfig)
 	case "main":
-		cfg = MainChainConfig
+		cfg = deepCopyChainConfig(MainChainConfig)
 	default:
 		return nil
 	}
-	// 深拷贝切片字段：浅拷贝会共享底层数组，调用方修改 Urls 会污染全局配置
-	cfg.Urls = append([]string(nil), cfg.Urls...)
 	return &cfg
 }
 
 // 获取所有的主链
-// 注意：当前为占位实现，暂无子链配置数据源。
+// 返回的是全局配置的深拷贝，调用方修改返回值不会污染全局配置。
 func GetChainConfigs(env string) []chaintypes.ChainConfigType {
-	return []chaintypes.ChainConfigType{}
+	switch env {
+	case "test":
+		// Base Sepolia：合约地址未配置（主网未部署时为空）则不启用，避免无效连接。
+		if BaseTestChainConfig.TokenAddress == "" {
+			return []chaintypes.ChainConfigType{}
+		}
+		return []chaintypes.ChainConfigType{deepCopyChainConfig(BaseTestChainConfig)}
+	case "main":
+		if BaseMainChainConfig.TokenAddress == "" {
+			return []chaintypes.ChainConfigType{}
+		}
+		return []chaintypes.ChainConfigType{deepCopyChainConfig(BaseMainChainConfig)}
+	default:
+		return []chaintypes.ChainConfigType{}
+	}
+}
+
+// deepCopyChainConfig 返回链配置的深拷贝（含 Urls 底层数组），调用方修改返回值不会污染全局配置。
+func deepCopyChainConfig(cfg chaintypes.ChainConfigType) chaintypes.ChainConfigType {
+	cfg.Urls = append([]string(nil), cfg.Urls...)
+	return cfg
 }

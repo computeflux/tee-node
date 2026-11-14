@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/computeflux/tee-provider/config"
+	"github.com/computeflux/tee-provider/pkg/chains/evm"
 	"github.com/computeflux/tee-provider/pkg/chains/revive"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
@@ -97,8 +98,8 @@ func ConnectChain(env string, pk *crypto.PrivKey) {
 // connectMainChain creates a MainChainApi for the given config.
 func connectMainChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (MainChainApi, error) {
 	switch config.ChainType {
-	// case "evm":
-	// 	return evm.NewContract(config, pk)
+	case "evm":
+		return evm.NewContract(config, pk)
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:
@@ -120,8 +121,8 @@ func GetChainByID(chainId uint32) (ChainApi, error) {
 // connectChain creates a ChainApi for the given config.
 func connectChain(config *chaintypes.ChainConfigType, pk *crypto.PrivKey) (ChainApi, error) {
 	switch config.ChainType {
-	// case "evm":
-	// 	return evm.NewContract(config, pk)
+	case "evm":
+		return evm.NewContract(config, pk)
 	case "substrate":
 		return revive.NewContract(config, pk)
 	default:

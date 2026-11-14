@@ -29,6 +29,7 @@ type EvmChain struct {
 	subnet     *bindings.Subnet
 	subnetAddr common.Address
 	bls        *bindings.BLS
+	blsBase    *bindings.BaseBLS
 	blsAddr    common.Address
 	chainID    *big.Int
 	chainName  string
@@ -78,12 +79,20 @@ func NewContract(config *chaintypes.ChainConfigType, pk *teecrypto.PrivKey) (*Ev
 	}
 
 	var bls *bindings.BLS
+	var blsBase *bindings.BaseBLS
 	var bAddr common.Address
 	if config.BLSAddress != "" {
 		bAddr = common.HexToAddress(config.BLSAddress)
-		bls, err = bindings.NewBLS(bAddr, client)
-		if err != nil {
-			return nil, fmt.Errorf("bind BLS: %w", err)
+		if isBaseChainID(chainID) {
+			blsBase, err = bindings.NewBaseBLS(bAddr, client)
+			if err != nil {
+				return nil, fmt.Errorf("bind BaseBLS: %w", err)
+			}
+		} else {
+			bls, err = bindings.NewBLS(bAddr, client)
+			if err != nil {
+				return nil, fmt.Errorf("bind BLS: %w", err)
+			}
 		}
 	}
 
@@ -95,6 +104,7 @@ func NewContract(config *chaintypes.ChainConfigType, pk *teecrypto.PrivKey) (*Ev
 		subnet:     subnet,
 		subnetAddr: sAddr,
 		bls:        bls,
+		blsBase:    blsBase,
 		blsAddr:    bAddr,
 		chainID:    chainID,
 		chainName:  config.NetworkLabel,
@@ -107,6 +117,15 @@ func NewContract(config *chaintypes.ChainConfigType, pk *teecrypto.PrivKey) (*Ev
 }
 
 // ── Failover ──────────────────────────────────────────────
+
+// isBaseChainID reports whether the chain uses the BaseBLS gateway ABI
+// (submit(data, hmG1, negSig)): Base mainnet (8453) and Base Sepolia (84532).
+func isBaseChainID(chainID *big.Int) bool {
+	if chainID == nil {
+		return false
+	}
+	return chainID.Cmp(big.NewInt(8453)) == 0 || chainID.Cmp(big.NewInt(84532)) == 0
+}
 
 // dialFirst tries each URL in order, returning the first successful connection.
 func dialFirst(urls []string) (*ethclient.Client, error) {
@@ -147,11 +166,20 @@ func (e *EvmChain) reconnect() error {
 			continue
 		}
 		var bls *bindings.BLS
+		var blsBase *bindings.BaseBLS
 		if e.blsAddr != (common.Address{}) {
-			bls, err = bindings.NewBLS(e.blsAddr, client)
-			if err != nil {
-				client.Close()
-				continue
+			if isBaseChainID(e.chainID) {
+				blsBase, err = bindings.NewBaseBLS(e.blsAddr, client)
+				if err != nil {
+					client.Close()
+					continue
+				}
+			} else {
+				bls, err = bindings.NewBLS(e.blsAddr, client)
+				if err != nil {
+					client.Close()
+					continue
+				}
 			}
 		}
 		e.client.Close()
@@ -159,6 +187,7 @@ func (e *EvmChain) reconnect() error {
 		e.token = token
 		e.subnet = subnet
 		e.bls = bls
+		e.blsBase = blsBase
 		return nil
 	}
 	return fmt.Errorf("reconnect: all %d URLs failed", len(e.urls))

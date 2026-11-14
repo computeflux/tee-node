@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 )
 
 // ── TEECallToCall ──────────────────────────────────────────
 
 func TestEvmChain_TEECallToCall(t *testing.T) {
 	e := &EvmChain{}
-	call, err := e.TEECallToCall(&model.TeeCall{}, nil)
+	call, err := e.TEECallToCall(&batch.HubCallIndex{}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "tee_attest", call.EVM.Method)
 }
@@ -199,27 +199,11 @@ func TestEvmChain_Identity(t *testing.T) {
 	assert.Equal(t, uint32(1), e.ChainId())
 }
 
-// ── CheckMapAccount ────────────────────────────────────────
+// ── CheckMapAccount ────────────────────────────────────────────
 
 func TestEvmChain_CheckMapAccount(t *testing.T) {
 	e := &EvmChain{}
 	ok, err := e.CheckMapAccount(crypto.PubKey{})
 	require.NoError(t, err)
 	assert.True(t, ok)
-}
-
-// ── GetLatestNonce / GetRelayEvents ────────────────────────
-
-func TestEvmChain_GetLatestNonce(t *testing.T) {
-	e := &EvmChain{}
-	nonce, err := e.GetLatestNonce()
-	require.NoError(t, err)
-	assert.Equal(t, uint64(0), nonce)
-}
-
-func TestEvmChain_GetRelayEvents(t *testing.T) {
-	e := &EvmChain{}
-	events, err := e.GetRelayEvents(0, 100)
-	require.NoError(t, err)
-	assert.Nil(t, events)
 }

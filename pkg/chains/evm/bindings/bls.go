@@ -1,5 +1,10 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
+//
+// Source: revive-contract/evms contracts/EthBLS.sol (ETH / Polkadot Hub BLS
+// gateway, submit(data, negSig)). The Base network gateway (BaseBLS.sol) has a
+// different ABI (submit(data, hmG1, negSig)); regenerate a separate binding
+// (type BaseBLS) when wiring Base withdrawals.
 
 package bindings
 

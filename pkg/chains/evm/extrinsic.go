@@ -16,17 +16,23 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/computeflux/tee-provider/pkg/chains/evm/bindings"
-	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
 	chain "github.com/wetee-dao/ink.go"
 )
 
 // ── Extrinsic helpers ──────────────────────────────────────
 
-func (e *EvmChain) TEECallToCall(tcall *model.TeeCall, dkgKey []byte) (*chaintypes.ChainCall, error) {
+func (e *EvmChain) TEECallToCall(tcall *batch.HubCallIndex, dkgKey []byte) (*chaintypes.ChainCall, error) {
 	return &chaintypes.ChainCall{EVM: chaintypes.EvmCall{Method: "tee_attest"}}, nil
+}
+
+// GetCodeVersions is not available on EVM chains (governance lives on the
+// Substrate main chain).
+func (e *EvmChain) GetCodeVersions() ([]*chaintypes.CodeVersion, error) {
+	return nil, fmt.Errorf("evm: GetCodeVersions not supported on chain %d", e.chainId)
 }
 
 func (e *EvmChain) TxCallOfSetNextEpoch(nodeId uint64, signer crypto.PubKey) (*chaintypes.ChainCall, error) {
@@ -178,13 +184,13 @@ func (e *EvmChain) getBLSSigner(signer chain.SignerType) (blsEIP2537Signer, erro
 	return blsSigner, nil
 }
 
-func (e *EvmChain) blsSign(signer chain.SignerType, msg []byte) (sig, negSig []byte, err error) {
+func (e *EvmChain) blsSign(signer chain.SignerType, msg []byte) (sig, negSig, hmG1EIP []byte, err error) {
 	blsSigner, err := e.getBLSSigner(signer)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	sig, negSig, _, err = blsSigner.BLSSignEIP2537(msg)
-	return sig, negSig, err
+	sig, negSig, hmG1EIP, err = blsSigner.BLSSignEIP2537(msg)
+	return sig, negSig, hmG1EIP, err
 }
 
 func (e *EvmChain) sendBLSTx(submitData []byte, untilFinalized bool, nonce uint64) error {
@@ -248,8 +254,21 @@ func (e *EvmChain) sendBLSTx(submitData []byte, untilFinalized bool, nonce uint6
 // SignAndSubmit submits a transaction (single or batch) to the chain via the BLS gateway contract.
 // If call.Data was produced by BatchCall, it is decoded as bytes[] and routed to BLS.batchSubmit;
 // otherwise it is treated as a single call and routed to BLS.submit.
+//
+// Gateway variants (selected by chainID in client.go):
+//   - EthBLS (ETH / Polkadot Hub): submit(data, negSig) — the contract maps
+//     keccak256(data) to G1 on-chain via the 0x10 precompile.
+//   - BaseBLS (Base / OP-Stack): submit(data, hmG1, negSig) — hmG1 =
+//     MAP_FP_TO_G1(keccak256(msg)) is computed off-chain (BLSSignEIP2537) and
+//     submitted with the signature; the contract verifies data↔hmG1 binding on
+//     chain via the 0x0f pairing (OP-spec 0x10 is not usable on Base forks).
+//
+// The BLS message is always the exact raw bytes that PartialSign signed
+// (call.EVM.Data), so partial signatures collected off-chain recover
+// correctly: submit signs keccak256(data); batchSubmit signs
+// keccak256(abi.encode(bytes[] datas)) — BatchCall packs exactly that.
 func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainCall, untilFinalized bool, nonce uint64) error {
-	if e.bls == nil {
+	if e.bls == nil && e.blsBase == nil {
 		return errors.New("BLS contract not configured")
 	}
 
@@ -263,10 +282,6 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainC
 		}
 	}
 
-	// The BLS message must be the exact raw bytes that PartialSign signed,
-	// so that the partial signatures collected off-chain can be recovered
-	// on-chain.  We use call.Data directly (no extra keccak256) to stay
-	// compatible with PartialSign(signer, call).
 	var blsFunc string
 	if len(datas) > 1 {
 		blsFunc = "batchSubmit"
@@ -276,7 +291,7 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainC
 		}
 		blsFunc = "submit"
 	}
-	sig, negSig, err := e.blsSign(signer, call.EVM.Data)
+	sig, negSig, hmG1EIP, err := e.blsSign(signer, call.EVM.Data)
 	if err != nil {
 		return fmt.Errorf("BLS sign: %w", err)
 	}
@@ -288,19 +303,37 @@ func (e *EvmChain) SignAndSubmit(signer chain.SignerType, call chaintypes.ChainC
 		"negSig_len:", len(negSig),
 	)
 
-	blsABI, err := bindings.BLSMetaData.GetAbi()
-	if err != nil {
-		return fmt.Errorf("get BLS ABI: %w", err)
-	}
-
 	var submitData []byte
-	if blsFunc == "batchSubmit" {
-		submitData, err = blsABI.Pack("batchSubmit", datas, negSig)
+	if e.blsBase != nil {
+		// BaseBLS: hmG1 supplied by the signer.
+		blsABI, err := bindings.BaseBLSMetaData.GetAbi()
+		if err != nil {
+			return fmt.Errorf("get BaseBLS ABI: %w", err)
+		}
+		if hmG1EIP == nil {
+			return errors.New("BaseBLS gateway: signer returned no hmG1")
+		}
+		if blsFunc == "batchSubmit" {
+			submitData, err = blsABI.Pack("batchSubmit", datas, hmG1EIP, negSig)
+		} else {
+			submitData, err = blsABI.Pack("submit", datas[0], hmG1EIP, negSig)
+		}
+		if err != nil {
+			return fmt.Errorf("pack BaseBLS.%s: %w", blsFunc, err)
+		}
 	} else {
-		submitData, err = blsABI.Pack("submit", datas[0], negSig)
-	}
-	if err != nil {
-		return fmt.Errorf("pack BLS.%s: %w", blsFunc, err)
+		blsABI, err := bindings.BLSMetaData.GetAbi()
+		if err != nil {
+			return fmt.Errorf("get BLS ABI: %w", err)
+		}
+		if blsFunc == "batchSubmit" {
+			submitData, err = blsABI.Pack("batchSubmit", datas, negSig)
+		} else {
+			submitData, err = blsABI.Pack("submit", datas[0], negSig)
+		}
+		if err != nil {
+			return fmt.Errorf("pack BLS.%s: %w", blsFunc, err)
+		}
 	}
 
 	return e.sendBLSTx(submitData, untilFinalized, nonce)

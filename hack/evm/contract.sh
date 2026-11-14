@@ -14,7 +14,7 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 ROOT="$( cd "$DIR/../" && pwd )"
-CONTRACT_DIR="$ROOT/../contract"
+CONTRACT_DIR="$ROOT/../revive-contract/evms"
 BINDINGS_DIR="$ROOT/pkg/chains/evm/bindings"
 
 CMD="${1:-build}"
@@ -39,13 +39,18 @@ case "$CMD" in
         abigen --abi /tmp/subnet_abi.json --pkg bindings --type Subnet --out "$BINDINGS_DIR/subnet.go"
         echo "  subnet.go ($(wc -l < "$BINDINGS_DIR/subnet.go") lines)"
 
-        # BLS
-        python3 -c "import json; json.dump(json.load(open('$CONTRACT_DIR/artifacts/contracts/BLS.sol/BLS.json'))['abi'], open('/tmp/bls_abi.json','w'))"
+        # BLS (EthBLS, ETH/Polkadot Hub 版网关；Base 网络用 BaseBLS)
+        python3 -c "import json; json.dump(json.load(open('$CONTRACT_DIR/artifacts/contracts/EthBLS.sol/EthBLS.json'))['abi'], open('/tmp/bls_abi.json','w'))"
         abigen --abi /tmp/bls_abi.json --pkg bindings --type BLS --out "$BINDINGS_DIR/bls.go"
         echo "  bls.go ($(wc -l < "$BINDINGS_DIR/bls.go") lines)"
 
+        # BaseBLS (Base/OP-Stack 版网关, submit(data, hmG1, negSig))
+        python3 -c "import json; json.dump(json.load(open('$CONTRACT_DIR/artifacts/contracts/BaseBLS.sol/BaseBLS.json'))['abi'], open('/tmp/bls_base_abi.json','w'))"
+        abigen --abi /tmp/bls_base_abi.json --pkg bindings --type BaseBLS --out "$BINDINGS_DIR/bls_base.go"
+        echo "  bls_base.go ($(wc -l < "$BINDINGS_DIR/bls_base.go") lines)"
+
         # Cleanup
-        rm -f /tmp/token_abi.json /tmp/subnet_abi.json /tmp/bls_abi.json
+        rm -f /tmp/token_abi.json /tmp/subnet_abi.json /tmp/bls_abi.json /tmp/bls_base_abi.json
 
         echo ""
         echo "=== 3. Verify Go build ==="
@@ -61,7 +66,7 @@ case "$CMD" in
             echo "ERROR: .env not found"
             exit 1
         fi
-        npx hardhat run deploy_subnet_token.js --config hardhat.config.polkadot.js --network polkadotTestnet
+        npx hardhat run hack/polkadot/deploy_subnet_token.js --config hardhat.config.polkadot.js --network polkadotTestnet
         ;;
 
     all)

@@ -51,8 +51,8 @@ func TestConnectMainChain_InvalidEnv(t *testing.T) {
 }
 
 func TestConnectMainChain_UnsupportedChainType(t *testing.T) {
-	// "evm" 配置当前不支持：connectMainChain 必须返回错误而不是 os.Exit(1)。
-	cfg := &chaintypes.ChainConfigType{ChainType: "evm"}
+	// evm 已支持（走 dialFirst）；未知链类型必须返回错误而不是 os.Exit(1)。
+	cfg := &chaintypes.ChainConfigType{ChainType: "cosmos"}
 	_, err := connectMainChain(cfg, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported chain type")
@@ -60,7 +60,7 @@ func TestConnectMainChain_UnsupportedChainType(t *testing.T) {
 
 func TestConnectChain_UnsupportedChainType(t *testing.T) {
 	// 同样的 os.Exit(1) 问题在 connectChain 中也要避免。
-	cfg := &chaintypes.ChainConfigType{ChainType: "evm"}
+	cfg := &chaintypes.ChainConfigType{ChainType: "cosmos"}
 	_, err := connectChain(cfg, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported chain type")

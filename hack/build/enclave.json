@@ -46,6 +46,14 @@
         {
             "name": "NOTIFY_ACTIVES_URL",
             "fromHost": true
+        },
+        {
+            "name": "RELAY_FROM_BLOCK_84532",
+            "fromHost": true
+        },
+        {
+            "name": "RELAY_FROM_BLOCK_8453",
+            "fromHost": true
         }
     ],
     "files": [

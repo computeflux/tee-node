@@ -26,6 +26,8 @@ SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
 docker rm -f $NAME 2>/dev/null || true
 
 # 镜像 CMD 已内置 OE_SIMULATION=1（SGX 模拟模式），无需挂载 SGX 设备，直接本地 docker 部署
+# Base Sepolia relay（积分充值/提现同步）：RPC/合约地址均写死在 config/test.go（防注入）。
+# 扫描起点默认 Token 部署块（CodeAt 二分自动探测），可用 RELAY_FROM_BLOCK_<chainID> 覆盖。
 docker run -d \
     --name $NAME \
     --restart unless-stopped \
@@ -36,6 +38,7 @@ docker run -d \
     -e SIDE_CHAIN_PORT=$SIDE_CHAIN_PORT \
     -e GQL_PORT=$GQL_PORT \
     -e CHAIN_ENV=$CHAIN_ENV \
+    -e RELAY_FROM_BLOCK_84532=${RELAY_FROM_BLOCK_84532:-58640908} \
     -e SGX_VERIFY_SERVICE_URL=http://$SVS_HOST:8004 \
     -e NOTIFY_PUSH_SECRET=4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c \
     -e NOTIFY_ACTIVES_URL=http://xiaobai.asyou.me:9100 \

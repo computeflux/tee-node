@@ -226,6 +226,19 @@ Environment="LOG_API_TOKEN=$LOG_API_TOKEN"
 EOF
 sudo systemctl daemon-reload
 
+# ── Base Sepolia relay（积分充值/提现同步）──
+# RPC 与合约地址均写死在 config/test.go（不接受环境变量覆盖，防注入）；
+# 扫描起点默认用 Token 部署块（CodeAt 二分自动探测），可用 RELAY_FROM_BLOCK_<chainID> 覆盖。
+if [ "${ENABLE_BASE_SEPOLIA:-1}" = "1" ]; then
+    echo "Enabling Base Sepolia relay for tee-node0.service ..."
+    sudo mkdir -p /etc/systemd/system/tee-node0.service.d
+    sudo tee /etc/systemd/system/tee-node0.service.d/base.conf >/dev/null <<EOF
+[Service]
+Environment="RELAY_FROM_BLOCK_84532=${RELAY_FROM_BLOCK_84532:-58640908}"
+EOF
+    sudo systemctl daemon-reload
+fi
+
 # ── 通知推送（actives 服务地址 + 推送密钥，所有节点统一值）──
 NOTIFY_PUSH_SECRET="4a56b7a0d5eb5af09a5ec9ed00fa1518861219ef5a22d2d8eac329068c83aa6c"
 NOTIFY_ACTIVES_URL="${NOTIFY_ACTIVES_URL:-http://xiaobai.asyou.me:9100}"
