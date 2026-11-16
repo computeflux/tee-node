@@ -1,5 +1,7 @@
-// relay_test.go EVM relay 事件解码单测：验证 Token 日志 → gateway 调用的
-// SCALE 参数编码（与 gateway_gen dispatch / Rust emit_event 的编码一致）。
+// relay_test.go EVM relay 读取单测：验证从 Token 合约的 relay view 函数
+// （getLatestNonce / getEvents）读取事件。新版 Token.sol 把 relay 事件写入链上
+// 存储（_relayEvents + _eventNonce），eventData 为 SCALE 编码，与 PolkaVM 版
+// emit_event 逐字节一致，relay 直接透传给网关合约。
 package evm
 
 import (
@@ -8,115 +10,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
-
-func TestDecodeRelayLog_Recharged(t *testing.T) {
-	tokenABI, err := tokenParsedABI()
-	require.NoError(t, err)
-
-	user := common.HexToAddress("0x1234567890AbCdEf1234567890aBcDeF12345678")
-	points := big.NewInt(4_000_000_000) // 4e9 points
-
-	// Recharged(address indexed user, uint256 amount, uint256 points, uint256 timestamp)
-	// Inputs.Unpack → non-indexed [amount, points, timestamp]; relay uses points.
-	data, err := tokenABI.Events["Recharged"].Inputs.Pack(user, big.NewInt(1_000_000), points, big.NewInt(1700000000))
-	require.NoError(t, err)
-
-	lg := &ethtypes.Log{
-		Address: common.HexToAddress("0x000000000000000000000000000000000000dEaD"),
-		Topics: []common.Hash{
-			tokenABI.Events["Recharged"].ID,
-			common.BytesToHash(user.Bytes()),
-		},
-		Data: data,
-	}
-
-	ev, err := decodeRelayLog(tokenABI, lg)
-	require.NoError(t, err)
-	require.Equal(t, []byte("gateway"), ev.TargetContract)
-	require.Equal(t, []byte("Recharge"), ev.EventType)
-	require.Len(t, ev.EventData, 2)
-
-	var userArg store.UniAddr
-	require.NoError(t, store.ScaleDecode(&userArg, ev.EventData[0]))
-	require.Equal(t, uint32(2), userArg.T)
-	require.Equal(t, user.Bytes(), userArg.V)
-
-	var pointsArg store.U256
-	require.NoError(t, store.ScaleDecode(&pointsArg, ev.EventData[1]))
-	require.NotNil(t, pointsArg.Int)
-	require.Equal(t, 0, pointsArg.Int.Cmp(points))
-
-	require.Len(t, ev.EventData[1], 32, "U256 must be 32B little-endian")
-}
-
-func TestDecodeRelayLog_WithdrawalDone(t *testing.T) {
-	tokenABI, err := tokenParsedABI()
-	require.NoError(t, err)
-
-	lg := &ethtypes.Log{
-		Topics: []common.Hash{
-			tokenABI.Events["WithdrawalDone"].ID,
-			common.BigToHash(big.NewInt(42)),
-		},
-	}
-
-	ev, err := decodeRelayLog(tokenABI, lg)
-	require.NoError(t, err)
-	require.Equal(t, []byte("gateway"), ev.TargetContract)
-	require.Equal(t, []byte("WithdrawalDone"), ev.EventType)
-	require.Len(t, ev.EventData, 1)
-
-	var nonce uint64
-	require.NoError(t, store.ScaleDecode(&nonce, ev.EventData[0]))
-	require.Equal(t, uint64(42), nonce)
-}
-
-func TestDecodeRelayLog_WithdrawalCancelled(t *testing.T) {
-	tokenABI, err := tokenParsedABI()
-	require.NoError(t, err)
-
-	lg := &ethtypes.Log{
-		Topics: []common.Hash{
-			tokenABI.Events["WithdrawalCancelled"].ID,
-			common.BigToHash(big.NewInt(7)),
-		},
-	}
-
-	ev, err := decodeRelayLog(tokenABI, lg)
-	require.NoError(t, err)
-	require.Equal(t, []byte("WithdrawalCancelled"), ev.EventType)
-
-	var nonce uint64
-	require.NoError(t, store.ScaleDecode(&nonce, ev.EventData[0]))
-	require.Equal(t, uint64(7), nonce)
-}
-
-func TestDecodeRelayLog_UnrelatedTopic(t *testing.T) {
-	tokenABI, err := tokenParsedABI()
-	require.NoError(t, err)
-
-	lg := &ethtypes.Log{Topics: []common.Hash{common.HexToHash("0xdeadbeef")}}
-	_, err = decodeRelayLog(tokenABI, lg)
-	require.Error(t, err)
-
-	lg = &ethtypes.Log{}
-	_, err = decodeRelayLog(tokenABI, lg)
-	require.Error(t, err)
-}
-
-func TestRelayTopic0(t *testing.T) {
-	topics := relayTopic0()
-	require.Len(t, topics, 3)
-	for _, tp := range topics {
-		require.NotEqual(t, common.Hash{}, tp)
-	}
-}
 
 // nil client（未连接）必须报错而不是 panic；错误信息须带链标识。
 func TestEvmChain_RelayNotConnected(t *testing.T) {
@@ -133,13 +31,39 @@ func TestEvmChain_RelayNotConnected(t *testing.T) {
 	var _ chaintypes.RelayEvent
 }
 
-// 公共 Base RPC 把 eth_getLogs 限制在 200 个区块（超出返回 HTTP 413）；
-// filterRelayLogs 必须自动分片拉取并去重，不能因跨度超限而报错。
-// 连不上网时跳过（集成测试）。
-func TestFilterRelayLogs_ChunkedAgainstPublicRPC(t *testing.T) {
-	client, err := dialFirst([]string{"https://sepolia.base.org"})
+// GetRelayEvents 在 to < from 时返回空。
+func TestEvmChain_GetRelayEvents_EmptyRange(t *testing.T) {
+	e := &EvmChain{chainId: 84532, chainName: "Base Testnet", tokenAddr: common.HexToAddress("0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0")}
+	events, err := e.GetRelayEvents(5, 1)
+	require.NoError(t, err)
+	require.Nil(t, events)
+}
+
+// 合约 ABI 必须暴露新版 relay view 函数（否则说明 bindings 未从更新后的
+// Token.sol 重新生成）。
+func TestTokenABI_HasRelayViewFunctions(t *testing.T) {
+	tokenABI, err := tokenParsedABI()
+	require.NoError(t, err)
+
+	for _, name := range []string{"getLatestNonce", "getEvents", "getEvent"} {
+		_, ok := tokenABI.Methods[name]
+		require.True(t, ok, "token ABI must expose %s() (regenerate bindings from updated Token.sol)", name)
+	}
+
+	getEvents, ok := tokenABI.Methods["getEvents"]
+	require.True(t, ok)
+	require.Len(t, getEvents.Inputs, 2, "getEvents(uint64 from, uint64 to)")
+}
+
+// 集成测试：连上部署了新版 Token 的 Base Sepolia，验证 getLatestNonce /
+// getEvents 端到端可读，且 eventData 为可解码的 SCALE。连不上网时跳过。
+//
+// ⚠️ 需先把 Token 升级到带 relay view 函数的版本并重新生成 bindings；旧部署的
+// 合约没有这些函数，CallContract 会 revert，测试会 Skip。
+func TestEvmChain_RelayViewFunctionsAgainstPublicRPC(t *testing.T) {
+	client, err := dialFirst([]string{"https://base-sepolia-rpc.publicnode.com", "https://sepolia.base.org"})
 	if err != nil {
-		t.Skipf("no network access to sepolia.base.org: %v", err)
+		t.Skipf("no network access to Base Sepolia: %v", err)
 	}
 	e := &EvmChain{
 		client:    client,
@@ -151,19 +75,47 @@ func TestFilterRelayLogs_ChunkedAgainstPublicRPC(t *testing.T) {
 
 	head, err := client.BlockNumber(context.Background())
 	require.NoError(t, err)
+	require.Greater(t, head, uint64(0))
 
-	// 跨度远超 200（部署块起）：旧实现会 413，现在应成功
-	logs, err := e.filterRelayLogs(58640908, head)
+	latest, err := e.GetLatestNonce()
 	require.NoError(t, err)
-
-	// 分片拼接后必须严格升序且无重复（nonce = 序号，顺序/重复都会破坏 nonce 语义）
-	seen := map[string]bool{}
-	var prevKey uint64
-	for i := range logs {
-		key := logKey(&logs[i])
-		require.False(t, seen[key], "duplicate log at chunk boundary: %s", key)
-		seen[key] = true
-		require.GreaterOrEqual(t, logs[i].BlockNumber, prevKey, "logs not ascending")
-		prevKey = logs[i].BlockNumber
+	if latest == 0 {
+		t.Skipf("token has no relay events yet (latestNonce=0); deploy events then re-run")
 	}
+
+	events, err := e.GetRelayEvents(1, latest)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+
+	for _, ev := range events {
+		require.Equal(t, []byte("gateway"), ev.TargetContract)
+		require.NotEmpty(t, ev.EventType)
+		require.NotEmpty(t, ev.EventData)
+
+		switch string(ev.EventType) {
+		case "Recharge":
+			require.Len(t, ev.EventData, 2)
+			var user store.UniAddr
+			require.NoError(t, store.ScaleDecode(&user, ev.EventData[0]))
+			require.Equal(t, uint32(2), user.T)
+			require.Len(t, user.V, 20)
+			var points store.U256
+			require.NoError(t, store.ScaleDecode(&points, ev.EventData[1]))
+			require.NotNil(t, points.Int)
+			require.Positive(t, points.Int.Sign())
+			require.Len(t, ev.EventData[1], 32, "U256 must be 32B little-endian")
+		case "WithdrawalDone", "WithdrawalCancelled":
+			require.Len(t, ev.EventData, 1)
+			var nonce uint64
+			require.NoError(t, store.ScaleDecode(&nonce, ev.EventData[0]))
+		default:
+			t.Fatalf("unexpected relay eventType: %q", string(ev.EventType))
+		}
+	}
+}
+
+// 编译期防漂移：确保 relayScanCap 仍为正值、与合约 getEvents 的有界查询语义匹配。
+func TestRelayScanCapSane(t *testing.T) {
+	require.Positive(t, relayScanCap)
+	var _ = big.NewInt // keep math/big referenced for future scale assertions
 }

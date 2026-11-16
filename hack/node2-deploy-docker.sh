@@ -25,7 +25,7 @@ SVS_HOST="${SVS_HOST:-xiaobai.asyou.me}"
 # 幂等：先移除旧容器（等同原来的 kubectl delete）
 docker rm -f $NAME 2>/dev/null || true
 
-# 镜像 CMD 已内置 OE_SIMULATION=1（SGX 模拟模式），无需挂载 SGX 设备，直接本地 docker 部署
+# 镜像已本地构建（hack/build.sh 生成并 tag 到本地 docker，无需 push），直接本地 docker 部署
 # Base Testnet relay（积分充值/提现同步）：RPC/合约地址均写死在 config/test.go（防注入）。
 # 扫描起点默认 Token 部署块（CodeAt 二分自动探测），可用 RELAY_FROM_BLOCK_<chainID> 覆盖。
 docker run -d \

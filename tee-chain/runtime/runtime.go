@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/pkg/model"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/pkg/types/teetypes"
@@ -19,13 +18,13 @@ import (
 // 它实现了 store.ContractApi 接口，在 FinalizeTx / Query 等路径中传入区块高度、交易和调用方信息。
 // 每次合约调用都会创建一个新的 Runtime 实例，确保执行上下文的隔离性。
 type Runtime struct {
-	unix    int64         // 当前区块时间戳，用于时间相关的业务逻辑判断
-	height  int64         // 当前区块高度，用于时间相关的业务逻辑判断
-	version uint32        // 当前执行的运行时版本号
-	txn     store.StoreTx // 当前交易对象，包含交易的签名和原始数据
-	caller  store.UniAddr // 调用者地址，标识合约方法的调用发起方
-	sudo    store.UniAddr // 超级管理员账户地址，用于执行特权操作
-	events  *[]abci.Event // 交易级事件管道（共享 sink）：合约执行期间通过 EmitEvent 累积，
+	unix    int64          // 当前区块时间戳，用于时间相关的业务逻辑判断
+	height  int64          // 当前区块高度，用于时间相关的业务逻辑判断
+	version uint32         // 当前执行的运行时版本号
+	txn     store.StoreTx  // 当前交易对象，包含交易的签名和原始数据
+	caller  store.UniAddr  // 调用者地址，标识合约方法的调用发起方
+	sudo    store.UniAddr  // 超级管理员账户地址，用于执行特权操作
+	events  *[]store.Event // 交易级事件管道（共享 sink）：合约执行期间通过 EmitEvent 累积，
 	// 跨合约调用（Call/Query 派生的子 Runtime）共享同一 sink，FinalizeTx 取出后挂到 ExecTxResult
 }
 
@@ -39,16 +38,16 @@ type Runtime struct {
 // 返回:
 //   - Runtime: 初始化后的运行时上下文对象
 //
-// 注意：events 必须初始化为 &[]abci.Event{}，否则 Call/Query 派生的子 Runtime
+// 注意：events 必须初始化为 &[]store.Event{}，否则 Call/Query 派生的子 Runtime
 // 拷贝到的 events 为 nil，子合约事件会写入各自的独立 sink 而丢失。
 func NewRuntime(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr) *Runtime {
-	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo, events: &[]abci.Event{}}
+	return &Runtime{unix: ts.Unix(), height: height, version: 0, txn: txn, caller: caller, sudo: sudo, events: &[]store.Event{}}
 }
 
 // NewRuntimeWithVersion 创建带指定版本的合约运行时实例。
 // events 同样初始化为非 nil，保证跨合约调用共享同一事件 sink。
 func NewRuntimeWithVersion(height int64, ts time.Time, txn *dbstore.Txn, caller store.UniAddr, sudo store.UniAddr, version uint32) *Runtime {
-	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo, events: &[]abci.Event{}}
+	return &Runtime{unix: ts.Unix(), height: height, version: version, txn: txn, caller: caller, sudo: sudo, events: &[]store.Event{}}
 }
 
 // GetHeight 获取当前区块高度。
@@ -98,12 +97,12 @@ func (r *Runtime) GetSystemAccount() store.UniAddr {
 	return r.sudo
 }
 
-// newAbciEvent 构造一个 abci.Event：属性按 key 排序后追加，保证属性顺序确定。
+// newEvent 构造一个 store.Event：属性按 key 排序后追加，保证属性顺序确定。
 // Go map 迭代顺序随机，而事件会持久化进区块结果（LastResultsHash）并被 TxIndexer 索引，
 // 顺序不确定会导致节点间结果不一致（潜在共识分歧）。所有属性标记 Index=true。
 // 调用前必须已通过 store.IsValidEvent 校验（type + 属性 + 个数上限）。
-func newAbciEvent(eventType string, attrs map[string]string) abci.Event {
-	event := abci.Event{Type: eventType}
+func newEvent(eventType string, attrs map[string]string) store.Event {
+	event := store.Event{Type: eventType}
 	if len(attrs) == 0 {
 		return event
 	}
@@ -113,7 +112,7 @@ func newAbciEvent(eventType string, attrs map[string]string) abci.Event {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		event.Attributes = append(event.Attributes, abci.EventAttribute{
+		event.Attributes = append(event.Attributes, store.EventAttribute{
 			Key:   k,
 			Value: attrs[k],
 			Index: true,
@@ -133,17 +132,17 @@ func (r *Runtime) EmitEvent(eventType string, attrs map[string]string) {
 		return
 	}
 	if r.events == nil {
-		r.events = &[]abci.Event{}
+		r.events = &[]store.Event{}
 	}
 	if len(*r.events) >= store.MaxEventsPerTx {
 		return
 	}
-	*r.events = append(*r.events, newAbciEvent(eventType, attrs))
+	*r.events = append(*r.events, newEvent(eventType, attrs))
 }
 
 // TakeEvents 取出并清空当前运行时累积的所有事件（含跨合约调用子 Runtime 发射的事件）。
-// FinalizeTx 在合约执行完毕后调用，将事件挂到 abci.ExecTxResult.Events。
-func (r *Runtime) TakeEvents() []abci.Event {
+// FinalizeTx 在合约执行完毕后调用，由宿主转换为 abci.Event 挂到 abci.ExecTxResult.Events。
+func (r *Runtime) TakeEvents() []store.Event {
 	if r.events == nil {
 		return nil
 	}

@@ -1,9 +1,5 @@
 package store
 
-import (
-	abci "github.com/cometbft/cometbft/abci/types"
-)
-
 type ContractCall interface {
 	GetName() []byte
 	GetMethod() []byte
@@ -55,7 +51,9 @@ type ContractApi interface {
 	// 事件 type 统一小写下划线命名；attrs 为事件属性键值对。
 	EmitEvent(eventType string, attrs map[string]string)
 	// TakeEvents 取出并清空当前运行时累积的所有事件（FinalizeTx 用）。
-	TakeEvents() []abci.Event
+	// 返回 store.Event 而非 abci.Event：合约运行时/WASM guest 不依赖 cometbft，
+	// 由宿主在 FinalizeTx 边界转换为 abci.Event。
+	TakeEvents() []Event
 }
 
 // StoreTx 抽象化存储操作接口。Native (*store.Txn) 和 WASM 均满足。

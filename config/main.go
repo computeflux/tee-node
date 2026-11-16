@@ -12,10 +12,13 @@ var BaseMainChainConfig = baseMainChainDefaults()
 
 func baseMainChainDefaults() chaintypes.ChainConfigType {
 	return chaintypes.ChainConfigType{
-		ChainID:      8453,
-		ChainType:    "evm",
-		Cipher:       crypto.SuiteBLS12381,
-		Urls:         []string{"https://mainnet.base.org"},
+		ChainID:   8453,
+		ChainType: "evm",
+		Cipher:    crypto.SuiteBLS12381,
+		Urls: []string{
+			"https://mainnet.base.org",
+			"https://base-rpc.publicnode.com",
+		},
 		TokenAddress: "",
 		BLSAddress:   "",
 		NetworkLabel: "Base",

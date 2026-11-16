@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"unsafe"
 
-	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
@@ -210,7 +209,7 @@ func (r *wasmRuntime) EmitEvent(eventType string, attrs map[string]string) {
 }
 
 // TakeEvents 在 WASM guest 侧无意义：事件由宿主在 FinalizeTx 统一取出挂到 ExecTxResult。
-func (r *wasmRuntime) TakeEvents() []abci.Event { return nil }
+func (r *wasmRuntime) TakeEvents() []store.Event { return nil }
 
 // 编译期断言：wasmRuntime 必须完整实现 store.ContractApi，
 // 接口再次扩展时（如新增方法）此处会编译失败，避免遗漏。

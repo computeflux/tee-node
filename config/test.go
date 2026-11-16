@@ -22,11 +22,17 @@ var TestChainConfig = chaintypes.ChainConfigType{
 //	BaseBLS 0x2921A9385F94A78572A33C2590C94B93A5Ee2841（target=部署者 EOA，aggPubkey 已设）
 //
 // RPC 写死；⚠️ 公共 sepolia.base.org 有速率限制，生产化前需换私有节点。
+// BaseTestChainConfig.BaseRPCUrls: multiple endpoints so dialFirst/reconnect
+// can fail over when a public RPC drops long-lived connections.
 var BaseTestChainConfig = chaintypes.ChainConfigType{
-	ChainID:      84532,
-	ChainType:    "evm",
-	Cipher:       crypto.SuiteBLS12381,
-	Urls:         []string{"https://sepolia.base.org"},
+	ChainID:   84532,
+	ChainType: "evm",
+	Cipher:    crypto.SuiteBLS12381,
+	Urls: []string{
+		"https://sepolia.base.org",
+		"https://base-sepolia-rpc.publicnode.com",
+		"https://rpc.sepolia-base.org",
+	},
 	TokenAddress: "0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0",
 	BLSAddress:   "0x2921A9385F94A78572A33C2590C94B93A5Ee2841",
 	NetworkLabel: "Base Testnet",

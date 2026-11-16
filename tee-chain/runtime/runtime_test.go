@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	abci "github.com/cometbft/cometbft/abci/types"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
@@ -158,9 +157,9 @@ func TestRuntime_EmitEvent_TakeEvents(t *testing.T) {
 
 	// 发射单个事件
 	r.EmitEvent("credit_transfer", map[string]string{
-		"from":    "0xaaa",
-		"to":      "0xbbb",
-		"amount":  "1000",
+		"from":   "0xaaa",
+		"to":     "0xbbb",
+		"amount": "1000",
 	})
 
 	events := r.TakeEvents()
@@ -363,12 +362,12 @@ func TestRuntime_Call_SharedEventSink(t *testing.T) {
 // 验证 Runtime 满足 store.ContractApi 接口（含新增的 EmitEvent/TakeEvents）
 var _ store.ContractApi = (*Runtime)(nil)
 
-// 验证 abci.Event 类型正确性
-func TestRuntime_EventType_IsAbciEvent(t *testing.T) {
+// 验证 store.Event 类型正确性
+func TestRuntime_EventType_IsStoreEvent(t *testing.T) {
 	txn := newTestTxn(t)
 	r := NewRuntime(1, time.Now(), txn, store.UniAddr{}, store.UniAddr{})
 	r.EmitEvent("type_check", map[string]string{"a": "b"})
 
-events := r.TakeEvents()
-	var _ []abci.Event = events
+	events := r.TakeEvents()
+	var _ []store.Event = events
 }

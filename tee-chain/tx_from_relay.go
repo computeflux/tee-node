@@ -67,6 +67,9 @@ func (app *TeeChain) fetchAndCacheRelayEvents() {
 		chainID := c.ChainId()
 
 		// 查询主链最新 nonce | query main chain latest nonce
+		//
+		// 读已提交（latest）头；最新一笔事件由 GetRelayEvents 的 +1 nonce 探测补齐
+		// （公共 Base RPC 不支持 eth_call 的 pending 视图）。
 		latest, err := c.GetLatestNonce()
 		if err != nil {
 			util.LogWithRed("RELAY-WORKER", "GetLatestNonce failed, chain", c.ChainId(), "err:", err)

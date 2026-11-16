@@ -1,5 +1,23 @@
 package store
 
+// ── 交易级事件数据结构 ────────────────────────────────────────────────────
+//
+// Event / EventAttribute 字段与 abci.Event / abci.EventAttribute 一致，但在本包内定义，
+// 避免合约运行时（含 TinyGo 编译的 WASM guest）依赖 cometbft：abci/types 会间接引入
+// ed25519 / curve25519-voi 等大依赖，且其在 TinyGo（wasip1 同时带 purego 标签）下
+// 构建标签组合无法编译。宿主在 FinalizeTx 边界转换为 abci.Event 挂到 ExecTxResult。
+
+type Event struct {
+	Type       string
+	Attributes []EventAttribute
+}
+
+type EventAttribute struct {
+	Key   string
+	Value string
+	Index bool
+}
+
 // ── 交易级事件校验与资源上限 ──────────────────────────────────────────────
 //
 // 事件会直接进入 abci.ExecTxResult.Events（参与区块结果持久化与 LastResultsHash

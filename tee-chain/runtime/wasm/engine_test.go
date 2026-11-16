@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/auth"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gov"
@@ -89,7 +88,7 @@ func (r *testRuntime) VerifyTEE(_, _ []byte, _ int64, _ []byte, _ uint32) store.
 	return store.NewErr[store.TeeVerifyInfo, string]("verify_tee: not available in test")
 }
 func (r *testRuntime) EmitEvent(_ string, _ map[string]string) {}
-func (r *testRuntime) TakeEvents() []abci.Event               { return nil }
+func (r *testRuntime) TakeEvents() []store.Event               { return nil }
 
 // ── 辅助函数 ──────────────────────────────────────────────
 

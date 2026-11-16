@@ -15,6 +15,7 @@ import (
 	"github.com/computeflux/tee-provider/tee-chain/relay"
 	contracts "github.com/computeflux/tee-provider/tee-chain/runtime"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/wasm"
 	"github.com/pkg/errors"
 )
@@ -39,6 +40,23 @@ func newPipelineEvent(eventType string, attrs map[string]string) abci.Event {
 		})
 	}
 	return event
+}
+
+// toAbciEvents 将运行时事件（store.Event）转换为 abci.Event。
+// store.Event 不依赖 cometbft（WASM guest 可在 TinyGo 下编译），转换只在宿主边界发生。
+func toAbciEvents(events []store.Event) []abci.Event {
+	if len(events) == 0 {
+		return nil
+	}
+	out := make([]abci.Event, len(events))
+	for i, ev := range events {
+		attrs := make([]abci.EventAttribute, len(ev.Attributes))
+		for j, attr := range ev.Attributes {
+			attrs[j] = abci.EventAttribute{Key: attr.Key, Value: attr.Value, Index: attr.Index}
+		}
+		out[i] = abci.Event{Type: ev.Type, Attributes: attrs}
+	}
+	return out
 }
 
 func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts time.Time, proposer []byte) ([]*abci.ExecTxResult, error) {
@@ -154,14 +172,14 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				} else {
 					// 管道事件：relay 同步完成（交易详情页展示跨链同步的数据基础）
 					txEvents = append(txEvents, newPipelineEvent("relay_synced", map[string]string{
-						"chain_id":    fmt.Sprint(ev.ChainID),
-						"nonce":       fmt.Sprint(ev.Nonce),
-						"block_num":   fmt.Sprint(ev.BlockNum),
-						"contract":    string(ev.TargetContract),
-						"event_type":  string(ev.EventType),
+						"chain_id":   fmt.Sprint(ev.ChainID),
+						"nonce":      fmt.Sprint(ev.Nonce),
+						"block_num":  fmt.Sprint(ev.BlockNum),
+						"contract":   string(ev.TargetContract),
+						"event_type": string(ev.EventType),
 					}))
 					// 合约执行期间通过 EmitEvent 发射的事件一并挂上
-					txEvents = append(txEvents, runtime.TakeEvents()...)
+					txEvents = append(txEvents, toAbciEvents(runtime.TakeEvents())...)
 				}
 			}
 		case *model.SysCall_Contract:
@@ -182,7 +200,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				)
 			}
 
-			var mutationEvents []abci.Event
+			var mutationEvents []store.Event
 			mutationEvents, err = app.ContractMutation(caller, callerType, txn, ts, height, p.Contract)
 			if err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "contract mutation error"))
@@ -196,7 +214,7 @@ func (app *TeeChain) FinalizeTx(txs [][]byte, txn *dbstore.Txn, height int64, ts
 				"nonce":    fmt.Sprint(txNonce),
 			}))
 			// 合约执行期间通过 EmitEvent 发射的事件一并挂上
-			txEvents = append(txEvents, mutationEvents...)
+			txEvents = append(txEvents, toAbciEvents(mutationEvents)...)
 
 			if err := TxnSetCallerNonce(txn, caller, callerType, txNonce); err != nil {
 				util.LogWithRed("Finalize TX", errors.Wrap(err, "Nonce update caller nonce"))

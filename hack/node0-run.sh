@@ -264,8 +264,8 @@ sudo systemctl start tee-node0.service
 sleep 2
 if systemctl is-active --quiet tee-node0.service; then
     echo "Service started successfully (auto-restart enabled)."
-    # 默认不 tail(部署脚本不该永久阻塞); TAIL=1 bash node0-run.sh 可实时看日志
-    if [ "${TAIL:-0}" = "1" ]; then
+    # 默认 tail（部署完成后直接看日志）；TAIL=0 bash node0-run.sh 可跳过，避免阻塞
+    if [ "${TAIL:-1}" = "1" ]; then
         echo "Tailing logs (Ctrl+C to stop watching, node will keep running):"
         journalctl -u tee-node0.service -f -o cat
     fi

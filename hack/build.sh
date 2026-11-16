@@ -25,8 +25,7 @@ ego sign dsecret
 
 cd $DIR/../
 
-# 构建镜像
+# 构建镜像（仅本地构建 + tag；node2 走本地 docker run，无需 push 到 registry）
 docker build -t wetee/tee-provider:$tag .
-docker push wetee/tee-provider:$tag
 
 echo "wetee/tee-provider:$tag" > ./hack/.version

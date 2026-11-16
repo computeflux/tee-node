@@ -4,7 +4,6 @@ package testutil
 import (
 	"strings"
 
-	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
@@ -64,7 +63,7 @@ type MockRuntime struct {
 	System        bool
 	CallFunc      func(store.UniAddr, store.ContractCall) ([]byte, error)
 	VerifyTEEFunc func(report, data []byte, t int64, caller []byte, teeType uint32) store.Result[store.TeeVerifyInfo, string]
-	events        []abci.Event
+	events        []store.Event
 }
 
 var _ store.ContractApi = (*MockRuntime)(nil)
@@ -94,9 +93,9 @@ func (r *MockRuntime) VerifyTEE(report, data []byte, t int64, caller []byte, tee
 }
 
 func (r *MockRuntime) EmitEvent(eventType string, attrs map[string]string) {
-	event := abci.Event{Type: eventType}
+	event := store.Event{Type: eventType}
 	for k, v := range attrs {
-		event.Attributes = append(event.Attributes, abci.EventAttribute{
+		event.Attributes = append(event.Attributes, store.EventAttribute{
 			Key:   k,
 			Value: v,
 			Index: true,
@@ -105,7 +104,7 @@ func (r *MockRuntime) EmitEvent(eventType string, attrs map[string]string) {
 	r.events = append(r.events, event)
 }
 
-func (r *MockRuntime) TakeEvents() []abci.Event {
+func (r *MockRuntime) TakeEvents() []store.Event {
 	events := r.events
 	r.events = nil
 	return events
