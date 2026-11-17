@@ -1,11 +1,17 @@
 package evm
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,15 +19,108 @@ import (
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	crypto "github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/tee-chain/runtime/module/batch"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/module/gateway"
+	"github.com/computeflux/tee-provider/tee-chain/runtime/store"
 )
 
 // ── TEECallToCall ──────────────────────────────────────────
 
-func TestEvmChain_TEECallToCall(t *testing.T) {
+func TestEvmChain_TEECallToCall_UnsupportedType(t *testing.T) {
 	e := &EvmChain{}
-	call, err := e.TEECallToCall(&batch.HubCallIndex{}, nil)
+	call, err := e.TEECallToCall(&batch.HubCallIndex{CallType: 1}, nil)
+	assert.ErrorContains(t, err, "unsupported hub call type")
+	assert.Nil(t, call)
+}
+
+func TestBuildWithdrawCall_Native(t *testing.T) {
+	wa := &gateway.WithdrawApply{
+		User:   store.UniAddr{T: 1, V: make([]byte, 20)},
+		Credit: store.U256{Int: big.NewInt(100)},
+		Nonce:  42,
+	}
+
+	call, err := buildWithdrawCall(wa)
 	require.NoError(t, err)
-	assert.Equal(t, "tee_attest", call.EVM.Method)
+	assert.Equal(t, "withdraw", call.EVM.Method)
+
+	abiInst, err := bindings.TokenMetaData.GetAbi()
+	require.NoError(t, err)
+	args, err := abiInst.Methods["withdraw"].Inputs.Unpack(call.EVM.Data[4:])
+	require.NoError(t, err)
+	require.Len(t, args, 3)
+	assert.Equal(t, common.BytesToAddress(wa.User.V), args[0])
+	assert.Equal(t, int64(100), args[1].(*big.Int).Int64())
+	assert.Equal(t, uint64(42), args[2])
+}
+
+func TestBuildWithdrawCall_ERC20(t *testing.T) {
+	tokenAddr := make([]byte, 20)
+	tokenAddr[0] = 0xAA
+	wa := &gateway.WithdrawApply{
+		Contract: tokenAddr,
+		User:     store.UniAddr{T: 1, V: make([]byte, 20)},
+		Credit:   store.U256{Int: big.NewInt(7)},
+		Nonce:    9,
+	}
+
+	call, err := buildWithdrawCall(wa)
+	require.NoError(t, err)
+	assert.Equal(t, "withdrawErc20", call.EVM.Method)
+
+	abiInst, err := bindings.TokenMetaData.GetAbi()
+	require.NoError(t, err)
+	args, err := abiInst.Methods["withdrawErc20"].Inputs.Unpack(call.EVM.Data[4:])
+	require.NoError(t, err)
+	require.Len(t, args, 4)
+	assert.Equal(t, common.BytesToAddress(tokenAddr), args[0])
+	assert.Equal(t, common.BytesToAddress(wa.User.V), args[1])
+	assert.Equal(t, int64(7), args[2].(*big.Int).Int64())
+	assert.Equal(t, uint64(9), args[3])
+}
+
+func TestBuildWithdrawCall_InvalidAddresses(t *testing.T) {
+	_, err := buildWithdrawCall(&gateway.WithdrawApply{
+		User:   store.UniAddr{V: make([]byte, 19)},
+		Credit: store.U256{Int: big.NewInt(1)},
+	})
+	assert.ErrorContains(t, err, "user")
+
+	_, err = buildWithdrawCall(&gateway.WithdrawApply{
+		Contract: make([]byte, 19),
+		User:     store.UniAddr{V: make([]byte, 20)},
+		Credit:   store.U256{Int: big.NewInt(1)},
+	})
+	assert.ErrorContains(t, err, "token")
+}
+
+func TestBuildWithdrawCall_NativeMarker(t *testing.T) {
+	// The gateway stores the token symbol for native withdrawals ("ETH" is
+	// what the frontend sends); it must not be treated as an ERC20 address.
+	for _, marker := range []string{"ETH", "eth", "native", "0x0"} {
+		wa := &gateway.WithdrawApply{
+			Contract: []byte(marker),
+			User:     store.UniAddr{T: 2, V: make([]byte, 20)},
+			Credit:   store.U256{Int: big.NewInt(5)},
+			Nonce:    3,
+		}
+		call, err := buildWithdrawCall(wa)
+		require.NoError(t, err, marker)
+		assert.Equal(t, "withdraw", call.EVM.Method, marker)
+		if call.EVM.Method != "withdraw" {
+			continue
+		}
+		assert.NotContains(t, string(call.EVM.Data[:4]), "withdrawErc20")
+	}
+}
+
+func TestBuildWithdrawCall_Nil(t *testing.T) {
+	_, err := buildWithdrawCall(nil)
+	assert.Error(t, err)
+
+	_, err = buildWithdrawCall(&gateway.WithdrawApply{
+		User: store.UniAddr{V: make([]byte, 20)},
+	})
+	assert.ErrorContains(t, err, "nil credit")
 }
 
 // ── TxCallOfSetNextEpoch ───────────────────────────────────
@@ -97,6 +196,69 @@ func TestIsHex(t *testing.T) {
 	assert.False(t, isHex('g'))
 	assert.False(t, isHex(' '))
 	assert.False(t, isHex('-'))
+}
+
+// mockDataError mirrors go-ethereum's rpc.jsonError: the message is a plain
+// "execution reverted" while the revert payload lives in ErrorData().
+type mockDataError struct {
+	msg  string
+	data interface{}
+}
+
+func (e *mockDataError) Error() string          { return e.msg }
+func (e *mockDataError) ErrorData() interface{} { return e.data }
+
+func TestExtractRevertData_DataError(t *testing.T) {
+	selector := []byte{0x10, 0xe4, 0x16, 0xaa}
+	tests := []struct {
+		name string
+		err  error
+		want []byte
+	}{
+		{"string data", &mockDataError{msg: "execution reverted", data: "0x10e416aa"}, selector},
+		{"bytes data", &mockDataError{msg: "execution reverted", data: selector}, selector},
+		{"hexutil data", &mockDataError{msg: "execution reverted", data: hexutil.Bytes(selector)}, selector},
+		{"nested data", &mockDataError{msg: "execution reverted", data: map[string]interface{}{"data": "0x10e416aa"}}, selector},
+		{"wrapped", fmt.Errorf("estimate: %w", &mockDataError{msg: "execution reverted", data: "0x10e416aa"}), selector},
+		{"empty data", &mockDataError{msg: "execution reverted", data: ""}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractRevertData(tt.err))
+		})
+	}
+}
+
+func TestRevertReason_GatewayCustomError(t *testing.T) {
+	abiInst, err := bindings.BaseBLSMetaData.GetAbi()
+	require.NoError(t, err)
+
+	errDef := abiInst.Errors["BLSSignatureInvalid"]
+	revertErr := &mockDataError{
+		msg:  "execution reverted",
+		data: "0x" + hex.EncodeToString(errDef.ID[:4]),
+	}
+
+	assert.Equal(t, "reverted: BLSSignatureInvalid", revertReason(revertErr, ethereum.CallMsg{}, nil, abiInst))
+}
+
+func TestRevertReason_ErrorString(t *testing.T) {
+	strType, err := abi.NewType("string", "", nil)
+	require.NoError(t, err)
+	payload, err := abi.Arguments{{Type: strType}}.Pack("boom")
+	require.NoError(t, err)
+	raw := append([]byte{0x08, 0xc3, 0x79, 0xa0}, payload...)
+
+	revertErr := &mockDataError{msg: "execution reverted", data: hexutil.Bytes(raw)}
+	assert.Equal(t, "reverted: boom", revertReason(revertErr, ethereum.CallMsg{}, nil, nil))
+}
+
+func TestRevertReason_NoData(t *testing.T) {
+	abiInst, err := bindings.BaseBLSMetaData.GetAbi()
+	require.NoError(t, err)
+
+	assert.Equal(t, "", revertReason(errors.New("execution reverted"), ethereum.CallMsg{}, nil, abiInst))
 }
 
 // ── buildValidators ────────────────────────────────────────

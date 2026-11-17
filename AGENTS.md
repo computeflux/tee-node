@@ -34,7 +34,7 @@ export OE_MODE=SIM                # TEE 模式: SIM（开发）/ HW（生产）
 # OAuth: GOOGLE/GITHUB/TWITTER_CLIENT_ID/SECRET
 # Base 主链（积分充值/提现 relay + BaseBLS 网关，链类型 evm）：
 #   RPC 与合约地址全部写死在 config（不接受环境变量覆盖，防止注入非法 RPC/地址）：
-#   test: sepolia.base.org + Token 0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0 + BaseBLS 0x2921A9385F94A78572A33C2590C94B93A5Ee2841
+#   test: sepolia.base.org + Token 0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0 + BaseBLS 0xA063B04Ff5895B36237A358a7369351cF551e156
 #   main: mainnet.base.org（合约未部署，地址空 → 不启用；主网部署后把地址填进 config/main.go 同风格写死）。
 #   ⚠️ 公共 RPC 限速，上线前需改成私有节点地址（改代码重新编译）。
 #   relay 扫描起点默认用 Token 部署块自动探测（CodeAt 二分），可用 RELAY_FROM_BLOCK_<chainID> 覆盖。

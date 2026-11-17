@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	oed25519 "github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -413,6 +414,19 @@ func TestPrivKey_ToSecp256k1Signer(t *testing.T) {
 		require.NotNil(t, signer)
 		assert.Equal(t, uint8(2), signer.SignType())
 		assert.Len(t, signer.Public(), 33)
+	})
+
+	t.Run("eth_address_matches_public_key", func(t *testing.T) {
+		priv, _, err := GenerateEd25519KeyPair(rand.Reader)
+		require.NoError(t, err)
+		signer := priv.ToSecp256k1Signer()
+
+		pub, err := ethcrypto.DecompressPubkey(signer.Public())
+		require.NoError(t, err)
+
+		addr := signer.EthAddress()
+		assert.Regexp(t, `^0x[0-9a-fA-F]{40}$`, addr)
+		assert.Equal(t, ethcrypto.PubkeyToAddress(*pub).Hex(), addr)
 	})
 
 	t.Run("sign_verify_roundtrip", func(t *testing.T) {

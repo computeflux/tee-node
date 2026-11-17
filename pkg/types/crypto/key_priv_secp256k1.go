@@ -47,6 +47,12 @@ func (s *Secp256k1Signer) Public() []byte {
 	return s.pub
 }
 
+// EthAddress returns the MetaMask-style Ethereum address (0x-prefixed 20-byte hex)
+// derived from this signer's secp256k1 public key.
+func (s *Secp256k1Signer) EthAddress() string {
+	return ethcrypto.PubkeyToAddress(s.priv.PublicKey).Hex()
+}
+
 // PrivateKey returns the underlying ECDSA private key.
 func (s *Secp256k1Signer) PrivateKey() *ecdsa.PrivateKey {
 	return s.priv

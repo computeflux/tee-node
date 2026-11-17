@@ -39,7 +39,7 @@ func main() {
 	//   LOG_LEVEL   日志等级 debug/info/warn/error/off, 默认 info
 	//   LOG_STDOUT  是否输出到终端(1/0), 默认 1(方便调试)
 	//   LOG_FILE    日志文件路径, 默认 ./token_chain_data/app.log
-	logLevel := util.ParseLogLevel(util.GetEnv("LOG_LEVEL", "warn"))
+	logLevel := util.ParseLogLevel(util.GetEnv("LOG_LEVEL", "info"))
 	logStdout := util.GetEnvInt("LOG_STDOUT", 1) == 1
 	logFile := util.GetEnv("LOG_FILE", "./token_chain_data/app.log")
 	if err := util.SetupLog(util.LogOptions{
@@ -77,7 +77,7 @@ func main() {
 	crypto.PrintValidatorForGenesis(nodePriv)
 
 	util.LogWithYellow("Ed25519 Key", nodePriv.GetPublicForSuite(crypto.SuiteEd25519).SS58())
-	util.LogWithYellow("ETH Key", hex.EncodeToString(nodePriv.ToSecp256k1Signer().Public()))
+	util.LogWithYellow("ETH Address", nodePriv.ToSecp256k1Signer().EthAddress())
 	util.LogWithYellow("BLS12381 Key", hex.EncodeToString(nodePriv.GetPublicForSuite(crypto.SuiteBLS12381).Byte()))
 	util.LogWithYellow("P2P Key", p2pKey.GetPublicForSuite(crypto.SuiteEd25519).SS58())
 

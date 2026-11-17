@@ -46,16 +46,20 @@ func (d *DssSigner) signBLS12381(suite pairing.Suite, long *dkgtypes.DistKeyShar
 	var pubShares []*share.PubShare
 	for _, sig := range d.sigs {
 		if len(sig) < 2 {
-			continue
+			return nil, fmt.Errorf("malformed partial signature (len %d)", len(sig))
 		}
 		idx := uint32(binary.BigEndian.Uint16(sig[:2]))
 		sigPoint := suite.G1().Point()
 		if err := sigPoint.UnmarshalBinary(sig[2:]); err != nil {
-			continue
+			return nil, fmt.Errorf("unmarshal partial signature for idx %d: %w", idx, err)
 		}
 		pubShare := pubPoly.Eval(idx)
 		if !suite.ValidatePairing(hmG1, pubShare.V, sigPoint, g2Base) {
-			continue
+			// Strict: a single invalid share means the sig set is stale/tampered
+			// (e.g. a retry batch mixing partial sigs signed over old data).
+			// Silently skipping lets a polluted set submit on-chain and wastes
+			// the threshold; reject the whole batch so it re-collects cleanly.
+			return nil, fmt.Errorf("invalid partial signature from idx %d", idx)
 		}
 		pubShares = append(pubShares, &share.PubShare{I: idx, V: sigPoint})
 		if uint32(len(pubShares)) >= uint32(threshold) {

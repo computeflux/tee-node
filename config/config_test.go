@@ -100,7 +100,7 @@ func TestGetChainConfigs_BaseAddressesHardcoded(t *testing.T) {
 		t.Fatalf("GetChainConfigs(test) = %+v, want one Base Testnet chain", cfgs)
 	}
 	if cfgs[0].TokenAddress != "0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0" ||
-		cfgs[0].BLSAddress != "0x2921A9385F94A78572A33C2590C94B93A5Ee2841" {
+		cfgs[0].BLSAddress != "0xA063B04Ff5895B36237A358a7369351cF551e156" {
 		t.Errorf("Base Testnet addresses must be hardcoded, got token=%s bls=%s", cfgs[0].TokenAddress, cfgs[0].BLSAddress)
 	}
 	if cfgs[0].Urls[0] != "https://sepolia.base.org" {

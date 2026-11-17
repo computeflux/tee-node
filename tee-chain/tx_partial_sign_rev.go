@@ -7,6 +7,7 @@ import (
 	"github.com/computeflux/tee-provider/pkg/dkg"
 	"github.com/computeflux/tee-provider/pkg/model"
 	dbstore "github.com/computeflux/tee-provider/pkg/types"
+	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/util"
 	"github.com/pkg/errors"
 )
@@ -60,9 +61,9 @@ func (s *TeeChain) handlePartialSign(msg *model.BlockPartialSign) error {
 		util.LogWithGray("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold)
 		return nil
 	}
-	util.LogWithGreen("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold)
 
-	// Deduplication
+	// Deduplication (must happen BEFORE validation: the full set is validated
+	// once per collection, not once per message).
 	key := fmt.Sprintf("%d_%d", msg.TxIndex, msg.ChainId)
 	s.syncMu.Lock()
 	if s.syncInProgress[key] {
@@ -70,14 +71,18 @@ func (s *TeeChain) handlePartialSign(msg *model.BlockPartialSign) error {
 		util.LogWithGray("PartialSign", "sync already in progress for", key)
 		return nil
 	}
-	s.syncInProgress[key] = true
 	s.syncMu.Unlock()
 
-	// Extract the DSS share signatures
-	shares := make([][]byte, 0, len(sigs))
-	for _, sig := range sigs {
-		shares = append(shares, sig.HubSig)
+	// Validate the full partial-signature set against the exact batch call
+	// BEFORE claiming the sync slot. If any share is stale (e.g. a retry batch
+	// racing with late partial sigs from the previous attempt), release nothing
+	// and let later messages re-trigger collection.
+	valid, err := s.validatePartialSigs(msg.TxIndex, msg.ChainId, sigs)
+	if err != nil {
+		util.LogWithRed("PartialSign", "validate partial sigs error:", err)
+		return nil
 	}
+	util.LogWithGreen("PartialSign", "ALL =", len(sigs), "TH[+1] =", s.dkg.Threshold)
 
 	// Launch a detached goroutine for the main-chain submission
 	go func(txIndex int64, chainId uint32, shares [][]byte) {
@@ -91,9 +96,42 @@ func (s *TeeChain) handlePartialSign(msg *model.BlockPartialSign) error {
 		if err != nil {
 			util.LogWithRed("handlePartialSign", "SyncToHub error:", err)
 		}
-	}(msg.TxIndex, msg.ChainId, shares)
+	}(msg.TxIndex, msg.ChainId, valid)
 
 	return nil
+}
+
+// validatePartialSigs rebuilds the batch call for (txIndex, chainId) and keeps
+// only the partial signatures that verify against it. Returns an error when the
+// valid count is below the DKG threshold (the batch's sig set is polluted).
+func (s *TeeChain) validatePartialSigs(txIndex int64, chainId uint32, sigs []*model.BlockPartialSign) ([][]byte, error) {
+	chain, err := chains.GetChainByID(chainId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getChain error")
+	}
+
+	ids, _ := loadHubCallIds(txIndex, chainId)
+	var call *chaintypes.ChainCall
+	if len(ids) > 0 {
+		call, err = buildBatchCallFromIDs(s.dkg, chainId, ids)
+	} else {
+		call, err = loadBatchCall(txIndex, chainId)
+	}
+	if err != nil || call == nil {
+		return nil, errors.Wrap(err, "load batch call")
+	}
+
+	signer := dkg.NewDssSigner(s.dkg, 0, chain.GetCipher())
+	signer.SetSigs(dkg.SigsOfMessages(sigs))
+	if _, err := signer.Sign(call.EVM.Data); err != nil {
+		return nil, err
+	}
+
+	valid := make([][]byte, 0, len(sigs))
+	for _, sig := range sigs {
+		valid = append(valid, sig.HubSig)
+	}
+	return valid, nil
 }
 
 // SyncToHub submits the aggregated threshold signature to the main chain.

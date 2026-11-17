@@ -6,6 +6,7 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	dkgtypes "github.com/computeflux/tee-provider/pkg/dkg/types"
+	"github.com/computeflux/tee-provider/pkg/model"
 	"github.com/computeflux/tee-provider/pkg/types/chaintypes"
 	"github.com/computeflux/tee-provider/pkg/types/crypto"
 	"github.com/computeflux/tee-provider/pkg/util"
@@ -46,6 +47,16 @@ type DssSigner struct {
 // set shares for dss
 func (d *DssSigner) SetSigs(btsigs [][]byte) {
 	d.sigs = btsigs
+}
+
+// SigsOfMessages extracts the raw partial-signature bytes from received
+// messages (index-prefixed format as produced by PartialSign).
+func SigsOfMessages(sigs []*model.BlockPartialSign) [][]byte {
+	raw := make([][]byte, 0, len(sigs))
+	for _, s := range sigs {
+		raw = append(raw, s.HubSig)
+	}
+	return raw
 }
 
 // get public key for this suite

@@ -16,10 +16,12 @@ var TestChainConfig = chaintypes.ChainConfigType{
 }
 
 // Base Testnet 测试链（积分充值/提现 relay + BaseBLS 网关）。
-// 地址写死（2026-11-14 部署，见 evms hack/base/deployments.json），不接受环境变量覆盖：
+// 地址写死（2026-11-16 重新部署，见 evms hack/base/deployments.json），不接受环境变量覆盖：
 //
 //	Token（UUPS 代理）0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0（impl 0x0eBFcbDA82979f22F1AfCDaF7cbe9A3E56A8C05e）
-//	BaseBLS 0x2921A9385F94A78572A33C2590C94B93A5Ee2841（target=部署者 EOA，aggPubkey 已设）
+//	BaseBLS 0xA063B04Ff5895B36237A358a7369351cF551e156（target=Token 代理，aggPubkey 已设；链上校验 hmG1==map(keccak(data))）
+//
+// 旧 BaseBLS 0x2921... / 0x05d4... 已弃用（前者无 setTarget，后者无 data↔hmG1 校验）。
 //
 // RPC 写死；⚠️ 公共 sepolia.base.org 有速率限制，生产化前需换私有节点。
 // BaseTestChainConfig.BaseRPCUrls: multiple endpoints so dialFirst/reconnect
@@ -34,6 +36,6 @@ var BaseTestChainConfig = chaintypes.ChainConfigType{
 		"https://rpc.sepolia-base.org",
 	},
 	TokenAddress: "0xC7701fC65125C0a5cdBc760806F8fCf33D2aD2E0",
-	BLSAddress:   "0x2921A9385F94A78572A33C2590C94B93A5Ee2841",
+	BLSAddress:   "0xA063B04Ff5895B36237A358a7369351cF551e156",
 	NetworkLabel: "Base Testnet",
 }
