@@ -64,7 +64,7 @@ func (g *GatewayScheduler) Start(ctx context.Context) {
 // OnIndexRefreshed 在 indexer 完成一次全量刷新后调用，清空路由缓存。
 func (g *GatewayScheduler) OnIndexRefreshed() {
 	g.scheduler.routeCache.Clear()
-	g.log.Info("route cache cleared after index refresh")
+	g.log.Debug("route cache cleared after index refresh")
 }
 
 // Schedule 非流式入口。

@@ -79,6 +79,5 @@ func (c *ModelRouteCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entries = make(map[cacheKey]*cachedRoute)
-	c.log.Info("route cache cleared")
+	c.log.Debug("route cache cleared")
 }
-
