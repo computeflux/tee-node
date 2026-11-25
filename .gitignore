@@ -68,3 +68,4 @@ node0.log
 
 local-client
 /sdkgen
+hack/ssl/test/
